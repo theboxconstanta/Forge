@@ -18,51 +18,10 @@ const MISCARI = [
   'Murph', 'DT', 'Jackie', 'Randy', 'Nancy', 'Amanda',
 ]
 
-const WOD_ZI = {
-  id: 'wod-2026-06-23',
-  tip: 'EMOM', durata: '20 minute',
-  variante: [
-    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', descriere: 'La fiecare minut:', miscari: ['3 Goblet Squats 8kg', '3 Ring Rows', '5 Air Squats'] },
-    { nivel: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢', descriere: 'La fiecare minut:', miscari: ['5 Thrusters 20kg', '5 Ring Rows', '10 Air Squats'] },
-    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', descriere: 'La fiecare minut:', miscari: ['7 Thrusters 30kg', '7 Jumping Pull-ups', '10 Air Squats'] },
-    { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', descriere: 'La fiecare minut:', miscari: ['10 Thrusters 43kg', '10 Pull-ups', '10 Air Squats'] }
-  ]
-}
-
-const ZILE_INITIALE = [
-  { zi: 'Lun', nr: 16, clase: [
-    { id:'c1', nume:'CrossFit WOD', ora:'07:00–08:00', coach:'Andrei M.', locuri:12, ocupate:10 },
-    { id:'c2', nume:'Weightlifting', ora:'09:00–10:00', coach:'Elena P.', locuri:8, ocupate:4 },
-    { id:'c3', nume:'CrossFit WOD', ora:'18:00–19:00', coach:'Andrei M.', locuri:12, ocupate:11 },
-  ]},
-  { zi: 'Mar', nr: 17, clase: [
-    { id:'c4', nume:'CrossFit WOD', ora:'07:00–08:00', coach:'Andrei M.', locuri:12, ocupate:12 },
-    { id:'c5', nume:'Gymnastics', ora:'17:00–18:00', coach:'Mihai C.', locuri:10, ocupate:6 },
-    { id:'c6', nume:'CrossFit WOD', ora:'18:00–19:00', coach:'Elena P.', locuri:12, ocupate:8 },
-    { id:'c7', nume:'Open Gym', ora:'20:00–21:30', coach:'—', locuri:20, ocupate:3 },
-  ]},
-  { zi: 'Mie', nr: 18, clase: [
-    { id:'c8', nume:'CrossFit WOD', ora:'07:00–08:00', coach:'Elena P.', locuri:12, ocupate:9 },
-    { id:'c9', nume:'Powerlifting', ora:'10:00–11:30', coach:'Radu B.', locuri:6, ocupate:2 },
-    { id:'c10', nume:'CrossFit WOD', ora:'18:00–19:00', coach:'Mihai C.', locuri:12, ocupate:12 },
-  ]},
-  { zi: 'Joi', nr: 19, clase: [
-    { id:'c11', nume:'CrossFit WOD', ora:'07:00–08:00', coach:'Andrei M.', locuri:12, ocupate:4 },
-    { id:'c12', nume:'Weightlifting', ora:'18:00–19:00', coach:'Elena P.', locuri:8, ocupate:6 },
-  ]},
-  { zi: 'Vin', nr: 20, clase: [
-    { id:'c13', nume:'CrossFit WOD', ora:'07:00–08:00', coach:'Mihai C.', locuri:12, ocupate:8 },
-    { id:'c14', nume:'CrossFit WOD', ora:'18:00–19:00', coach:'Andrei M.', locuri:12, ocupate:10 },
-    { id:'c15', nume:'Party WOD 🎉', ora:'19:00–20:30', coach:'Toți coachii', locuri:30, ocupate:22 },
-  ]},
-]
-
 const FEED_INITIAL = [
   { id:1, nume:'Mihai D.', avatar:'MD', avatarBg:'#EEEDFE', avatarColor:'#3C3489', text:'Fran în 3:58 🔥 PR nou cu 24 secunde!', timp:'12 min', reactii:{ '🔥':8, '💪':5, '❤️':3 }, comentarii:[], variantaWod:'RX' },
   { id:2, nume:'Ioana A.', avatar:'IA', avatarBg:'#EAF3DE', avatarColor:'#27500A', text:'Back squat 75kg — prima dată! 🎉 Mulțumesc coach!', timp:'1 oră', reactii:{ '🔥':4, '💪':7, '❤️':12 }, comentarii:[{ autor:'Coach Andrei', text:'Bravo Ioana! 💪' }], variantaWod:'Beginner' },
-  { id:3, nume:'Radu B.', avatar:'RB', avatarBg:'#FAEEDA', avatarColor:'#633806', text:'EMOM 20 min — am supraviețuit 😅 Varianta Intermediate e serioasă!', timp:'2 ore', reactii:{ '🔥':6, '💪':4, '❤️':2 }, comentarii:[], variantaWod:'Intermediate' },
-  { id:4, nume:'Elena A.', avatar:'EA', avatarBg:'#E1F5EE', avatarColor:'#085041', text:'Grace în 4:12 — obiectivul e sub 4 minute până la sfârșit de lună!', timp:'3 ore', reactii:{ '🔥':5, '💪':9, '❤️':6 }, comentarii:[{ autor:'Mihai D.', text:'Hai că poți! 🚀' }], variantaWod:'RX' },
-  { id:5, nume:'Călin P.', avatar:'CP', avatarBg:'#E6F1FB', avatarColor:'#0C447C', text:'Prima dată la CrossFit azi — OnRamp completat! Mult mai greu decât mă așteptam 😤', timp:'5 ore', reactii:{ '🔥':10, '💪':8, '❤️':7 }, comentarii:[{ autor:'Coach Andrei', text:'Bine ai venit! 🎉' }, { autor:'Ioana A.', text:'Felicitări! Revii mâine? 😊' }], variantaWod:'OnRamp' },
+  { id:3, nume:'Radu B.', avatar:'RB', avatarBg:'#FAEEDA', avatarColor:'#633806', text:'EMOM 20 min — am supraviețuit 😅', timp:'2 ore', reactii:{ '🔥':6, '💪':4, '❤️':2 }, comentarii:[], variantaWod:'Intermediate' },
 ]
 
 function fmt(s) {
@@ -78,7 +37,7 @@ function formatPR(pr) {
   return '—'
 }
 
-function NavBar({ screen, setScreen }) {
+function NavBar({ screen, setScreen, isAdmin }) {
   return (
     <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
       {[
@@ -87,6 +46,7 @@ function NavBar({ screen, setScreen }) {
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
         { icon: '📅', lbl: 'Clase', sc: 'clase' },
         { icon: '👥', lbl: 'Feed', sc: 'feed' },
+        ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
         <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#3C3489' : '#aaa' }}>
           <span style={{ fontSize: '20px' }}>{n.icon}</span>
@@ -448,23 +408,276 @@ function Feed({ showToast }) {
   )
 }
 
+function Admin({ showToast, user }) {
+  const [adminTab, setAdminTab] = useState('clase')
+  const [clase, setClase] = useState([])
+  const [wods, setWods] = useState([])
+  const [membri, setMembri] = useState([])
+  const [loadingClase, setLoadingClase] = useState(true)
+  const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
+  const [dataClasa, setDataClasa] = useState('')
+  const [oraInceput, setOraInceput] = useState('07:00')
+  const [oraSfarsit, setOraSfarsit] = useState('08:00')
+  const [coachClasa, setCoachClasa] = useState('')
+  const [locuriClasa, setLocuriClasa] = useState(12)
+  const [savingClasa, setSavingClasa] = useState(false)
+  const [tipWod, setTipWod] = useState('AMRAP')
+  const [durataWod, setDurataWod] = useState('20 minute')
+  const [dataWod, setDataWod] = useState('')
+  const [savingWod, setSavingWod] = useState(false)
+  const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  const [rezervariClasa, setRezervariClasa] = useState({})
+  const [clasaDeschisa, setClasaDeschisa] = useState(null)
+
+  useEffect(() => { fetchClase(); fetchWods(); fetchMembri() }, [])
+
+  const fetchClase = async () => {
+    setLoadingClase(true)
+    const { data } = await supabase.from('classes').select('*').order('date', { ascending: true }).order('start_time', { ascending: true })
+    if (data) setClase(data)
+    setLoadingClase(false)
+  }
+
+  const fetchWods = async () => {
+    const { data } = await supabase.from('wods').select('*').order('date', { ascending: false })
+    if (data) setWods(data)
+  }
+
+  const fetchMembri = async () => {
+    const { data } = await supabase.from('personal_records').select('member_id').limit(100)
+    if (data) setMembri([...new Set(data.map(d => d.member_id))])
+  }
+
+  const fetchRezervariClasa = async (classId) => {
+    const { data } = await supabase.from('bookings').select('member_id, created_at').eq('class_id', classId)
+    if (data) setRezervariClasa(prev => ({ ...prev, [classId]: data }))
+  }
+
+  const saveClasa = async () => {
+    if (!dataClasa || !oraInceput || !oraSfarsit) { showToast('❌ Completează toate câmpurile!'); return }
+    setSavingClasa(true)
+    const { error } = await supabase.from('classes').insert({
+      name: numeClasa, date: dataClasa, start_time: oraInceput, end_time: oraSfarsit,
+      coach: coachClasa || 'Coach', max_spots: locuriClasa,
+    })
+    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    else { showToast('✓ Clasă creată!'); await fetchClase(); setDataClasa(''); setCoachClasa('') }
+    setSavingClasa(false)
+  }
+
+  const stergeClasa = async (id) => {
+    await supabase.from('classes').delete().eq('id', id)
+    showToast('✓ Clasă ștearsă!'); await fetchClase()
+  }
+
+  const saveWod = async () => {
+    if (!dataWod) { showToast('❌ Alege data WOD-ului!'); return }
+    setSavingWod(true)
+    const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+    const { error } = await supabase.from('wods').insert({
+      date: dataWod, type: tipWod, duration: durataWod,
+      movements_onramp: parseLinii(wodVariante.onramp),
+      movements_beginner: parseLinii(wodVariante.beginner),
+      movements_intermediate: parseLinii(wodVariante.intermediate),
+      movements_rx: parseLinii(wodVariante.rx),
+    })
+    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    else {
+      showToast('✓ WOD creat!'); await fetchWods()
+      setDataWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    }
+    setSavingWod(false)
+  }
+
+  const stergeWod = async (id) => {
+    await supabase.from('wods').delete().eq('id', id)
+    showToast('✓ WOD șters!'); await fetchWods()
+  }
+
+  return (
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a' }}>⚙️ Admin</h1>
+        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>COACH</span>
+      </div>
+      <div style={{ display: 'flex', background: '#e8e8e8', borderRadius: '12px', padding: '3px', marginBottom: '16px' }}>
+        {[{ id: 'clase', lbl: '📅 Clase' }, { id: 'wod', lbl: '🏋️ WOD' }, { id: 'membri', lbl: '👥 Membri' }].map(t => (
+          <div key={t.id} onClick={() => setAdminTab(t.id)}
+            style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '10px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#fff' : 'transparent', color: adminTab === t.id ? '#1a1a1a' : '#888', boxShadow: adminTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+            {t.lbl}
+          </div>
+        ))}
+      </div>
+
+      {adminTab === 'clase' && (
+        <>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>+ Clasă nouă</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip clasă</div>
+            <select value={numeClasa} onChange={e => setNumeClasa(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
+              <option>CrossFit WOD</option><option>Weightlifting</option><option>Gymnastics</option>
+              <option>Powerlifting</option><option>Open Gym</option><option>Kids CrossFit</option><option>Foundations</option>
+            </select>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data</div>
+            <input type="date" value={dataClasa} onChange={e => setDataClasa(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Ora început</div>
+                <input type="time" value={oraInceput} onChange={e => setOraInceput(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Ora sfârșit</div>
+                <input type="time" value={oraSfarsit} onChange={e => setOraSfarsit(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Coach</div>
+            <input value={coachClasa} onChange={e => setCoachClasa(e.target.value)} placeholder="ex: Andrei M." style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Locuri disponibile</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <button onClick={() => setLocuriClasa(l => Math.max(1, l - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>−</button>
+              <span style={{ fontSize: '18px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{locuriClasa}</span>
+              <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>+</button>
+            </div>
+            <button onClick={saveClasa} disabled={savingClasa} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingClasa ? 'not-allowed' : 'pointer', opacity: savingClasa ? 0.7 : 1 }}>
+              {savingClasa ? 'Se salvează...' : '+ Creează clasa'}
+            </button>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '10px' }}>Clase create ({clase.length})</div>
+          {loadingClase ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#aaa' }}>Se încarcă...</div>
+          ) : clase.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: '13px' }}>Nicio clasă creată încă</div>
+          ) : clase.map(c => (
+            <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO')} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>👤 {c.coach} · {c.max_spots} locuri</div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button onClick={() => { if (clasaDeschisa === c.id) { setClasaDeschisa(null) } else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
+                    style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '11px', cursor: 'pointer' }}>👥</button>
+                  <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                </div>
+              </div>
+              {clasaDeschisa === c.id && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0})</div>
+                  {!rezervariClasa[c.id] ? (
+                    <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
+                  ) : rezervariClasa[c.id].length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio rezervare</div>
+                  ) : rezervariClasa[c.id].map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EEEDFE', color: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '600' }}>
+                        {r.member_id?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#555' }}>{r.member_id?.slice(0, 8)}...</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+
+      {adminTab === 'wod' && (
+        <>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>+ WOD nou</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data WOD</div>
+            <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip WOD</div>
+            <select value={tipWod} onChange={e => setTipWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
+              <option>AMRAP</option><option>For Time</option><option>EMOM</option><option>Tabata</option>
+              <option>Chipper</option><option>Ladder</option><option>Partner WOD</option>
+            </select>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată</div>
+            <input value={durataWod} onChange={e => setDurataWod(e.target.value)} placeholder="ex: 20 minute" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+
+            {[
+              { key: 'onramp', label: '🔵 OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
+              { key: 'beginner', label: '🟢 Beginner', culoare: '#27500A', bg: '#EAF3DE' },
+              { key: 'intermediate', label: '🟡 Intermediate', culoare: '#633806', bg: '#FAEEDA' },
+              { key: 'rx', label: '🔴 RX', culoare: '#791F1F', bg: '#FCEBEB' },
+            ].map(v => (
+              <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px' }}>{v.label}</div>
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Exerciții (unul per linie)</div>
+                <textarea
+                  value={wodVariante[v.key]}
+                  onChange={e => setWodVariante(prev => ({ ...prev, [v.key]: e.target.value }))}
+                  placeholder={'ex:\n10 Pull-ups\n20 Push-ups\n30 Air Squats'}
+                  rows={4}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }}
+                />
+              </div>
+            ))}
+
+            <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
+              {savingWod ? 'Se salvează...' : '+ Creează WOD'}
+            </button>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '10px' }}>WOD-uri create ({wods.length})</div>
+          {wods.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: '13px' }}>Niciun WOD creat încă</div>
+          ) : wods.map(w => (
+            <div key={w.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{w.type} · {w.duration}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
+                  {w.movements_rx && w.movements_rx.length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px' }}>🔴 RX: {w.movements_rx.slice(0, 2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>
+                  )}
+                </div>
+                <button onClick={() => stergeWod(w.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {adminTab === 'membri' && (
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>Membri activi ({membri.length})</div>
+          {membri.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: '13px' }}>Niciun membru înregistrat</div>
+          ) : membri.map((id, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: i < membri.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#EEEDFE', color: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600' }}>
+                {id?.slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ fontSize: '12px', color: '#555' }}>ID: {id?.slice(0, 12)}...</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function App() {
   const [screen, setScreen] = useState('home')
   const [prevScreen, setPrevScreen] = useState('home')
   const [wodDeschis, setWodDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
+  const [wodZiData, setWodZiData] = useState(null)
   const [prSelectat, setPrSelectat] = useState(null)
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
+  const [claseDB, setClaseDB] = useState([])
   const [ziSelectata, setZiSelectata] = useState(0)
-  const [claseState, setClaseState] = useState(ZILE_INITIALE)
   const [rezervariMele, setRezervariMele] = useState([])
   const [clasaSelectata, setClasaSelectata] = useState(null)
   const [clasaTab, setClasaTab] = useState('ore')
   const [toast, setToast] = useState('')
   const [abonamentActiv, setAbonamentActiv] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [prValoare, setPrValoare] = useState('')
   const [prReps, setPrReps] = useState('')
   const [prTimp, setPrTimp] = useState('')
@@ -487,8 +700,7 @@ function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setAuthLoading(false)
+      setUser(session?.user ?? null); setAuthLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
@@ -497,33 +709,38 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      fetchPRuri()
-      fetchWodLogs()
-      fetchRezervari()
-    }
+    if (user) { fetchPRuri(); fetchWodLogs(); fetchRezervari(); fetchClaseDB(); fetchWodZi(); checkAdmin() }
   }, [user])
 
+  const checkAdmin = async () => {
+    const { data } = await supabase.from('admins').select('id').eq('id', user.id)
+    setIsAdmin(data && data.length > 0)
+  }
+
   const fetchPRuri = async () => {
-    const { data, error } = await supabase.from('personal_records').select('*').eq('member_id', user.id).order('recorded_at', { ascending: false })
-    if (!error && data) setPrDate(data)
+    const { data } = await supabase.from('personal_records').select('*').eq('member_id', user.id).order('recorded_at', { ascending: false })
+    if (data) setPrDate(data)
   }
 
   const fetchWodLogs = async () => {
-    const { data, error } = await supabase.from('wod_logs').select('*').eq('member_id', user.id).order('logged_at', { ascending: false })
-    if (!error && data) setWodLogs(data)
+    const { data } = await supabase.from('wod_logs').select('*').eq('member_id', user.id).order('logged_at', { ascending: false })
+    if (data) setWodLogs(data)
+  }
+
+  const fetchClaseDB = async () => {
+    const { data } = await supabase.from('classes').select('*').order('date', { ascending: true }).order('start_time', { ascending: true })
+    if (data) setClaseDB(data)
   }
 
   const fetchRezervari = async () => {
-    const { data, error } = await supabase.from('bookings').select('*').eq('member_id', user.id)
-    if (!error && data) {
-      const ids = data.map(b => b.class_id)
-      setRezervariMele(ids)
-      setClaseState(prev => prev.map(zi => ({
-        ...zi,
-        clase: zi.clase.map(c => ({ ...c, rezervat: ids.includes(c.id) }))
-      })))
-    }
+    const { data } = await supabase.from('bookings').select('class_id').eq('member_id', user.id)
+    if (data) setRezervariMele(data.map(b => b.class_id))
+  }
+
+  const fetchWodZi = async () => {
+    const azi = new Date().toISOString().split('T')[0]
+    const { data } = await supabase.from('wods').select('*').eq('date', azi).single()
+    if (data) setWodZiData(data)
   }
 
   const handleLogin = async () => {
@@ -546,23 +763,16 @@ function App() {
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
   const saveWodLog = async () => {
-    if (!variantaAleasa === null) return
     setWodSaving(true)
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id,
-      wod_id: null,
-      variant_level: WOD_ZI.variante[variantaAleasa]?.nivel || null,
-      result: wodResult || null,
-      time_result: wodTime || null,
-      notes: wodNote || null,
+      member_id: user.id, wod_id: null,
+      variant_level: variantaAleasa !== null ? ['OnRamp','Beginner','Intermediate','RX'][variantaAleasa] : null,
+      result: wodResult || null, time_result: wodTime || null, notes: wodNote || null,
     })
-    if (error) { showToast('❌ Eroare la salvare!'); console.error(error) }
+    if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
-      showToast('WOD salvat! 🎉')
-      await fetchWodLogs()
-      setScreen('home')
-      setWodDeschis(false)
-      setVariantaAleasa(null)
+      showToast('WOD salvat! 🎉'); await fetchWodLogs()
+      setScreen('home'); setWodDeschis(false); setVariantaAleasa(null)
       setWodResult(''); setWodTime(''); setWodNote('')
     }
     setWodSaving(false)
@@ -582,45 +792,44 @@ function App() {
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
     else { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'kg' }
     const { error } = await supabase.from('personal_records').insert(insertData)
-    if (error) { showToast('❌ Eroare la salvare!'); console.error(error) }
-    else {
-      showToast('PR salvat! 🏆')
-      await fetchPRuri()
-      setScreen('pr')
-      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
-    }
+    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    else { showToast('PR salvat! 🏆'); await fetchPRuri(); setScreen('pr'); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX') }
     setPrSaving(false)
   }
 
-  const toggleRezervare = async (ziIdx, clasaId) => {
-    const clasa = claseState[ziIdx].clase.find(c => c.id === clasaId)
+  const toggleRezervare = async (clasaId) => {
+    const clasa = claseDB.find(c => c.id === clasaId)
     const esteRezervat = rezervariMele.includes(clasaId)
-
-    if (!esteRezervat && clasa.ocupate >= clasa.locuri) { showToast('❌ Clasa e completă!'); return }
-
+    if (!esteRezervat && clasa && clasa.max_spots <= 0) { showToast('❌ Clasa e completă!'); return }
     if (esteRezervat) {
-      const { error } = await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
-      if (error) { showToast('❌ Eroare!'); return }
+      await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
-      setClaseState(prev => prev.map((zi, i) => i !== ziIdx ? zi : {
-        ...zi, clase: zi.clase.map(c => c.id !== clasaId ? c : { ...c, rezervat: false, ocupate: c.ocupate - 1 })
-      }))
       showToast('✓ Rezervare anulată')
     } else {
-      const { error } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
-      if (error) { showToast('❌ Eroare!'); return }
+      await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
       setRezervariMele(prev => [...prev, clasaId])
-      setClaseState(prev => prev.map((zi, i) => i !== ziIdx ? zi : {
-        ...zi, clase: zi.clase.map(c => c.id !== clasaId ? c : { ...c, rezervat: true, ocupate: c.ocupate + 1 })
-      }))
       showToast('✓ Loc rezervat! Te așteptăm!')
     }
     setClasaSelectata(null)
+    await fetchClaseDB()
   }
 
-  const rezervarileMeleAfisate = claseState.flatMap((zi, ziIdx) =>
-    zi.clase.filter(c => rezervariMele.includes(c.id)).map(c => ({ ...c, zi: zi.zi, nr: zi.nr, ziIdx }))
-  )
+  const zileUnice = [...new Set(claseDB.map(c => c.date))].sort()
+  const claseGroupate = zileUnice.map(date => ({
+    date,
+    zi: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short' }),
+    nr: new Date(date + 'T00:00:00').getDate(),
+    clase: claseDB.filter(c => c.date === date)
+  }))
+
+  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id))
+
+  const VARIANTE_CONFIG = [
+    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
+    { nivel: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢', key: 'movements_beginner' },
+    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', key: 'movements_intermediate' },
+    { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', key: 'movements_rx' },
+  ]
 
   if (authLoading) return (
     <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
@@ -680,7 +889,7 @@ function App() {
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>Abonamentul a expirat</div>
-            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>Nu mai ai acces la funcțiile aplicației. Reînnoiește abonamentul pentru a continua.</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>Nu mai ai acces la funcțiile aplicației.</div>
             <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               Vezi abonamentul →
             </button>
@@ -688,7 +897,6 @@ function App() {
         </div>
       )}
 
-      {/* ══ HOME ══ */}
       {screen === 'home' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -715,38 +923,47 @@ function App() {
             <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <div>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>WOD-ul zilei</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>{WOD_ZI.tip} · {WOD_ZI.durata}</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
+                  {wodZiData ? `${wodZiData.type} · ${wodZiData.duration}` : 'Niciun WOD programat azi'}
+                </div>
               </div>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#3C3489' : '#EEEDFE', color: wodDeschis ? '#fff' : '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                 {wodDeschis ? '−' : '+'}
               </div>
             </div>
-            {wodDeschis && (
+            {wodDeschis && wodZiData && (
               <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                {WOD_ZI.variante.map((v, i) => (
-                  <div key={i} onClick={() => setVariantaAleasa(variantaAleasa === i ? null : i)}
-                    style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i ? '10px' : '0' }}>
-                      <span>{v.emoji}</span>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                      {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
-                    </div>
-                    {variantaAleasa === i && (
-                      <div>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{v.descriere}</div>
-                        {v.miscari.map((m, j) => (
-                          <div key={j} style={{ padding: '5px 0', borderBottom: j < v.miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-                            <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
-                          </div>
-                        ))}
+                {VARIANTE_CONFIG.map((v, i) => {
+                  const miscari = wodZiData[v.key] || []
+                  return (
+                    <div key={i} onClick={() => setVariantaAleasa(variantaAleasa === i ? null : i)}
+                      style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
+                        <span>{v.emoji}</span>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
+                        {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {variantaAleasa === i && miscari.length > 0 && (
+                        <div>
+                          {miscari.map((m, j) => (
+                            <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                              <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
                 <button onClick={() => setScreen('log')} disabled={variantaAleasa === null}
                   style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#3C3489' : '#ccc', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
-                  {variantaAleasa !== null ? `Loghează — ${WOD_ZI.variante[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
+                  {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
                 </button>
+              </div>
+            )}
+            {wodDeschis && !wodZiData && (
+              <div style={{ marginTop: '12px', borderTop: '1px solid #f0f0f0', paddingTop: '12px', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
+                {isAdmin ? '⚙️ Mergi la Admin → WOD pentru a crea WOD-ul de azi' : 'Coachul nu a programat WOD-ul de azi încă'}
               </div>
             )}
           </div>
@@ -756,8 +973,8 @@ function App() {
               <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: '13px' }}>Nicio activitate încă</div>
             ) : [...wodLogs.slice(0, 2).map(w => ({ nume: `WOD ${w.variant_level || ''}`, val: w.result || w.time_result || '—', pr: false })),
                ...prDate.slice(0, 1).map(p => ({ nume: p.movement, val: formatPR(p), pr: true }))
-              ].slice(0, 3).map((a, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < 2 ? '1px solid #f0f0f0' : 'none' }}>
+              ].slice(0, 3).map((a, i, arr) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                 <span style={{ fontSize: '13px', color: '#1a1a1a' }}>{a.nume}</span>
                 <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: '500', background: a.pr ? '#EAF3DE' : '#f5f5f5', color: a.pr ? '#27500A' : '#666' }}>
                   {a.pr ? '🏆 ' : ''}{a.val}
@@ -771,7 +988,6 @@ function App() {
         </div>
       )}
 
-      {/* ══ ABONAMENT ══ */}
       {screen === 'abonament' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -779,10 +995,9 @@ function App() {
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Abonamentul meu</h1>
           </div>
           {!abonamentActiv ? (
-            <div style={{ background: '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', border: '1px solid #F7C1C1', textAlign: 'center' }}>
+            <div style={{ background: '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔒</div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>Abonament expirat</div>
-              <div style={{ fontSize: '12px', color: '#A32D2D', lineHeight: '1.6' }}>Reînnoiește acum pentru a recăpăta accesul.</div>
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #3C3489' }}>
@@ -801,17 +1016,16 @@ function App() {
                 <span style={{ fontSize: '12px', color: '#888' }}>⏳ Timp rămas</span>
                 <span style={{ fontSize: '12px', fontWeight: '600', color: '#BA7517' }}>7 zile</span>
               </div>
-              <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '6px', marginBottom: '4px' }}>
+              <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '6px' }}>
                 <div style={{ width: '77%', height: '6px', borderRadius: '4px', background: '#534AB7' }} />
               </div>
-              <div style={{ fontSize: '10px', color: '#aaa', textAlign: 'right' }}>23 din 30 zile folosite</div>
             </div>
           )}
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>🎟️ Ședințe</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <span style={{ fontSize: '12px', color: '#888' }}>Folosite</span>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a' }}>{wodLogs.length} din 8</span>
+              <span style={{ fontSize: '12px', fontWeight: '600' }}>{wodLogs.length} din 8</span>
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '6px', marginBottom: '8px' }}>
               <div style={{ width: Math.min(100, (wodLogs.length / 8) * 100) + '%', height: '6px', borderRadius: '4px', background: '#EF9F27' }} />
@@ -827,12 +1041,11 @@ function App() {
           </button>
           <button onClick={() => setAbonamentActiv(!abonamentActiv)}
             style={{ width: '100%', marginTop: '8px', padding: '10px', background: 'transparent', color: '#888', border: '1px dashed #ccc', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>
-            🧪 [Test] Simulează: {abonamentActiv ? 'Expirare' : 'Activare'} abonament
+            🧪 [Test] {abonamentActiv ? 'Simulează expirare' : 'Simulează activare'}
           </button>
         </div>
       )}
 
-      {/* ══ LOG WOD ══ */}
       {screen === 'log' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -840,10 +1053,11 @@ function App() {
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Log WOD</h1>
           </div>
           {variantaAleasa !== null && (
-            <div style={{ background: WOD_ZI.variante[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
+            <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: WOD_ZI.variante[variantaAleasa].culoare }}>
-                {WOD_ZI.variante[variantaAleasa].emoji} {WOD_ZI.variante[variantaAleasa].nivel} — {WOD_ZI.tip} {WOD_ZI.durata}
+              <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare }}>
+                {VARIANTE_CONFIG[variantaAleasa].emoji} {VARIANTE_CONFIG[variantaAleasa].nivel}
+                {wodZiData ? ` — ${wodZiData.type} ${wodZiData.duration}` : ''}
               </div>
             </div>
           )}
@@ -868,7 +1082,6 @@ function App() {
         </div>
       )}
 
-      {/* ══ LOG PR ══ */}
       {screen === 'logPR' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -925,15 +1138,13 @@ function App() {
         </div>
       )}
 
-      {/* ══ PR-URI ══ */}
       {screen === 'pr' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '16px' }}>Recorduri personale 🏆</h1>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '8px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             {prDate.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏆</div>
-                Niciun PR salvat încă
+                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏆</div>Niciun PR salvat încă
               </div>
             ) : prDate.map((pr, i) => (
               <div key={i} onClick={() => setPrSelectat(prSelectat === i ? null : i)}
@@ -963,7 +1174,6 @@ function App() {
         </div>
       )}
 
-      {/* ══ CLASE ══ */}
       {screen === 'clase' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Rezervă o clasă</h1>
@@ -977,55 +1187,55 @@ function App() {
           </div>
           {clasaTab === 'ore' && (
             <>
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
-                {claseState.map((z, i) => {
-                  const areRez = z.clase.some(c => rezervariMele.includes(c.id))
-                  return (
-                    <div key={i} onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 12px', borderRadius: '12px', border: ziSelectata === i ? '2px solid #3C3489' : '1px solid #e0e0e0', background: ziSelectata === i ? '#3C3489' : '#fff', cursor: 'pointer', minWidth: '52px', flexShrink: 0 }}>
-                      <span style={{ fontSize: '10px', color: ziSelectata === i ? '#C5C2F5' : '#888' }}>{z.zi}</span>
-                      <span style={{ fontSize: '16px', fontWeight: '600', color: ziSelectata === i ? '#fff' : '#1a1a1a' }}>{z.nr}</span>
-                      {areRez && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: ziSelectata === i ? '#C5C2F5' : '#3C3489', marginTop: '2px' }} />}
-                    </div>
-                  )
-                })}
-              </div>
-              {claseState[ziSelectata].clase.map((c) => {
-                const liber = c.locuri - c.ocupate
-                const pct = Math.round((c.ocupate / c.locuri) * 100)
-                const esteRezervat = rezervariMele.includes(c.id)
-                const plin = liber <= 0 && !esteRezervat
-                const barColor = plin ? '#E24B4A' : pct > 75 ? '#BA7517' : '#27500A'
-                const isOpen = clasaSelectata === c.id
-                return (
-                  <div key={c.id} onClick={() => setClasaSelectata(isOpen ? null : c.id)}
-                    style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : '4px solid transparent' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.nume}</div>
-                        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>🕐 {c.ora} · 👤 {c.coach}</div>
-                      </div>
-                      <div>
-                        {esteRezervat ? <span style={{ background: '#EEEDFE', color: '#3C3489', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Rezervat</span>
-                          : plin ? <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '11px', padding: '3px 8px', borderRadius: '20px' }}>Complet</span>
-                          : <span style={{ fontSize: '12px', color: '#555' }}>{liber} locuri</span>}
-                      </div>
-                    </div>
-                    <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '4px', margin: '10px 0 4px' }}>
-                      <div style={{ width: Math.min(100, pct) + '%', height: '4px', borderRadius: '4px', background: barColor, transition: 'width 0.3s' }} />
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#aaa' }}>{c.ocupate}/{c.locuri} locuri ocupate</div>
-                    {isOpen && (
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                        <button onClick={(e) => { e.stopPropagation(); toggleRezervare(ziSelectata, c.id) }} disabled={plin}
-                          style={{ width: '100%', padding: '10px', background: esteRezervat ? 'transparent' : plin ? '#ccc' : '#3C3489', color: esteRezervat ? '#A32D2D' : '#fff', border: esteRezervat ? '1px solid #F7C1C1' : 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: plin ? 'not-allowed' : 'pointer' }}>
-                          {esteRezervat ? 'Anulează rezervarea' : plin ? 'Clasă completă' : 'Rezervă locul'}
-                        </button>
-                      </div>
-                    )}
+              {claseGroupate.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '10px' }}>📅</div>
+                  {isAdmin ? 'Creează clase din panoul Admin ⚙️' : 'Nicio clasă programată momentan'}
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
+                    {claseGroupate.map((z, i) => {
+                      const areRez = z.clase.some(c => rezervariMele.includes(c.id))
+                      return (
+                        <div key={i} onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 12px', borderRadius: '12px', border: ziSelectata === i ? '2px solid #3C3489' : '1px solid #e0e0e0', background: ziSelectata === i ? '#3C3489' : '#fff', cursor: 'pointer', minWidth: '52px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '10px', color: ziSelectata === i ? '#C5C2F5' : '#888' }}>{z.zi}</span>
+                          <span style={{ fontSize: '16px', fontWeight: '600', color: ziSelectata === i ? '#fff' : '#1a1a1a' }}>{z.nr}</span>
+                          {areRez && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: ziSelectata === i ? '#C5C2F5' : '#3C3489', marginTop: '2px' }} />}
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
+                  {claseGroupate[ziSelectata]?.clase.map((c) => {
+                    const esteRezervat = rezervariMele.includes(c.id)
+                    const isOpen = clasaSelectata === c.id
+                    return (
+                      <div key={c.id} onClick={() => setClasaSelectata(isOpen ? null : c.id)}
+                        style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : '4px solid transparent' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
+                            <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach}</div>
+                          </div>
+                          {esteRezervat
+                            ? <span style={{ background: '#EEEDFE', color: '#3C3489', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Rezervat</span>
+                            : <span style={{ fontSize: '12px', color: '#555' }}>{c.max_spots} locuri</span>
+                          }
+                        </div>
+                        {isOpen && (
+                          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                            <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }}
+                              style={{ width: '100%', padding: '10px', background: esteRezervat ? 'transparent' : '#3C3489', color: esteRezervat ? '#A32D2D' : '#fff', border: esteRezervat ? '1px solid #F7C1C1' : 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                              {esteRezervat ? 'Anulează rezervarea' : 'Rezervă locul'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </>
+              )}
             </>
           )}
           {clasaTab === 'mele' && (
@@ -1039,13 +1249,13 @@ function App() {
                 <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.nume}</div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {c.zi} {c.nr} iun · 🕐 {c.ora}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO')} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
                       <div style={{ fontSize: '12px', color: '#888' }}>👤 {c.coach}</div>
                     </div>
                     <span style={{ background: '#EAF3DE', color: '#27500A', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Confirmat</span>
                   </div>
-                  <button onClick={() => toggleRezervare(c.ziIdx, c.id)}
+                  <button onClick={() => toggleRezervare(c.id)}
                     style={{ width: '100%', marginTop: '10px', padding: '8px', background: 'transparent', color: '#A32D2D', border: '1px solid #F7C1C1', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
                     Anulează rezervarea
                   </button>
@@ -1058,6 +1268,7 @@ function App() {
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} />}
       {screen === 'feed' && <Feed showToast={showToast} />}
+      {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: '500', zIndex: 300, whiteSpace: 'nowrap' }}>
@@ -1065,7 +1276,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} />
+      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} />
     </div>
   )
 }
