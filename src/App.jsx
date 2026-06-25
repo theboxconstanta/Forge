@@ -1070,6 +1070,7 @@ function App() {
   const [wodDurata, setWodDurata] = useState('')
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
+  const [logTab, setLogTab] = useState('nou')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
@@ -1546,20 +1547,71 @@ function App() {
 
       {screen === 'log' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '4px' }}>Classic Logging</h1>
-          <p style={{ fontSize: '13px', color: '#888', marginBottom: '22px' }}>Câte mișcări are antrenamentul tău?</p>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
-            <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
-              style={{ flex: 1, background: '#EEEDFE', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <span style={{ fontSize: '32px' }}>🏋️</span>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', textAlign: 'center' }}>Mișcare Unică</span>
-            </div>
-            <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
-              style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <span style={{ fontSize: '32px' }}>⚙️</span>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
-            </div>
+          <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
+          <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
+            {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
+              <div key={t.id} onClick={() => setLogTab(t.id)}
+                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#3C3489' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                {t.lbl}
+              </div>
+            ))}
           </div>
+
+          {logTab === 'nou' && (
+            <>
+              <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
+                  style={{ flex: 1, background: '#EEEDFE', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <span style={{ fontSize: '32px' }}>🏋️</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', textAlign: 'center' }}>Mișcare Unică</span>
+                </div>
+                <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
+                  style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <span style={{ fontSize: '32px' }}>⚙️</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {logTab === 'jurnal' && (
+            <>
+              {wodLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
+                  <div style={{ fontSize: '14px' }}>Niciun antrenament logat încă</div>
+                </div>
+              ) : wodLogs.map((w, i) => {
+                const parts = (w.notes || '').split('\n---\n')
+                const miscariLog = parts[0] && !parts[1] && !w.notes?.includes('\n---\n') ? null : parts[0]
+                const noteLog = parts[1] || (parts.length === 1 && w.notes && !w.notes.includes('---') ? w.notes : null)
+                const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+                return (
+                  <div key={i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489' }}>{w.variant_level || 'WOD'}</div>
+                      <div style={{ fontSize: '11px', color: '#aaa' }}>{data}</div>
+                    </div>
+                    {miscariLog && miscariLog.trim() && (
+                      <div style={{ marginBottom: '6px' }}>
+                        {miscariLog.trim().split('\n').map((m, j) => (
+                          <div key={j} style={{ fontSize: '12px', color: '#555' }}>• {m}</div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {w.result && <span style={{ fontSize: '12px', background: '#EEEDFE', color: '#3C3489', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
+                      {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
+                    </div>
+                    {noteLog && noteLog.trim() && (
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '6px', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
 
