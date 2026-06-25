@@ -463,6 +463,7 @@ function Admin({ showToast, user }) {
   const [rezervariClasa, setRezervariClasa] = useState({})
   const [clasaDeschisa, setClasaDeschisa] = useState(null)
   const [clientSelectat, setClientSelectat] = useState(null)
+  const [sortClienti, setSortClienti] = useState('toti')
 
   useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente() }, [])
 
@@ -583,11 +584,18 @@ function Admin({ showToast, user }) {
     showToast('✓ Abonament șters!'); await fetchAbonamente()
   }
 
-  const clientiFiltrati = clienti.filter(c =>
-    !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())
-  )
-
   const getAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.is_active)
+
+  const esteClientActiv = (email) => {
+    const abo = getAbonamentClient(email)
+    return abo && new Date(abo.end_date) >= new Date()
+  }
+  const clientiFiltrati = clienti
+    .filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))
+    .filter(c => {
+      if (sortClienti === 'toti') return true
+      return sortClienti === 'activi' ? esteClientActiv(c.email) : !esteClientActiv(c.email)
+    })
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -608,12 +616,27 @@ function Admin({ showToast, user }) {
       {/* CLIENTI */}
       {adminTab === 'clienti' && (
         <>
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '16px' }}>🔍</span>
             <input value={searchClienti} onChange={e => setSearchClienti(e.target.value)} placeholder="Caută după nume sau email..."
               style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>CLIENȚI ({clientiFiltrati.length})</div>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+            {[
+              { id: 'toti', lbl: 'Toți', count: clienti.filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())).length },
+              { id: 'activi', lbl: '✓ Activi', count: clienti.filter(c => esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
+              { id: 'inactivi', lbl: '⚠️ Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
+            ].map(s => (
+              <div key={s.id} onClick={() => setSortClienti(s.id)}
+                style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#3C3489' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                {s.lbl}
+                <span style={{ background: sortClienti === s.id ? 'rgba(255,255,255,0.25)' : '#f0f0f0', color: sortClienti === s.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{s.count}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+            {sortClienti === 'toti' ? 'TOȚI CLIENȚII' : sortClienti === 'activi' ? 'ACTIVI' : 'INACTIVI'} ({clientiFiltrati.length})
+          </div>
           {clientiFiltrati.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>👥</div>
@@ -902,6 +925,7 @@ function App() {
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [abonamentReal, setAbonamentReal] = useState(null)
+  const [abonamentLoading, setAbonamentLoading] = useState(true)
   const [prValoare, setPrValoare] = useState('')
   const [prReps, setPrReps] = useState('')
   const [prTimp, setPrTimp] = useState('')
@@ -959,6 +983,7 @@ function App() {
   }
 
   const fetchAbonamentMeu = async () => {
+    setAbonamentLoading(true)
     const { data } = await supabase.from('subscriptions')
       .select('*, subscription_plans(name, sessions)')
       .eq('member_email', user.email.toLowerCase())
@@ -967,6 +992,7 @@ function App() {
       .limit(1)
     if (data && data.length > 0) setAbonamentReal(data[0])
     else setAbonamentReal(null)
+    setAbonamentLoading(false)
   }
 
   const fetchPRuri = async () => {
@@ -1080,7 +1106,7 @@ function App() {
     { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', key: 'movements_rx' },
   ]
 
-  const abonamentActiv = abonamentReal ? new Date(abonamentReal.end_date) >= new Date() : true
+  const abonamentActiv = abonamentReal !== null && new Date(abonamentReal.end_date) >= new Date()
   const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   if (authLoading) return (
@@ -1136,14 +1162,23 @@ function App() {
   return (
     <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative' }}>
 
-      {!abonamentActiv && abonamentReal !== null && screen !== 'abonament' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px' }}>
+      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>Abonamentul a expirat</div>
-            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>Contactează coachul pentru reînnoire.</div>
-            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
+              {abonamentReal ? 'Abonamentul a expirat' : 'Niciun abonament activ'}
+            </div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>
+              {abonamentReal
+                ? 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'
+                : 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'}
+            </div>
+            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
               Vezi abonamentul →
+            </button>
+            <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
+              Deconectează-te
             </button>
           </div>
         </div>
