@@ -548,7 +548,6 @@ function Admin({ showToast, user }) {
     const endDate = new Date(dataStartAbonament)
     endDate.setDate(endDate.getDate() + 30)
     const { error } = await supabase.from('subscriptions').insert({
-      member_id: user.id,
       member_email: emailAbonament.toLowerCase().trim(),
       plan_id: planSelectat,
       sessions_total: plan?.sessions || null,
