@@ -558,7 +558,7 @@ function Admin({ showToast, user }) {
       is_active: true,
       notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
     })
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
     else { showToast('✓ Abonament adăugat!'); await fetchAbonamente(); setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('') }
     setSavingAbonament(false)
   }
