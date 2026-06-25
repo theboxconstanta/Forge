@@ -1643,6 +1643,7 @@ function App() {
           </div>
           {clasaTab === 'ore' && (
             <>
+                  <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '4px' }}>debug: {zileCalendar.length} zile / {claseGroupate.length} chips</div>
                   <div ref={chipsScrollRef} style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
                     {claseGroupate.map((z, i) => {
                       const areRez = z.clase.some(c => rezervariMele.includes(c.id))
