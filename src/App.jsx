@@ -1339,7 +1339,7 @@ function App() {
   return (
     <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative' }}>
 
-      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && (
+      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && screen !== 'clase' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
@@ -1632,9 +1632,6 @@ function App() {
 
       {screen === 'clase' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
-          <div style={{ background: '#ffeb3b', padding: '8px 12px', borderRadius: '8px', marginBottom: '10px', fontSize: '14px', fontWeight: '700' }}>
-            DEBUG: {zileCalendar.length} zile în calendar / {claseGroupate.length} chips
-          </div>
           <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Rezervă o clasă</h1>
           <div style={{ display: 'flex', background: '#e8e8e8', borderRadius: '12px', padding: '3px', marginBottom: '14px' }}>
             {[{ id: 'ore', lbl: 'Ore disponibile' }, { id: 'mele', lbl: 'Rezervările mele' }].map(t => (
