@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 
 const MISCARI = [
@@ -1033,6 +1033,7 @@ function App() {
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
+  const [zileCalendar, setZileCalendar] = useState([])
   const [ziSelectata, setZiSelectata] = useState(0)
   const aziChipRef = useRef(null)
   const chipsScrollRef = useRef(null)
@@ -1090,10 +1091,9 @@ function App() {
   useEffect(() => {
     const azi = new Date()
     const az = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
-    const zile = [...new Set([az, ...claseDB.map(c => c.date)])].sort()
-    const idx = zile.indexOf(az)
+    const idx = zileCalendar.indexOf(az)
     if (idx >= 0) setZiSelectata(idx)
-    if (!scrolledOnce.current) {
+    if (!scrolledOnce.current && zileCalendar.length > 0) {
       scrolledOnce.current = true
       setTimeout(() => {
         const container = chipsScrollRef.current
@@ -1103,7 +1103,7 @@ function App() {
         }
       }, 150)
     }
-  }, [claseDB])
+  }, [zileCalendar])
 
   const saveProfile = async () => {
     await supabase.from('profiles').upsert({
@@ -1148,7 +1148,16 @@ function App() {
     const { data } = await supabase.from('classes').select('*')
       .gte('date', de30Str)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
-    if (data) setClaseDB(data)
+    const dbData = data || []
+    setClaseDB(dbData)
+    const azi = new Date()
+    const dates = new Set(dbData.map(c => c.date))
+    for (let i = 0; i <= 90; i++) {
+      const d = new Date(azi)
+      d.setDate(d.getDate() + i)
+      dates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+    }
+    setZileCalendar([...dates].sort())
   }
 
   const fetchRezervari = async () => {
@@ -1248,24 +1257,13 @@ function App() {
   const _azi = new Date()
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
 
-  const zileUnice = useMemo(() => {
-    const azi = new Date()
-    const dates = new Set(claseDB.map(c => c.date))
-    for (let i = 0; i <= 90; i++) {
-      const d = new Date(azi)
-      d.setDate(d.getDate() + i)
-      dates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
-    }
-    return [...dates].sort()
-  }, [claseDB])
-
-  const claseGroupate = useMemo(() => zileUnice.map(date => ({
+  const claseGroupate = zileCalendar.map(date => ({
     date,
     zi: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short' }),
     nr: new Date(date + 'T00:00:00').getDate(),
     luna: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { month: 'short' }),
     clase: claseDB.filter(c => c.date === date)
-  })), [zileUnice, claseDB])
+  }))
 
   const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id))
 
