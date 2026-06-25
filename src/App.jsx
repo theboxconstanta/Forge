@@ -881,7 +881,7 @@ function Admin({ showToast, user }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO')} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
                   <div style={{ fontSize: '12px', color: '#888' }}>👤 {c.coach} · {c.max_spots} locuri</div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -1096,7 +1096,11 @@ function App() {
   }
 
   const fetchClaseDB = async () => {
-    const { data } = await supabase.from('classes').select('*').order('date', { ascending: true }).order('start_time', { ascending: true })
+    const azi = new Date()
+    const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const { data } = await supabase.from('classes').select('*')
+      .gte('date', aziStr)
+      .order('date', { ascending: true }).order('start_time', { ascending: true })
     if (data) setClaseDB(data)
   }
 
