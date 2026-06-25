@@ -1009,6 +1009,9 @@ function App() {
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
   const [ziSelectata, setZiSelectata] = useState(0)
+  const aziChipRef = useRef(null)
+  const chipsScrollRef = useRef(null)
+  const scrolledOnce = useRef(false)
   const [rezervariMele, setRezervariMele] = useState([])
   const [clasaSelectata, setClasaSelectata] = useState(null)
   const [clasaTab, setClasaTab] = useState('ore')
@@ -1059,6 +1062,24 @@ function App() {
     }
   }, [user])
 
+  useEffect(() => {
+    const azi = new Date()
+    const az = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const zile = [...new Set([az, ...claseDB.map(c => c.date)])].sort()
+    const idx = zile.indexOf(az)
+    if (idx >= 0) setZiSelectata(idx)
+    if (!scrolledOnce.current) {
+      scrolledOnce.current = true
+      setTimeout(() => {
+        const container = chipsScrollRef.current
+        const chip = aziChipRef.current
+        if (container && chip) {
+          container.scrollLeft = Math.max(0, chip.offsetLeft - 12)
+        }
+      }, 150)
+    }
+  }, [claseDB])
+
   const saveProfile = async () => {
     await supabase.from('profiles').upsert({
       id: user.id,
@@ -1096,10 +1117,11 @@ function App() {
   }
 
   const fetchClaseDB = async () => {
-    const azi = new Date()
-    const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const acum30 = new Date()
+    acum30.setDate(acum30.getDate() - 30)
+    const de30Str = `${acum30.getFullYear()}-${String(acum30.getMonth()+1).padStart(2,'0')}-${String(acum30.getDate()).padStart(2,'0')}`
     const { data } = await supabase.from('classes').select('*')
-      .gte('date', aziStr)
+      .gte('date', de30Str)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
     if (data) setClaseDB(data)
   }
@@ -1198,11 +1220,14 @@ function App() {
     await fetchAbonamentMeu()
   }
 
-  const zileUnice = [...new Set(claseDB.map(c => c.date))].sort()
+  const _azi = new Date()
+  const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
+  const zileUnice = [...new Set([aziStr, ...claseDB.map(c => c.date)])].sort()
   const claseGroupate = zileUnice.map(date => ({
     date,
     zi: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short' }),
     nr: new Date(date + 'T00:00:00').getDate(),
+    luna: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { month: 'short' }),
     clase: claseDB.filter(c => c.date === date)
   }))
   const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id))
@@ -1574,23 +1599,28 @@ function App() {
           </div>
           {clasaTab === 'ore' && (
             <>
-              {claseGroupate.length === 0 ? (
+              {claseDB.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '10px' }}>📅</div>
                   {isAdmin ? 'Creează clase din panoul Admin ⚙️' : 'Nicio clasă programată momentan'}
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
+                  <div ref={chipsScrollRef} style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
                     {claseGroupate.map((z, i) => {
                       const areRez = z.clase.some(c => rezervariMele.includes(c.id))
                       const selectat = ziSelectata === i
+                      const esteAzi = z.date === aziStr
                       return (
-                        <div key={i} onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 12px', borderRadius: '12px', border: selectat ? '2px solid #3C3489' : areRez ? '2px solid #3C3489' : '1px solid #e0e0e0', background: selectat ? '#3C3489' : areRez ? '#EEEDFE' : '#fff', cursor: 'pointer', minWidth: '52px', flexShrink: 0 }}>
-                          <span style={{ fontSize: '10px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : '#888' }}>{z.zi}</span>
-                          <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#3C3489' : '#1a1a1a' }}>{z.nr}</span>
-                          {areRez && <div style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : '#3C3489', fontWeight: '700', marginTop: '1px' }}>✓</div>}
+                        <div key={i} ref={esteAzi ? aziChipRef : null}
+                          onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 10px', borderRadius: '12px', border: selectat ? '2px solid #3C3489' : areRez ? '2px solid #3C3489' : '1px solid #e0e0e0', background: selectat ? '#3C3489' : areRez ? '#EEEDFE' : '#fff', cursor: 'pointer', minWidth: '48px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '10px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#888', fontWeight: esteAzi ? '700' : '400' }}>{z.zi}</span>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: esteAzi && !selectat ? '2px solid #3C3489' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#1a1a1a' }}>{z.nr}</span>
+                          </div>
+                          <span style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#aaa', marginTop: '1px' }}>{z.luna}</span>
+                          {areRez && <div style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : '#3C3489', fontWeight: '700' }}>✓</div>}
                         </div>
                       )
                     })}
