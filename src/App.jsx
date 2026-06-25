@@ -1116,7 +1116,7 @@ function App() {
   }, [zileCalendar])
 
   useEffect(() => {
-    if (!user || isAdmin || zileCalendar.length === 0) return
+    if (!user || zileCalendar.length === 0) return
     const date = zileCalendar[ziSelectata]
     if (!date) return
     const ids = claseDB.filter(c => c.date === date).map(c => c.id)
@@ -1754,10 +1754,12 @@ function App() {
                                 ))}
                               </div>
                             )}
-                            <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
-                              style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
-                              {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
-                            </button>
+                            {!isAdmin && (
+                              <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
+                                style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
+                                {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
