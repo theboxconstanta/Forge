@@ -1033,7 +1033,16 @@ function App() {
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
-  const [zileCalendar, setZileCalendar] = useState([])
+  const [zileCalendar, setZileCalendar] = useState(() => {
+    const azi = new Date()
+    const dates = []
+    for (let i = 0; i <= 90; i++) {
+      const d = new Date(azi)
+      d.setDate(d.getDate() + i)
+      dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+    }
+    return dates
+  })
   const [ziSelectata, setZiSelectata] = useState(0)
   const aziChipRef = useRef(null)
   const chipsScrollRef = useRef(null)
