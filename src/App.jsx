@@ -1352,10 +1352,7 @@ function App() {
                 ? 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'
                 : 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'}
             </div>
-            <button onClick={fetchAbonamentMeu} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
-              🔄 Reîncarcă abonamentul
-            </button>
-            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#3C3489', border: '1px solid #3C3489', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '8px' }}>
+            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
               Vezi abonamentul →
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
