@@ -443,6 +443,7 @@ function Admin({ showToast, user }) {
   const [repetitiva, setRepetitiva] = useState(false)
   const [saptamaniRepetare, setSaptamaniRepetare] = useState(4)
   const [zileRepetare, setZileRepetare] = useState([])
+  const [laInfinit, setLaInfinit] = useState(false)
   const [savingClasa, setSavingClasa] = useState(false)
 
   const [tipWod, setTipWod] = useState('AMRAP')
@@ -512,12 +513,13 @@ function Admin({ showToast, user }) {
   const genereazaDateRepetare = () => {
     if (!dataClasa || zileRepetare.length === 0) return []
     const start = new Date(dataClasa + 'T00:00:00')
-    const dow = start.getDay() // 0=Sun
+    const dow = start.getDay()
     const daysToMon = dow === 0 ? -6 : 1 - dow
     const luni = new Date(start)
     luni.setDate(luni.getDate() + daysToMon)
+    const saptamani = laInfinit ? 52 : saptamaniRepetare
     const dates = []
-    for (let w = 0; w < saptamaniRepetare; w++) {
+    for (let w = 0; w < saptamani; w++) {
       for (const d of zileRepetare) {
         const zi = new Date(luni)
         zi.setDate(zi.getDate() + w * 7 + d)
@@ -810,7 +812,7 @@ function Admin({ showToast, user }) {
               <span style={{ fontSize: '18px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{locuriClasa}</span>
               <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>+</button>
             </div>
-            <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]) }}
+            <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]); setLaInfinit(false) }}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EEEDFE' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #3C3489' : '1.5px solid transparent' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>Repetă săptămânal</div>
@@ -831,12 +833,24 @@ function Admin({ showToast, user }) {
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: '11px', color: '#3C3489', fontWeight: '600', marginBottom: '8px' }}>NUMĂR SĂPTĂMÂNI</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '18px', fontWeight: '700', color: '#3C3489', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
-                  <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                  {[{ id: false, lbl: 'Nr. săptămâni' }, { id: true, lbl: 'Până opresc eu' }].map(opt => (
+                    <div key={String(opt.id)} onClick={() => setLaInfinit(opt.id)}
+                      style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#3C3489' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #3C3489' : '1px solid #C5C2F5' }}>
+                      {opt.lbl}
+                    </div>
+                  ))}
                 </div>
+                {!laInfinit && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#3C3489', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
+                    <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  </div>
+                )}
+                {laInfinit && (
+                  <div style={{ fontSize: '11px', color: '#534AB7', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
+                )}
                 {dataClasa && zileRepetare.length > 0 && (() => {
                   const dates = genereazaDateRepetare()
                   if (dates.length === 0) return null
