@@ -510,6 +510,13 @@ function Admin({ showToast, user }) {
   const toggleZiRepetare = (idx) =>
     setZileRepetare(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort((a, b) => a - b))
 
+  const dateToStr = (d) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const z = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${z}`
+  }
+
   const genereazaDateRepetare = () => {
     if (!dataClasa || zileRepetare.length === 0) return []
     const start = new Date(dataClasa + 'T00:00:00')
@@ -523,7 +530,7 @@ function Admin({ showToast, user }) {
       for (const d of zileRepetare) {
         const zi = new Date(luni)
         zi.setDate(zi.getDate() + w * 7 + d)
-        if (zi >= start) dates.push(zi.toISOString().split('T')[0])
+        if (zi >= start) dates.push(dateToStr(zi))
       }
     }
     return dates
