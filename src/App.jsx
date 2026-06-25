@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from './supabase'
 
 const MISCARI = [
@@ -1247,21 +1247,26 @@ function App() {
 
   const _azi = new Date()
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
-  const _continuousDates = []
-  const _cur = new Date(_azi); _cur.setHours(0,0,0,0)
-  const _end = new Date(_azi.getTime() + 90 * 86400000)
-  while (_cur <= _end) {
-    _continuousDates.push(`${_cur.getFullYear()}-${String(_cur.getMonth()+1).padStart(2,'0')}-${String(_cur.getDate()).padStart(2,'0')}`)
-    _cur.setDate(_cur.getDate() + 1)
-  }
-  const zileUnice = [...new Set([...claseDB.map(c => c.date), ..._continuousDates])].sort()
-  const claseGroupate = zileUnice.map(date => ({
+
+  const zileUnice = useMemo(() => {
+    const azi = new Date()
+    const dates = new Set(claseDB.map(c => c.date))
+    for (let i = 0; i <= 90; i++) {
+      const d = new Date(azi)
+      d.setDate(d.getDate() + i)
+      dates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+    }
+    return [...dates].sort()
+  }, [claseDB])
+
+  const claseGroupate = useMemo(() => zileUnice.map(date => ({
     date,
     zi: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short' }),
     nr: new Date(date + 'T00:00:00').getDate(),
     luna: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { month: 'short' }),
     clase: claseDB.filter(c => c.date === date)
-  }))
+  })), [zileUnice, claseDB])
+
   const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id))
 
   const VARIANTE_CONFIG = [
