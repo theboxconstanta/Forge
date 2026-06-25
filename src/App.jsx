@@ -1414,13 +1414,10 @@ function App() {
               </div>
             ))}
           </div>
-          <button onClick={goTimer} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: '#fff', border: '2px solid #3C3489', borderRadius: '14px', fontSize: '14px', fontWeight: '600', color: '#3C3489', cursor: 'pointer', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            ⏱️ Pornește Timer
-          </button>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <div>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>WOD-ul zilei</div>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>Workout Of The Day</div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
                   {wodZiData ? `${wodZiData.type} · ${wodZiData.duration}` : 'Niciun WOD programat azi'}
                 </div>
@@ -1461,6 +1458,9 @@ function App() {
               </div>
             )}
           </div>
+          <button onClick={goTimer} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: '#fff', border: '2px solid #3C3489', borderRadius: '14px', fontSize: '14px', fontWeight: '600', color: '#3C3489', cursor: 'pointer', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            ⏱️ Pornește Timer
+          </button>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>Activitate recentă</div>
             {wodLogs.length === 0 && prDate.length === 0 ? (
