@@ -1066,6 +1066,10 @@ function App() {
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
+  const [wodTip, setWodTip] = useState('AMRAP')
+  const [wodDurata, setWodDurata] = useState('')
+  const [wodMiscari, setWodMiscari] = useState([])
+  const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
@@ -1231,16 +1235,20 @@ function App() {
 
   const saveWodLog = async () => {
     setWodSaving(true)
+    const miscariText = wodMiscari.length > 0 ? wodMiscari.join('\n') : ''
+    const noteFull = [miscariText, wodNote].filter(Boolean).join('\n---\n')
+    const tipSalvat = variantaAleasa !== null ? ['OnRamp','Beginner','Intermediate','RX'][variantaAleasa] : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: null,
-      variant_level: variantaAleasa !== null ? ['OnRamp','Beginner','Intermediate','RX'][variantaAleasa] : null,
-      result: wodResult || null, time_result: wodTime || null, notes: wodNote || null,
+      variant_level: tipSalvat,
+      result: wodResult || null, time_result: wodTime || null, notes: noteFull || null,
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
       showToast('WOD salvat! 🎉'); await fetchWodLogs()
       setScreen('home'); setWodDeschis(false); setVariantaAleasa(null)
       setWodResult(''); setWodTime(''); setWodNote('')
+      setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
   }
@@ -1570,17 +1578,51 @@ function App() {
               </div>
             </div>
           )}
+
+          {variantaAleasa === null && (
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIP ANTRENAMENT</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
+                  <div key={t} onClick={() => setWodTip(t)}
+                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #3C3489' : '1px solid #e0e0e0', background: wodTip === t ? '#EEEDFE' : '#fafafa', color: wodTip === t ? '#3C3489' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
+                    {t}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>DURATĂ / RUNDE</div>
+              <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder="ex: 20 minute, 5 runde" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            </div>
+          )}
+
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
+            {wodMiscari.map((m, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EEEDFE', borderRadius: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '13px', color: '#3C3489' }}>• {m}</span>
+                <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                style={{ padding: '10px 14px', borderRadius: '10px', background: '#3C3489', color: '#fff', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+            </div>
+          </div>
+
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Rezultat / Scor</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>REZULTAT / SCOR</div>
               <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder="ex: 18 runde complete" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIMP</div>
               <input value={wodTime} onChange={e => setWodTime(e.target.value)} placeholder="ex: 4:22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Note</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NOTE</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder="Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
