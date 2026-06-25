@@ -440,6 +440,8 @@ function Admin({ showToast, user }) {
   const [oraSfarsit, setOraSfarsit] = useState('08:00')
   const [coachClasa, setCoachClasa] = useState('')
   const [locuriClasa, setLocuriClasa] = useState(12)
+  const [repetitiva, setRepetitiva] = useState(false)
+  const [saptamaniRepetare, setSaptamaniRepetare] = useState(4)
   const [savingClasa, setSavingClasa] = useState(false)
 
   const [tipWod, setTipWod] = useState('AMRAP')
@@ -506,12 +508,20 @@ function Admin({ showToast, user }) {
   const saveClasa = async () => {
     if (!dataClasa) { showToast('❌ Completează data!'); return }
     setSavingClasa(true)
-    const { error } = await supabase.from('classes').insert({
-      name: numeClasa, date: dataClasa, start_time: oraInceput, end_time: oraSfarsit,
-      coach: coachClasa || 'Coach', max_spots: locuriClasa,
-    })
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('✓ Clasă creată!'); await fetchClase(); setDataClasa(''); setCoachClasa('') }
+    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa }
+    const records = repetitiva
+      ? Array.from({ length: saptamaniRepetare }, (_, i) => {
+          const d = new Date(dataClasa + 'T00:00:00')
+          d.setDate(d.getDate() + i * 7)
+          return { ...baza, date: d.toISOString().split('T')[0] }
+        })
+      : [{ ...baza, date: dataClasa }]
+    const { error } = await supabase.from('classes').insert(records)
+    if (error) { showToast('❌ ' + (error.message || 'Eroare!')); console.error(error) }
+    else {
+      showToast(repetitiva ? `✓ ${saptamaniRepetare} clase create!` : '✓ Clasă creată!')
+      await fetchClase(); setDataClasa(''); setCoachClasa('')
+    }
     setSavingClasa(false)
   }
 
@@ -780,8 +790,38 @@ function Admin({ showToast, user }) {
               <span style={{ fontSize: '18px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{locuriClasa}</span>
               <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>+</button>
             </div>
+            <div onClick={() => setRepetitiva(!repetitiva)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EEEDFE' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #3C3489' : '1.5px solid transparent' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>Repetă săptămânal</div>
+                <div style={{ fontSize: '11px', color: '#888' }}>Creează automat pentru mai multe săptămâni</div>
+              </div>
+              <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#3C3489' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: '3px', left: repetitiva ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </div>
+            </div>
+            {repetitiva && (
+              <div style={{ background: '#EEEDFE', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', color: '#3C3489', fontWeight: '600', marginBottom: '8px' }}>NUMĂR DE SĂPTĂMÂNI</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <button onClick={() => setSaptamaniRepetare(s => Math.max(2, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <span style={{ fontSize: '20px', fontWeight: '700', color: '#3C3489', minWidth: '90px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
+                  <button onClick={() => setSaptamaniRepetare(s => Math.min(24, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                </div>
+                {dataClasa && (
+                  <div style={{ fontSize: '11px', color: '#534AB7', lineHeight: '1.5' }}>
+                    {(() => {
+                      const start = new Date(dataClasa + 'T00:00:00')
+                      const end = new Date(dataClasa + 'T00:00:00')
+                      end.setDate(end.getDate() + (saptamaniRepetare - 1) * 7)
+                      return `${saptamaniRepetare} clase · ${start.toLocaleDateString('ro-RO')} → ${end.toLocaleDateString('ro-RO')}`
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
             <button onClick={saveClasa} disabled={savingClasa} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingClasa ? 'not-allowed' : 'pointer', opacity: savingClasa ? 0.7 : 1 }}>
-              {savingClasa ? 'Se salvează...' : '+ Creează clasa'}
+              {savingClasa ? 'Se salvează...' : repetitiva ? `+ Creează ${saptamaniRepetare} clase` : '+ Creează clasa'}
             </button>
           </div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>CLASE ({clase.length})</div>
