@@ -813,10 +813,11 @@ function Admin({ showToast, user }) {
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>+ Clasă nouă</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip clasă</div>
-            <select value={numeClasa} onChange={e => setNumeClasa(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
-              <option>CrossFit WOD</option><option>Weightlifting</option><option>Gymnastics</option>
-              <option>Powerlifting</option><option>Open Gym</option><option>Kids CrossFit</option><option>Foundations</option>
-            </select>
+            <input list="nume-clase-list" value={numeClasa} onChange={e => setNumeClasa(e.target.value)} placeholder="Nume clasă" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <datalist id="nume-clase-list">
+              <option value="CrossFit WOD" /><option value="Weightlifting" /><option value="Gymnastics" />
+              <option value="Powerlifting" /><option value="Open Gym" /><option value="Kids CrossFit" /><option value="Foundations" />
+            </datalist>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data</div>
             <input type="date" value={dataClasa} onChange={e => setDataClasa(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
