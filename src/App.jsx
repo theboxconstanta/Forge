@@ -1631,13 +1631,6 @@ function App() {
           </div>
           {clasaTab === 'ore' && (
             <>
-              {claseDB.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '10px' }}>📅</div>
-                  {isAdmin ? 'Creează clase din panoul Admin ⚙️' : 'Nicio clasă programată momentan'}
-                </div>
-              ) : (
-                <>
                   <div ref={chipsScrollRef} style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
                     {claseGroupate.map((z, i) => {
                       const areRez = z.clase.some(c => rezervariMele.includes(c.id))
@@ -1704,8 +1697,6 @@ function App() {
                       </div>
                     )
                   })}
-                </>
-              )}
             </>
           )}
           {clasaTab === 'mele' && (
