@@ -561,6 +561,17 @@ function Admin({ showToast, user }) {
     fetchClase()
   }
 
+  const stergeSeria = async (c) => {
+    const azi = new Date()
+    const aziS = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const { error } = await supabase.from('classes').delete()
+      .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
+      .gte('date', aziS)
+    if (error) showToast('❌ ' + error.message)
+    else showToast('✓ Seria ștearsă!')
+    await fetchClase()
+  }
+
   const stergeClasa = async (id) => {
     await supabase.from('classes').delete().eq('id', id)
     showToast('✓ Clasă ștearsă!'); await fetchClase()
@@ -900,6 +911,7 @@ function Admin({ showToast, user }) {
                   <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
                     style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '11px', cursor: 'pointer' }}>👥</button>
                   <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                  <button onClick={() => { if (window.confirm(`Ștergi toate clasele viitoare „${c.name}" ${c.start_time?.slice(0,5)}?`)) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ serie</button>
                 </div>
               </div>
               {clasaDeschisa === c.id && (
