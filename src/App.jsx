@@ -1247,7 +1247,14 @@ function App() {
 
   const _azi = new Date()
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
-  const zileUnice = [...new Set([aziStr, ...claseDB.map(c => c.date)])].sort()
+  const _continuousDates = []
+  const _cur = new Date(_azi); _cur.setHours(0,0,0,0)
+  const _end = new Date(_azi.getTime() + 90 * 86400000)
+  while (_cur <= _end) {
+    _continuousDates.push(`${_cur.getFullYear()}-${String(_cur.getMonth()+1).padStart(2,'0')}-${String(_cur.getDate()).padStart(2,'0')}`)
+    _cur.setDate(_cur.getDate() + 1)
+  }
+  const zileUnice = [...new Set([...claseDB.map(c => c.date), ..._continuousDates])].sort()
   const claseGroupate = zileUnice.map(date => ({
     date,
     zi: new Date(date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short' }),
@@ -1640,7 +1647,7 @@ function App() {
                         <div key={i} ref={esteAzi ? aziChipRef : null}
                           onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
                           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 10px', borderRadius: '12px', border: selectat ? '2px solid #3C3489' : areRez ? '2px solid #3C3489' : '1px solid #e0e0e0', background: selectat ? '#3C3489' : areRez ? '#EEEDFE' : '#fff', cursor: 'pointer', minWidth: '48px', flexShrink: 0 }}>
-                          <span style={{ fontSize: '10px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#888', fontWeight: esteAzi ? '700' : '400' }}>{z.zi}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#888' }}>{z.zi}</span>
                           <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: esteAzi && !selectat ? '2px solid #3C3489' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#1a1a1a' }}>{z.nr}</span>
                           </div>
@@ -1653,6 +1660,12 @@ function App() {
                   {sedinteLimitate && !isAdmin && (
                     <div style={{ background: sedinteRamase <= 0 ? '#FCEBEB' : sedinteRamase <= 1 ? '#FAEEDA' : '#EAF3DE', borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', fontWeight: '500', color: sedinteRamase <= 0 ? '#791F1F' : sedinteRamase <= 1 ? '#633806' : '#27500A' }}>
                       {sedinteRamase <= 0 ? '🔒 Ai epuizat toate ședințele' : `🎟️ ${sedinteRamase} ședință${sedinteRamase === 1 ? '' : 'e'} rămase din ${abonamentReal.sessions_total}`}
+                    </div>
+                  )}
+                  {claseGroupate[ziSelectata]?.clase.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '30px 20px', color: '#bbb', fontSize: '13px' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>📭</div>
+                      Nicio clasă programată în această zi.
                     </div>
                   )}
                   {claseGroupate[ziSelectata]?.clase.map((c) => {
