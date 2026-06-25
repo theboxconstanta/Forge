@@ -1584,12 +1584,13 @@ function App() {
                   <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
                     {claseGroupate.map((z, i) => {
                       const areRez = z.clase.some(c => rezervariMele.includes(c.id))
+                      const selectat = ziSelectata === i
                       return (
                         <div key={i} onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 12px', borderRadius: '12px', border: ziSelectata === i ? '2px solid #3C3489' : '1px solid #e0e0e0', background: ziSelectata === i ? '#3C3489' : '#fff', cursor: 'pointer', minWidth: '52px', flexShrink: 0 }}>
-                          <span style={{ fontSize: '10px', color: ziSelectata === i ? '#C5C2F5' : '#888' }}>{z.zi}</span>
-                          <span style={{ fontSize: '16px', fontWeight: '600', color: ziSelectata === i ? '#fff' : '#1a1a1a' }}>{z.nr}</span>
-                          {areRez && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: ziSelectata === i ? '#C5C2F5' : '#3C3489', marginTop: '2px' }} />}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 12px', borderRadius: '12px', border: selectat ? '2px solid #3C3489' : areRez ? '2px solid #3C3489' : '1px solid #e0e0e0', background: selectat ? '#3C3489' : areRez ? '#EEEDFE' : '#fff', cursor: 'pointer', minWidth: '52px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '10px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : '#888' }}>{z.zi}</span>
+                          <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#3C3489' : '#1a1a1a' }}>{z.nr}</span>
+                          {areRez && <div style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : '#3C3489', fontWeight: '700', marginTop: '1px' }}>✓</div>}
                         </div>
                       )
                     })}
@@ -1604,25 +1605,31 @@ function App() {
                     const isOpen = clasaSelectata === c.id
                     const blocat = !esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                     return (
-                      <div key={c.id} onClick={() => setClasaSelectata(isOpen ? null : c.id)}
-                        style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : '4px solid transparent' }}>
+                      <div key={c.id} onClick={() => !esteRezervat && setClasaSelectata(isOpen ? null : c.id)}
+                        style={{ background: esteRezervat ? '#EEEDFE' : '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: esteRezervat ? 'default' : 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : blocat ? '4px solid #e0e0e0' : '4px solid transparent' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div>
                             <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
-                            <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach}</div>
+                            <div style={{ fontSize: '12px', color: esteRezervat ? '#534AB7' : '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach}</div>
                           </div>
                           {esteRezervat
-                            ? <span style={{ background: '#EEEDFE', color: '#3C3489', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Rezervat</span>
+                            ? <span style={{ background: '#3C3489', color: '#fff', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', flexShrink: 0 }}>✓ Rezervat</span>
                             : blocat
                               ? <span style={{ fontSize: '11px', color: '#aaa' }}>🔒</span>
                               : <span style={{ fontSize: '12px', color: '#555' }}>{c.max_spots} locuri</span>
                           }
                         </div>
-                        {isOpen && (
+                        {esteRezervat && (
+                          <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }}
+                            style={{ width: '100%', marginTop: '10px', padding: '9px', background: 'transparent', color: '#A32D2D', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                            Anulează rezervarea
+                          </button>
+                        )}
+                        {!esteRezervat && isOpen && (
                           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                             <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
-                              style={{ width: '100%', padding: '10px', background: esteRezervat ? 'transparent' : blocat ? '#f0f0f0' : '#3C3489', color: esteRezervat ? '#A32D2D' : blocat ? '#aaa' : '#fff', border: esteRezervat ? '1px solid #F7C1C1' : 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
-                              {esteRezervat ? 'Anulează rezervarea' : blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
+                              style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
+                              {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
                             </button>
                           </div>
                         )}
@@ -1645,7 +1652,7 @@ function App() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO')} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'short' })} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
                       <div style={{ fontSize: '12px', color: '#888' }}>👤 {c.coach}</div>
                     </div>
                     <span style={{ background: '#EAF3DE', color: '#27500A', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Confirmat</span>
