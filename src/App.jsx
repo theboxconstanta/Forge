@@ -1169,19 +1169,33 @@ function App() {
     setPrSaving(false)
   }
 
+  const sedinteLimitate = abonamentReal?.sessions_total != null
+  const sedinteRamase = sedinteLimitate ? Math.max(0, (abonamentReal.sessions_total) - (abonamentReal.sessions_used || 0)) : null
+
   const toggleRezervare = async (clasaId) => {
     const esteRezervat = rezervariMele.includes(clasaId)
+    if (!esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0) {
+      showToast('❌ Ai epuizat toate ședințele din abonament!')
+      return
+    }
     if (esteRezervat) {
       await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
+      if (sedinteLimitate && abonamentReal?.id) {
+        await supabase.from('subscriptions').update({ sessions_used: Math.max(0, (abonamentReal.sessions_used || 0) - 1) }).eq('id', abonamentReal.id)
+      }
       showToast('✓ Rezervare anulată')
     } else {
       await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
       setRezervariMele(prev => [...prev, clasaId])
+      if (sedinteLimitate && abonamentReal?.id) {
+        await supabase.from('subscriptions').update({ sessions_used: (abonamentReal.sessions_used || 0) + 1 }).eq('id', abonamentReal.id)
+      }
       showToast('✓ Loc rezervat! Te așteptăm!')
     }
     setClasaSelectata(null)
     await fetchClaseDB()
+    await fetchAbonamentMeu()
   }
 
   const zileUnice = [...new Set(claseDB.map(c => c.date))].sort()
@@ -1580,9 +1594,15 @@ function App() {
                       )
                     })}
                   </div>
+                  {sedinteLimitate && !isAdmin && (
+                    <div style={{ background: sedinteRamase <= 0 ? '#FCEBEB' : sedinteRamase <= 1 ? '#FAEEDA' : '#EAF3DE', borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', fontWeight: '500', color: sedinteRamase <= 0 ? '#791F1F' : sedinteRamase <= 1 ? '#633806' : '#27500A' }}>
+                      {sedinteRamase <= 0 ? '🔒 Ai epuizat toate ședințele' : `🎟️ ${sedinteRamase} ședință${sedinteRamase === 1 ? '' : 'e'} rămase din ${abonamentReal.sessions_total}`}
+                    </div>
+                  )}
                   {claseGroupate[ziSelectata]?.clase.map((c) => {
                     const esteRezervat = rezervariMele.includes(c.id)
                     const isOpen = clasaSelectata === c.id
+                    const blocat = !esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                     return (
                       <div key={c.id} onClick={() => setClasaSelectata(isOpen ? null : c.id)}
                         style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : '4px solid transparent' }}>
@@ -1593,14 +1613,16 @@ function App() {
                           </div>
                           {esteRezervat
                             ? <span style={{ background: '#EEEDFE', color: '#3C3489', fontSize: '11px', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>✓ Rezervat</span>
-                            : <span style={{ fontSize: '12px', color: '#555' }}>{c.max_spots} locuri</span>
+                            : blocat
+                              ? <span style={{ fontSize: '11px', color: '#aaa' }}>🔒</span>
+                              : <span style={{ fontSize: '12px', color: '#555' }}>{c.max_spots} locuri</span>
                           }
                         </div>
                         {isOpen && (
                           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                            <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }}
-                              style={{ width: '100%', padding: '10px', background: esteRezervat ? 'transparent' : '#3C3489', color: esteRezervat ? '#A32D2D' : '#fff', border: esteRezervat ? '1px solid #F7C1C1' : 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                              {esteRezervat ? 'Anulează rezervarea' : 'Rezervă locul'}
+                            <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
+                              style={{ width: '100%', padding: '10px', background: esteRezervat ? 'transparent' : blocat ? '#f0f0f0' : '#3C3489', color: esteRezervat ? '#A32D2D' : blocat ? '#aaa' : '#fff', border: esteRezervat ? '1px solid #F7C1C1' : 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
+                              {esteRezervat ? 'Anulează rezervarea' : blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
                             </button>
                           </div>
                         )}
