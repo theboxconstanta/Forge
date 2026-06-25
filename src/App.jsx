@@ -1048,6 +1048,7 @@ function App() {
   const chipsScrollRef = useRef(null)
   const scrolledOnce = useRef(false)
   const [rezervariMele, setRezervariMele] = useState([])
+  const [rezervariPerClasa, setRezervariPerClasa] = useState({})
   const [clasaSelectata, setClasaSelectata] = useState(null)
   const [clasaTab, setClasaTab] = useState('ore')
   const [toast, setToast] = useState('')
@@ -1114,6 +1115,14 @@ function App() {
     }
   }, [zileCalendar])
 
+  useEffect(() => {
+    if (!user || isAdmin || zileCalendar.length === 0) return
+    const date = zileCalendar[ziSelectata]
+    if (!date) return
+    const ids = claseDB.filter(c => c.date === date).map(c => c.id)
+    fetchRezervariZi(ids)
+  }, [ziSelectata, claseDB])
+
   const saveProfile = async () => {
     await supabase.from('profiles').upsert({
       id: user.id,
@@ -1173,6 +1182,26 @@ function App() {
   const fetchRezervari = async () => {
     const { data } = await supabase.from('bookings').select('class_id').eq('member_id', user.id)
     if (data) setRezervariMele(data.map(b => b.class_id))
+  }
+
+  const fetchRezervariZi = async (classIds) => {
+    if (!classIds || classIds.length === 0) return
+    const { data } = await supabase.from('bookings').select('class_id, member_id').in('class_id', classIds)
+    if (!data) return
+    const grouped = {}
+    classIds.forEach(id => { grouped[id] = [] })
+    data.forEach(b => { if (grouped[b.class_id] !== undefined) grouped[b.class_id].push(b.member_id) })
+    const allIds = [...new Set(data.map(b => b.member_id))]
+    let profilesMap = {}
+    if (allIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', allIds)
+      if (profiles) profiles.forEach(p => { profilesMap[p.id] = p.full_name })
+    }
+    const result = {}
+    classIds.forEach(id => {
+      result[id] = { count: grouped[id].length, membri: grouped[id].map(mid => profilesMap[mid] || 'Membru') }
+    })
+    setRezervariPerClasa(result)
   }
 
   const fetchWodZi = async () => {
@@ -1690,17 +1719,41 @@ function App() {
                             ? <span style={{ background: '#3C3489', color: '#fff', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', flexShrink: 0 }}>✓ Rezervat</span>
                             : blocat
                               ? <span style={{ fontSize: '11px', color: '#aaa' }}>🔒</span>
-                              : <span style={{ fontSize: '12px', color: '#555' }}>{c.max_spots} locuri</span>
+                              : <span style={{ fontSize: '12px', color: (rezervariPerClasa[c.id]?.count ?? 0) >= c.max_spots ? '#e53935' : '#555', fontWeight: '500' }}>
+                                  {rezervariPerClasa[c.id]?.count ?? 0}/{c.max_spots} locuri
+                                </span>
                           }
                         </div>
                         {esteRezervat && (
-                          <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }}
-                            style={{ width: '100%', marginTop: '10px', padding: '9px', background: 'transparent', color: '#A32D2D', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                            Anulează rezervarea
-                          </button>
+                          <>
+                            {rezervariPerClasa[c.id]?.membri?.length > 0 && (
+                              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e8e5f7' }}>
+                                <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', marginBottom: '5px' }}>
+                                  PARTICIPANȚI ({rezervariPerClasa[c.id].count}/{c.max_spots})
+                                </div>
+                                {rezervariPerClasa[c.id].membri.map((name, i) => (
+                                  <div key={i} style={{ fontSize: '12px', color: '#534AB7', padding: '2px 0' }}>👤 {name}</div>
+                                ))}
+                              </div>
+                            )}
+                            <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }}
+                              style={{ width: '100%', marginTop: '10px', padding: '9px', background: 'transparent', color: '#A32D2D', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                              Anulează rezervarea
+                            </button>
+                          </>
                         )}
                         {!esteRezervat && isOpen && (
                           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                            {rezervariPerClasa[c.id]?.membri?.length > 0 && (
+                              <div style={{ marginBottom: '10px' }}>
+                                <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', marginBottom: '5px' }}>
+                                  PARTICIPANȚI ({rezervariPerClasa[c.id].count}/{c.max_spots})
+                                </div>
+                                {rezervariPerClasa[c.id].membri.map((name, i) => (
+                                  <div key={i} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>👤 {name}</div>
+                                ))}
+                              </div>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
                               style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
                               {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
