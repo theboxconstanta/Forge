@@ -1129,12 +1129,13 @@ function App() {
 
   const fetchAbonamentMeu = async () => {
     setAbonamentLoading(true)
-    const { data } = await supabase.from('subscriptions')
+    const { data, error } = await supabase.from('subscriptions')
       .select('*, subscription_plans(name, sessions)')
       .eq('member_email', user.email.toLowerCase())
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
+    if (error) console.error('fetchAbonamentMeu error:', error)
     if (data && data.length > 0) setAbonamentReal(data[0])
     else setAbonamentReal(null)
     setAbonamentLoading(false)
@@ -1351,7 +1352,10 @@ function App() {
                 ? 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'
                 : 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'}
             </div>
-            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+            <button onClick={fetchAbonamentMeu} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+              🔄 Reîncarcă abonamentul
+            </button>
+            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#3C3489', border: '1px solid #3C3489', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '8px' }}>
               Vezi abonamentul →
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
