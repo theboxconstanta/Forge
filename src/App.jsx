@@ -1277,14 +1277,18 @@ function App() {
       await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
       if (sedinteLimitate && abonamentReal?.id) {
-        await supabase.from('subscriptions').update({ sessions_used: Math.max(0, (abonamentReal.sessions_used || 0) - 1) }).eq('id', abonamentReal.id)
+        const newUsed = Math.max(0, (abonamentReal.sessions_used || 0) - 1)
+        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
+        setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
       showToast('✓ Rezervare anulată')
     } else {
       await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
       setRezervariMele(prev => [...prev, clasaId])
       if (sedinteLimitate && abonamentReal?.id) {
-        await supabase.from('subscriptions').update({ sessions_used: (abonamentReal.sessions_used || 0) + 1 }).eq('id', abonamentReal.id)
+        const newUsed = (abonamentReal.sessions_used || 0) + 1
+        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
+        setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
       showToast('✓ Loc rezervat! Te așteptăm!')
     }
@@ -1694,7 +1698,7 @@ function App() {
                   </div>
                   {sedinteLimitate && !isAdmin && (
                     <div style={{ background: sedinteRamase <= 0 ? '#FCEBEB' : sedinteRamase <= 1 ? '#FAEEDA' : '#EAF3DE', borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '12px', fontWeight: '500', color: sedinteRamase <= 0 ? '#791F1F' : sedinteRamase <= 1 ? '#633806' : '#27500A' }}>
-                      {sedinteRamase <= 0 ? '🔒 Ai epuizat toate ședințele' : `🎟️ ${sedinteRamase} ședință${sedinteRamase === 1 ? '' : 'e'} rămase din ${abonamentReal.sessions_total}`}
+                      {sedinteRamase <= 0 ? '🔒 Ai epuizat toate ședințele' : `🎟️ ${sedinteRamase} ședințe rămase din ${abonamentReal.sessions_total}`}
                     </div>
                   )}
                   {claseGroupate[ziSelectata]?.clase.length === 0 && (
