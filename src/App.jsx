@@ -1446,7 +1446,7 @@ function App() {
                     </div>
                   )
                 })}
-                <button onClick={() => setScreen('log')} disabled={variantaAleasa === null}
+                <button onClick={() => { setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                   style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#3C3489' : '#ccc', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                   {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
                 </button>
@@ -1538,8 +1538,27 @@ function App() {
 
       {screen === 'log' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '4px' }}>Classic Logging</h1>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '22px' }}>Câte mișcări are antrenamentul tău?</p>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+            <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
+              style={{ flex: 1, background: '#EEEDFE', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <span style={{ fontSize: '32px' }}>🏋️</span>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', textAlign: 'center' }}>Mișcare Unică</span>
+            </div>
+            <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
+              style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <span style={{ fontSize: '32px' }}>⚙️</span>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {screen === 'logWOD' && (
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Log WOD</h1>
           </div>
           {variantaAleasa !== null && (
