@@ -554,6 +554,13 @@ function Admin({ showToast, user }) {
     setSavingClasa(false)
   }
 
+  const stergeClaseleTrecute = async () => {
+    const azi = new Date()
+    const aziS = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    await supabase.from('classes').delete().lt('date', aziS)
+    fetchClase()
+  }
+
   const stergeClasa = async (id) => {
     await supabase.from('classes').delete().eq('id', id)
     showToast('✓ Clasă ștearsă!'); await fetchClase()
@@ -875,7 +882,12 @@ function Admin({ showToast, user }) {
               {savingClasa ? 'Se salvează...' : repetitiva && zileRepetare.length > 0 && dataClasa ? `+ Creează ${genereazaDateRepetare().length} clase` : '+ Creează clasa'}
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>CLASE ({clase.length})</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', color: '#888' }}>CLASE ({clase.length})</div>
+            {clase.some(c => c.date < new Date().toISOString().split('T')[0]) && (
+              <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>🗑️ Șterge trecute</button>
+            )}
+          </div>
           {clase.map(c => (
             <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
