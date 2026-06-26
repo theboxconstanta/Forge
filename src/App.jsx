@@ -63,6 +63,7 @@ function NavBar({ screen, setScreen, isAdmin }) {
         { icon: '✏️', lbl: 'Log', sc: 'log' },
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
         { icon: '📅', lbl: 'Clase', sc: 'clase' },
+        { icon: '🏅', lbl: 'Clasament', sc: 'clasament' },
         { icon: '👥', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
@@ -84,7 +85,11 @@ function CautareMiscare({ onAleage, preFill }) {
     if (val.length < 1) { setSugestii([]); return }
     setSugestii(MISCARI.filter(m => m.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
   }
-  const alege = (m) => { setQuery(m); setAleasa(m); setSugestii([]); onAleage(m) }
+  const alege = (m) => {
+    const canonic = MISCARI.find(x => x.toLowerCase() === m.toLowerCase().trim())
+    const normalized = canonic || m.trim().replace(/\b\w/g, c => c.toUpperCase())
+    setQuery(normalized); setAleasa(normalized); setSugestii([]); onAleage(normalized)
+  }
   return (
     <div style={{ position: 'relative', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Exercițiu / Mișcare</div>
@@ -104,18 +109,18 @@ function CautareMiscare({ onAleage, preFill }) {
   )
 }
 
-function Timer({ onBack }) {
+function Timer({ onBack, defaultFortime }) {
   const [mod, setMod] = useState('fortime')
   const [running, setRunning] = useState(false)
-  const [secunde, setSecunde] = useState(900)
-  const [totalSec, setTotalSec] = useState(900)
+  const [secunde, setSecunde] = useState((defaultFortime || 15) * 60)
+  const [totalSec, setTotalSec] = useState((defaultFortime || 15) * 60)
   const [runde, setRunde] = useState(0)
   const [minutEmom, setMinutEmom] = useState(1)
   const [tabataRunda, setTabataRunda] = useState(1)
   const [tabataFaza, setTabataFaza] = useState('lucru')
   const [gata, setGata] = useState(false)
   const [countdown, setCountdown] = useState(null)
-  const [config, setConfig] = useState({ fortime: 15, amrap: 20, emom: 10, emomInterval: 60, tabataRunde: 8, tabataLucru: 20, tabataOdihna: 10 })
+  const [config, setConfig] = useState({ fortime: defaultFortime || 15, amrap: 20, emom: 10, emomInterval: 60, tabataRunde: 8, tabataLucru: 20, tabataOdihna: 10 })
   const intervalRef = useRef(null)
   const countdownRef = useRef(null)
   const moduri = [
@@ -341,6 +346,124 @@ function Timer({ onBack }) {
         <button onClick={reset} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', cursor: 'pointer' }}>
           Anulează
         </button>
+      )}
+    </div>
+  )
+}
+
+function Clasament({ logs, loading, wodZiData, onRefresh }) {
+  const [tab, setTab] = useState('RX')
+
+  const parseTime = (str) => {
+    if (!str) return Infinity
+    const parts = str.trim().split(':').map(Number)
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if (parts.length === 2) return parts[0] * 60 + parts[1]
+    return parseFloat(str) || Infinity
+  }
+
+  const parseScore = (str) => {
+    if (!str) return -Infinity
+    const match = str.match(/(\d+(\.\d+)?)/)
+    return match ? parseFloat(match[1]) : -Infinity
+  }
+
+  const sortLogs = (arr) => {
+    const withTime = arr.filter(l => l.time_result).length
+    const withResult = arr.filter(l => l.result).length
+    if (withTime >= withResult && withTime > 0) {
+      return [...arr].sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
+    }
+    if (withResult > 0) {
+      return [...arr].sort((a, b) => parseScore(b.result) - parseScore(a.result))
+    }
+    return [...arr].sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
+  }
+
+  const TABS = [
+    { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴' },
+    { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡' },
+    { id: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢' },
+    { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵' },
+  ]
+
+  const currentTab = TABS.find(t => t.id === tab)
+  const tabLogs = sortLogs(logs.filter(l => l.variant_level === tab))
+  const isForTime = tabLogs.filter(l => l.time_result).length >= tabLogs.filter(l => l.result).length && tabLogs.some(l => l.time_result)
+
+  return (
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' }}>Clasament 🏅</h1>
+        <button onClick={onRefresh} style={{ background: '#EEEDFE', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#3C3489', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
+      </div>
+      <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
+        {new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}
+        {wodZiData ? ` · ${wodZiData.type} ${wodZiData.duration}` : ''}
+      </p>
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
+        {TABS.map(t => {
+          const cnt = logs.filter(l => l.variant_level === t.id).length
+          return (
+            <div key={t.id} onClick={() => setTab(t.id)}
+              style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: tab === t.id ? '700' : '400', background: tab === t.id ? t.culoare : '#fff', color: tab === t.id ? '#fff' : '#888', border: `1px solid ${tab === t.id ? t.culoare : '#e0e0e0'}`, whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {t.emoji} {t.id}
+              {cnt > 0 && <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : '#f0f0f0', color: tab === t.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '700' }}>{cnt}</span>}
+            </div>
+          )
+        })}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
+      ) : tabLogs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+          <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏁</div>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>Niciun rezultat încă</div>
+          <div style={{ fontSize: '12px', color: '#aaa' }}>Fii primul care loghează {tab} azi!</div>
+        </div>
+      ) : (
+        <div>
+          {isForTime ? (
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '500', background: '#f5f5f5', borderRadius: '8px', padding: '6px 10px' }}>
+              ⏱️ For Time — timp mai mic = loc mai bun
+            </div>
+          ) : tabLogs.some(l => l.result) ? (
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '500', background: '#f5f5f5', borderRadius: '8px', padding: '6px 10px' }}>
+              🔄 AMRAP — scor mai mare = loc mai bun
+            </div>
+          ) : null}
+
+          {tabLogs.map((log, i) => {
+            const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || 'Anonim'
+            const podium = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+            const result = log.time_result || log.result || '—'
+            const borderColor = i === 0 ? currentTab.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
+            return (
+              <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ fontSize: podium ? '22px' : '13px', fontWeight: '700', color: '#888', minWidth: '30px', textAlign: 'center' }}>
+                    {podium || `#${i + 1}`}
+                  </div>
+                  <AvatarCircle name={name} size={36} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{name}</div>
+                    <div style={{ fontSize: '11px', color: '#aaa' }}>
+                      {new Date(log.logged_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: currentTab.culoare }}>{result}</div>
+                    {log.time_result && log.result && (
+                      <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
@@ -626,7 +749,7 @@ function Admin({ showToast }) {
     if (!numePlan) { showToast('❌ Introdu numele!'); return }
     setSavingPlan(true)
     const { error } = await supabase.from('subscription_plans').insert({
-      name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : 0,
+      name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : null,
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else { showToast('✓ Plan adăugat!'); await fetchPlanuri(); setNumePlan(''); setSedintePlan(''); setPretPlan('') }
@@ -771,7 +894,7 @@ function Admin({ showToast }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Plan</div>
             <select value={planSelectat} onChange={e => setPlanSelectat(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
-              {planuri.map(p => <option key={p.id} value={p.id}>{p.name}{p.price ? ` — ${p.price} RON` : ''}</option>)}
+              {planuri.map(p => <option key={p.id} value={p.id}>{p.name}{p.price != null ? ` — ${p.price} RON` : ''}</option>)}
             </select>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data start</div>
             <input type="date" value={dataStartAbonament} onChange={e => setDataStartAbonament(e.target.value)}
@@ -1011,7 +1134,7 @@ function Admin({ showToast }) {
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{p.name}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                    {p.sessions ? `${p.sessions} ședințe` : 'Nelimitat'} · {p.price ? `${p.price} RON` : 'Preț nesetat'}
+                    {p.sessions ? `${p.sessions} ședințe` : 'Nelimitat'} · {p.price != null ? `${p.price} RON` : 'Preț nesetat'}
                   </div>
                 </div>
                 <button onClick={() => stergePlan(p.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
@@ -1021,6 +1144,65 @@ function Admin({ showToast }) {
         </>
       )}
     </div>
+  )
+}
+
+function JurnalList({ logs }) {
+  const [deschis, setDeschis] = useState(null)
+  if (logs.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+      <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
+      <div style={{ fontSize: '14px' }}>Niciun antrenament logat încă</div>
+    </div>
+  )
+  return (
+    <>
+      {logs.map((w, i) => {
+        const parts = (w.notes || '').split('\n---\n')
+        const miscariLog = parts.length > 1 ? parts[0] : null
+        const noteLog = parts.length > 1 ? parts[1] : (w.notes || null)
+        const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+        const isOpen = deschis === i
+        return (
+          <div key={i} onClick={() => setDeschis(isOpen ? null : i)}
+            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489' }}>{w.variant_level || 'WOD'}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ fontSize: '11px', color: '#aaa' }}>{data}</div>
+                <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {w.result && <span style={{ fontSize: '12px', background: '#EEEDFE', color: '#3C3489', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
+              {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
+              {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
+            </div>
+            {isOpen && (
+              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                {miscariLog && miscariLog.trim() && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>MIȘCĂRI</div>
+                    {miscariLog.trim().split('\n').map((m, j) => (
+                      <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                    ))}
+                  </div>
+                )}
+                {noteLog && noteLog.trim() && (
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>NOTE</div>
+                    <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                  </div>
+                )}
+                {!miscariLog && !noteLog && (
+                  <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio detaliere suplimentară.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </>
   )
 }
 
@@ -1089,6 +1271,8 @@ function App() {
   const [authEmailInit] = useState(localStorage.getItem('forge_remember_email') || '')
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(false)
+  const [clasamentLogs, setClasamentLogs] = useState([])
+  const [clasamentLoading, setClasamentLoading] = useState(false)
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -1129,6 +1313,7 @@ function App() {
       fetchWodZi()
       checkAdmin()
       fetchAbonamentMeu()
+      fetchClasament()
     }
   }, [user])
 
@@ -1148,6 +1333,10 @@ function App() {
       }, 150)
     }
   }, [zileCalendar])
+
+  useEffect(() => {
+    if (screen === 'clasament' && user) fetchClasament()
+  }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user || zileCalendar.length === 0) return
@@ -1238,6 +1427,27 @@ function App() {
     setRezervariPerClasa(result)
   }
 
+  const fetchClasament = async () => {
+    setClasamentLoading(true)
+    const today = new Date().toISOString().split('T')[0]
+    const { data: logs } = await supabase
+      .from('wod_logs')
+      .select('*')
+      .gte('logged_at', today + 'T00:00:00')
+      .lte('logged_at', today + 'T23:59:59')
+      .in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
+    if (logs && logs.length > 0) {
+      const ids = [...new Set(logs.map(l => l.member_id))]
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', ids)
+      const map = {}
+      if (profiles) profiles.forEach(p => { map[p.id] = p })
+      setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
+    } else {
+      setClasamentLogs([])
+    }
+    setClasamentLoading(false)
+  }
+
   const fetchWodZi = async () => {
     const azi = new Date().toISOString().split('T')[0]
     const { data } = await supabase.from('wods').select('*').eq('date', azi).single()
@@ -1281,9 +1491,17 @@ function App() {
 
   const handleLogout = async () => { await supabase.auth.signOut() }
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
+  const parseWodMinute = (durataStr) => {
+    if (!durataStr) return null
+    const match = durataStr.match(/(\d+)/)
+    return match ? parseInt(match[1]) : null
+  }
+
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
   const saveWodLog = async () => {
+    const areContiut = wodResult.trim() || wodTime.trim() || wodMiscari.length > 0
+    if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
     setWodSaving(true)
     const miscariText = wodMiscari.length > 0 ? wodMiscari.join('\n') : ''
     const noteFull = [miscariText, wodNote].filter(Boolean).join('\n---\n')
@@ -1295,7 +1513,7 @@ function App() {
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
-      showToast('WOD salvat! 🎉'); await fetchWodLogs()
+      showToast('WOD salvat! 🎉'); await fetchWodLogs(); fetchClasament()
       setScreen('home'); setWodDeschis(false); setVariantaAleasa(null)
       setWodResult(''); setWodTime(''); setWodNote('')
       setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
@@ -1305,6 +1523,8 @@ function App() {
 
   const savePR = async () => {
     if (!miscarePR) return
+    const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prDistanta.trim()
+    if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
     setPrSaving(true)
     const isBenchmark = ['Fran','Grace','Cindy','Helen','Diane','Annie','Barbara','Murph','DT','Jackie','Nancy','Amanda'].includes(miscarePR)
     const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR)
@@ -1547,7 +1767,7 @@ function App() {
         </span>
       </div>
 
-      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && screen !== 'clase' && (
+      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && screen !== 'clase' && screen !== 'clasament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
@@ -1581,7 +1801,7 @@ function App() {
             </button>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {[{ val: wodLogs.length.toString(), lbl: 'WOD-uri' }, { val: prDate.length.toString(), lbl: 'PR-uri' }, { val: `🔥 ${rezervariMele.length}`, lbl: 'Rezervări' }].map((s, i) => (
+            {[{ val: wodLogs.length.toString(), lbl: 'WOD-uri' }, { val: prDate.length.toString(), lbl: 'PR-uri' }, { val: `🔥 ${rezervarileMeleAfisate.length}`, lbl: 'Rezervări' }].map((s, i) => (
               <div key={i} style={{ flex: 1, background: '#fff', borderRadius: '12px', padding: '12px 8px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{s.val}</div>
                 <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>{s.lbl}</div>
@@ -1733,7 +1953,7 @@ function App() {
                 </div>
                 <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
                   style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '32px' }}>⚙️</span>
+                  <span style={{ fontSize: '32px' }}>🔥</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
                 </div>
               </div>
@@ -1741,41 +1961,7 @@ function App() {
           )}
 
           {logTab === 'jurnal' && (
-            <>
-              {wodLogs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
-                  <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
-                  <div style={{ fontSize: '14px' }}>Niciun antrenament logat încă</div>
-                </div>
-              ) : wodLogs.map((w, i) => {
-                const parts = (w.notes || '').split('\n---\n')
-                const miscariLog = parts[0] && !parts[1] && !w.notes?.includes('\n---\n') ? null : parts[0]
-                const noteLog = parts[1] || (parts.length === 1 && w.notes && !w.notes.includes('---') ? w.notes : null)
-                const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-                return (
-                  <div key={i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489' }}>{w.variant_level || 'WOD'}</div>
-                      <div style={{ fontSize: '11px', color: '#aaa' }}>{data}</div>
-                    </div>
-                    {miscariLog && miscariLog.trim() && (
-                      <div style={{ marginBottom: '6px' }}>
-                        {miscariLog.trim().split('\n').map((m, j) => (
-                          <div key={j} style={{ fontSize: '12px', color: '#555' }}>• {m}</div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {w.result && <span style={{ fontSize: '12px', background: '#EEEDFE', color: '#3C3489', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
-                      {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
-                    </div>
-                    {noteLog && noteLog.trim() && (
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '6px', fontStyle: 'italic' }}>{noteLog.trim()}</div>
-                    )}
-                  </div>
-                )
-              })}
-            </>
+            <JurnalList logs={wodLogs} />
           )}
         </div>
       )}
@@ -1971,7 +2157,7 @@ function App() {
             {[{ id: 'ore', lbl: 'Ore disponibile' }, { id: 'mele', lbl: 'Rezervările mele' }].map(t => (
               <div key={t.id} onClick={() => setClasaTab(t.id)}
                 style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: clasaTab === t.id ? '600' : '400', background: clasaTab === t.id ? '#fff' : 'transparent', color: clasaTab === t.id ? '#1a1a1a' : '#888', boxShadow: clasaTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                {t.lbl} {t.id === 'mele' && rezervariMele.length > 0 && <span style={{ background: '#3C3489', color: '#fff', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', marginLeft: '4px' }}>{rezervariMele.length}</span>}
+                {t.lbl} {t.id === 'mele' && rezervarileMeleAfisate.length > 0 && <span style={{ background: '#3C3489', color: '#fff', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', marginLeft: '4px' }}>{rezervarileMeleAfisate.length}</span>}
               </div>
             ))}
           </div>
@@ -2058,12 +2244,10 @@ function App() {
                                 ))}
                               </div>
                             )}
-                            {!isAdmin && (
                               <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
                                 style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
                                 {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
                               </button>
-                            )}
                           </div>
                         )}
                       </div>
@@ -2099,7 +2283,8 @@ function App() {
         </div>
       )}
 
-      {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} />}
+      {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={wodZiData} onRefresh={fetchClasament} />}
       {screen === 'feed' && <Feed showToast={showToast} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
