@@ -1363,23 +1363,37 @@ function App() {
 
   if (!user) return (
     <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
-      <img src="/forge.png" alt="Forge" style={{ width: '140px', height: '140px', borderRadius: '28px', marginBottom: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
-      {showInstall && (
-        <div style={{ width: '100%', marginBottom: '16px' }}>
-          {installPrompt && (
-            <button onClick={handleInstall} style={{ width: '100%', padding: '14px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px' }}>
-              Instalează aplicația
+      {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setInstallDismissed(false)}>
+        <div style={{ background: '#1a1a1a', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: '430px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+          <img src="/forge.png" alt="Forge" style={{ width: '72px', height: '72px', borderRadius: '16px', marginBottom: '16px' }} />
+          <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>Instalează Forge</div>
+          {isIOS ? (<>
+            <div style={{ fontSize: '14px', color: '#aaa', lineHeight: '1.7', marginBottom: '20px' }}>
+              1. Apasă <strong style={{ color: '#fff' }}>↑ Share</strong> din bara de jos<br/>
+              2. Alege <strong style={{ color: '#fff' }}>Add to Home Screen</strong><br/>
+              3. Apasă <strong style={{ color: '#fff' }}>Add</strong>
+            </div>
+            <div style={{ fontSize: '32px', marginBottom: '20px' }}>↑</div>
+          </>) : (<>
+            <div style={{ fontSize: '14px', color: '#aaa', lineHeight: '1.7', marginBottom: '20px' }}>
+              1. Apasă <strong style={{ color: '#fff' }}>⋮ Meniu</strong> din browser<br/>
+              2. Alege <strong style={{ color: '#fff' }}>Adaugă pe ecranul principal</strong>
+            </div>
+          </>)}
+          <button onClick={() => setInstallDismissed(false)} style={{ width: '100%', padding: '13px', background: '#333', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Închide</button>
+        </div>
+      </div>}
+      <img src="/forge.png" alt="Forge" style={{ width: '140px', height: '140px', borderRadius: '28px', marginBottom: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
+      {!isStandalone && (
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          {installPrompt ? (
+            <button onClick={handleInstall} style={{ background: 'none', border: '1px solid #444', borderRadius: '20px', padding: '8px 20px', color: '#aaa', fontSize: '13px', cursor: 'pointer' }}>
+              + Adaugă pe ecranul principal
             </button>
-          )}
-          {isIOS && !installPrompt && (
-            <div style={{ background: '#1a1a1a', borderRadius: '14px', padding: '14px 16px', color: '#ccc', fontSize: '13px', lineHeight: '1.6', textAlign: 'center' }}>
-              Apasă <strong style={{ color: '#fff' }}>Share</strong> (↑) din browser, apoi <strong style={{ color: '#fff' }}>Add to Home Screen</strong> pentru a instala.
-            </div>
-          )}
-          {!isIOS && !installPrompt && (
-            <div style={{ background: '#1a1a1a', borderRadius: '14px', padding: '14px 16px', color: '#ccc', fontSize: '13px', lineHeight: '1.6', textAlign: 'center' }}>
-              Din meniul browserului (⋮) alege <strong style={{ color: '#fff' }}>Adaugă pe ecranul principal</strong>.
-            </div>
+          ) : (
+            <button onClick={() => setInstallDismissed(true)} style={{ background: 'none', border: '1px solid #444', borderRadius: '20px', padding: '8px 20px', color: '#aaa', fontSize: '13px', cursor: 'pointer' }}>
+              + Adaugă pe ecranul principal
+            </button>
           )}
         </div>
       )}
