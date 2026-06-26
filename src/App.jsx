@@ -717,6 +717,31 @@ function Admin({ showToast }) {
   }
 
   const stergeClasa = async (id) => {
+    // returnăm ședințele membrilor cu abonamente limitate care aveau rezervare
+    const { data: bks } = await supabase.from('bookings').select('member_id').eq('class_id', id)
+    if (bks?.length > 0) {
+      const memberIds = bks.map(b => b.member_id)
+      const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
+      if (profs?.length > 0) {
+        for (const prof of profs) {
+          const email = prof.email?.toLowerCase()
+          if (!email) continue
+          const { data: abo } = await supabase.from('subscriptions')
+            .select('id, sessions_used')
+            .eq('member_email', email)
+            .eq('is_active', true)
+            .not('sessions_total', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+          if (abo) {
+            await supabase.from('subscriptions')
+              .update({ sessions_used: Math.max(0, (abo.sessions_used || 0) - 1) })
+              .eq('id', abo.id)
+          }
+        }
+      }
+    }
     await supabase.from('classes').delete().eq('id', id)
     showToast('✓ Clasă ștearsă!'); await fetchClase()
   }
@@ -745,6 +770,11 @@ function Admin({ showToast }) {
   const saveAbonament = async () => {
     if (!emailAbonament || !planSelectat) { showToast('❌ Completează emailul și planul!'); return }
     setSavingAbonament(true)
+    // dezactivam abonamentele vechi active pentru acelasi email
+    await supabase.from('subscriptions')
+      .update({ is_active: false })
+      .eq('member_email', emailAbonament.toLowerCase().trim())
+      .eq('is_active', true)
     const plan = planuri.find(p => p.id === planSelectat)
     const endDate = new Date(dataStartAbonament)
     endDate.setDate(endDate.getDate() + 30)
@@ -1580,7 +1610,7 @@ function App() {
     if (esteRezervat) {
       await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
-      if (sedinteLimitate && abonamentReal?.id) {
+      if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = Math.max(0, (abonamentReal.sessions_used || 0) - 1)
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
@@ -1589,7 +1619,7 @@ function App() {
     } else {
       await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
       setRezervariMele(prev => [...prev, clasaId])
-      if (sedinteLimitate && abonamentReal?.id) {
+      if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = (abonamentReal.sessions_used || 0) + 1
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
@@ -1621,8 +1651,8 @@ function App() {
     { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', key: 'movements_rx' },
   ]
 
-  const abonamentActiv = abonamentReal !== null && new Date(abonamentReal.end_date) >= new Date()
-  const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+  const abonamentActiv = abonamentReal !== null && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
+  const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   if (resetMode) return (
     <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
