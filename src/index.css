@@ -3,17 +3,37 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
-html, body {
+html {
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
   width: 100%;
   height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #111;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
 
 #root {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
