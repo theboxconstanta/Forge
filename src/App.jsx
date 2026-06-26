@@ -1077,11 +1077,13 @@ function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
-  const [authEmail, setAuthEmail] = useState('')
+  const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('forge_remember_email') || '')
   const [authPassword, setAuthPassword] = useState('')
   const [authNume, setAuthNume] = useState('')
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('forge_remember_email'))
+  const [authEmailInit] = useState(localStorage.getItem('forge_remember_email') || '')
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(false)
 
@@ -1241,7 +1243,17 @@ function App() {
   const handleLogin = async () => {
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+    if (error) { setAuthError(error.message) }
+    else { rememberMe ? localStorage.setItem('forge_remember_email', authEmail) : localStorage.removeItem('forge_remember_email') }
+    setAuthSubmitting(false)
+  }
+
+  const handleForgotPassword = async () => {
+    if (!authEmail) { setAuthError('Introdu emailul mai întâi.'); return }
+    setAuthSubmitting(true); setAuthError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(authEmail, { redirectTo: window.location.origin })
     if (error) setAuthError(error.message)
+    else setAuthError('✓ Email de resetare trimis! Verifică inbox-ul.')
     setAuthSubmitting(false)
   }
 
@@ -1441,10 +1453,22 @@ function App() {
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Email</div>
           <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="email@exemplu.com" type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: authScreen === 'login' ? '12px' : '20px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Parolă</div>
           <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="minimum 6 caractere" type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
+        {authScreen === 'login' && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                style={{ width: '16px', height: '16px', accentColor: '#3C3489', cursor: 'pointer' }} />
+              <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
+            </label>
+            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#7b73e8', cursor: 'pointer', fontWeight: '500' }}>
+              Forgot password?
+            </span>
+          </div>
+        )}
         {authError && (
           <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
             {authError}
