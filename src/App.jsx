@@ -1812,22 +1812,44 @@ function App() {
             </div>
           )}
 
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
-            {wodMiscari.map((m, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EEEDFE', borderRadius: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', color: '#3C3489' }}>• {m}</span>
-                <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          {variantaAleasa !== null && wodZiData ? (() => {
+            const cheie = ['movements_onramp','movements_beginner','movements_intermediate','movements_rx'][variantaAleasa]
+            const miscariWod = wodZiData[cheie] || []
+            return (
+              <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
+                <div style={{ background: '#f8f7ff', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', marginBottom: '8px' }}>
+                    {wodZiData.type} · {wodZiData.duration}
+                  </div>
+                  {miscariWod.length > 0 ? miscariWod.map((m, i) => (
+                    <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #ece9ff' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
+                      {m}
+                    </div>
+                  )) : (
+                    <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
+                  )}
+                </div>
               </div>
-            ))}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-              <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                style={{ padding: '10px 14px', borderRadius: '10px', background: '#3C3489', color: '#fff', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+            )
+          })() : (
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
+              {wodMiscari.map((m, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EEEDFE', borderRadius: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#3C3489' }}>• {m}</span>
+                  <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                  placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#3C3489', color: '#fff', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom: '14px' }}>
