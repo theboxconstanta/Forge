@@ -359,7 +359,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     const parts = str.trim().split(':').map(Number)
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
     if (parts.length === 2) return parts[0] * 60 + parts[1]
-    return parseFloat(str) || Infinity
+    // fara ":" — tratat ca minute (ex: "15" = 15 min = 900 sec)
+    return (parseFloat(str) || Infinity) * 60
   }
 
   const parseScore = (str) => {
@@ -368,16 +369,33 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     return match ? parseFloat(match[1]) : -Infinity
   }
 
+  const deduplicateBest = (arr) => {
+    const byMember = {}
+    const withTime = arr.filter(l => l.time_result).length >= arr.filter(l => l.result).length && arr.some(l => l.time_result)
+    arr.forEach(log => {
+      const id = log.member_id
+      if (!byMember[id]) { byMember[id] = log; return }
+      const curr = byMember[id]
+      if (withTime) {
+        if (parseTime(log.time_result) < parseTime(curr.time_result)) byMember[id] = log
+      } else {
+        if (parseScore(log.result) > parseScore(curr.result)) byMember[id] = log
+      }
+    })
+    return Object.values(byMember)
+  }
+
   const sortLogs = (arr) => {
-    const withTime = arr.filter(l => l.time_result).length
-    const withResult = arr.filter(l => l.result).length
+    const deduped = deduplicateBest(arr)
+    const withTime = deduped.filter(l => l.time_result).length
+    const withResult = deduped.filter(l => l.result).length
     if (withTime >= withResult && withTime > 0) {
-      return [...arr].sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
+      return deduped.sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
     }
     if (withResult > 0) {
-      return [...arr].sort((a, b) => parseScore(b.result) - parseScore(a.result))
+      return deduped.sort((a, b) => parseScore(b.result) - parseScore(a.result))
     }
-    return [...arr].sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
+    return deduped.sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
   }
 
   const TABS = [
