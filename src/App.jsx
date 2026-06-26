@@ -1467,9 +1467,15 @@ function App() {
   return (
     <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none' }}>
 
-      <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 0 8px' }}>
-        <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
-        <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', marginLeft: '8px', letterSpacing: '1px' }}>FORGE</span>
+      <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
+          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+        </div>
+        <span style={{ fontSize: '14px', fontWeight: '600' }}>
+          <span style={{ color: '#fff' }}>CrossFit </span>
+          <span style={{ color: '#C8FF00' }}>C15</span>
+        </span>
       </div>
 
       {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && screen !== 'clase' && (
