@@ -1082,6 +1082,26 @@ function App() {
   const [authNume, setAuthNume] = useState('')
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [installDismissed, setInstallDismissed] = useState(false)
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+  const showInstall = !isStandalone && !installDismissed
+
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setInstallDismissed(true)
+    setInstallPrompt(null)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1342,29 +1362,48 @@ function App() {
   )
 
   if (!user) return (
-    <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
-      <div style={{ width: '100%', background: '#fff', borderRadius: '20px', padding: '32px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🏋️</div>
-          <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>WOD Simple</h1>
+    <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
+      <img src="/forge.png" alt="Forge" style={{ width: '140px', height: '140px', borderRadius: '28px', marginBottom: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
+      {showInstall && (
+        <div style={{ width: '100%', marginBottom: '16px' }}>
+          {installPrompt && (
+            <button onClick={handleInstall} style={{ width: '100%', padding: '14px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px' }}>
+              Instalează aplicația
+            </button>
+          )}
+          {isIOS && !installPrompt && (
+            <div style={{ background: '#1a1a1a', borderRadius: '14px', padding: '14px 16px', color: '#ccc', fontSize: '13px', lineHeight: '1.6', textAlign: 'center' }}>
+              Apasă <strong style={{ color: '#fff' }}>Share</strong> (↑) din browser, apoi <strong style={{ color: '#fff' }}>Add to Home Screen</strong> pentru a instala.
+            </div>
+          )}
+          {!isIOS && !installPrompt && (
+            <div style={{ background: '#1a1a1a', borderRadius: '14px', padding: '14px 16px', color: '#ccc', fontSize: '13px', lineHeight: '1.6', textAlign: 'center' }}>
+              Din meniul browserului (⋮) alege <strong style={{ color: '#fff' }}>Adaugă pe ecranul principal</strong>.
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{ width: '100%', background: '#1a1a1a', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>Forge</h1>
           <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? 'Bine ai revenit!' : 'Creează cont nou'}</p>
         </div>
         {authScreen === 'register' && (
           <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume complet</div>
-            <input value={authNume} onChange={e => setAuthNume(e.target.value)} placeholder="ex: Alex Ionescu" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui' }} />
+            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Nume complet</div>
+            <input value={authNume} onChange={e => setAuthNume(e.target.value)} placeholder="ex: Alex Ionescu" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
           </div>
         )}
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Email</div>
-          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="email@exemplu.com" type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui' }} />
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Email</div>
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="email@exemplu.com" type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Parolă</div>
-          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="minimum 6 caractere" type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui' }} />
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Parolă</div>
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="minimum 6 caractere" type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         {authError && (
-          <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#EAF3DE' : '#FCEBEB', color: authError.startsWith('✓') ? '#27500A' : '#791F1F', fontSize: '12px' }}>
+          <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
             {authError}
           </div>
         )}
@@ -1374,7 +1413,7 @@ function App() {
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
           {authScreen === 'login' ? 'Nu ai cont? ' : 'Ai deja cont? '}
-          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#3C3489', fontWeight: '600', cursor: 'pointer' }}>
+          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#7b73e8', fontWeight: '600', cursor: 'pointer' }}>
             {authScreen === 'login' ? 'Înregistrează-te' : 'Intră în cont'}
           </span>
         </div>
