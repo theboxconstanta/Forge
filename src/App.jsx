@@ -1363,24 +1363,53 @@ function App() {
 
   if (!user) return (
     <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
-      {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setInstallDismissed(false)}>
-        <div style={{ background: '#1a1a1a', borderRadius: '20px 20px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: '430px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          <img src="/forge.png" alt="Forge" style={{ width: '72px', height: '72px', borderRadius: '16px', marginBottom: '16px' }} />
-          <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>Instalează Forge</div>
-          {isIOS ? (<>
-            <div style={{ fontSize: '14px', color: '#aaa', lineHeight: '1.7', marginBottom: '20px' }}>
-              1. Apasă <strong style={{ color: '#fff' }}>↑ Share</strong> din bara de jos<br/>
-              2. Alege <strong style={{ color: '#fff' }}>Add to Home Screen</strong><br/>
-              3. Apasă <strong style={{ color: '#fff' }}>Add</strong>
+      {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setInstallDismissed(false)}>
+        <div style={{ background: '#1c1c1e', borderRadius: '24px 24px 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: '430px' }} onClick={e => e.stopPropagation()}>
+          <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px', margin: '0 auto 24px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+            <img src="/forge.png" alt="Forge" style={{ width: '56px', height: '56px', borderRadius: '12px' }} />
+            <div>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff' }}>Instalează Forge</div>
+              <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>Adaugă pe ecranul principal</div>
             </div>
-            <div style={{ fontSize: '32px', marginBottom: '20px' }}>↑</div>
+          </div>
+          {isIOS ? (<>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              {[
+                { nr: '1', text: 'Apasă butonul', icon: '⎋', sub: 'Share — în bara de jos a Safari' },
+                { nr: '2', text: 'Derulează și alege', icon: '＋', sub: '"Add to Home Screen"' },
+                { nr: '3', text: 'Apasă', icon: '✓', sub: '"Add" în colțul din dreapta sus' },
+              ].map(s => (
+                <div key={s.nr} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: '#2c2c2e', borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '20px' }}>💡</span>
+              <span style={{ fontSize: '12px', color: '#888', lineHeight: '1.5' }}>Butonul Share (⎋) se află în mijlocul barei de jos din Safari</span>
+            </div>
           </>) : (<>
-            <div style={{ fontSize: '14px', color: '#aaa', lineHeight: '1.7', marginBottom: '20px' }}>
-              1. Apasă <strong style={{ color: '#fff' }}>⋮ Meniu</strong> din browser<br/>
-              2. Alege <strong style={{ color: '#fff' }}>Adaugă pe ecranul principal</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              {[
+                { icon: '⋮', text: 'Apasă meniul', sub: 'Cele 3 puncte din colțul browserului' },
+                { icon: '＋', text: 'Alege opțiunea', sub: '"Adaugă pe ecranul principal"' },
+              ].map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </>)}
-          <button onClick={() => setInstallDismissed(false)} style={{ width: '100%', padding: '13px', background: '#333', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Închide</button>
+          <button onClick={() => setInstallDismissed(false)} style={{ width: '100%', padding: '14px', background: '#2c2c2e', color: '#fff', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Am înțeles</button>
         </div>
       </div>}
       <img src="/forge.png" alt="Forge" style={{ width: '140px', height: '140px', borderRadius: '28px', marginBottom: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
