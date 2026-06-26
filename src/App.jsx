@@ -1569,6 +1569,14 @@ function App() {
       showToast('❌ Ai epuizat toate ședințele din abonament!')
       return
     }
+    if (!esteRezervat) {
+      const clasa = claseDB.find(c => c.id === clasaId)
+      const ocupate = rezervariPerClasa[clasaId]?.count ?? 0
+      if (clasa && ocupate >= clasa.max_spots) {
+        showToast('❌ Clasa este plină!')
+        return
+      }
+    }
     if (esteRezervat) {
       await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
@@ -1604,7 +1612,7 @@ function App() {
     clase: claseDB.filter(c => c.date === date)
   }))
 
-  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id))
+  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id) && c.date >= aziStr)
 
   const VARIANTE_CONFIG = [
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
@@ -2214,6 +2222,8 @@ function App() {
                   {claseGroupate[ziSelectata]?.clase.map((c) => {
                     const esteRezervat = rezervariMele.includes(c.id)
                     const isOpen = clasaSelectata === c.id
+                    const esteInTrecut = c.date < aziStr
+                    const esteFulla = !isAdmin && (rezervariPerClasa[c.id]?.count ?? 0) >= c.max_spots
                     const blocat = !esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                     return (
                       <div key={c.id} onClick={() => !esteRezervat && setClasaSelectata(isOpen ? null : c.id)}
@@ -2225,10 +2235,10 @@ function App() {
                           </div>
                           {esteRezervat
                             ? <span style={{ background: '#3C3489', color: '#fff', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', flexShrink: 0 }}>✓ Rezervat</span>
-                            : blocat
-                              ? <span style={{ fontSize: '11px', color: '#aaa' }}>🔒</span>
-                              : <span style={{ fontSize: '12px', color: (rezervariPerClasa[c.id]?.count ?? 0) >= c.max_spots ? '#e53935' : '#555', fontWeight: '500' }}>
-                                  {rezervariPerClasa[c.id]?.count ?? 0}/{c.max_spots} locuri
+                            : esteInTrecut
+                              ? <span style={{ fontSize: '11px', color: '#aaa', background: '#f0f0f0', padding: '3px 8px', borderRadius: '20px' }}>Trecut</span>
+                              : <span style={{ fontSize: '12px', color: esteFulla ? '#e53935' : '#555', fontWeight: '500' }}>
+                                  {rezervariPerClasa[c.id]?.count ?? 0}/{c.max_spots} {esteFulla ? '🔒 Plin' : 'locuri'}
                                 </span>
                           }
                         </div>
@@ -2262,10 +2272,16 @@ function App() {
                                 ))}
                               </div>
                             )}
-                              <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat}
-                                style={{ width: '100%', padding: '10px', background: blocat ? '#f0f0f0' : '#3C3489', color: blocat ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat ? 'not-allowed' : 'pointer' }}>
-                                {blocat ? 'Ședințe epuizate' : 'Rezervă locul'}
+                            {esteInTrecut ? (
+                              <div style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#aaa', background: '#f5f5f5', borderRadius: '10px' }}>
+                                Clasă trecută — nu se mai poate rezerva
+                              </div>
+                            ) : (
+                              <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat || esteFulla}
+                                style={{ width: '100%', padding: '10px', background: blocat || esteFulla ? '#f0f0f0' : '#3C3489', color: blocat || esteFulla ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat || esteFulla ? 'not-allowed' : 'pointer' }}>
+                                {blocat ? 'Ședințe epuizate' : esteFulla ? 'Clasă plină' : 'Rezervă locul'}
                               </button>
+                            )}
                           </div>
                         )}
                       </div>
