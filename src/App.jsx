@@ -1083,6 +1083,9 @@ function App() {
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('forge_remember_email'))
+  const [resetMode, setResetMode] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [authEmailInit] = useState(localStorage.getItem('forge_remember_email') || '')
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(false)
@@ -1109,7 +1112,8 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null); setAuthLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { setResetMode(true); return }
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -1248,6 +1252,16 @@ function App() {
     setAuthSubmitting(false)
   }
 
+  const handleSetNewPassword = async () => {
+    if (newPassword !== newPasswordConfirm) { setAuthError('Parolele nu coincid.'); return }
+    if (newPassword.length < 6) { setAuthError('Parola trebuie să aibă minim 6 caractere.'); return }
+    setAuthSubmitting(true); setAuthError('')
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) setAuthError(error.message)
+    else { setResetMode(false); setNewPassword(''); setNewPasswordConfirm('') }
+    setAuthSubmitting(false)
+  }
+
   const handleForgotPassword = async () => {
     if (!authEmail) { setAuthError('Introdu emailul mai întâi.'); return }
     setAuthSubmitting(true); setAuthError('')
@@ -1363,6 +1377,37 @@ function App() {
 
   const abonamentActiv = abonamentReal !== null && new Date(abonamentReal.end_date) >= new Date()
   const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+
+  if (resetMode) return (
+    <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
+      <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
+      <div style={{ width: '100%', background: '#1a1a1a', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>Parolă nouă</div>
+          <div style={{ fontSize: '13px', color: '#888' }}>Alege o parolă nouă pentru contul tău</div>
+        </div>
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Parolă nouă</div>
+          <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder="minimum 6 caractere"
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Confirmă parola</div>
+          <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder="repetă parola"
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+        </div>
+        {authError && (
+          <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
+            {authError}
+          </div>
+        )}
+        <button onClick={handleSetNewPassword} disabled={authSubmitting}
+          style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+          {authSubmitting ? 'Se salvează...' : 'Salvează parola'}
+        </button>
+      </div>
+    </div>
+  )
 
   if (authLoading) return (
     <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
