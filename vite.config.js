@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'pwa-icon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'Workout Of The Day',
-        short_name: 'WOD',
+        name: 'Forge',
+        short_name: 'Forge',
         description: 'Aplicație CrossFit pentru antrenamente, PR-uri și clase',
         theme_color: '#3C3489',
         background_color: '#ffffff',
