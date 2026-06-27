@@ -1797,7 +1797,7 @@ function App() {
     clase: claseDB.filter(c => c.date === date)
   }))
 
-  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id) && c.date >= aziStr)
+  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > new Date())
 
   const VARIANTE_CONFIG = [
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
