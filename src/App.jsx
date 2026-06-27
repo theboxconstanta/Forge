@@ -2332,12 +2332,12 @@ function App() {
             return (
               <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
-                <div style={{ background: '#f8f7ff', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
+                <div style={{ background: '#f5fff0', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', marginBottom: '8px' }}>
                     {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                   </div>
                   {miscariWod.length > 0 ? miscariWod.map((m, i) => (
-                    <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #ece9ff' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
+                    <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #d4f0c0' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
                       {m}
                     </div>
                   )) : (
@@ -2636,4 +2636,5 @@ function App() {
 }
 
 export default App
+
 
