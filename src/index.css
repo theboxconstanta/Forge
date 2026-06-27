@@ -38,19 +38,23 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Pe telefon in landscape: rotim continutul inapoi la portret */
-@media screen and (orientation: landscape) and (max-height: 500px) {
-  html, body {
+/* Pe telefon in landscape: rotim continutul inapoi la portret (fallback CSS) */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+  html {
     overflow: hidden;
-    width: 100vh;
-    height: 100vw;
+  }
+  body {
+    overflow: hidden;
+    width: 100dvh;
+    height: 100dvw;
+    max-width: 100dvh;
   }
   #root {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vh;
-    height: 100vw;
+    width: 100dvh;
+    height: 100dvw;
     transform: rotate(-90deg) translateX(-100%);
     transform-origin: top left;
     overflow-y: auto;
