@@ -932,11 +932,11 @@ function Admin({ showToast }) {
         <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>COACH</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '16px', paddingBottom: '4px' }}>
-        {[{ id: 'clienti', lbl: '👥 Clienți' }, { id: 'abonamente', lbl: '🎟️ Abonamente' }, { id: 'clase', lbl: '📅 Clase' }, { id: 'wod', lbl: '🏋️ WOD' }, { id: 'planuri', lbl: '📋 Planuri' }].map(t => (
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ padding: '7px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#3C3489' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {t.lbl}
+            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#3C3489' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
           </div>
         ))}
       </div>
