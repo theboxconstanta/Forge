@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 /* eslint-disable */
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
@@ -50,7 +50,7 @@ const MISCARI = [
 ]
 
 const FEED_INITIAL = [
-  { id:1, nume:'Mihai D.', avatar:'MD', avatarBg:'#EEEDFE', avatarColor:'#3C3489', text:'Fran în 3:58 🔥 PR nou cu 24 secunde!', timp:'12 min', reactii:{ '🔥':8, '💪':5, '❤️':3 }, comentarii:[], variantaWod:'RX' },
+  { id:1, nume:'Mihai D.', avatar:'MD', avatarBg:'#EDFFD4', avatarColor:'#2F6600', text:'Fran în 3:58 🔥 PR nou cu 24 secunde!', timp:'12 min', reactii:{ '🔥':8, '💪':5, '❤️':3 }, comentarii:[], variantaWod:'RX' },
   { id:2, nume:'Ioana A.', avatar:'IA', avatarBg:'#EAF3DE', avatarColor:'#27500A', text:'Back squat 75kg — prima dată! 🎉 Mulțumesc coach!', timp:'1 oră', reactii:{ '🔥':4, '💪':7, '❤️':12 }, comentarii:[{ autor:'Coach Andrei', text:'Bravo Ioana! 💪' }], variantaWod:'Beginner' },
   { id:3, nume:'Radu B.', avatar:'RB', avatarBg:'#FAEEDA', avatarColor:'#633806', text:'EMOM 20 min — am supraviețuit 😅', timp:'2 ore', reactii:{ '🔥':6, '💪':4, '❤️':2 }, comentarii:[], variantaWod:'Intermediate' },
 ]
@@ -74,8 +74,8 @@ function getInitiale(name) {
 }
 
 function AvatarCircle({ name, size = 38 }) {
-  const culori = ['#EEEDFE', '#EAF3DE', '#FAEEDA', '#E6F1FB', '#FCE8E8']
-  const textCulori = ['#3C3489', '#27500A', '#633806', '#0C447C', '#791F1F']
+  const culori = ['#EDFFD4', '#EAF3DE', '#FAEEDA', '#E6F1FB', '#FCE8E8']
+  const textCulori = ['#2F6600', '#27500A', '#633806', '#0C447C', '#791F1F']
   const idx = name ? name.charCodeAt(0) % culori.length : 0
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', background: culori[idx], color: textCulori[idx], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.3, fontWeight: '600', flexShrink: 0 }}>
@@ -96,7 +96,7 @@ function NavBar({ screen, setScreen, isAdmin }) {
         { icon: '👥', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
-        <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#3C3489' : '#aaa' }}>
+        <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#2F6600' : '#aaa' }}>
           <span style={{ fontSize: '20px' }}>{n.icon}</span>
           <span style={{ fontSize: '10px', fontWeight: screen === n.sc ? '600' : '400' }}>{n.lbl}</span>
         </div>
@@ -123,13 +123,13 @@ function CautareMiscare({ onAleage, preFill }) {
     <div style={{ position: 'relative', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Exercițiu / Mișcare</div>
       <input value={query} onChange={e => cauta(e.target.value)} placeholder="Scrie pentru a căuta..."
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #3C3489' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #2F6600' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
       {sugestii.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
           {sugestii.map((s, i) => (
             <div key={i} onClick={() => alege(s)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f5f5f5' : 'none' }}>{s}</div>
           ))}
-          <div onClick={() => alege(query)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '12px', color: '#3C3489', fontWeight: '500', background: '#EEEDFE' }}>
+          <div onClick={() => alege(query)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '12px', color: '#2F6600', fontWeight: '500', background: '#EDFFD4' }}>
             + Adaugă "{query}" ca mișcare nouă
           </div>
         </div>
@@ -221,7 +221,7 @@ function Timer({ onBack, defaultFortime }) {
   const pct = Math.max(0, secunde / totalSec)
   const circumferinta = 2 * Math.PI * 80
   const offset = circumferinta * (1 - pct)
-  const culoareRing = gata ? '#27500A' : mod === 'tabata' && tabataFaza === 'odihna' ? '#1D9E75' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#534AB7'
+  const culoareRing = gata ? '#27500A' : mod === 'tabata' && tabataFaza === 'odihna' ? '#1D9E75' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#2F6600'
   const culoareText = gata ? '#27500A' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -232,9 +232,9 @@ function Timer({ onBack, defaultFortime }) {
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
         {moduri.map(m => (
           <div key={m.id} onClick={() => setMod(m.id)}
-            style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #3C3489' : '1px solid #e0e0e0', background: mod === m.id ? '#EEEDFE' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #2F6600' : '1px solid #e0e0e0', background: mod === m.id ? '#EDFFD4' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <div style={{ fontSize: '18px' }}>{m.icon}</div>
-            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#3C3489' : '#888' }}>{m.lbl}</div>
+            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#2F6600' : '#888' }}>{m.lbl}</div>
           </div>
         ))}
       </div>
@@ -311,10 +311,10 @@ function Timer({ onBack, defaultFortime }) {
         </div>
       )}
       {countdown !== null && (
-        <div style={{ background: '#3C3489', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', color: '#C5C2F5', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pregătește-te!</div>
+        <div style={{ background: '#2F6600', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
+          <div style={{ fontSize: '13px', color: '#C8FF00', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pregătește-te!</div>
           <div style={{ fontSize: '80px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>{countdown}</div>
-          <div style={{ fontSize: '14px', color: '#C5C2F5', marginTop: '8px' }}>
+          <div style={{ fontSize: '14px', color: '#C8FF00', marginTop: '8px' }}>
             {countdown <= 3 ? ['', '🔴', '🟡', '🟢'][countdown] + ' ' : ''}{countdown === 1 ? 'Gata!' : countdown <= 3 ? countdown : 'secunde...'}
           </div>
         </div>
@@ -352,20 +352,20 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'amrap' && (
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>RUNDE</div>
-              <div style={{ fontSize: '42px', fontWeight: '700', color: '#3C3489' }}>{runde}</div>
+              <div style={{ fontSize: '42px', fontWeight: '700', color: '#2F6600' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
                 <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '18px', cursor: 'pointer' }}>−</button>
-                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #3C3489', background: '#EEEDFE', fontSize: '18px', color: '#3C3489', fontWeight: '700', cursor: 'pointer' }}>+</button>
+                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #2F6600', background: '#EDFFD4', fontSize: '18px', color: '#2F6600', fontWeight: '700', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
             <button onClick={reset} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '20px', cursor: 'pointer' }}>↺</button>
-            <button onClick={toggleTimer} style={{ width: '64px', height: '64px', borderRadius: '50%', border: 'none', background: gata ? '#EAF3DE' : running ? '#BA7517' : '#3C3489', color: gata ? '#27500A' : '#fff', fontSize: '24px', cursor: gata ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+            <button onClick={toggleTimer} style={{ width: '64px', height: '64px', borderRadius: '50%', border: 'none', background: gata ? '#EAF3DE' : running ? '#BA7517' : '#2F6600', color: gata ? '#27500A' : '#fff', fontSize: '24px', cursor: gata ? 'default' : 'pointer', transition: 'background 0.2s' }}>
               {gata ? '✓' : running ? '⏸' : '▶'}
             </button>
             {mod === 'amrap'
-              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #3C3489', background: '#EEEDFE', color: '#3C3489', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+1</button>
+              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #2F6600', background: '#EDFFD4', color: '#2F6600', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+1</button>
               : <div style={{ width: '48px' }} />
             }
           </div>
@@ -442,7 +442,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' }}>Clasament 🏅</h1>
-        <button onClick={onRefresh} style={{ background: '#EEEDFE', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#3C3489', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
+        <button onClick={onRefresh} style={{ background: '#EDFFD4', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
       </div>
       <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
         {new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -538,7 +538,7 @@ function Feed({ showToast }) {
   }
   const posteaza = () => {
     if (!postText.trim()) return
-    setFeed(prev => [{ id: Date.now(), nume: 'Tu', avatar: 'TU', avatarBg: '#EEEDFE', avatarColor: '#3C3489', text: postText.trim(), timp: 'acum', reactii: { '🔥': 0, '💪': 0, '❤️': 0 }, comentarii: [], variantaWod: 'RX' }, ...prev])
+    setFeed(prev => [{ id: Date.now(), nume: 'Tu', avatar: 'TU', avatarBg: '#EDFFD4', avatarcolor: '#2F6600', text: postText.trim(), timp: 'acum', reactii: { '🔥': 0, '💪': 0, '❤️': 0 }, comentarii: [], variantaWod: 'RX' }, ...prev])
     setPostText(''); showToast('Postat! 🎉')
   }
   return (
@@ -546,11 +546,11 @@ function Feed({ showToast }) {
       <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Feed 👥</h1>
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#EEEDFE', color: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>TU</div>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#EDFFD4', color: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>TU</div>
           <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="Cum a fost antrenamentul azi?"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#1a1a1a', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'system-ui' }} />
         </div>
-        {postText.trim() && <button onClick={posteaza} style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Postează</button>}
+        {postText.trim() && <button onClick={posteaza} style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Postează</button>}
       </div>
       {feed.map(post => (
         <div key={post.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -568,7 +568,7 @@ function Feed({ showToast }) {
           <div style={{ display: 'flex', gap: '8px', marginBottom: post.comentarii.length > 0 ? '10px' : '0' }}>
             {Object.entries(post.reactii).map(([emoji, count]) => {
               const activa = reactiiMele[post.id + '-' + emoji]
-              return <button key={emoji} onClick={() => toggleReactie(post.id, emoji)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: activa ? '1.5px solid #3C3489' : '1px solid #e0e0e0', background: activa ? '#EEEDFE' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: activa ? '#3C3489' : '#555', fontWeight: activa ? '600' : '400' }}>{emoji} {count}</button>
+              return <button key={emoji} onClick={() => toggleReactie(post.id, emoji)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: activa ? '1.5px solid #2F6600' : '1px solid #e0e0e0', background: activa ? '#EDFFD4' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: activa ? '#2F6600' : '#555', fontWeight: activa ? '600' : '400' }}>{emoji} {count}</button>
             })}
             <button onClick={() => setComentariuDeschis(comentariuDeschis === post.id ? null : post.id)} style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e0e0e0', background: '#f5f5f5', cursor: 'pointer', fontSize: '11px', color: '#888' }}>💬 {post.comentarii.length > 0 ? post.comentarii.length : ''}</button>
           </div>
@@ -588,7 +588,7 @@ function Feed({ showToast }) {
           {comentariuDeschis === post.id && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input value={comentariuText} onChange={e => setComentariuText(e.target.value)} onKeyDown={e => e.key === 'Enter' && adaugaComentariu(post.id)} placeholder="Scrie un comentariu..." style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa' }} />
-              <button onClick={() => adaugaComentariu(post.id)} style={{ padding: '8px 14px', borderRadius: '20px', background: '#3C3489', color: '#fff', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Trimite</button>
+              <button onClick={() => adaugaComentariu(post.id)} style={{ padding: '8px 14px', borderRadius: '20px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Trimite</button>
             </div>
           )}
         </div>
@@ -937,7 +937,7 @@ function Admin({ showToast }) {
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#3C3489' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#2F6600' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
           </div>
         ))}
@@ -958,7 +958,7 @@ function Admin({ showToast }) {
               { id: 'inactivi', lbl: '⚠️ Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
             ].map(s => (
               <div key={s.id} onClick={() => setSortClienti(s.id)}
-                style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#3C3489' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#2F6600' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {s.lbl}
                 <span style={{ background: sortClienti === s.id ? 'rgba(255,255,255,0.25)' : '#f0f0f0', color: sortClienti === s.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{s.count}</span>
               </div>
@@ -982,7 +982,7 @@ function Admin({ showToast }) {
             const isOpen = clientSelectat === c.id
             return (
               <div key={c.id} onClick={() => setClientSelectat(isOpen ? null : c.id)}
-                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#3C3489' : abo ? '#27500A' : '#e0e0e0'}` }}>
+                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#2F6600' : abo ? '#27500A' : '#e0e0e0'}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <AvatarCircle name={c.full_name || c.email} size={42} />
                   <div style={{ flex: 1 }}>
@@ -990,7 +990,7 @@ function Admin({ showToast }) {
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#3C3489' : '#27500A', fontWeight: '500' }}>
+                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#2F6600' : '#27500A', fontWeight: '500' }}>
                           {sedinteEpuizate ? '⚠️ Epuizat' : expirat ? '⚠️ Expirat' : neInceput ? `📅 Din ${new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
@@ -1025,7 +1025,7 @@ function Admin({ showToast }) {
                       </div>
                     ) : null}
                     <button onClick={(e) => { e.stopPropagation(); setAdminTab('abonamente'); setEmailAbonament(c.email); setNumeAbonament(c.full_name || '') }}
-                      style={{ width: '100%', padding: '8px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                      style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                       {abo ? '🔄 Reînnoiește abonament' : '+ Adaugă abonament'}
                     </button>
                   </div>
@@ -1100,7 +1100,7 @@ function Admin({ showToast }) {
                 </div>
               )
             })()}
-            <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
+            <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
               {savingAbonament ? 'Se salvează...' : '+ Adaugă abonament'}
             </button>
           </div>
@@ -1127,7 +1127,7 @@ function Admin({ showToast }) {
                       {aSedinteEpuizate ? ' · epuizat' : ''}
                     </div>
                     {a.sessions_total && <div style={{ fontSize: '11px', color: aSedinteEpuizate ? '#E24B4A' : '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
-                    <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes || 'Plătit: 0 RON'}</div>
+                    <div style={{ fontSize: '11px', color: '#2F6600', marginTop: '2px' }}>{a.notes || 'Plătit: 0 RON'}</div>
                   </div>
                   <button onClick={() => stergeAbonament(a.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', marginLeft: '8px' }}>🗑️</button>
                 </div>
@@ -1169,22 +1169,22 @@ function Admin({ showToast }) {
               <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>+</button>
             </div>
             <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]); setLaInfinit(false) }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EEEDFE' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #3C3489' : '1.5px solid transparent' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EDFFD4' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #2F6600' : '1.5px solid transparent' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>Repetă săptămânal</div>
                 <div style={{ fontSize: '11px', color: '#888' }}>Creează automat pe zilele alese</div>
               </div>
-              <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#3C3489' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+              <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#2F6600' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: '3px', left: repetitiva ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
               </div>
             </div>
             {repetitiva && (
-              <div style={{ background: '#EEEDFE', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', color: '#3C3489', fontWeight: '600', marginBottom: '8px' }}>ZILELE SĂPTĂMÂNII</div>
+              <div style={{ background: '#EDFFD4', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600', marginBottom: '8px' }}>ZILELE SĂPTĂMÂNII</div>
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
                   {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((z, i) => (
                     <div key={i} onClick={() => toggleZiRepetare(i)}
-                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#3C3489' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #3C3489' : '1px solid #C5C2F5' }}>
+                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#2F6600' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #2F6600' : '1px solid #C5C2F5' }}>
                       {z}
                     </div>
                   ))}
@@ -1192,27 +1192,27 @@ function Admin({ showToast }) {
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                   {[{ id: false, lbl: 'Nr. săptămâni' }, { id: true, lbl: 'Până opresc eu' }].map(opt => (
                     <div key={String(opt.id)} onClick={() => setLaInfinit(opt.id)}
-                      style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#3C3489' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #3C3489' : '1px solid #C5C2F5' }}>
+                      style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#2F6600' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #2F6600' : '1px solid #C5C2F5' }}>
                       {opt.lbl}
                     </div>
                   ))}
                 </div>
                 {!laInfinit && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#3C3489', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
-                    <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #C5C2F5', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                    <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#2F6600', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
+                    <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
                   </div>
                 )}
                 {laInfinit && (
-                  <div style={{ fontSize: '11px', color: '#534AB7', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
+                  <div style={{ fontSize: '11px', color: '#2F6600', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
                 )}
                 {dataClasa && zileRepetare.length > 0 && (() => {
                   const dates = genereazaDateRepetare()
                   if (dates.length === 0) return null
                   const last = new Date(dates[dates.length - 1] + 'T00:00:00')
                   return (
-                    <div style={{ fontSize: '11px', color: '#534AB7', lineHeight: '1.6' }}>
+                    <div style={{ fontSize: '11px', color: '#2F6600', lineHeight: '1.6' }}>
                       {dates.length} clase · până în {last.toLocaleDateString('ro-RO')}
                     </div>
                   )
@@ -1220,7 +1220,7 @@ function Admin({ showToast }) {
                 {zileRepetare.length === 0 && <div style={{ fontSize: '11px', color: '#888' }}>Alege cel puțin o zi</div>}
               </div>
             )}
-            <button onClick={saveClasa} disabled={savingClasa} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingClasa ? 'not-allowed' : 'pointer', opacity: savingClasa ? 0.7 : 1 }}>
+            <button onClick={saveClasa} disabled={savingClasa} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingClasa ? 'not-allowed' : 'pointer', opacity: savingClasa ? 0.7 : 1 }}>
               {savingClasa ? 'Se salvează...' : repetitiva && zileRepetare.length > 0 && dataClasa ? `+ Creează ${genereazaDateRepetare().length} clase` : '+ Creează clasa'}
             </button>
           </div>
@@ -1295,7 +1295,7 @@ function Admin({ showToast }) {
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
               </div>
             ))}
-            <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
+            <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
               {savingWod ? 'Se salvează...' : '+ Creează WOD'}
             </button>
           </div>
@@ -1329,7 +1329,7 @@ function Admin({ showToast }) {
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Preț (RON)</div>
             <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder="ex: 250"
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-            <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
+            <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
               {savingPlan ? 'Se salvează...' : '+ Adaugă plan'}
             </button>
           </div>
@@ -1371,16 +1371,16 @@ function JurnalList({ logs }) {
         const isOpen = deschis === i
         return (
           <div key={i} onClick={() => setDeschis(isOpen ? null : i)}
-            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489', cursor: 'pointer' }}>
+            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489' }}>{w.variant_level || 'WOD'}</div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600' }}>{w.variant_level || 'WOD'}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#aaa' }}>{data}</div>
                 <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-              {w.result && <span style={{ fontSize: '12px', background: '#EEEDFE', color: '#3C3489', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
+              {w.result && <span style={{ fontSize: '12px', background: '#EDFFD4', color: '#2F6600', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
               {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
               {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
             </div>
@@ -1914,7 +1914,7 @@ function App() {
           </div>
         )}
         <button onClick={handleSetNewPassword} disabled={authSubmitting}
-          style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+          style={{ width: '100%', padding: '13px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
           {authSubmitting ? 'Se salvează...' : 'Salvează parola'}
         </button>
       </div>
@@ -1950,7 +1950,7 @@ function App() {
                 { nr: '3', text: 'Apasă', icon: '✓', sub: '"Add" în colțul din dreapta sus' },
               ].map(s => (
                 <div key={s.nr} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
                   <div>
                     <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
@@ -1969,7 +1969,7 @@ function App() {
                 { icon: '＋', text: 'Alege opțiunea', sub: '"Adaugă pe ecranul principal"' },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
                   <div>
                     <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
@@ -2018,10 +2018,10 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentColor: '#3C3489', cursor: 'pointer' }} />
+                style={{ width: '16px', height: '16px', accentcolor: '#2F6600', cursor: 'pointer' }} />
               <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
             </label>
-            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#7b73e8', cursor: 'pointer', fontWeight: '500' }}>
+            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#2F6600', cursor: 'pointer', fontWeight: '500' }}>
               Forgot password?
             </span>
           </div>
@@ -2032,12 +2032,12 @@ function App() {
           </div>
         )}
         <button onClick={authScreen === 'login' ? handleLogin : handleRegister} disabled={authSubmitting}
-          style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+          style={{ width: '100%', padding: '13px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
           {authSubmitting ? 'Se încarcă...' : authScreen === 'login' ? 'Intră în cont' : 'Creează cont'}
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
           {authScreen === 'login' ? 'Nu ai cont? ' : 'Ai deja cont? '}
-          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#7b73e8', fontWeight: '600', cursor: 'pointer' }}>
+          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>
             {authScreen === 'login' ? 'Înregistrează-te' : 'Intră în cont'}
           </span>
         </div>
@@ -2078,7 +2078,7 @@ function App() {
                     ? 'Ai consumat toate ședințele din abonament. Contactează coachul pentru a achiziționa un abonament nou.'
                     : 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'}
             </div>
-            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
               Vezi abonamentul →
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
@@ -2095,7 +2095,7 @@ function App() {
               <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a' }}>Bună, {user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0]} 👋</h1>
               <p style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
-            <button onClick={() => setScreen('abonament')} style={{ background: abonamentActiv ? '#EEEDFE' : '#FCEBEB', color: abonamentActiv ? '#3C3489' : '#791F1F', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', marginTop: '4px', whiteSpace: 'nowrap' }}>
+            <button onClick={() => setScreen('abonament')} style={{ background: abonamentActiv ? '#EDFFD4' : '#FCEBEB', color: abonamentActiv ? '#2F6600' : '#791F1F', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', marginTop: '4px', whiteSpace: 'nowrap' }}>
               {abonamentActiv ? '🎟️ Abonament' : '🔒 Expirat'}
             </button>
           </div>
@@ -2123,7 +2123,7 @@ function App() {
                   </div>
                 )}
               </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#3C3489' : '#EEEDFE', color: wodDeschis ? '#fff' : '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#2F6600' : '#EDFFD4', color: wodDeschis ? '#fff' : '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                 {wodDeschis ? '−' : '+'}
               </div>
             </div>
@@ -2159,7 +2159,7 @@ function App() {
                   )
                 })}
                 <button onClick={() => { setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
-                  style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#3C3489' : '#ccc', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                  style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#2F6600' : '#ccc', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                   {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
                 </button>
               </div>
@@ -2170,7 +2170,7 @@ function App() {
               </div>
             )}
           </div>
-          <button onClick={goTimer} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: '#fff', border: '2px solid #3C3489', borderRadius: '14px', fontSize: '14px', fontWeight: '600', color: '#3C3489', cursor: 'pointer', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <button onClick={goTimer} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: '#fff', border: '2px solid #2F6600', borderRadius: '14px', fontSize: '14px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             ⏱️ Pornește Timer
           </button>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -2207,16 +2207,16 @@ function App() {
               <div style={{ fontSize: '12px', color: '#888' }}>Contactează coachul pentru a adăuga un abonament.</div>
             </div>
           ) : !abonamentActiv ? (
-            <div style={{ background: !abonamentInceput ? '#EEEDFE' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
+            <div style={{ background: !abonamentInceput ? '#EDFFD4' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>
                 {!abonamentInceput ? '📅' : sedinteLimitate && sedinteRamase === 0 ? '🏁' : '🔒'}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#3C3489' : '#791F1F', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#2F6600' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? 'Abonament programat'
                   : sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate'
                   : 'Abonament expirat'}
               </div>
-              <div style={{ fontSize: '12px', color: !abonamentInceput ? '#3C3489' : '#A32D2D' }}>
+              <div style={{ fontSize: '12px', color: !abonamentInceput ? '#2F6600' : '#A32D2D' }}>
                 {!abonamentInceput
                   ? `Începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}.`
                   : sedinteLimitate && sedinteRamase === 0
@@ -2225,7 +2225,7 @@ function App() {
               </div>
             </div>
           ) : (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #3C3489' }}>
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #2F6600' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Plan activ</div>
@@ -2252,8 +2252,8 @@ function App() {
               )}
             </div>
           )}
-          <div style={{ background: '#EEEDFE', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#534AB7' }}>Pentru reînnoire sau întrebări contactează coachul.</div>
+          <div style={{ background: '#EDFFD4', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: '#2F6600' }}>Pentru reînnoire sau întrebări contactează coachul.</div>
           </div>
         </div>
       )}
@@ -2264,7 +2264,7 @@ function App() {
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
             {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
               <div key={t.id} onClick={() => setLogTab(t.id)}
-                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#3C3489' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#2F6600' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
                 {t.lbl}
               </div>
             ))}
@@ -2275,9 +2275,9 @@ function App() {
               <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
-                  style={{ flex: 1, background: '#EEEDFE', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  style={{ flex: 1, background: '#EDFFD4', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🏋️</span>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', textAlign: 'center' }}>Mișcare Unică</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', textAlign: 'center' }}>Mișcare Unică</span>
                 </div>
                 <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
                   style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
@@ -2316,7 +2316,7 @@ function App() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
                 {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
                   <div key={t} onClick={() => setWodTip(t)}
-                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #3C3489' : '1px solid #e0e0e0', background: wodTip === t ? '#EEEDFE' : '#fafafa', color: wodTip === t ? '#3C3489' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
+                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #2F6600' : '1px solid #e0e0e0', background: wodTip === t ? '#EDFFD4' : '#fafafa', color: wodTip === t ? '#2F6600' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
                     {t}
                   </div>
                 ))}
@@ -2333,7 +2333,7 @@ function App() {
               <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
                 <div style={{ background: '#f8f7ff', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', marginBottom: '8px' }}>
                     {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                   </div>
                   {miscariWod.length > 0 ? miscariWod.map((m, i) => (
@@ -2350,8 +2350,8 @@ function App() {
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
               {wodMiscari.map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EEEDFE', borderRadius: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#3C3489' }}>• {m}</span>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EDFFD4', borderRadius: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#2F6600' }}>• {m}</span>
                   <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                 </div>
               ))}
@@ -2360,7 +2360,7 @@ function App() {
                   onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
                   placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#3C3489', color: '#fff', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
               </div>
             </div>
           )}
@@ -2379,7 +2379,7 @@ function App() {
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder="Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
-              style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
+              style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
               {wodSaving ? 'Se salvează...' : 'Salvează WOD'}
             </button>
           </div>
@@ -2433,7 +2433,7 @@ function App() {
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Note</div>
                 <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder="Belt? Knee sleeves? Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                 <button onClick={savePR} disabled={prSaving}
-                  style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
+                  style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
                   {prSaving ? 'Se salvează...' : 'Salvează PR'}
                 </button>
               </>
@@ -2455,15 +2455,15 @@ function App() {
                 style={{ padding: '12px 0', borderBottom: i < prDate.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>{pr.movement}</div>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#3C3489' }}>{formatPR(pr)}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#2F6600' }}>{formatPR(pr)}</span>
                 </div>
                 <div style={{ fontSize: '10px', color: '#aaa' }}>
                   {new Date(pr.recorded_at).toLocaleDateString('ro-RO')}{pr.notes ? ' · ' + pr.notes : ''}
                 </div>
                 {prSelectat === i && (
-                  <div style={{ marginTop: '10px', background: '#EEEDFE', borderRadius: '10px', padding: '10px 12px' }}>
+                  <div style={{ marginTop: '10px', background: '#EDFFD4', borderRadius: '10px', padding: '10px 12px' }}>
                     <button onClick={(e) => { e.stopPropagation(); setLogPentruPR(pr); setMiscarePR(pr.movement); setPrValoare(''); setPrReps(''); setPrNote(''); setScreen('logPR') }}
-                      style={{ width: '100%', padding: '8px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                      style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                       + Adaugă rezultat nou
                     </button>
                   </div>
@@ -2472,7 +2472,7 @@ function App() {
             ))}
           </div>
           <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
-            style={{ width: '100%', padding: '12px', background: '#fff', color: '#3C3489', border: '2px solid #3C3489', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            style={{ width: '100%', padding: '12px', background: '#fff', color: '#2F6600', border: '2px solid #2F6600', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
             + Adaugă PR nou
           </button>
         </div>
@@ -2485,7 +2485,7 @@ function App() {
             {[{ id: 'ore', lbl: 'Ore disponibile' }, { id: 'mele', lbl: 'Rezervările mele' }].map(t => (
               <div key={t.id} onClick={() => setClasaTab(t.id)}
                 style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: clasaTab === t.id ? '600' : '400', background: clasaTab === t.id ? '#fff' : 'transparent', color: clasaTab === t.id ? '#1a1a1a' : '#888', boxShadow: clasaTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                {t.lbl} {t.id === 'mele' && rezervarileMeleAfisate.length > 0 && <span style={{ background: '#3C3489', color: '#fff', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', marginLeft: '4px' }}>{rezervarileMeleAfisate.length}</span>}
+                {t.lbl} {t.id === 'mele' && rezervarileMeleAfisate.length > 0 && <span style={{ background: '#C8FF00', color: '#111', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', marginLeft: '4px' }}>{rezervarileMeleAfisate.length}</span>}
               </div>
             ))}
           </div>
@@ -2499,13 +2499,13 @@ function App() {
                       return (
                         <div key={i} ref={esteAzi ? aziChipRef : null}
                           onClick={() => { setZiSelectata(i); setClasaSelectata(null) }}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 10px', borderRadius: '12px', border: selectat ? '2px solid #3C3489' : areRez ? '2px solid #3C3489' : '1px solid #e0e0e0', background: selectat ? '#3C3489' : areRez ? '#EEEDFE' : '#fff', cursor: 'pointer', minWidth: '48px', flexShrink: 0 }}>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#888' }}>{z.zi}</span>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: esteAzi && !selectat ? '2px solid #3C3489' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#1a1a1a' }}>{z.nr}</span>
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 10px', borderRadius: '12px', border: selectat ? '2px solid #2F6600' : areRez ? '2px solid #2F6600' : '1px solid #e0e0e0', background: selectat ? '#2F6600' : areRez ? '#EDFFD4' : '#fff', cursor: 'pointer', minWidth: '48px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: selectat ? '#C8FF00' : areRez ? '#2F6600' : esteAzi ? '#2F6600' : '#888' }}>{z.zi}</span>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: esteAzi && !selectat ? '2px solid #2F6600' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '16px', fontWeight: '600', color: selectat ? '#fff' : areRez ? '#2F6600' : esteAzi ? '#2F6600' : '#1a1a1a' }}>{z.nr}</span>
                           </div>
-                          <span style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : areRez ? '#3C3489' : esteAzi ? '#3C3489' : '#aaa', marginTop: '1px' }}>{z.luna}</span>
-                          {areRez && <div style={{ fontSize: '9px', color: selectat ? '#C5C2F5' : '#3C3489', fontWeight: '700' }}>✓</div>}
+                          <span style={{ fontSize: '9px', color: selectat ? '#C8FF00' : areRez ? '#2F6600' : esteAzi ? '#2F6600' : '#aaa', marginTop: '1px' }}>{z.luna}</span>
+                          {areRez && <div style={{ fontSize: '9px', color: selectat ? '#C8FF00' : '#2F6600', fontWeight: '700' }}>✓</div>}
                         </div>
                       )
                     })}
@@ -2529,14 +2529,14 @@ function App() {
                     const blocat = !esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                     return (
                       <div key={c.id} onClick={() => !esteRezervat && setClasaSelectata(isOpen ? null : c.id)}
-                        style={{ background: esteRezervat ? '#EEEDFE' : '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: esteRezervat ? 'default' : 'pointer', borderLeft: esteRezervat ? '4px solid #3C3489' : blocat ? '4px solid #e0e0e0' : '4px solid transparent' }}>
+                        style={{ background: esteRezervat ? '#EDFFD4' : '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: esteRezervat ? 'default' : 'pointer', borderLeft: esteRezervat ? '4px solid #2F6600' : blocat ? '4px solid #e0e0e0' : '4px solid transparent' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div>
                             <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
-                            <div style={{ fontSize: '12px', color: esteRezervat ? '#534AB7' : '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach}</div>
+                            <div style={{ fontSize: '12px', color: esteRezervat ? '#2F6600' : '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach}</div>
                           </div>
                           {esteRezervat
-                            ? <span style={{ background: '#3C3489', color: '#fff', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', flexShrink: 0 }}>✓ Rezervat</span>
+                            ? <span style={{ background: '#C8FF00', color: '#111', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', flexShrink: 0 }}>✓ Rezervat</span>
                             : esteInTrecut
                               ? <span style={{ fontSize: '11px', color: '#aaa', background: '#f0f0f0', padding: '3px 8px', borderRadius: '20px' }}>Trecut</span>
                               : <span style={{ fontSize: '12px', color: esteFulla ? '#e53935' : '#555', fontWeight: '500' }}>
@@ -2552,7 +2552,7 @@ function App() {
                                   PARTICIPANȚI ({rezervariPerClasa[c.id].count}/{c.max_spots})
                                 </div>
                                 {rezervariPerClasa[c.id].membri.map((name, i) => (
-                                  <div key={i} style={{ fontSize: '12px', color: '#534AB7', padding: '2px 0' }}>👤 {name}</div>
+                                  <div key={i} style={{ fontSize: '12px', color: '#2F6600', padding: '2px 0' }}>👤 {name}</div>
                                 ))}
                               </div>
                             )}
@@ -2580,7 +2580,7 @@ function App() {
                               </div>
                             ) : (
                               <button onClick={(e) => { e.stopPropagation(); toggleRezervare(c.id) }} disabled={blocat || esteFulla}
-                                style={{ width: '100%', padding: '10px', background: blocat || esteFulla ? '#f0f0f0' : '#3C3489', color: blocat || esteFulla ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat || esteFulla ? 'not-allowed' : 'pointer' }}>
+                                style={{ width: '100%', padding: '10px', background: blocat || esteFulla ? '#f0f0f0' : '#2F6600', color: blocat || esteFulla ? '#aaa' : '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: blocat || esteFulla ? 'not-allowed' : 'pointer' }}>
                                 {blocat ? 'Ședințe epuizate' : esteFulla ? 'Clasă plină' : 'Rezervă locul'}
                               </button>
                             )}
@@ -2599,7 +2599,7 @@ function App() {
                   <div style={{ fontSize: '14px' }}>Nu ai nicio rezervare</div>
                 </div>
               ) : rezervarileMeleAfisate.map((c) => (
-                <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #3C3489' }}>
+                <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
@@ -2636,3 +2636,4 @@ function App() {
 }
 
 export default App
+
