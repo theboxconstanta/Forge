@@ -4,8 +4,9 @@ import webpush from "npm:web-push";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@forge.ro";
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Forge Gym <onboarding@resend.dev>";
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY")!;
+const FROM_NAME = Deno.env.get("FROM_NAME") || "Forge Gym";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "luciandorinrosca@gmail.com";
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
@@ -66,12 +67,17 @@ async function notify(
     }
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: title, html: emailTemplate(html) }),
+    headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sender: { name: FROM_NAME, email: FROM_EMAIL },
+      to: [{ email }],
+      subject: title,
+      htmlContent: emailTemplate(html),
+    }),
   });
-  if (!res.ok) console.error("Resend error for", email, await res.text());
+  if (!res.ok) console.error("Brevo error for", email, await res.text());
 }
 
 Deno.serve(async () => {

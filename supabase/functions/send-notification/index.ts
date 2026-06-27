@@ -4,8 +4,9 @@ import webpush from "npm:web-push";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@forge.ro";
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Forge Gym <onboarding@resend.dev>";
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY")!;
+const FROM_NAME = Deno.env.get("FROM_NAME") || "Forge Gym";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "luciandorinrosca@gmail.com";
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
@@ -65,6 +66,24 @@ const emailTemplate = (html: string) => `
   <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Forge Gym · CrossFit C15 · Constanța</p>
 </div>`;
 
+async function sendEmail(to: string, subject: string, html: string) {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sender: { name: FROM_NAME, email: FROM_EMAIL },
+      to: [{ email: to }],
+      subject,
+      htmlContent: emailTemplate(html),
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Brevo error:", err);
+  }
+  return res.ok;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -95,27 +114,15 @@ Deno.serve(async (req) => {
         );
       } catch (e) {
         console.error("Push failed:", e);
-        // Remove invalid subscriptions
         if ((e as { statusCode?: number }).statusCode === 410) {
           await supabase.from("push_subscriptions").delete()
-            .eq("member_email", member_email.toLowerCase())
-            .eq("subscription->endpoint", row.subscription.endpoint);
+            .eq("member_email", member_email.toLowerCase());
         }
       }
     }
 
-    // Email via Resend
-    const emailRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [member_email],
-        subject: title,
-        html: emailTemplate(html),
-      }),
-    });
-    if (!emailRes.ok) console.error("Resend error:", await emailRes.text());
+    // Email via Brevo
+    await sendEmail(member_email, title, html);
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (err) {
