@@ -1073,7 +1073,11 @@ function Admin({ showToast }) {
             })()}
             <div style={{ marginBottom: '6px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Plan</div>
-            <select value={planSelectat} onChange={e => setPlanSelectat(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
+            <select value={planSelectat} onChange={e => {
+              setPlanSelectat(e.target.value)
+              const p = planuri.find(p => p.id === e.target.value)
+              if (p?.price != null) setPretPlatit(String(p.price))
+            }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
               {planuri.map(p => <option key={p.id} value={p.id}>{p.name}{p.price != null ? ` — ${p.price} RON` : ''}</option>)}
             </select>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data start</div>
