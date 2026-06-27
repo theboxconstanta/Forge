@@ -1455,6 +1455,7 @@ function App() {
   const [rezervariPerClasa, setRezervariPerClasa] = useState({})
   const [clasaSelectata, setClasaSelectata] = useState(null)
   const [clasaTab, setClasaTab] = useState('ore')
+  const [claseAziDeschise, setClaseAziDeschise] = useState(true)
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [abonamentReal, setAbonamentReal] = useState(null)
@@ -2089,111 +2090,204 @@ function App() {
         </div>
       )}
 
-      {screen === 'home' && (
-        <div style={{ padding: '20px', paddingBottom: '80px' }}>
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a' }}>Bună, {user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0]} 👋</h1>
-              <p style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-            <button onClick={() => setScreen('abonament')} style={{ background: abonamentActiv ? '#EDFFD4' : '#FCEBEB', color: abonamentActiv ? '#2F6600' : '#791F1F', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', marginTop: '4px', whiteSpace: 'nowrap' }}>
-              {abonamentActiv ? '🎟️ Abonament' : '🔒 Expirat'}
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {[{ val: wodLogs.length.toString(), lbl: 'WOD-uri' }, { val: prDate.length.toString(), lbl: 'PR-uri' }, { val: `🔥 ${rezervarileMeleAfisate.length}`, lbl: 'Rezervări' }].map((s, i) => (
-              <div key={i} style={{ flex: 1, background: '#fff', borderRadius: '12px', padding: '12px 8px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{s.val}</div>
-                <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>{s.lbl}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-              <div>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>Workout Of The Day</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                  {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : 'Niciun WOD programat azi'}
+      {screen === 'home' && (() => {
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0]
+        const dow = today.getDay()
+        const monday = new Date(today)
+        monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+        const saptamana = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(monday); d.setDate(monday.getDate() + i)
+          const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+          return { d, ds, areWod: wodLogs.some(l => l.logged_at?.startsWith(ds)), esteAzi: ds === todayStr }
+        })
+        const zileSapt = ['L','Ma','Mi','J','V','S','D']
+        const claseAzi = claseDB.filter(c => c.date === todayStr).sort((a,b) => a.start_time.localeCompare(b.start_time))
+        const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
+        const sessTotal = abonamentReal?.sessions_total
+        const sessUsed = abonamentReal?.sessions_used || 0
+        const progres = sessTotal ? Math.min(1, sessUsed / sessTotal) : 0
+        const prenume = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Athlete'
+        const numeFull = user?.user_metadata?.full_name || user?.email || ''
+        const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
+        return (
+          <div style={{ paddingBottom: '80px', background: '#f5f5f5' }}>
+
+            {/* ── Card dată + calendar săptămânal ── */}
+            <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '26px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px' }}>
+                    {today.getDate()} {today.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
+                  </span>
+                  <span onClick={() => setScreen('clase')} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', lineHeight: 1 }}>›</span>
                 </div>
-                {wodZiData?.name && (
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>
-                )}
-                {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
-                  <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                    {(wodZiData.movements_rx || []).join(' · ')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#2F6600', lineHeight: 1 }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>SESIUNI</div>
+                  </div>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#C8FF00', letterSpacing: '-0.5px' }}>{initiale}</span>
+                  </div>
+                </div>
+              </div>
+              <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
+
+              {/* Calendar săptămânal */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
+                {zileSapt.map((z, i) => (
+                  <div key={i} style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.04em', paddingBottom: '6px' }}>{z}</div>
+                ))}
+                {saptamana.map(({ d, areWod, esteAzi }, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div style={{
+                      width: '38px', height: '38px', borderRadius: '10px',
+                      background: areWod ? '#EDFFD4' : esteAzi ? '#1a1a1a' : 'transparent',
+                      border: esteAzi && !areWod ? '2px solid #1a1a1a' : 'none',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
+                    }}>
+                      <span style={{ fontSize: '15px', fontWeight: esteAzi ? '900' : '400', color: areWod ? '#2F6600' : esteAzi ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
+                      {areWod && <span style={{ fontSize: '9px', lineHeight: 1 }}>⚡</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Clase azi ── */}
+            <div style={{ background: '#fff', marginBottom: '10px' }}>
+              <div onClick={() => setClaseAziDeschise(!claseAziDeschise)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em' }}>CROSSFIT C15</span>
+                <span style={{ fontSize: '18px', color: '#888', display: 'inline-block', transform: claseAziDeschise ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>⌄</span>
+              </div>
+              {claseAziDeschise && (
+                <div style={{ padding: '0 16px 16px', display: 'flex', gap: '10px', overflowX: 'auto' }}>
+                  {claseAzi.length === 0
+                    ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă azi</div>
+                    : claseAzi.map(c => {
+                        const rezervat = rezervariMele.includes(c.id)
+                        const nrRez = rezervariPerClasa[c.id]?.count || 0
+                        const plin = nrRez >= c.max_spots
+                        const bgCol = rezervat ? '#EDFFD4' : plin ? '#FFEBEE' : '#FFF8E1'
+                        const txtCol = rezervat ? '#2F6600' : plin ? '#C62828' : '#8B6914'
+                        return (
+                          <div key={c.id} onClick={() => { setScreen('clase') }} style={{ background: bgCol, borderRadius: '14px', padding: '12px 14px', minWidth: '120px', flexShrink: 0, cursor: 'pointer' }}>
+                            <div style={{ fontSize: '17px', fontWeight: '800', color: txtCol, letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</div>
+                            <div style={{ fontSize: '12px', color: txtCol, marginTop: '2px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '110px' }}>{c.name || 'CrossFit WOD'}</div>
+                            {rezervat && <div style={{ fontSize: '10px', color: '#2F6600', marginTop: '5px', fontWeight: '700' }}>✓ Rezervat</div>}
+                            {!rezervat && plin && <div style={{ fontSize: '10px', color: '#C62828', marginTop: '5px' }}>Complet</div>}
+                          </div>
+                        )
+                      })
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* ── WOD ── */}
+            <div style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px' }}>
+              <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.1em', marginBottom: '3px' }}>WORKOUT OF THE DAY</div>
+                  <div style={{ fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>
+                    {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : 'Niciun WOD azi'}
+                  </div>
+                  {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
+                  {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
+                  )}
+                </div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#1a1a1a' : '#EDFFD4', color: wodDeschis ? '#C8FF00' : '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                  {wodDeschis ? '−' : '+'}
+                </div>
+              </div>
+              {wodDeschis && wodZiData && (
+                <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
+                  {VARIANTE_CONFIG.map((v, i) => {
+                    const miscari = wodZiData[v.key] || []
+                    return (
+                      <div key={i} onClick={() => setVariantaAleasa(variantaAleasa === i ? null : i)}
+                        style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
+                          <span>{v.emoji}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
+                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
+                        </div>
+                        {variantaAleasa === i && miscari.length > 0 && (
+                          <>
+                            <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
+                                <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
+                              </div>
+                              {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
+                            </div>
+                            {miscari.map((m, j) => (
+                              <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                                <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <button onClick={() => { setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
+                    style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#C8FF00' : '#ccc', color: variantaAleasa !== null ? '#111' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                    {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
+                  </button>
+                </div>
+              )}
+              {wodDeschis && !wodZiData && (
+                <div style={{ marginTop: '12px', borderTop: '1px solid #f0f0f0', paddingTop: '12px', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
+                  {isAdmin ? '⚙️ Admin → WOD pentru a crea WOD-ul de azi' : 'Coachul nu a programat WOD-ul de azi încă'}
+                </div>
+              )}
+            </div>
+
+            {/* ── Card abonament ── */}
+            {abonamentReal && (
+              <div onClick={() => setScreen('abonament')} style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a' }}>{abonamentReal.subscription_plans?.name || 'Abonament'}</div>
+                    <div style={{ fontSize: '22px', marginTop: '4px' }}>🏅</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    {sessTotal ? (
+                      <div style={{ fontSize: '18px', fontWeight: '800', lineHeight: 1 }}>
+                        <span style={{ color: '#2F6600' }}>{sessUsed}</span>
+                        <span style={{ color: '#ddd', fontWeight: '400', fontSize: '16px' }}> / </span>
+                        <span style={{ color: '#2F6600' }}>{sessTotal}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', color: '#2F6600', fontWeight: '700' }}>Nelimitat</div>
+                    )}
+                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{zileRamase} zile rămase</div>
+                  </div>
+                </div>
+                {sessTotal && (
+                  <div style={{ height: '7px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#2F6600', borderRadius: '4px' }} />
                   </div>
                 )}
               </div>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#2F6600' : '#EDFFD4', color: wodDeschis ? '#fff' : '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
-                {wodDeschis ? '−' : '+'}
-              </div>
+            )}
+
+            {/* ── Timer + logout ── */}
+            <div style={{ background: '#fff', marginBottom: '10px' }}>
+              <button onClick={goTimer} style={{ width: '100%', padding: '14px 20px', background: 'none', border: 'none', borderBottom: '1px solid #f5f5f5', fontSize: '14px', fontWeight: '600', color: '#1a1a1a', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span>⏱️</span> Pornește Timer
+              </button>
+              <button onClick={handleLogout} style={{ width: '100%', padding: '12px 20px', background: 'none', border: 'none', fontSize: '12px', color: '#bbb', cursor: 'pointer', textAlign: 'left' }}>
+                Deconectează-te
+              </button>
             </div>
-            {wodDeschis && wodZiData && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                {VARIANTE_CONFIG.map((v, i) => {
-                  const miscari = wodZiData[v.key] || []
-                  return (
-                    <div key={i} onClick={() => setVariantaAleasa(variantaAleasa === i ? null : i)}
-                      style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
-                        <span>{v.emoji}</span>
-                        <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                        {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
-                      </div>
-                      {variantaAleasa === i && miscari.length > 0 && (
-                        <>
-                          <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
-                              <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
-                            </div>
-                            {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
-                          </div>
-                          {miscari.map((m, j) => (
-                            <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-                              <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )
-                })}
-                <button onClick={() => { setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
-                  style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#2F6600' : '#ccc', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
-                  {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
-                </button>
-              </div>
-            )}
-            {wodDeschis && !wodZiData && (
-              <div style={{ marginTop: '12px', borderTop: '1px solid #f0f0f0', paddingTop: '12px', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
-                {isAdmin ? '⚙️ Mergi la Admin → WOD pentru a crea WOD-ul de azi' : 'Coachul nu a programat WOD-ul de azi încă'}
-              </div>
-            )}
+
           </div>
-          <button onClick={goTimer} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: '#fff', border: '2px solid #2F6600', borderRadius: '14px', fontSize: '14px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            ⏱️ Pornește Timer
-          </button>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>Activitate recentă</div>
-            {wodLogs.length === 0 && prDate.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: '13px' }}>Nicio activitate încă</div>
-            ) : [...wodLogs.slice(0, 2).map(w => ({ nume: `WOD ${w.variant_level || ''}`, val: w.result || w.time_result || '—', pr: false })),
-               ...prDate.slice(0, 1).map(p => ({ nume: p.movement, val: formatPR(p), pr: true }))
-              ].slice(0, 3).map((a, i, arr) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                <span style={{ fontSize: '13px', color: '#1a1a1a' }}>{a.nume}</span>
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: '500', background: a.pr ? '#EAF3DE' : '#f5f5f5', color: a.pr ? '#27500A' : '#666' }}>
-                  {a.pr ? '🏆 ' : ''}{a.val}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button onClick={handleLogout} style={{ width: '100%', marginTop: '14px', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
-            Deconectează-te
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {screen === 'abonament' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
