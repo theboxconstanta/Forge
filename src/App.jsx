@@ -935,7 +935,7 @@ function Admin({ showToast }) {
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                         <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : '#27500A', fontWeight: '500' }}>
-                          {expirat ? `⚠️ Expirat` : expiraCurand ? `⏰ ${zileRamase}z` : `✓ ${zileRamase}z`}
+                          {expirat ? `⚠️ Expirat` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
                         {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} șed.</span>}
@@ -1011,7 +1011,7 @@ function Admin({ showToast }) {
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{a.member_email}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{a.subscription_plans?.name}</div>
                     <div style={{ fontSize: '11px', color: expirat ? '#E24B4A' : '#27500A', marginTop: '2px' }}>
-                      {expirat ? `⚠️ Expirat acum ${Math.abs(zileRamase)} zile` : `✓ ${zileRamase} zile rămase`}
+                      {expirat ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}` : `✓ Valabil până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
                     </div>
                     <div style={{ fontSize: '11px', color: '#aaa' }}>
                       {new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} → {new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}
