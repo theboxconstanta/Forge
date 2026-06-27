@@ -3,6 +3,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 
+const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
+const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+async function sendNotification(type, memberEmail, planName, endDate) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch(`${EDGE_BASE}/send-notification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ type, member_email: memberEmail, plan_name: planName, end_date: endDate }),
+    })
+  } catch (e) { console.error('sendNotification error:', e) }
+}
+
 const MISCARI = [
   'Air Squat', 'Back Squat', 'Front Squat', 'Overhead Squat', 'Box Squat', 'Pause Squat',
   'Shoulder Press', 'Push Press', 'Push Jerk', 'Split Jerk', 'Bench Press', 'Strict Press',
@@ -789,7 +810,12 @@ function Admin({ showToast }) {
       notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
     })
     if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
-    else { showToast('✓ Abonament adăugat!'); await fetchAbonamente(); setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('') }
+    else {
+      showToast('✓ Abonament adăugat!')
+      await fetchAbonamente()
+      setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+      sendNotification('subscription_added', emailAbonament.toLowerCase().trim(), plan?.name, endDate.toISOString().split('T')[0])
+    }
     setSavingAbonament(false)
   }
 
@@ -810,8 +836,28 @@ function Admin({ showToast }) {
   }
 
   const stergeAbonament = async (id) => {
-    await supabase.from('subscriptions').delete().eq('id', id)
-    showToast('✓ Abonament șters!'); await fetchAbonamente()
+    const abo = abonamente.find(a => a.id === id)
+    if (abo?.member_email) {
+      // gasim profilul membrului ca sa stim member_id-ul
+      const { data: profil } = await supabase.from('profiles')
+        .select('id').eq('email', abo.member_email.toLowerCase()).single()
+      if (profil?.id) {
+        // stergem rezervarile viitoare ale membrului
+        const aziStr = new Date().toISOString().split('T')[0]
+        const { data: futureCls } = await supabase.from('classes').select('id').gte('date', aziStr)
+        const futureIds = futureCls?.map(c => c.id) || []
+        if (futureIds.length > 0) {
+          await supabase.from('bookings').delete().eq('member_id', profil.id).in('class_id', futureIds)
+        }
+      }
+    }
+    await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
+    showToast('✓ Abonament anulat și rezervările viitoare șterse!')
+    await fetchAbonamente()
+    if (abo?.member_email) {
+      const planName = abo.subscription_plans?.name || 'Abonament'
+      sendNotification('subscription_cancelled', abo.member_email, planName, abo.end_date)
+    }
   }
 
   const getAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.is_active)
@@ -1362,8 +1408,30 @@ function App() {
       checkAdmin()
       fetchAbonamentMeu()
       fetchClasament()
+      registerPushSubscription()
     }
   }, [user])
+
+  const registerPushSubscription = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') return
+      const sw = await navigator.serviceWorker.ready
+      let sub = await sw.pushManager.getSubscription()
+      if (!sub) {
+        sub = await sw.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        })
+      }
+      await supabase.from('push_subscriptions').upsert({
+        member_email: user.email.toLowerCase(),
+        subscription: sub.toJSON(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'member_email' })
+    } catch (e) { console.error('Push registration failed:', e) }
+  }
 
   useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     const azi = new Date()
