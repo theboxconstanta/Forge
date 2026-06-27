@@ -84,6 +84,19 @@ function AvatarCircle({ name, size = 38 }) {
   )
 }
 
+function parseWodMinute(durataStr) {
+  if (!durataStr) return null
+  const match = durataStr.match(/(\d+)/)
+  return match ? parseInt(match[1]) : null
+}
+
+function formatWodDurata(durataStr) {
+  if (!durataStr) return ''
+  if (/^\d+:\d+$/.test(durataStr.trim())) return durataStr.trim()
+  const mins = parseWodMinute(durataStr)
+  return mins != null ? `${mins}:00` : durataStr
+}
+
 function NavBar({ screen, setScreen, isAdmin }) {
   return (
     <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
@@ -1744,18 +1757,6 @@ function App() {
 
   const handleLogout = async () => { await supabase.auth.signOut() }
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
-  const parseWodMinute = (durataStr) => {
-    if (!durataStr) return null
-    const match = durataStr.match(/(\d+)/)
-    return match ? parseInt(match[1]) : null
-  }
-
-  const formatWodDurata = (durataStr) => {
-    if (!durataStr) return ''
-    if (/^\d+:\d+$/.test(durataStr.trim())) return durataStr.trim()
-    const mins = parseWodMinute(durataStr)
-    return mins != null ? `${mins}:00` : durataStr
-  }
 
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
