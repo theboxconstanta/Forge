@@ -1045,18 +1045,21 @@ function Admin({ showToast }) {
             const aSedinteEpuizate = a.sessions_total != null && Math.max(0, a.sessions_total - (a.sessions_used || 0)) === 0
             const aNeInceput = new Date(a.start_date + 'T00:00:00') > new Date()
             const expirat = zileRamase < 0 || aSedinteEpuizate
+            const aActiv = !expirat && !aNeInceput
+            const culoareData = expirat ? '#E24B4A' : aNeInceput ? '#E24B4A' : '#27500A'
+            const membruNume = clienti.find(c => c.email?.toLowerCase() === a.member_email?.toLowerCase())?.full_name
+            const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })
             return (
-              <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : aNeInceput ? '#3C3489' : '#27500A'}` }}>
+              <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : aNeInceput ? '#E24B4A' : '#27500A'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{a.member_email}</div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{a.subscription_plans?.name}</div>
-                    <div style={{ fontSize: '11px', color: expirat ? '#E24B4A' : aNeInceput ? '#3C3489' : '#27500A', marginTop: '2px' }}>
-                      {aSedinteEpuizate
-                        ? `⚠️ Epuizat · valabil până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
-                        : expirat
-                          ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
-                          : `${aNeInceput ? '📅' : '✓'} Valabil din ${new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{membruNume || a.member_email}</div>
+                    {membruNume && <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{a.member_email}</div>}
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{a.subscription_plans?.name}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '500', color: culoareData, marginTop: '2px' }}>
+                      {aSedinteEpuizate ? '⚠️ ' : aActiv ? '✓ ' : '📅 '}
+                      {fmtData(a.start_date)} → {fmtData(a.end_date)}
+                      {aSedinteEpuizate ? ' · epuizat' : ''}
                     </div>
                     {a.sessions_total && <div style={{ fontSize: '11px', color: aSedinteEpuizate ? '#E24B4A' : '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
                     {a.notes && <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes}</div>}
