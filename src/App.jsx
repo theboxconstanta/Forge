@@ -1011,10 +1011,9 @@ function Admin({ showToast }) {
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{a.member_email}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{a.subscription_plans?.name}</div>
                     <div style={{ fontSize: '11px', color: expirat ? '#E24B4A' : '#27500A', marginTop: '2px' }}>
-                      {expirat ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}` : `✓ Valabil până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#aaa' }}>
-                      {new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} → {new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}
+                      {expirat
+                        ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
+                        : `✓ Valabil din ${new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
                     </div>
                     {a.sessions_total && <div style={{ fontSize: '11px', color: '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
                     {a.notes && <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes}</div>}
@@ -2057,12 +2056,10 @@ function App() {
                 <span style={{ background: '#EAF3DE', color: '#27500A', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>✓ Activ</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', color: '#888' }}>📅 Expiră</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a' }}>{new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#888' }}>⏳ Timp rămas</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: zileRamaseAbonament <= 5 ? '#E24B4A' : '#BA7517' }}>{zileRamaseAbonament} zile</span>
+                <span style={{ fontSize: '12px', color: '#888' }}>📅 Valabil</span>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a' }}>
+                  {new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} – {new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}
+                </span>
               </div>
               {abonamentReal.sessions_total && (
                 <>
