@@ -729,6 +729,37 @@ function Admin({ showToast }) {
   const stergeSeria = async (c) => {
     const azi = new Date()
     const aziS = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const { data: claseSeriei } = await supabase.from('classes').select('id')
+      .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
+      .gte('date', aziS)
+    const serieIds = claseSeriei?.map(cl => cl.id) || []
+    if (serieIds.length > 0) {
+      const { data: bks } = await supabase.from('bookings').select('member_id').in('class_id', serieIds)
+      if (bks?.length > 0) {
+        const memberIds = [...new Set(bks.map(b => b.member_id))]
+        const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
+        if (profs?.length > 0) {
+          for (const prof of profs) {
+            const email = prof.email?.toLowerCase()
+            if (!email) continue
+            const memberBookings = bks.filter(b => b.member_id === prof.id).length
+            const { data: abo } = await supabase.from('subscriptions')
+              .select('id, sessions_used')
+              .eq('member_email', email)
+              .eq('is_active', true)
+              .not('sessions_total', 'is', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (abo) {
+              await supabase.from('subscriptions')
+                .update({ sessions_used: Math.max(0, (abo.sessions_used || 0) - memberBookings) })
+                .eq('id', abo.id)
+            }
+          }
+        }
+      }
+    }
     const { error } = await supabase.from('classes').delete()
       .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
       .gte('date', aziS)
@@ -813,7 +844,7 @@ function Admin({ showToast }) {
     else {
       showToast('✓ Abonament adăugat!')
       await fetchAbonamente()
-      setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+      setEmailAbonament(''); setNumeAbonament(''); setPretPlatit(''); setDataStartAbonament(new Date().toISOString().split('T')[0])
       sendNotification('subscription_added', emailAbonament.toLowerCase().trim(), plan?.name, endDate.toISOString().split('T')[0])
     }
     setSavingAbonament(false)
@@ -864,7 +895,11 @@ function Admin({ showToast }) {
 
   const esteClientActiv = (email) => {
     const abo = getAbonamentClient(email)
-    return abo && new Date(abo.end_date + 'T23:59:59') >= new Date()
+    if (!abo) return false
+    const inceput = new Date(abo.start_date + 'T00:00:00') <= new Date()
+    const neexpirat = new Date(abo.end_date + 'T23:59:59') >= new Date()
+    const sedinteOK = abo.sessions_total == null || Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) > 0
+    return inceput && neexpirat && sedinteOK
   }
   const clientiFiltrati = clienti
     .filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))
@@ -921,12 +956,14 @@ function Admin({ showToast }) {
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
             const zileRamase = abo ? Math.ceil((new Date(abo.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
-            const expirat = zileRamase !== null && zileRamase < 0
-            const expiraCurand = zileRamase !== null && zileRamase >= 0 && zileRamase <= 5
+            const sedinteEpuizate = abo?.sessions_total != null && Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) === 0
+            const neInceput = abo ? new Date(abo.start_date + 'T00:00:00') > new Date() : false
+            const expirat = (zileRamase !== null && zileRamase < 0) || sedinteEpuizate
+            const expiraCurand = !expirat && zileRamase !== null && zileRamase >= 0 && zileRamase <= 5
             const isOpen = clientSelectat === c.id
             return (
               <div key={c.id} onClick={() => setClientSelectat(isOpen ? null : c.id)}
-                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : abo ? '#27500A' : '#e0e0e0'}` }}>
+                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#3C3489' : abo ? '#27500A' : '#e0e0e0'}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <AvatarCircle name={c.full_name || c.email} size={42} />
                   <div style={{ flex: 1 }}>
@@ -934,8 +971,8 @@ function Admin({ showToast }) {
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : '#27500A', fontWeight: '500' }}>
-                          {expirat ? `⚠️ Expirat` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
+                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#3C3489' : '#27500A', fontWeight: '500' }}>
+                          {sedinteEpuizate ? '⚠️ Epuizat' : expirat ? '⚠️ Expirat' : neInceput ? `📅 Din ${new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
                         {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} șed.</span>}
@@ -948,7 +985,9 @@ function Admin({ showToast }) {
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                     {abo ? (
                       <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>ABONAMENT ACTIV</div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>
+                          {sedinteEpuizate ? 'ABONAMENT EPUIZAT' : expirat ? 'ABONAMENT EXPIRAT' : neInceput ? 'ABONAMENT PROGRAMAT' : 'ABONAMENT ACTIV'}
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                           <span style={{ color: '#888' }}>Plan</span>
                           <span style={{ fontWeight: '600' }}>{abo.subscription_plans?.name}</span>
@@ -960,7 +999,7 @@ function Admin({ showToast }) {
                         {abo.sessions_total && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                             <span style={{ color: '#888' }}>Ședințe</span>
-                            <span style={{ fontWeight: '600' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
+                            <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#1a1a1a' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
                           </div>
                         )}
                         {abo.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{abo.notes}</div>}
@@ -1003,19 +1042,23 @@ function Admin({ showToast }) {
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>ABONAMENTE ({abonamente.length})</div>
           {abonamente.map(a => {
             const zileRamase = Math.ceil((new Date(a.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24))
-            const expirat = zileRamase < 0
+            const aSedinteEpuizate = a.sessions_total != null && Math.max(0, a.sessions_total - (a.sessions_used || 0)) === 0
+            const aNeInceput = new Date(a.start_date + 'T00:00:00') > new Date()
+            const expirat = zileRamase < 0 || aSedinteEpuizate
             return (
-              <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : '#27500A'}` }}>
+              <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : aNeInceput ? '#3C3489' : '#27500A'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{a.member_email}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{a.subscription_plans?.name}</div>
-                    <div style={{ fontSize: '11px', color: expirat ? '#E24B4A' : '#27500A', marginTop: '2px' }}>
-                      {expirat
-                        ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
-                        : `✓ Valabil din ${new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
+                    <div style={{ fontSize: '11px', color: expirat ? '#E24B4A' : aNeInceput ? '#3C3489' : '#27500A', marginTop: '2px' }}>
+                      {aSedinteEpuizate
+                        ? `⚠️ Epuizat · valabil până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
+                        : expirat
+                          ? `⚠️ Expirat pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`
+                          : `${aNeInceput ? '📅' : '✓'} Valabil din ${new Date(a.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} până pe ${new Date(a.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}`}
                     </div>
-                    {a.sessions_total && <div style={{ fontSize: '11px', color: '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
+                    {a.sessions_total && <div style={{ fontSize: '11px', color: aSedinteEpuizate ? '#E24B4A' : '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
                     {a.notes && <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes}</div>}
                   </div>
                   <button onClick={() => stergeAbonament(a.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', marginLeft: '8px' }}>🗑️</button>
@@ -1687,13 +1730,23 @@ function App() {
 
   const toggleRezervare = async (clasaId) => {
     const esteRezervat = rezervariMele.includes(clasaId)
-    if (!esteRezervat && !isAdmin && !abonamentActiv) {
-      showToast('❌ Nu ai un abonament activ!')
-      return
-    }
-    if (!esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0) {
-      showToast('❌ Ai epuizat toate ședințele din abonament!')
-      return
+    if (!esteRezervat && !isAdmin) {
+      if (!abonamentReal) {
+        showToast('❌ Nu ai un abonament activ!')
+        return
+      }
+      if (new Date(abonamentReal.start_date + 'T00:00:00') > new Date()) {
+        showToast(`❌ Abonamentul tău începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO')}!`)
+        return
+      }
+      if (new Date(abonamentReal.end_date + 'T23:59:59') < new Date()) {
+        showToast('❌ Abonamentul tău a expirat!')
+        return
+      }
+      if (sedinteLimitate && sedinteRamase <= 0) {
+        showToast('❌ Ai epuizat toate ședințele din abonament!')
+        return
+      }
     }
     if (!esteRezervat) {
       const clasa = claseDB.find(c => c.id === clasaId)
