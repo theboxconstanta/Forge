@@ -446,7 +446,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
       </div>
       <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
         {new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}
-        {wodZiData ? ` · ${wodZiData.type} ${wodZiData.duration}` : ''}
+        {wodZiData ? ` · ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
       </p>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -1746,6 +1746,13 @@ function App() {
     return match ? parseInt(match[1]) : null
   }
 
+  const formatWodDurata = (durataStr) => {
+    if (!durataStr) return ''
+    if (/^\d+:\d+$/.test(durataStr.trim())) return durataStr.trim()
+    const mins = parseWodMinute(durataStr)
+    return mins != null ? `${mins}:00` : durataStr
+  }
+
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
   const saveWodLog = async () => {
@@ -2101,8 +2108,13 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>Workout Of The Day</div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                  {wodZiData ? `${wodZiData.type} · ${wodZiData.duration}` : 'Niciun WOD programat azi'}
+                  {wodZiData ? `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : 'Niciun WOD programat azi'}
                 </div>
+                {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                    {(wodZiData.movements_rx || []).join(' · ')}
+                  </div>
+                )}
               </div>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#3C3489' : '#EEEDFE', color: wodDeschis ? '#fff' : '#3C3489', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                 {wodDeschis ? '−' : '+'}
@@ -2275,7 +2287,7 @@ function App() {
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
               <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare }}>
                 {VARIANTE_CONFIG[variantaAleasa].emoji} {VARIANTE_CONFIG[variantaAleasa].nivel}
-                {wodZiData ? ` — ${wodZiData.type} ${wodZiData.duration}` : ''}
+                {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
               </div>
             </div>
           )}
@@ -2304,7 +2316,7 @@ function App() {
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
                 <div style={{ background: '#f8f7ff', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#3C3489', marginBottom: '8px' }}>
-                    {wodZiData.type} · {wodZiData.duration}
+                    {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                   </div>
                   {miscariWod.length > 0 ? miscariWod.map((m, i) => (
                     <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #ece9ff' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
