@@ -1747,7 +1747,9 @@ function App() {
     { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', key: 'movements_rx' },
   ]
 
-  const abonamentActiv = abonamentReal !== null && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
+  const abonamentActiv = abonamentReal !== null
+    && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
+    && (!sedinteLimitate || sedinteRamase > 0)
   const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   if (resetMode) return (
@@ -1924,12 +1926,14 @@ function App() {
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
-              {abonamentReal ? 'Abonamentul a expirat' : 'Niciun abonament activ'}
+              {!abonamentReal ? 'Niciun abonament activ' : sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate' : 'Abonamentul a expirat'}
             </div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>
-              {abonamentReal
-                ? 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'
-                : 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'}
+              {!abonamentReal
+                ? 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'
+                : sedinteLimitate && sedinteRamase === 0
+                  ? 'Ai consumat toate ședințele din abonament. Contactează coachul pentru a achiziționa un abonament nou.'
+                  : 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'}
             </div>
             <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
               Vezi abonamentul →
@@ -2042,9 +2046,15 @@ function App() {
             </div>
           ) : !abonamentActiv ? (
             <div style={{ background: '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔒</div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>Abonament expirat</div>
-              <div style={{ fontSize: '12px', color: '#A32D2D' }}>Contactează coachul pentru reînnoire.</div>
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>{sedinteLimitate && sedinteRamase === 0 ? '🏁' : '🔒'}</div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>
+                {sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate' : 'Abonament expirat'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#A32D2D' }}>
+                {sedinteLimitate && sedinteRamase === 0
+                  ? 'Ai consumat toate ședințele. Contactează coachul pentru un abonament nou.'
+                  : 'Contactează coachul pentru reînnoire.'}
+              </div>
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #3C3489' }}>
