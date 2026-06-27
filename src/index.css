@@ -37,3 +37,22 @@ body {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
+
+@media screen and (orientation: landscape) {
+  #root { display: none; }
+  body::after {
+    content: '🔄 Rotește telefonul în modul portret';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    background: #111;
+    color: #fff;
+    font-size: 18px;
+    font-family: system-ui, -apple-system, sans-serif;
+    text-align: center;
+    padding: 24px;
+    z-index: 9999;
+  }
+}
