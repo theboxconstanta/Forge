@@ -39,7 +39,8 @@ body {
 }
 
 /* Pe telefon in landscape: rotim continutul inapoi la portret (fallback CSS) */
-@media screen and (orientation: landscape) and (max-height: 600px) {
+/* hover:none + pointer:coarse = touch device (telefon/tableta), niciodata desktop */
+@media screen and (orientation: landscape) and (max-height: 600px) and (hover: none) and (pointer: coarse) {
   html {
     overflow: hidden;
   }
