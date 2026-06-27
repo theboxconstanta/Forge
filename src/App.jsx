@@ -2132,11 +2132,19 @@ function App() {
                         <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
                         {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
                       </div>
-                      {variantaAleasa === i && miscari.length > 0 && miscari.map((m, j) => (
-                        <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-                          <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
-                        </div>
-                      ))}
+                      {variantaAleasa === i && miscari.length > 0 && (
+                        <>
+                          <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
+                            <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
+                          </div>
+                          {miscari.map((m, j) => (
+                            <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                              <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )
                 })}
