@@ -818,7 +818,7 @@ function Admin({ showToast }) {
 
   const esteClientActiv = (email) => {
     const abo = getAbonamentClient(email)
-    return abo && new Date(abo.end_date) >= new Date()
+    return abo && new Date(abo.end_date + 'T23:59:59') >= new Date()
   }
   const clientiFiltrati = clienti
     .filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))
@@ -874,7 +874,7 @@ function Admin({ showToast }) {
             </div>
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
-            const zileRamase = abo ? Math.ceil((new Date(abo.end_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+            const zileRamase = abo ? Math.ceil((new Date(abo.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
             const expirat = zileRamase !== null && zileRamase < 0
             const expiraCurand = zileRamase !== null && zileRamase >= 0 && zileRamase <= 5
             const isOpen = clientSelectat === c.id
@@ -956,7 +956,7 @@ function Admin({ showToast }) {
           </div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>ABONAMENTE ({abonamente.length})</div>
           {abonamente.map(a => {
-            const zileRamase = Math.ceil((new Date(a.end_date) - new Date()) / (1000 * 60 * 60 * 24))
+            const zileRamase = Math.ceil((new Date(a.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24))
             const expirat = zileRamase < 0
             return (
               <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : '#27500A'}` }}>
@@ -1595,6 +1595,10 @@ function App() {
 
   const toggleRezervare = async (clasaId) => {
     const esteRezervat = rezervariMele.includes(clasaId)
+    if (!esteRezervat && !isAdmin && !abonamentActiv) {
+      showToast('❌ Nu ai un abonament activ!')
+      return
+    }
     if (!esteRezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0) {
       showToast('❌ Ai epuizat toate ședințele din abonament!')
       return
