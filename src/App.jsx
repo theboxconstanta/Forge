@@ -6,6 +6,14 @@ import { supabase } from './supabase'
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
+function levenshtein(a, b) {
+  const m = a.length, n = b.length
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0))
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+  return dp[m][n]
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -1033,7 +1041,25 @@ function Admin({ showToast }) {
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>+ Abonament nou</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Email atlet</div>
             <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder="email@exemplu.com" type="email"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+              list="clienti-emails-list"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
+            <datalist id="clienti-emails-list">
+              {clienti.map(c => <option key={c.id} value={c.email}>{c.full_name}</option>)}
+            </datalist>
+            {(() => {
+              const emailTastat = emailAbonament.toLowerCase().trim()
+              if (emailTastat.length < 4) return null
+              const similar = clienti.find(c => {
+                const ce = c.email?.toLowerCase()
+                return ce && ce !== emailTastat && levenshtein(ce, emailTastat) <= 3
+              })
+              return similar ? (
+                <div style={{ fontSize: '11px', color: '#BA7517', background: '#FAEEDA', borderRadius: '8px', padding: '6px 10px', marginBottom: '6px' }}>
+                  ⚠️ Email similar cu <strong>{similar.email}</strong> ({similar.full_name}). Verifică dacă e corect.
+                </div>
+              ) : null
+            })()}
+            <div style={{ marginBottom: '6px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Plan</div>
             <select value={planSelectat} onChange={e => setPlanSelectat(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
               {planuri.map(p => <option key={p.id} value={p.id}>{p.name}{p.price != null ? ` — ${p.price} RON` : ''}</option>)}
