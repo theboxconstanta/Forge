@@ -38,3 +38,23 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Pe telefon in landscape: rotim continutul inapoi la portret */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  html, body {
+    overflow: hidden;
+    width: 100vh;
+    height: 100vw;
+  }
+  #root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(-90deg) translateX(-100%);
+    transform-origin: top left;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
