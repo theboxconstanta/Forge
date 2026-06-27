@@ -664,11 +664,17 @@ function Admin({ showToast }) {
   }
 
   const fetchRezervariClasa = async (classId) => {
-    const { data } = await supabase.from('bookings').select('member_id').eq('class_id', classId)
+    const { data } = await supabase.from('bookings')
+      .select('member_id, profiles(id, full_name, email)')
+      .eq('class_id', classId)
     if (data) {
-      const ids = data.map(d => d.member_id)
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', ids)
-      setRezervariClasa(prev => ({ ...prev, [classId]: profiles || data }))
+      const rezultat = data.map(b => ({
+        member_id: b.member_id,
+        id: b.profiles?.id,
+        full_name: b.profiles?.full_name,
+        email: b.profiles?.email,
+      }))
+      setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
     }
   }
 
