@@ -1431,6 +1431,7 @@ function App() {
   const [wodDeschis, setWodDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
+  const [dataAcasa, setDataAcasa] = useState(new Date().toISOString().split('T')[0])
   const [prSelectat, setPrSelectat] = useState(null)
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
@@ -1581,6 +1582,10 @@ function App() {
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (user) fetchWodZi(dataAcasa)
+  }, [dataAcasa]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!user) return
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
@@ -1715,10 +1720,10 @@ function App() {
     setClasamentLoading(false)
   }
 
-  const fetchWodZi = async () => {
-    const azi = new Date().toISOString().split('T')[0]
-    const { data } = await supabase.from('wods').select('*').eq('date', azi).single()
-    if (data) setWodZiData(data)
+  const fetchWodZi = async (data_param) => {
+    const data_str = data_param || dataAcasa || new Date().toISOString().split('T')[0]
+    const { data } = await supabase.from('wods').select('*').eq('date', data_str).maybeSingle()
+    setWodZiData(data || null)
   }
 
   const handleLogin = async () => {
@@ -2091,18 +2096,18 @@ function App() {
       )}
 
       {screen === 'home' && (() => {
-        const today = new Date()
-        const todayStr = today.toISOString().split('T')[0]
-        const dow = today.getDay()
-        const monday = new Date(today)
-        monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+        const actualToday = new Date().toISOString().split('T')[0]
+        const selData = new Date(dataAcasa + 'T00:00:00')
+        const addZile = (ds, n) => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+        const dow = selData.getDay()
+        const monday = new Date(selData); monday.setDate(selData.getDate() - (dow === 0 ? 6 : dow - 1))
         const saptamana = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(monday.getDate() + i)
           const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-          return { d, ds, areWod: wodLogs.some(l => l.logged_at?.startsWith(ds)), esteAzi: ds === todayStr }
+          return { d, ds, areWod: wodLogs.some(l => l.logged_at?.startsWith(ds)), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
         })
         const zileSapt = ['L','Ma','Mi','J','V','S','D']
-        const claseAzi = claseDB.filter(c => c.date === todayStr).sort((a,b) => a.start_time.localeCompare(b.start_time))
+        const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
         const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
         const sessTotal = abonamentReal?.sessions_total
         const sessUsed = abonamentReal?.sessions_used || 0
@@ -2110,17 +2115,25 @@ function App() {
         const prenume = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Athlete'
         const numeFull = user?.user_metadata?.full_name || user?.email || ''
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
+        const esteAzi = dataAcasa === actualToday
         return (
           <div style={{ paddingBottom: '80px', background: '#f5f5f5' }}>
 
             {/* ── Card dată + calendar săptămânal ── */}
             <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '26px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px' }}>
-                    {today.getDate()} {today.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
-                  </span>
-                  <span onClick={() => setScreen('clase')} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', lineHeight: 1 }}>›</span>
+                {/* Navigare dată */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span onClick={() => setDataAcasa(addZile(dataAcasa, -1))} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', padding: '0 4px', userSelect: 'none' }}>‹</span>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px', lineHeight: 1 }}>
+                      {selData.getDate()} {selData.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
+                    </div>
+                    {!esteAzi && (
+                      <div onClick={() => setDataAcasa(actualToday)} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
+                    )}
+                  </div>
+                  <span onClick={() => setDataAcasa(addZile(dataAcasa, 1))} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', padding: '0 4px', userSelect: 'none' }}>›</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
@@ -2134,21 +2147,22 @@ function App() {
               </div>
               <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
 
-              {/* Calendar săptămânal */}
+              {/* Calendar săptămânal interactiv */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
                 {zileSapt.map((z, i) => (
                   <div key={i} style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.04em', paddingBottom: '6px' }}>{z}</div>
                 ))}
-                {saptamana.map(({ d, areWod, esteAzi }, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'center' }}>
+                {saptamana.map(({ d, ds, areWod, esteAzi: eAzi, esteSelectat }, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setDataAcasa(ds)}>
                     <div style={{
-                      width: '38px', height: '38px', borderRadius: '10px',
-                      background: areWod ? '#EDFFD4' : esteAzi ? '#1a1a1a' : 'transparent',
-                      border: esteAzi && !areWod ? '2px solid #1a1a1a' : 'none',
+                      width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer',
+                      background: esteSelectat ? '#1a1a1a' : areWod ? '#EDFFD4' : 'transparent',
+                      border: eAzi && !esteSelectat ? '2px solid #1a1a1a' : 'none',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
                     }}>
-                      <span style={{ fontSize: '15px', fontWeight: esteAzi ? '900' : '400', color: areWod ? '#2F6600' : esteAzi ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
-                      {areWod && <span style={{ fontSize: '9px', lineHeight: 1 }}>⚡</span>}
+                      <span style={{ fontSize: '15px', fontWeight: esteSelectat || eAzi ? '900' : '400', color: esteSelectat ? '#C8FF00' : areWod ? '#2F6600' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
+                      {areWod && !esteSelectat && <span style={{ fontSize: '9px', lineHeight: 1 }}>⚡</span>}
+                      {esteSelectat && <span style={{ fontSize: '7px', lineHeight: 1, color: '#C8FF00' }}>●</span>}
                     </div>
                   </div>
                 ))}
@@ -2163,9 +2177,9 @@ function App() {
               </div>
               {claseAziDeschise && (
                 <div style={{ padding: '0 16px 16px', display: 'flex', gap: '10px', overflowX: 'auto' }}>
-                  {claseAzi.length === 0
-                    ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă azi</div>
-                    : claseAzi.map(c => {
+                  {claseZi.length === 0
+                    ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă {esteAzi ? 'azi' : 'în această zi'}</div>
+                    : claseZi.map(c => {
                         const rezervat = rezervariMele.includes(c.id)
                         const nrRez = rezervariPerClasa[c.id]?.count || 0
                         const plin = nrRez >= c.max_spots
