@@ -622,6 +622,7 @@ function Admin({ showToast }) {
   const [tipWod, setTipWod] = useState('AMRAP')
   const [durataWod, setDurataWod] = useState('20 minute')
   const [dataWod, setDataWod] = useState('')
+  const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
 
@@ -818,13 +819,14 @@ function Admin({ showToast }) {
     const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
     const { error } = await supabase.from('wods').insert({
       date: dataWod, type: tipWod, duration: durataWod,
+      name: numeWod.trim() || null,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
       movements_rx: parseLinii(wodVariante.rx),
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('✓ WOD creat!'); await fetchWods(); setDataWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' }) }
+    else { showToast('✓ WOD creat!'); await fetchWods(); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' }) }
     setSavingWod(false)
   }
 
@@ -1277,7 +1279,9 @@ function Admin({ showToast }) {
               <option>Chipper</option><option>Ladder</option><option>Partner WOD</option>
             </select>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată</div>
-            <input value={durataWod} onChange={e => setDurataWod(e.target.value)} placeholder="ex: 20 minute" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+            <input value={durataWod} onChange={e => setDurataWod(e.target.value)} placeholder="ex: 20 minute" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume antrenament <span style={{ color: '#bbb' }}>(opțional)</span></div>
+            <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
               { key: 'onramp', label: '🔵 OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
               { key: 'beginner', label: '🟢 Beginner', culoare: '#27500A', bg: '#EAF3DE' },
@@ -1300,7 +1304,7 @@ function Admin({ showToast }) {
             <div key={w.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{w.type} · {w.duration}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
                   {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px' }}>🔴 {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
@@ -2108,8 +2112,11 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px', textTransform: 'uppercase', fontWeight: '500', letterSpacing: '0.05em' }}>Workout Of The Day</div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                  {wodZiData ? `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : 'Niciun WOD programat azi'}
+                  {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : 'Niciun WOD programat azi'}
                 </div>
+                {wodZiData?.name && (
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>
+                )}
                 {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
                   <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
                     {(wodZiData.movements_rx || []).join(' · ')}

@@ -1,0 +1,1 @@
+ALTER TABLE wods ADD COLUMN IF NOT EXISTS name text;
