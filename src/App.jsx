@@ -1807,10 +1807,16 @@ function App() {
   ]
 
   const abonamentInceput = abonamentReal ? new Date(abonamentReal.start_date + 'T00:00:00') <= new Date() : false
+
+  // Clase rezervate care nu s-au terminat inca (sedinte "in asteptare", nu consumate)
+  const sedinteProgramateViitor = sedinteLimitate
+    ? claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > new Date()).length
+    : 0
+
   const abonamentActiv = abonamentReal !== null
     && abonamentInceput
     && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
-    && (!sedinteLimitate || sedinteRamase > 0)
+    && (!sedinteLimitate || (sedinteRamase + sedinteProgramateViitor) > 0)
   const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   if (resetMode) return (
