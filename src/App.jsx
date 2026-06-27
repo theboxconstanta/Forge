@@ -1071,7 +1071,7 @@ function Admin({ showToast }) {
                       {aSedinteEpuizate ? ' · epuizat' : ''}
                     </div>
                     {a.sessions_total && <div style={{ fontSize: '11px', color: aSedinteEpuizate ? '#E24B4A' : '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
-                    {a.notes && <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes}</div>}
+                    <div style={{ fontSize: '11px', color: '#3C3489', marginTop: '2px' }}>{a.notes || 'Plătit: 0 RON'}</div>
                   </div>
                   <button onClick={() => stergeAbonament(a.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', marginLeft: '8px' }}>🗑️</button>
                 </div>
