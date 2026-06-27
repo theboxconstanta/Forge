@@ -659,7 +659,7 @@ function Admin({ showToast }) {
   }
 
   const fetchAbonamente = async () => {
-    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)').order('created_at', { ascending: false })
+    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)').eq('is_active', true).order('created_at', { ascending: false })
     if (data) setAbonamente(data)
   }
 
