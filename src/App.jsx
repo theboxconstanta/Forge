@@ -1040,9 +1040,21 @@ function Admin({ showToast }) {
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' }}>+ Abonament nou</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Email atlet</div>
-            <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder="email@exemplu.com" type="email"
-              list="clienti-emails-list"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
+            {(() => {
+              const emailVal = emailAbonament.trim()
+              const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)
+              const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#27500A' : '#E24B4A'
+              return (
+                <>
+                  <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder="email@exemplu.com" type="email"
+                    list="clienti-emails-list"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1.5px solid ${borderColor}`, fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
+                  {emailVal.length > 0 && !emailValid && (
+                    <div style={{ fontSize: '11px', color: '#E24B4A', marginBottom: '4px' }}>Email invalid</div>
+                  )}
+                </>
+              )
+            })()}
             <datalist id="clienti-emails-list">
               {clienti.map(c => <option key={c.id} value={c.email}>{c.full_name}</option>)}
             </datalist>
@@ -1068,8 +1080,20 @@ function Admin({ showToast }) {
             <input type="date" value={dataStartAbonament} onChange={e => setDataStartAbonament(e.target.value)}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Sumă plătită (RON)</div>
-            <input type="number" value={pretPlatit} onChange={e => setPretPlatit(e.target.value)} placeholder="ex: 250"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+            <input type="number" value={pretPlatit} onChange={e => setPretPlatit(e.target.value)}
+              placeholder={planuri.find(p => p.id === planSelectat)?.price != null ? `Standard: ${planuri.find(p => p.id === planSelectat).price} RON` : 'ex: 250'}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
+            {(() => {
+              const planStd = planuri.find(p => p.id === planSelectat)
+              if (!planStd?.price || !pretPlatit) return <div style={{ marginBottom: '10px' }} />
+              const diff = parseFloat(pretPlatit) - planStd.price
+              if (diff === 0) return <div style={{ fontSize: '11px', color: '#27500A', marginBottom: '10px' }}>✓ Suma corespunde prețului standard</div>
+              return (
+                <div style={{ fontSize: '11px', color: diff < 0 ? '#E24B4A' : '#BA7517', marginBottom: '10px' }}>
+                  {diff < 0 ? `⚠️ Cu ${Math.abs(diff)} RON mai puțin decât prețul standard (${planStd.price} RON)` : `ℹ️ Cu ${diff} RON mai mult decât prețul standard (${planStd.price} RON)`}
+                </div>
+              )
+            })()}
             <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#3C3489', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
               {savingAbonament ? 'Se salvează...' : '+ Adaugă abonament'}
             </button>
