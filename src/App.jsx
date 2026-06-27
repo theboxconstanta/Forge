@@ -1539,7 +1539,7 @@ function App() {
     if (!date) return
     const ids = claseDB.filter(c => c.date === date).map(c => c.id)
     fetchRezervariZi(ids)
-  }, [ziSelectata, claseDB])
+  }, [ziSelectata, claseDB, zileCalendar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveProfile = async () => {
     await supabase.from('profiles').upsert({
