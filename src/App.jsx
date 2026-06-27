@@ -869,17 +869,20 @@ function Admin({ showToast }) {
   const stergeAbonament = async (id) => {
     const abo = abonamente.find(a => a.id === id)
     if (abo?.member_email) {
-      // gasim profilul membrului ca sa stim member_id-ul
+      const email = abo.member_email.toLowerCase().trim()
       const { data: profil } = await supabase.from('profiles')
-        .select('id').eq('email', abo.member_email.toLowerCase()).single()
+        .select('id').ilike('email', email).maybeSingle()
       if (profil?.id) {
-        // stergem rezervarile viitoare ale membrului
         const aziStr = new Date().toISOString().split('T')[0]
         const { data: futureCls } = await supabase.from('classes').select('id').gte('date', aziStr)
         const futureIds = futureCls?.map(c => c.id) || []
         if (futureIds.length > 0) {
-          await supabase.from('bookings').delete().eq('member_id', profil.id).in('class_id', futureIds)
+          const { error: delErr } = await supabase.from('bookings')
+            .delete().eq('member_id', profil.id).in('class_id', futureIds)
+          if (delErr) console.error('Eroare stergere rezervari:', delErr)
         }
+      } else {
+        console.warn('Profil negasit pentru email:', email)
       }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
