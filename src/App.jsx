@@ -1452,6 +1452,7 @@ function App() {
   const aziChipRef = useRef(null)
   const chipsScrollRef = useRef(null)
   const scrolledOnce = useRef(false)
+  const calSwipeX = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
   const [rezervariPerClasa, setRezervariPerClasa] = useState({})
   const [clasaSelectata, setClasaSelectata] = useState(null)
@@ -2104,7 +2105,7 @@ function App() {
         const saptamana = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(monday.getDate() + i)
           const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-          return { d, ds, areWod: wodLogs.some(l => l.logged_at?.startsWith(ds)), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
+          return { d, ds, areWod: wodLogs.some(l => l.logged_at && new Date(l.logged_at).toISOString().split('T')[0] === ds), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
         })
         const zileSapt = ['L','Ma','Mi','J','V','S','D']
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
@@ -2147,8 +2148,17 @@ function App() {
               </div>
               <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
 
-              {/* Calendar săptămânal interactiv */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
+              {/* Calendar săptămânal interactiv + swipe stânga/dreapta = săptămâna anterioară/următoare */}
+              <div
+                style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', touchAction: 'pan-y' }}
+                onTouchStart={e => { calSwipeX.current = e.touches[0].clientX }}
+                onTouchEnd={e => {
+                  if (calSwipeX.current === null) return
+                  const dx = e.changedTouches[0].clientX - calSwipeX.current
+                  calSwipeX.current = null
+                  if (Math.abs(dx) > 40) setDataAcasa(addZile(dataAcasa, dx < 0 ? 7 : -7))
+                }}
+              >
                 {zileSapt.map((z, i) => (
                   <div key={i} style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.04em', paddingBottom: '6px' }}>{z}</div>
                 ))}
@@ -2156,13 +2166,12 @@ function App() {
                   <div key={i} style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setDataAcasa(ds)}>
                     <div style={{
                       width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer',
-                      background: esteSelectat ? '#1a1a1a' : areWod ? '#EDFFD4' : 'transparent',
+                      background: esteSelectat ? '#1a1a1a' : 'transparent',
                       border: eAzi && !esteSelectat ? '2px solid #1a1a1a' : 'none',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
                     }}>
-                      <span style={{ fontSize: '15px', fontWeight: esteSelectat || eAzi ? '900' : '400', color: esteSelectat ? '#C8FF00' : areWod ? '#2F6600' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
-                      {areWod && !esteSelectat && <span style={{ fontSize: '9px', lineHeight: 1 }}>⚡</span>}
-                      {esteSelectat && <span style={{ fontSize: '7px', lineHeight: 1, color: '#C8FF00' }}>●</span>}
+                      <span style={{ fontSize: '15px', fontWeight: esteSelectat || eAzi ? '900' : '400', color: esteSelectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
+                      {areWod && <span style={{ fontSize: esteSelectat ? '7px' : '9px', lineHeight: 1, color: esteSelectat ? '#C8FF00' : '#C8FF00' }}>⚡</span>}
                     </div>
                   </div>
                 ))}
