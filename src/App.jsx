@@ -1871,10 +1871,10 @@ function App() {
   const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > new Date())
 
   const VARIANTE_CONFIG = [
-    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
-    { nivel: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢', key: 'movements_beginner' },
+    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', emoji: '🟠', key: 'movements_rx' },
     { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', key: 'movements_intermediate' },
-    { nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴', key: 'movements_rx' },
+    { nivel: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢', key: 'movements_beginner' },
+    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
   ]
 
   const abonamentInceput = abonamentReal ? new Date(abonamentReal.start_date + 'T00:00:00') <= new Date() : false
@@ -2141,9 +2141,12 @@ function App() {
                       </div>
                       {variantaAleasa === i && miscari.length > 0 && (
                         <>
-                          <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
-                            <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
+                          <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
+                              <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
+                            </div>
+                            {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
                           </div>
                           {miscari.map((m, j) => (
                             <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
@@ -2324,7 +2327,7 @@ function App() {
           )}
 
           {variantaAleasa !== null && wodZiData ? (() => {
-            const cheie = ['movements_onramp','movements_beginner','movements_intermediate','movements_rx'][variantaAleasa]
+            const cheie = VARIANTE_CONFIG[variantaAleasa].key
             const miscariWod = wodZiData[cheie] || []
             return (
               <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
