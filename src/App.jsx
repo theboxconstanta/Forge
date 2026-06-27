@@ -1455,6 +1455,31 @@ function App() {
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!user) return
+    const channel = supabase.channel('realtime-app')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
+        fetchClaseDB(); fetchClase()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        fetchRezervari(); fetchClaseDB()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
+        fetchAbonamentMeu(); fetchAbonamente()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wods' }, () => {
+        fetchWodZi(); fetchWods()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchClienti()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
+        fetchWodLogs(); fetchClasament()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!user || zileCalendar.length === 0) return
     const date = zileCalendar[ziSelectata]
     if (!date) return
