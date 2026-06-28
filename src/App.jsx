@@ -1555,6 +1555,8 @@ function App() {
   const [wodZiData, setWodZiData] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [prSelectat, setPrSelectat] = useState(null)
+  const [heroWodsDeschis, setHeroWodsDeschis] = useState(false)
+  const [heroWodNouInput, setHeroWodNouInput] = useState('')
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [miscarePR, setMiscarePR] = useState('')
@@ -2875,22 +2877,16 @@ function App() {
                 <div style={{ fontSize: '14px' }}>Niciun PR salvat încă</div>
               </div>
             )}
-            {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO', 'HERO_WODS'].map(cat => {
-              const miscariCat = cat === 'HERO_WODS'
-                ? PR_CATEGORII[cat]
-                : PR_CATEGORII[cat].filter(m => prGroups[m])
-              if (cat !== 'HERO_WODS' && miscariCat.length === 0) return null
-              if (cat === 'HERO_WODS' && PR_CATEGORII[cat].length === 0) return null
+            {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO'].map(cat => {
+              const miscariCat = PR_CATEGORII[cat].filter(m => prGroups[m])
+              if (miscariCat.length === 0) return null
               const cfg = catConfig[cat]
-              const vodCuPR = cat === 'HERO_WODS' ? miscariCat.filter(m => prGroups[m]).length : null
               return (
                 <div key={cat} style={{ marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb' }}>
-                      {cat === 'HERO_WODS' ? `${vodCuPR}/${miscariCat.length} completate` : `${miscariCat.length} exerciții`}
-                    </div>
+                    <div style={{ fontSize: '10px', color: '#bbb' }}>{miscariCat.length} exerciții</div>
                   </div>
                   <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                     {miscariCat.map((m, idx) => renderMiscare(m, idx, miscariCat.length, cat))}
@@ -2898,6 +2894,49 @@ function App() {
                 </div>
               )
             })}
+            {/* ── HERO WODs — dropdown collapsibil ── */}
+            {(() => {
+              const cfg = catConfig['HERO_WODS']
+              const toateHero = PR_CATEGORII['HERO_WODS']
+              const cuPR = toateHero.filter(m => prGroups[m]).length
+              return (
+                <div style={{ marginBottom: '20px' }}>
+                  {/* Header clickabil */}
+                  <div onClick={() => { setHeroWodsDeschis(v => !v); setPrSelectat(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{cuPR}/{toateHero.length} completate</div>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
+                      {heroWodsDeschis ? '▲' : '▼'}
+                    </div>
+                  </div>
+                  {heroWodsDeschis && (
+                    <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                      {toateHero.map((m, idx) => renderMiscare(m, idx, toateHero.length + 1, 'HERO_WODS'))}
+                      {/* Linie separator + formular WOD nou */}
+                      <div style={{ borderTop: '2px dashed #f0f0f0', padding: '14px' }}>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>HERO WOD PERSONALIZAT</div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            value={heroWodNouInput}
+                            onChange={e => setHeroWodNouInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}}
+                            placeholder="ex: Forge WOD, The C15..."
+                            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
+                          />
+                          <button
+                            onClick={() => { if (!heroWodNouInput.trim()) return; setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}
+                            style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#C8FF00' : '#f0f0f0', color: heroWodNouInput.trim() ? '#111' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
+                            →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             {miscariFaraCat.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
