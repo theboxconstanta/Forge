@@ -947,15 +947,17 @@ function Admin({ showToast }) {
   }
 
   const adjustMemberSessions = async (memberId, delta) => {
-    const { data: prof } = await supabase.from('profiles').select('email').eq('id', memberId).maybeSingle()
-    if (!prof?.email) return
-    const { data: abo } = await supabase.from('subscriptions')
+    const member = clienti.find(c => c.id === memberId)
+    const email = member?.email?.toLowerCase()
+    if (!email) return
+    const { data: abo, error } = await supabase.from('subscriptions')
       .select('id, sessions_used, sessions_total')
-      .eq('member_email', prof.email.toLowerCase())
+      .ilike('member_email', email)
       .eq('is_active', true)
       .not('sessions_total', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1).maybeSingle()
+    if (error) { console.error('adjustMemberSessions:', error); return }
     if (!abo) return
     const newUsed = Math.max(0, (abo.sessions_used || 0) + delta)
     await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
