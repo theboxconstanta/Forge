@@ -1154,6 +1154,39 @@ function Admin({ showToast }) {
                 </div>
                 {isOpen && (
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                    {/* Profil complet */}
+                    <div style={{ background: '#f8f8f8', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>PROFIL</div>
+                      {(c.first_name || c.last_name) && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#888' }}>Prenume / Nume</span>
+                          <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{[c.first_name, c.last_name].filter(Boolean).join(' ')}</span>
+                        </div>
+                      )}
+                      {c.birth_date && (() => {
+                        const varsta = Math.floor((new Date() - new Date(c.birth_date + 'T00:00:00')) / (365.25 * 24 * 3600 * 1000))
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                            <span style={{ color: '#888' }}>Data nașterii</span>
+                            <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{new Date(c.birth_date + 'T00:00:00').toLocaleDateString('ro-RO')} ({varsta} ani)</span>
+                          </div>
+                        )
+                      })()}
+                      {c.gender && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#888' }}>Gen</span>
+                          <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{c.gender === 'masculin' ? '♂ Masculin' : '♀ Feminin'}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#888' }}>Waiver</span>
+                        {c.waiver_accepted ? (
+                          <span style={{ fontWeight: '600', color: '#27500A' }}>✓ Acceptat {c.waiver_accepted_at ? new Date(c.waiver_accepted_at).toLocaleDateString('ro-RO') : ''}</span>
+                        ) : (
+                          <span style={{ fontWeight: '600', color: '#E24B4A' }}>✗ Neacceptat</span>
+                        )}
+                      </div>
+                    </div>
                     {abo ? (
                       <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>
@@ -1637,8 +1670,12 @@ function App() {
   const [showCalPicker, setShowCalPicker] = useState(false)
   const [calPickerYear, setCalPickerYear] = useState(new Date().getFullYear())
   const [calPickerMonth, setCalPickerMonth] = useState(new Date().getMonth())
+  const [onboardingStep, setOnboardingStep] = useState(1)
+  const [onboardingFirstName, setOnboardingFirstName] = useState('')
+  const [onboardingLastName, setOnboardingLastName] = useState('')
   const [onboardingGender, setOnboardingGender] = useState('')
-  const [onboardingName, setOnboardingName] = useState('')
+  const [onboardingBirthDate, setOnboardingBirthDate] = useState('')
+  const [onboardingWaiverAccepted, setOnboardingWaiverAccepted] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const avatarInputRef = useRef(null)
 
@@ -1765,24 +1802,35 @@ function App() {
   const fetchUserProfile = async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     setUserProfile(data)
-    if (!data?.gender) {
-      setOnboardingName(data?.full_name || user.user_metadata?.full_name || '')
-      setOnboardingGender('')
+    if (!data?.waiver_accepted) {
+      setOnboardingFirstName(data?.first_name || '')
+      setOnboardingLastName(data?.last_name || '')
+      setOnboardingGender(data?.gender || '')
+      setOnboardingBirthDate(data?.birth_date || '')
+      setOnboardingWaiverAccepted(false)
+      setOnboardingStep(1)
       setShowOnboarding(true)
     }
   }
 
   const saveOnboarding = async () => {
-    if (!onboardingGender) return
-    const name = onboardingName.trim() || user.user_metadata?.full_name || null
+    if (!onboardingWaiverAccepted) return
+    const firstName = onboardingFirstName.trim()
+    const lastName = onboardingLastName.trim()
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || null
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
-      full_name: name,
-      gender: onboardingGender,
+      first_name: firstName || null,
+      last_name: lastName || null,
+      full_name: fullName,
+      gender: onboardingGender || null,
+      birth_date: onboardingBirthDate || null,
+      waiver_accepted: true,
+      waiver_accepted_at: new Date().toISOString(),
     }, { onConflict: 'id' })
     if (error) { showToast('❌ Eroare la salvare. Încearcă din nou.'); return }
-    setUserProfile(prev => ({ ...prev, full_name: name, gender: onboardingGender }))
+    setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: onboardingGender, birth_date: onboardingBirthDate, waiver_accepted: true }))
     setShowOnboarding(false)
   }
 
@@ -3118,38 +3166,98 @@ function App() {
       })()}
 
       {showOnboarding && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: '480px' }}>
-            <div style={{ width: '40px', height: '4px', background: '#e0e0e0', borderRadius: '2px', margin: '0 auto 24px' }} />
-            <div style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', marginBottom: '6px' }}>Bun venit! 👋</div>
-            <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>Completează profilul tău pentru a apărea în clasament.</div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Nume complet</div>
-              <input
-                value={onboardingName}
-                onChange={e => setOnboardingName(e.target.value)}
-                placeholder="ex: Andrei Popescu"
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a' }}
-              />
+            {/* Progress dots */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '24px' }}>
+              {[1,2,3].map(s => (
+                <div key={s} style={{ width: s === onboardingStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s <= onboardingStep ? '#1a1a1a' : '#e0e0e0', transition: 'all 0.2s' }} />
+              ))}
             </div>
 
-            <div style={{ marginBottom: '28px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Gen</div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {[{ val: 'masculin', label: '♂ Masculin' }, { val: 'feminin', label: '♀ Feminin' }].map(g => (
-                  <div key={g.val} onClick={() => setOnboardingGender(g.val)}
-                    style={{ flex: 1, padding: '14px', borderRadius: '14px', border: `2px solid ${onboardingGender === g.val ? '#C8FF00' : '#e0e0e0'}`, background: onboardingGender === g.val ? '#f5ffe0' : '#fafafa', textAlign: 'center', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: onboardingGender === g.val ? '#2a5900' : '#888', transition: 'all 0.15s' }}>
-                    {g.label}
+            {/* PASUL 1 — Date personale */}
+            {onboardingStep === 1 && (
+              <>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', marginBottom: '4px' }}>Bun venit! 👋</div>
+                <div style={{ fontSize: '14px', color: '#888', marginBottom: '24px' }}>Completează datele tale pentru înregistrare.</div>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Prenume *</div>
+                    <input value={onboardingFirstName} onChange={e => setOnboardingFirstName(e.target.value)}
+                      placeholder="ex: Andrei"
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Nume *</div>
+                    <input value={onboardingLastName} onChange={e => setOnboardingLastName(e.target.value)}
+                      placeholder="ex: Popescu"
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
+                  <input type="date" value={onboardingBirthDate} onChange={e => setOnboardingBirthDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box', background: '#fff' }} />
+                </div>
+                <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast('❌ Completează toate câmpurile obligatorii!'); return }; setOnboardingStep(2) }}
+                  style={{ width: '100%', padding: '16px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer' }}>
+                  Continuă →
+                </button>
+              </>
+            )}
 
-            <button onClick={saveOnboarding} disabled={!onboardingGender}
-              style={{ width: '100%', padding: '16px', background: onboardingGender ? '#C8FF00' : '#e0e0e0', color: onboardingGender ? '#111' : '#aaa', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: onboardingGender ? 'pointer' : 'default', letterSpacing: '0.5px' }}>
-              Salvează profilul
-            </button>
+            {/* PASUL 2 — Gen */}
+            {onboardingStep === 2 && (
+              <>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', marginBottom: '4px' }}>Selectează genul</div>
+                <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>Folosit pentru clasamentul pe categorii.</div>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
+                  {[{ val: 'masculin', label: '♂', sub: 'Masculin' }, { val: 'feminin', label: '♀', sub: 'Feminin' }].map(g => (
+                    <div key={g.val} onClick={() => setOnboardingGender(g.val)}
+                      style={{ flex: 1, padding: '20px 14px', borderRadius: '16px', border: `2px solid ${onboardingGender === g.val ? '#1a1a1a' : '#e0e0e0'}`, background: onboardingGender === g.val ? '#1a1a1a' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '6px', color: onboardingGender === g.val ? '#C8FF00' : '#888' }}>{g.label}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: onboardingGender === g.val ? '#C8FF00' : '#888' }}>{g.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setOnboardingStep(1)}
+                    style={{ flex: 1, padding: '14px', background: '#f5f5f5', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>← Înapoi</button>
+                  <button onClick={() => { if (!onboardingGender) { showToast('❌ Selectează genul!'); return }; setOnboardingStep(3) }}
+                    style={{ flex: 2, padding: '14px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>Continuă →</button>
+                </div>
+              </>
+            )}
+
+            {/* PASUL 3 — Waiver */}
+            {onboardingStep === 3 && (
+              <>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: '#1a1a1a', marginBottom: '4px' }}>Acord de participare</div>
+                <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Citește și acceptă acordul pentru a continua.</div>
+                <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.5px', marginBottom: '10px' }}>DECLARAȚIE DE CONSIMȚĂMÂNT — CrossFit C15 / Forge</div>
+                  <p style={{ marginBottom: '8px' }}><strong>1. Starea de sănătate</strong><br />Declar că sunt apt/ă din punct de vedere medical pentru activități fizice de intensitate ridicată și nu am contraindicații medicale cunoscute. Am consultat sau mă angajez să consult un medic înainte de începerea programului.</p>
+                  <p style={{ marginBottom: '8px' }}><strong>2. Asumarea riscurilor</strong><br />Înțeleg că CrossFit și activitățile sportive implică riscuri inerente de accidentare. Îmi asum în mod voluntar aceste riscuri și participarea este de bună voie.</p>
+                  <p style={{ marginBottom: '8px' }}><strong>3. Limitarea răspunderii</strong><br />CrossFit C15, Forge și antrenorii nu sunt responsabili pentru accidentări, prejudicii sau pierderi survenite în timpul antrenamentelor, cu excepția cazurilor de neglijență gravă dovedită.</p>
+                  <p style={{ marginBottom: '8px' }}><strong>4. Regulamentul sălii</strong><br />Mă angajez să respect instrucțiunile antrenorilor, regulamentul intern și să utilizez echipamentul în siguranță. Comportamentul neadecvat poate duce la suspendarea accesului.</p>
+                  <p><strong>5. Date personale</strong><br />Datele mele personale sunt utilizate exclusiv pentru gestionarea membriei CrossFit C15 și nu vor fi partajate cu terți fără acordul meu explicit.</p>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={onboardingWaiverAccepted} onChange={e => setOnboardingWaiverAccepted(e.target.checked)}
+                    style={{ width: '20px', height: '20px', marginTop: '1px', accentColor: '#2F6600', flexShrink: 0, cursor: 'pointer' }} />
+                  <span style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5' }}>Am citit, înțeles și sunt de acord cu termenii acordului de mai sus.</span>
+                </label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setOnboardingStep(2)}
+                    style={{ flex: 1, padding: '14px', background: '#f5f5f5', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>← Înapoi</button>
+                  <button onClick={saveOnboarding} disabled={!onboardingWaiverAccepted}
+                    style={{ flex: 2, padding: '14px', background: onboardingWaiverAccepted ? '#C8FF00' : '#e0e0e0', color: onboardingWaiverAccepted ? '#111' : '#aaa', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: onboardingWaiverAccepted ? 'pointer' : 'default' }}>
+                    Confirm și intru ✓
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
