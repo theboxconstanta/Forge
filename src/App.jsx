@@ -763,6 +763,7 @@ function Admin({ showToast }) {
   const [clasaDeschisa, setClasaDeschisa] = useState(null)
   const [clientSelectat, setClientSelectat] = useState(null)
   const [sortClienti, setSortClienti] = useState('toti')
+  const [emailuriCuRezervariViitoare, setEmailuriCuRezervariViitoare] = useState(new Set())
 
   useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente() }, [])
 
@@ -791,6 +792,12 @@ function Admin({ showToast }) {
   const fetchAbonamente = async () => {
     const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)').eq('is_active', true).order('created_at', { ascending: false })
     if (data) setAbonamente(data)
+    const azi = new Date(); const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
+    const { data: claseViit } = await supabase.from('classes').select('id').gte('date', aziStr)
+    if (claseViit && claseViit.length > 0) {
+      const { data: bookings } = await supabase.from('bookings').select('member_id, profiles(email)').in('class_id', claseViit.map(c => c.id))
+      if (bookings) setEmailuriCuRezervariViitoare(new Set(bookings.map(b => b.profiles?.email?.toLowerCase()).filter(Boolean)))
+    }
   }
 
   const fetchRezervariClasa = async (classId) => {
@@ -1060,7 +1067,8 @@ function Admin({ showToast }) {
     if (!abo) return false
     const inceput = new Date(abo.start_date + 'T00:00:00') <= new Date()
     const neexpirat = new Date(abo.end_date + 'T23:59:59') >= new Date()
-    const sedinteOK = abo.sessions_total == null || Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) > 0
+    const areRezViitoare = emailuriCuRezervariViitoare.has(email?.toLowerCase())
+    const sedinteOK = abo.sessions_total == null || Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) > 0 || areRezViitoare
     return inceput && neexpirat && sedinteOK
   }
   const clientiFiltrati = clienti
