@@ -2027,7 +2027,7 @@ function App() {
         fetchClaseDB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchRezervari(); fetchClaseDB()
+        fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
         fetchAbonamentMeu()
