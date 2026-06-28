@@ -1611,69 +1611,89 @@ function Admin({ showToast }) {
               <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>🗑️ Șterge trecute</button>
             )}
           </div>
-          {clase.map(c => (
-            <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · 🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}</div>
-                  <div style={{ fontSize: '12px', color: '#888' }}>👤 {c.coach} · {c.max_spots} locuri</div>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
-                    style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '11px', cursor: 'pointer' }}>👥</button>
-                  <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
-                  <button onClick={() => { if (window.confirm(`Ștergi toate clasele viitoare „${c.name}" ${c.start_time?.slice(0,5)}?`)) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ serie</button>
-                </div>
-              </div>
-              {clasaDeschisa === c.id && (
-                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0}/{c.max_spots})</div>
-                  {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
-                    : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
-                    : rezervariClasa[c.id].map((r, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                      <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
-                        <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
-                      </div>
-                      <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
-                        style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕ Scoate</button>
+          {(() => {
+            const grouped = clase.reduce((acc, c) => { if (!acc[c.date]) acc[c.date] = []; acc[c.date].push(c); return acc }, {})
+            const azi = new Date().toISOString().split('T')[0]
+            return Object.entries(grouped).map(([date, claseZi]) => {
+              const dateObj = new Date(date + 'T00:00:00')
+              const eAzi = date === azi
+              const eTrecut = date < azi
+              const ziLabel = dateObj.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })
+              return (
+                <div key={date} style={{ marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#2F6600' : eTrecut ? '#f0f0f0' : '#1a1a1a', borderRadius: '20px', padding: '5px 14px' }}>
+                      {eAzi && <span style={{ fontSize: '10px', color: '#C8FF00', fontWeight: '800', letterSpacing: '0.08em' }}>AZI</span>}
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
                     </div>
-                  ))}
-                  {/* Adaugă manual */}
-                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f5f5f5' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>ADAUGĂ MANUAL</div>
-                    <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
-                      placeholder="Caută după nume sau email..."
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
-                    {adaugaMembruSearch[c.id]?.trim() && (() => {
-                      const q = adaugaMembruSearch[c.id].toLowerCase()
-                      const rezultate = clienti.filter(cl =>
-                        (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
-                        !(rezervariClasa[c.id] || []).some(r => r.member_id === cl.id)
-                      ).slice(0, 5)
-                      return rezultate.length > 0 ? (
-                        <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
-                          {rezultate.map(cl => (
-                            <div key={cl.id} onClick={() => adminAdaugaInClasa(c.id, cl.id)}
-                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <div style={{ fontWeight: '500', color: '#1a1a1a' }}>{cl.full_name || cl.email}</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
+                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+                  </div>
+                  {claseZi.map(c => (
+                    <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{c.name}</div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach} · {c.max_spots} locuri</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
+                            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '11px', cursor: 'pointer' }}>👥</button>
+                          <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                          <button onClick={() => { if (window.confirm(`Ștergi toate clasele viitoare „${c.name}" ${c.start_time?.slice(0,5)}?`)) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ serie</button>
+                        </div>
+                      </div>
+                      {clasaDeschisa === c.id && (
+                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0}/{c.max_spots})</div>
+                          {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
+                            : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
+                            : rezervariClasa[c.id].map((r, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                              <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
+                                <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
                               </div>
-                              <span style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600' }}>+ Adaugă</span>
+                              <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
+                                style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕ Scoate</button>
                             </div>
                           ))}
+                          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f5f5f5' }}>
+                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>ADAUGĂ MANUAL</div>
+                            <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
+                              placeholder="Caută după nume sau email..."
+                              style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
+                            {adaugaMembruSearch[c.id]?.trim() && (() => {
+                              const q = adaugaMembruSearch[c.id].toLowerCase()
+                              const rezultate = clienti.filter(cl =>
+                                (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
+                                !(rezervariClasa[c.id] || []).some(r => r.member_id === cl.id)
+                              ).slice(0, 5)
+                              return rezultate.length > 0 ? (
+                                <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
+                                  {rezultate.map(cl => (
+                                    <div key={cl.id} onClick={() => adminAdaugaInClasa(c.id, cl.id)}
+                                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <div>
+                                        <div style={{ fontWeight: '500', color: '#1a1a1a' }}>{cl.full_name || cl.email}</div>
+                                        <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
+                                      </div>
+                                      <span style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600' }}>+ Adaugă</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>Niciun rezultat</div>
+                            })()}
+                          </div>
                         </div>
-                      ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>Niciun rezultat</div>
-                    })()}
-                  </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          ))}
+              )
+            })
+          })()}
         </>
       )}
 
