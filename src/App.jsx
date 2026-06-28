@@ -1659,7 +1659,6 @@ function App() {
   const [resetMode, setResetMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
-  const [authEmailInit] = useState(localStorage.getItem('forge_remember_email') || '')
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(false)
   const [clasamentLogs, setClasamentLogs] = useState([])
