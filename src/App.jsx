@@ -66,9 +66,58 @@ const MISCARI = [
   'Box Jump', 'Broad Jump', 'Burpee', 'Double Under', 'Single Under',
   'Row', 'Run', 'Bike Erg', 'Assault Bike', 'Ski Erg',
   'KB Swing', 'KB Clean', 'KB Snatch', 'KB Goblet Squat', 'Wall Ball',
-  'Fran', 'Grace', 'Cindy', 'Helen', 'Diane', 'Annie', 'Barbara', 'Chelsea',
-  'Murph', 'DT', 'Jackie', 'Randy', 'Nancy', 'Amanda',
+  // Girls
+  'Angie','Annie','Amanda','Barbara','Chelsea','Cindy','Diane','Elizabeth','Eva',
+  'Fran','Grace','Helen','Isabel','Jackie','Karen','Kelly','Linda','Lynne','Mary','Nancy','Nicole',
+  // Heroes
+  'Murph','DT','Randy','Michael','Ryan','Josh','J.T.','Nate','Danny',
+  'Adam','Badger','Forrest','Kalsu','Ship','Scott','Griff','Glen','Nutts','Desforges',
 ]
+
+const HERO_WODS_INFO = {
+  // ── The Girls ──────────────────────────────────────────────────────
+  'Angie':     'For Time\n100 Pull-ups\n100 Push-ups\n100 Sit-ups\n100 Air Squats',
+  'Annie':     'For Time 50-40-30-20-10\nDouble Unders\nSit-ups',
+  'Amanda':    'For Time 9-7-5\nMuscle-ups\nSquat Snatches 60/40 kg',
+  'Barbara':   '5 rounds for time (3 min rest)\n20 Pull-ups\n30 Push-ups\n40 Sit-ups\n50 Air Squats',
+  'Chelsea':   'EMOM 30 min\n5 Pull-ups\n10 Push-ups\n15 Air Squats',
+  'Cindy':     'AMRAP 20 min\n5 Pull-ups\n10 Push-ups\n15 Air Squats',
+  'Diane':     'For Time 21-15-9\nDeadlift 100/70 kg\nHandstand Push-up',
+  'Elizabeth': 'For Time 21-15-9\nClean 60/40 kg\nRing Dip',
+  'Eva':       '5 rounds for time\n800m Run\n30 KB Swings 32 kg\n30 Pull-ups',
+  'Fran':      'For Time 21-15-9\nThrusters 43/30 kg\nPull-ups',
+  'Grace':     'For Time\n30 Clean & Jerk 60/40 kg',
+  'Helen':     '3 rounds for time\n400m Run\n21 KB Swings 24/16 kg\n12 Pull-ups',
+  'Isabel':    'For Time\n30 Snatches 60/40 kg',
+  'Jackie':    'For Time\n1000m Row\n50 Thrusters 20 kg\n30 Pull-ups',
+  'Karen':     'For Time\n150 Wall Balls 9/6 kg',
+  'Kelly':     '5 rounds for time\n400m Run\n30 Box Jumps 60 cm\n30 Wall Balls 9/6 kg',
+  'Linda':     'For Time 10-9-8-7-6-5-4-3-2-1\nDeadlift 1.5×BW\nBench Press 1×BW\nClean 0.75×BW',
+  'Lynne':     '5 rounds max reps\nBench Press (greutate corp)\nPull-ups',
+  'Mary':      'AMRAP 20 min\n5 Handstand Push-ups\n10 Pistol Squats\n15 Pull-ups',
+  'Nancy':     '5 rounds for time\n400m Run\n15 OHS 43/30 kg',
+  'Nicole':    'AMRAP 20 min\n400m Run\nMax Pull-ups (score = total pull-ups)',
+  // ── Hero WODs ──────────────────────────────────────────────────────
+  'Murph':     'For Time (vestă 9/6 kg)\n1 Mile Run (1.6 km)\n100 Pull-ups\n200 Push-ups\n300 Air Squats\n1 Mile Run (1.6 km)',
+  'DT':        '5 rounds for time\n12 Deadlifts 70/47 kg\n9 Hang Power Cleans 70/47 kg\n6 Push Jerks 70/47 kg',
+  'Randy':     'For Time\n75 Power Snatches 34/23 kg',
+  'Michael':   '3 rounds for time\n800m Run\n50 Back Extensions\n50 Sit-ups',
+  'Ryan':      '5 rounds for time\n7 Muscle-ups\n21 Burpees',
+  'Josh':      'For Time 21-15-9\nOHS 43/30 kg\nLeaning Rest Pull-ups',
+  'J.T.':      'For Time 21-15-9\nHandstand Push-ups\nRing Dips\nPush-ups',
+  'Nate':      'AMRAP 20 min\n2 Muscle-ups\n4 Handstand Push-ups\n8 KB Swings 32 kg',
+  'Danny':     'AMRAP 20 min\n30 Box Jumps 61 cm\n20 Push Press 52 kg\n10 Pull-ups',
+  'Adam':      '5 rounds for time\n20 Burpees\n400m Run',
+  'Badger':    '3 rounds for time\n30 Squat Cleans 43/30 kg\n30 Pull-ups\n800m Run',
+  'Forrest':   'AMRAP 20 min\n35 Burpees\n25 L Pull-ups\n50 Box Jumps 61 cm\n25 L Pull-ups',
+  'Kalsu':     'For Time (5 Burpees EMOM la start)\n100 Thrusters 61/43 kg',
+  'Ship':      '10 rounds for time\n10 Handstand Push-ups\n15 Box Jumps 61 cm\n20 Knees-to-Elbows',
+  'Scott':     '5 rounds for time\n5 Deadlifts 1.5×BW\n10 Burpees\n1 Rope Climb 4.5m',
+  'Griff':     '2 rounds for time\n800m Run\n400m Run backwards',
+  'Glen':      'For Time\n30 Clean & Jerk 60/40 kg\n1 Mile Run (1.6 km)\n— 10 rounds —\n3 Muscle-ups\n4 HSPU\n5 Hang Power Cleans 61 kg',
+  'Nutts':     'For Time\n10 HSPU\n15 Deadlifts 102 kg\n25 Box Jumps 76 cm\n50 C2B Pull-ups\n100 Wall Balls 9 kg\n200 Double Unders\n400m Run',
+  'Desforges': '7 rounds for time\n7 Muscle-ups\n100m Sprint',
+}
 
 const PR_CATEGORII = {
   WEIGHTLIFTING: [
@@ -87,11 +136,8 @@ const PR_CATEGORII = {
     'Box Jump','Broad Jump','Burpee','Double Under','Single Under',
     'KB Swing','KB Clean','KB Snatch','KB Goblet Squat','Wall Ball',
   ],
-  CARDIO: [
-    'Row','Run','Bike Erg','Assault Bike','Ski Erg',
-    'Fran','Grace','Cindy','Helen','Diane','Annie','Barbara','Chelsea',
-    'Murph','DT','Jackie','Randy','Nancy','Amanda',
-  ],
+  CARDIO: ['Row','Run','Bike Erg','Assault Bike','Ski Erg'],
+  HERO_WODS: Object.keys(HERO_WODS_INFO),
 }
 
 const FEED_INITIAL = [
@@ -1882,7 +1928,7 @@ function App() {
     const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prDistanta.trim()
     if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
     setPrSaving(true)
-    const isBenchmark = ['Fran','Grace','Cindy','Helen','Diane','Annie','Barbara','Murph','DT','Jackie','Nancy','Amanda'].includes(miscarePR)
+    const isBenchmark = miscarePR in HERO_WODS_INFO
     const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
@@ -2675,7 +2721,7 @@ function App() {
             <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} />
             {miscarePR && (
               <>
-                {['Fran','Grace','Cindy','Helen','Diane','Annie','Barbara','Murph','DT','Jackie','Nancy','Amanda'].includes(miscarePR) ? (
+                {miscarePR in HERO_WODS_INFO ? (
                   <>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
                     <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 4:22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
@@ -2735,9 +2781,10 @@ function App() {
         }
         const PCT_BARA = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
         const catConfig = {
-          WEIGHTLIFTING: { culoare: '#1a1a1a', bg: '#f5f5f5' },
-          GYMNASTICS:    { culoare: '#2F6600', bg: '#EDFFD4' },
-          CARDIO:        { culoare: '#0C447C', bg: '#E6F1FB' },
+          WEIGHTLIFTING: { culoare: '#1a1a1a', label: 'WEIGHTLIFTING' },
+          GYMNASTICS:    { culoare: '#2F6600', label: 'GYMNASTICS' },
+          CARDIO:        { culoare: '#0C447C', label: 'CARDIO' },
+          HERO_WODS:     { culoare: '#8B1A1A', label: 'HERO WODs' },
         }
         const toateMiscariCategorii = Object.values(PR_CATEGORII).flat()
         const miscariFaraCat = Object.keys(prGroups).filter(m => !toateMiscariCategorii.includes(m))
@@ -2746,13 +2793,14 @@ function App() {
           const best = bestPR(records)
           const isOpen = prSelectat === movement
           const bestKg = cat === 'WEIGHTLIFTING' && best?.unit === 'kg' && best?.value ? parseFloat(best.value) : null
+          const wodInfo = HERO_WODS_INFO[movement]
           return (
             <div key={movement} onClick={() => setPrSelectat(isOpen ? null : movement)}
               style={{ padding: '12px 14px', borderBottom: idx < total - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>{movement}</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#2F6600' }}>{best ? formatPR(best) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#2F6600' : '#ccc' }}>{best ? formatPR(best) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -2761,8 +2809,27 @@ function App() {
                   {new Date(best.recorded_at).toLocaleDateString('ro-RO')}{best.notes ? ' · ' + best.notes : ''}
                 </div>
               )}
+              {!best && !isOpen && wodInfo && (
+                <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
+              )}
               {isOpen && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
+                  {wodInfo && (
+                    <div style={{ marginBottom: '14px', background: '#111', borderRadius: '12px', padding: '14px', overflow: 'hidden' }}>
+                      {wodInfo.split('\n').map((line, li) => (
+                        <div key={li} style={{
+                          fontSize: li === 0 ? '11px' : '13px',
+                          fontWeight: li === 0 ? '800' : '400',
+                          color: li === 0 ? '#C8FF00' : '#e0e0e0',
+                          marginBottom: li === 0 ? '8px' : '3px',
+                          letterSpacing: li === 0 ? '0.8px' : '0',
+                          textTransform: li === 0 ? 'uppercase' : 'none',
+                        }}>
+                          {li === 0 ? line : `• ${line}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
                       <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} kg</div>
@@ -2779,7 +2846,7 @@ function App() {
                       </div>
                     </div>
                   )}
-                  {records.length > 1 && (
+                  {records && records.length > 1 && (
                     <div style={{ marginBottom: '10px' }}>
                       <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC</div>
                       {records.slice(0, 5).map((r, j) => (
@@ -2790,7 +2857,7 @@ function App() {
                       ))}
                     </div>
                   )}
-                  <button onClick={() => { setLogPentruPR(best); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+                  <button onClick={() => { setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                     style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     + Adaugă rezultat nou
                   </button>
@@ -2808,16 +2875,22 @@ function App() {
                 <div style={{ fontSize: '14px' }}>Niciun PR salvat încă</div>
               </div>
             )}
-            {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO'].map(cat => {
-              const miscariCat = PR_CATEGORII[cat].filter(m => prGroups[m])
-              if (miscariCat.length === 0) return null
+            {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO', 'HERO_WODS'].map(cat => {
+              const miscariCat = cat === 'HERO_WODS'
+                ? PR_CATEGORII[cat]
+                : PR_CATEGORII[cat].filter(m => prGroups[m])
+              if (cat !== 'HERO_WODS' && miscariCat.length === 0) return null
+              if (cat === 'HERO_WODS' && PR_CATEGORII[cat].length === 0) return null
               const cfg = catConfig[cat]
+              const vodCuPR = cat === 'HERO_WODS' ? miscariCat.filter(m => prGroups[m]).length : null
               return (
                 <div key={cat} style={{ marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cat}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb' }}>{miscariCat.length} exerciții</div>
+                    <div style={{ fontSize: '10px', color: '#bbb' }}>
+                      {cat === 'HERO_WODS' ? `${vodCuPR}/${miscariCat.length} completate` : `${miscariCat.length} exerciții`}
+                    </div>
                   </div>
                   <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                     {miscariCat.map((m, idx) => renderMiscare(m, idx, miscariCat.length, cat))}
