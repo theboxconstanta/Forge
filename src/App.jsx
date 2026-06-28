@@ -1644,6 +1644,8 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingGender, setOnboardingGender] = useState('')
   const [onboardingName, setOnboardingName] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef(null)
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -1803,6 +1805,21 @@ function App() {
     if (error) { showToast('❌ Eroare la salvare. Încearcă din nou.'); return }
     setUserProfile(prev => ({ ...prev, full_name: name, gender: onboardingGender }))
     setShowOnboarding(false)
+  }
+
+  const uploadAvatar = async (file) => {
+    if (!file) return
+    setAvatarUploading(true)
+    const ext = file.name.split('.').pop().toLowerCase() || 'jpg'
+    const path = `${user.id}/avatar.${ext}`
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
+    if (upErr) { showToast('❌ Eroare la upload!'); console.error(upErr); setAvatarUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+    const urlFinal = `${publicUrl}?t=${Date.now()}`
+    await supabase.from('profiles').upsert({ id: user.id, email: user.email, avatar_url: urlFinal }, { onConflict: 'id' })
+    setUserProfile(prev => ({ ...prev, avatar_url: urlFinal }))
+    showToast('✓ Poză de profil actualizată!')
+    setAvatarUploading(false)
   }
 
   const checkAdmin = async () => {
@@ -2336,9 +2353,18 @@ function App() {
                     <div style={{ fontSize: '20px', fontWeight: '900', color: '#2F6600', lineHeight: 1 }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>SESIUNI</div>
                   </div>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#C8FF00', letterSpacing: '-0.5px' }}>{initiale}</span>
+                  <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+                    {avatarUploading ? (
+                      <span style={{ fontSize: '10px', color: '#C8FF00', animation: 'spin 1s linear infinite' }}>⏳</span>
+                    ) : userProfile?.avatar_url ? (
+                      <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#C8FF00', letterSpacing: '-0.5px' }}>{initiale}</span>
+                    )}
                   </div>
+                  <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]); e.target.value = '' }} />
                 </div>
               </div>
               <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
