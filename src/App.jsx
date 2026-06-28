@@ -140,11 +140,6 @@ const PR_CATEGORII = {
   HERO_WODS: Object.keys(HERO_WODS_INFO),
 }
 
-const FEED_INITIAL = [
-  { id:1, nume:'Mihai D.', avatar:'MD', avatarBg:'#EDFFD4', avatarColor:'#2F6600', text:'Fran în 3:58 🔥 PR nou cu 24 secunde!', timp:'12 min', reactii:{ '🔥':8, '💪':5, '❤️':3 }, comentarii:[], variantaWod:'RX' },
-  { id:2, nume:'Ioana A.', avatar:'IA', avatarBg:'#EAF3DE', avatarColor:'#27500A', text:'Back squat 75kg — prima dată! 🎉 Mulțumesc coach!', timp:'1 oră', reactii:{ '🔥':4, '💪':7, '❤️':12 }, comentarii:[{ autor:'Coach Andrei', text:'Bravo Ioana! 💪' }], variantaWod:'Beginner' },
-  { id:3, nume:'Radu B.', avatar:'RB', avatarBg:'#FAEEDA', avatarColor:'#633806', text:'EMOM 20 min — am supraviețuit 😅', timp:'2 ore', reactii:{ '🔥':6, '💪':4, '❤️':2 }, comentarii:[], variantaWod:'Intermediate' },
-]
 
 function fmt(s) {
   const m = Math.floor(Math.abs(s) / 60)
@@ -165,10 +160,13 @@ function getInitiale(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-function AvatarCircle({ name, size = 38 }) {
+function AvatarCircle({ name, avatarUrl, size = 38 }) {
   const culori = ['#EDFFD4', '#EAF3DE', '#FAEEDA', '#E6F1FB', '#FCE8E8']
   const textCulori = ['#2F6600', '#27500A', '#633806', '#0C447C', '#791F1F']
   const idx = name ? name.charCodeAt(0) % culori.length : 0
+  if (avatarUrl) return (
+    <img src={avatarUrl} alt={name || ''} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+  )
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', background: culori[idx], color: textCulori[idx], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.3, fontWeight: '600', flexShrink: 0 }}>
       {getInitiale(name)}
@@ -636,83 +634,198 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
   )
 }
 
-function Feed({ showToast }) {
-  const [feed, setFeed] = useState(FEED_INITIAL)
+function Feed({ showToast, user, userProfile }) {
+  const [posts, setPosts] = useState([])
+  const [reactions, setReactions] = useState({})
+  const [comments, setComments] = useState({})
+  const [loading, setLoading] = useState(true)
   const [postText, setPostText] = useState('')
+  const [posting, setPosting] = useState(false)
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
-  const [reactiiMele, setReactiiMele] = useState({})
+
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#27500A', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#EAF3DE', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
-  const toggleReactie = (postId, emoji) => {
-    const key = postId + '-' + emoji
-    const aMea = reactiiMele[key]
-    setReactiiMele(prev => ({ ...prev, [key]: !aMea }))
-    setFeed(prev => prev.map(p => p.id !== postId ? p : { ...p, reactii: { ...p.reactii, [emoji]: p.reactii[emoji] + (aMea ? -1 : 1) } }))
+
+  const relativeTime = (ts) => {
+    const diff = Date.now() - new Date(ts).getTime()
+    const min = Math.floor(diff / 60000)
+    if (min < 1) return 'acum'
+    if (min < 60) return `${min} min`
+    const h = Math.floor(min / 60)
+    if (h < 24) return `${h}h`
+    return `${Math.floor(h / 24)}z`
   }
-  const adaugaComentariu = (postId) => {
+
+  const fetchAll = async (showLoader = false) => {
+    if (showLoader) setLoading(true)
+    const { data: postsData } = await supabase.from('feed_posts')
+      .select('*, profiles(full_name, email, avatar_url)')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (postsData) {
+      setPosts(postsData)
+      const ids = postsData.map(p => p.id)
+      if (ids.length > 0) {
+        const [{ data: reactData }, { data: commData }] = await Promise.all([
+          supabase.from('feed_reactions').select('post_id, emoji, member_id').in('post_id', ids),
+          supabase.from('feed_comments').select('*, profiles(full_name, avatar_url)').in('post_id', ids).order('created_at', { ascending: true }),
+        ])
+        if (reactData) {
+          const rMap = {}
+          reactData.forEach(r => {
+            if (!rMap[r.post_id]) rMap[r.post_id] = {}
+            if (!rMap[r.post_id][r.emoji]) rMap[r.post_id][r.emoji] = { count: 0, iMine: false }
+            rMap[r.post_id][r.emoji].count++
+            if (r.member_id === user.id) rMap[r.post_id][r.emoji].iMine = true
+          })
+          setReactions(rMap)
+        }
+        if (commData) {
+          const cMap = {}
+          commData.forEach(c => {
+            if (!cMap[c.post_id]) cMap[c.post_id] = []
+            cMap[c.post_id].push(c)
+          })
+          setComments(cMap)
+        }
+      }
+    }
+    if (showLoader) setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchAll(true)
+    const channel = supabase.channel('feed-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_reactions' }, () => fetchAll(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_comments' }, () => fetchAll(false))
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const posteaza = async () => {
+    if (!postText.trim() || posting) return
+    setPosting(true)
+    const { error } = await supabase.from('feed_posts').insert({ member_id: user.id, text: postText.trim() })
+    if (error) { showToast('❌ Eroare la postare!'); console.error(error) }
+    else { setPostText(''); showToast('Postat! 🎉') }
+    setPosting(false)
+  }
+
+  const toggleReactie = async (postId, emoji) => {
+    const iMine = reactions[postId]?.[emoji]?.iMine
+    // optimistic update
+    setReactions(prev => {
+      const cur = prev[postId]?.[emoji] || { count: 0, iMine: false }
+      return { ...prev, [postId]: { ...prev[postId], [emoji]: { count: iMine ? cur.count - 1 : cur.count + 1, iMine: !iMine } } }
+    })
+    if (iMine) {
+      await supabase.from('feed_reactions').delete().eq('post_id', postId).eq('member_id', user.id).eq('emoji', emoji)
+    } else {
+      await supabase.from('feed_reactions').insert({ post_id: postId, member_id: user.id, emoji })
+    }
+  }
+
+  const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
-    setFeed(prev => prev.map(p => p.id !== postId ? p : { ...p, comentarii: [...p.comentarii, { autor: 'Tu', text: comentariuText.trim() }] }))
-    setComentariuText(''); setComentariuDeschis(null)
-    showToast('Comentariu adăugat!')
+    const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
+    if (!error) { setComentariuText(''); setComentariuDeschis(null); showToast('Comentariu adăugat!') }
   }
-  const posteaza = () => {
-    if (!postText.trim()) return
-    setFeed(prev => [{ id: Date.now(), nume: 'Tu', avatar: 'TU', avatarBg: '#EDFFD4', avatarColor: '#2F6600', text: postText.trim(), timp: 'acum', reactii: { '🔥': 0, '💪': 0, '❤️': 0 }, comentarii: [], variantaWod: 'RX' }, ...prev])
-    setPostText(''); showToast('Postat! 🎉')
-  }
+
+  const myName = userProfile?.full_name || user?.email?.split('@')[0] || 'Tu'
+  const myAvatar = userProfile?.avatar_url
+
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Feed 👥</h1>
+
+      {/* Compose */}
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#EDFFD4', color: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>TU</div>
+          <AvatarCircle name={myName} avatarUrl={myAvatar} size={36} />
           <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="Cum a fost antrenamentul azi?"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#1a1a1a', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'system-ui' }} />
         </div>
-        {postText.trim() && <button onClick={posteaza} style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Postează</button>}
+        {postText.trim() && (
+          <button onClick={posteaza} disabled={posting}
+            style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', opacity: posting ? 0.7 : 1 }}>
+            {posting ? 'Se postează...' : 'Postează'}
+          </button>
+        )}
       </div>
-      {feed.map(post => (
-        <div key={post.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: post.avatarBg, color: post.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>{post.avatar}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{post.nume}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                <span style={{ fontSize: '10px', color: '#aaa' }}>{post.timp}</span>
-                {post.variantaWod && <span style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '20px', background: variantaBg[post.variantaWod] || '#f0f0f0', color: variantaColor[post.variantaWod] || '#888', fontWeight: '500' }}>{post.variantaWod}</span>}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
+      ) : posts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+          <div style={{ fontSize: '36px', marginBottom: '10px' }}>👥</div>
+          <div style={{ fontSize: '14px', color: '#888' }}>Nicio postare încă. Fii primul!</div>
+        </div>
+      ) : posts.map(post => {
+        const name = post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Membru'
+        const avatarUrl = post.profiles?.avatar_url
+        const postReactions = reactions[post.id] || {}
+        const postComments = comments[post.id] || []
+        return (
+          <div key={post.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <AvatarCircle name={name} avatarUrl={avatarUrl} size={38} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '10px', color: '#aaa' }}>{relativeTime(post.created_at)}</span>
+                  {post.variant_level && (
+                    <span style={{ fontSize: '10px', padding: '1px 7px', borderRadius: '20px', background: variantaBg[post.variant_level] || '#f0f0f0', color: variantaColor[post.variant_level] || '#888', fontWeight: '500' }}>{post.variant_level}</span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '12px' }}>{post.text}</div>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: post.comentarii.length > 0 ? '10px' : '0' }}>
-            {Object.entries(post.reactii).map(([emoji, count]) => {
-              const activa = reactiiMele[post.id + '-' + emoji]
-              return <button key={emoji} onClick={() => toggleReactie(post.id, emoji)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: activa ? '1.5px solid #2F6600' : '1px solid #e0e0e0', background: activa ? '#EDFFD4' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: activa ? '#2F6600' : '#555', fontWeight: activa ? '600' : '400' }}>{emoji} {count}</button>
-            })}
-            <button onClick={() => setComentariuDeschis(comentariuDeschis === post.id ? null : post.id)} style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e0e0e0', background: '#f5f5f5', cursor: 'pointer', fontSize: '11px', color: '#888' }}>💬 {post.comentarii.length > 0 ? post.comentarii.length : ''}</button>
-          </div>
-          {post.comentarii.length > 0 && (
-            <div style={{ borderTop: '1px solid #f5f5f5', paddingTop: '8px', marginBottom: '8px' }}>
-              {post.comentarii.map((c, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '600', color: '#666', flexShrink: 0 }}>{c.autor.split(' ').map(w => w[0]).join('').slice(0, 2)}</div>
-                  <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '6px 10px', flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{c.autor}</div>
-                    <div style={{ fontSize: '12px', color: '#555' }}>{c.text}</div>
-                  </div>
-                </div>
-              ))}
+            <div style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '12px' }}>{post.text}</div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: postComments.length > 0 ? '10px' : '0' }}>
+              {['🔥', '💪', '❤️'].map(emoji => {
+                const r = postReactions[emoji] || { count: 0, iMine: false }
+                return (
+                  <button key={emoji} onClick={() => toggleReactie(post.id, emoji)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: r.iMine ? '1.5px solid #2F6600' : '1px solid #e0e0e0', background: r.iMine ? '#EDFFD4' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: r.iMine ? '#2F6600' : '#555', fontWeight: r.iMine ? '600' : '400' }}>
+                    {emoji}{r.count > 0 ? ` ${r.count}` : ''}
+                  </button>
+                )
+              })}
+              <button onClick={() => setComentariuDeschis(comentariuDeschis === post.id ? null : post.id)}
+                style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e0e0e0', background: '#f5f5f5', cursor: 'pointer', fontSize: '11px', color: '#888' }}>
+                💬{postComments.length > 0 ? ` ${postComments.length}` : ''}
+              </button>
             </div>
-          )}
-          {comentariuDeschis === post.id && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input value={comentariuText} onChange={e => setComentariuText(e.target.value)} onKeyDown={e => e.key === 'Enter' && adaugaComentariu(post.id)} placeholder="Scrie un comentariu..." style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa' }} />
-              <button onClick={() => adaugaComentariu(post.id)} style={{ padding: '8px 14px', borderRadius: '20px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Trimite</button>
-            </div>
-          )}
-        </div>
-      ))}
+            {postComments.length > 0 && (
+              <div style={{ borderTop: '1px solid #f5f5f5', paddingTop: '8px', marginBottom: '8px' }}>
+                {postComments.map((c, i) => {
+                  const cName = c.profiles?.full_name || c.profiles?.email?.split('@')[0] || 'Membru'
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <AvatarCircle name={cName} avatarUrl={c.profiles?.avatar_url} size={26} />
+                      <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '6px 10px', flex: 1 }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#1a1a1a', marginBottom: '2px' }}>{cName}</div>
+                        <div style={{ fontSize: '12px', color: '#555' }}>{c.text}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {comentariuDeschis === post.id && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input value={comentariuText} onChange={e => setComentariuText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && adaugaComentariu(post.id)}
+                  placeholder="Scrie un comentariu..."
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa' }} />
+                <button onClick={() => adaugaComentariu(post.id)}
+                  style={{ padding: '8px 14px', borderRadius: '20px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Trimite</button>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -3127,7 +3240,7 @@ function App() {
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={wodZiData} onRefresh={fetchClasament} />}
-      {screen === 'feed' && <Feed showToast={showToast} />}
+      {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
       {showCalPicker && (() => {
