@@ -1555,6 +1555,8 @@ function App() {
   const [wodZiData, setWodZiData] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [prSelectat, setPrSelectat] = useState(null)
+  const [catDeschise, setCatDeschise] = useState({})
+  const [catSearch, setCatSearch] = useState({})
   const [heroWodsDeschis, setHeroWodsDeschis] = useState(false)
   const [heroWodNouInput, setHeroWodNouInput] = useState('')
   const [prDate, setPrDate] = useState([])
@@ -2881,16 +2883,36 @@ function App() {
               const miscariCat = PR_CATEGORII[cat].filter(m => prGroups[m])
               if (miscariCat.length === 0) return null
               const cfg = catConfig[cat]
+              const esteOpen = !!catDeschise[cat]
+              const search = (catSearch[cat] || '').toLowerCase()
+              const miscariAfisate = search ? miscariCat.filter(m => m.toLowerCase().includes(search)) : miscariCat
               return (
                 <div key={cat} style={{ marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <div onClick={() => { setCatDeschise(prev => ({ ...prev, [cat]: !prev[cat] })); setPrSelectat(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb' }}>{miscariCat.length} exerciții</div>
+                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{miscariCat.length} exerciții</div>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#1a1a1a' ? '#C8FF00' : '#fff', flexShrink: 0 }}>
+                      {esteOpen ? '▲' : '▼'}
+                    </div>
                   </div>
-                  <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                    {miscariCat.map((m, idx) => renderMiscare(m, idx, miscariCat.length, cat))}
-                  </div>
+                  {esteOpen && (
+                    <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
+                        <input
+                          value={catSearch[cat] || ''}
+                          onChange={e => setCatSearch(prev => ({ ...prev, [cat]: e.target.value }))}
+                          placeholder={`Caută în ${cfg.label}...`}
+                          style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box', outline: 'none' }}
+                        />
+                      </div>
+                      {miscariAfisate.length === 0
+                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#aaa' }}>Niciun exercițiu găsit</div>
+                        : miscariAfisate.map((m, idx) => renderMiscare(m, idx, miscariAfisate.length, cat))
+                      }
+                    </div>
+                  )}
                 </div>
               )
             })}
