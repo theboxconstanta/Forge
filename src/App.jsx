@@ -1708,6 +1708,9 @@ function App() {
 
   useEffect(() => {
     if (user) {
+      const d = new Date()
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      setDataAcasa(todayStr)
       saveProfile()
       fetchUserProfile()
       fetchPRuri()
@@ -1719,6 +1722,11 @@ function App() {
       fetchAbonamentMeu()
       fetchClasament()
       registerPushSubscription()
+      setTimeout(() => {
+        const container = homeCalScrollRef.current
+        const chip = homeCalTodayRef.current
+        if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
+      }, 150)
     }
   }, [user])
 
