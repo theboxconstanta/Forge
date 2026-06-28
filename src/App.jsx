@@ -919,7 +919,7 @@ function Admin({ showToast }) {
     const { data } = await supabase.from('bookings')
       .select('member_id, profiles(id, full_name, email)')
       .eq('class_id', classId)
-    if (data) {
+    if (data && data.length > 0 && data[0].profiles !== undefined) {
       const rezultat = data.map(b => ({
         member_id: b.member_id,
         id: b.profiles?.id,
@@ -927,7 +927,21 @@ function Admin({ showToast }) {
         email: b.profiles?.email,
       }))
       setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
+      return
     }
+    // fallback: join manual dacă FK nu e direct pe profiles
+    const memberIds = (data || []).map(b => b.member_id)
+    if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
+    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email').in('id', memberIds)
+    const profsMap = {}
+    ;(profsData || []).forEach(p => { profsMap[p.id] = p })
+    const rezultat = memberIds.map(mid => ({
+      member_id: mid,
+      id: profsMap[mid]?.id,
+      full_name: profsMap[mid]?.full_name,
+      email: profsMap[mid]?.email,
+    }))
+    setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
   }
 
   const fetchSettingsAdmin = async () => {
