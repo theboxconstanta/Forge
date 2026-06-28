@@ -783,7 +783,7 @@ function Feed({ showToast, user, userProfile }) {
             </div>
             <div style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '12px' }}>{post.text}</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: postComments.length > 0 ? '10px' : '0' }}>
-              {['🔥', '💪', '❤️'].map(emoji => {
+              {['❤️', '👍', '😂', '😮', '😢', '🙏'].map(emoji => {
                 const r = postReactions[emoji] || { count: 0, iMine: false }
                 return (
                   <button key={emoji} onClick={() => toggleReactie(post.id, emoji)}
