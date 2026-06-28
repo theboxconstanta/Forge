@@ -2872,7 +2872,13 @@ function App() {
         }
         return (
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
-            <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '20px' }}>Recorduri 🏆</h1>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Recorduri 🏆</h1>
+              <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+                style={{ padding: '8px 14px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
+                + PR nou
+              </button>
+            </div>
             {prDate.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
                 <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
@@ -2970,10 +2976,6 @@ function App() {
                 </div>
               </div>
             )}
-            <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
-              style={{ width: '100%', padding: '12px', background: '#fff', color: '#2F6600', border: '2px solid #2F6600', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-              + Adaugă PR nou
-            </button>
           </div>
         )
       })()}
