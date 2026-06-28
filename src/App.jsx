@@ -876,8 +876,11 @@ function Admin({ showToast }) {
   const [clientSelectat, setClientSelectat] = useState(null)
   const [sortClienti, setSortClienti] = useState('toti')
   const [memberIdsCuRezervariViitoare, setMemberIdsCuRezervariViitoare] = useState(new Set())
+  const [cancelWindowSetting, setCancelWindowSetting] = useState(2)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
 
-  useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente() }, [])
+  useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }, [])
 
   const fetchClase = async () => {
     setLoadingClase(true)
@@ -925,6 +928,40 @@ function Admin({ showToast }) {
       }))
       setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
     }
+  }
+
+  const fetchSettingsAdmin = async () => {
+    const { data } = await supabase.from('app_settings').select('key, value')
+    if (data) {
+      const cwh = data.find(s => s.key === 'cancel_window_hours')
+      if (cwh) setCancelWindowSetting(parseFloat(cwh.value) || 0)
+    }
+  }
+
+  const saveSettings = async () => {
+    setSavingSettings(true)
+    await supabase.from('app_settings').upsert({ key: 'cancel_window_hours', value: String(cancelWindowSetting), updated_at: new Date().toISOString() })
+    showToast('✓ Setări salvate!')
+    setSavingSettings(false)
+  }
+
+  const adminScoateDinClasa = async (classId, memberId) => {
+    const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
+    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    showToast('✓ Scos din clasă')
+    fetchRezervariClasa(classId)
+    fetchClase()
+  }
+
+  const adminAdaugaInClasa = async (classId, memberId) => {
+    const alreadyIn = (rezervariClasa[classId] || []).some(r => r.member_id === memberId)
+    if (alreadyIn) { showToast('❌ Deja rezervat!'); return }
+    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId })
+    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    showToast('✓ Adăugat la clasă')
+    setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
+    fetchRezervariClasa(classId)
+    fetchClase()
   }
 
   const toggleZiRepetare = (idx) =>
@@ -1199,7 +1236,7 @@ function Admin({ showToast }) {
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }].map(t => (
+        {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }, { id: 'setari', emoji: '⚙️', lbl: 'Setări' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
             style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#2F6600' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
@@ -1544,18 +1581,48 @@ function Admin({ showToast }) {
               </div>
               {clasaDeschisa === c.id && (
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0})</div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0}/{c.max_spots})</div>
                   {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
-                    : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio rezervare</div>
+                    : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
                     : rezervariClasa[c.id].map((r, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #f5f5f5' : 'none' }}>
                       <AvatarCircle name={r.full_name || r.email || r.member_id} size={28} />
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
                         <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
                       </div>
+                      <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
+                        style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕ Scoate</button>
                     </div>
                   ))}
+                  {/* Adaugă manual */}
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f5f5f5' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>ADAUGĂ MANUAL</div>
+                    <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
+                      placeholder="Caută după nume sau email..."
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
+                    {adaugaMembruSearch[c.id]?.trim() && (() => {
+                      const q = adaugaMembruSearch[c.id].toLowerCase()
+                      const rezultate = clienti.filter(cl =>
+                        (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
+                        !(rezervariClasa[c.id] || []).some(r => r.member_id === cl.id)
+                      ).slice(0, 5)
+                      return rezultate.length > 0 ? (
+                        <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
+                          {rezultate.map(cl => (
+                            <div key={cl.id} onClick={() => adminAdaugaInClasa(c.id, cl.id)}
+                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ fontWeight: '500', color: '#1a1a1a' }}>{cl.full_name || cl.email}</div>
+                                <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
+                              </div>
+                              <span style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600' }}>+ Adaugă</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>Niciun rezultat</div>
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -1646,6 +1713,31 @@ function Admin({ showToast }) {
           ))}
         </>
       )}
+
+      {/* SETĂRI */}
+      {adminTab === 'setari' && (
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>Fereastră de anulare clase</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Membrii nu pot anula cu mai puțin de X ore înainte de start. Admin-ul poate anula oricând.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <button onClick={() => setCancelWindowSetting(prev => Math.max(0, prev - 0.5))}
+              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: '#1a1a1a', lineHeight: 1 }}>{cancelWindowSetting}</div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>ore</div>
+            </div>
+            <button onClick={() => setCancelWindowSetting(prev => prev + 0.5)}
+              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
+          </div>
+          {cancelWindowSetting === 0 && (
+            <div style={{ fontSize: '11px', color: '#2F6600', background: '#EDFFD4', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>Membrii pot anula oricând (fără restricții).</div>
+          )}
+          <button onClick={saveSettings} disabled={savingSettings}
+            style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
+            {savingSettings ? 'Se salvează...' : '✓ Salvează setările'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1735,6 +1827,7 @@ function App() {
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
+  const [cancelWindowHours, setCancelWindowHours] = useState(2)
   const homeCalScrollRef = useRef(null)
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
@@ -1829,6 +1922,7 @@ function App() {
       fetchWodLogs()
       fetchRezervari()
       fetchClaseDB()
+      fetchSettings()
       fetchWodZi()
       checkAdmin()
       fetchAbonamentMeu()
@@ -1903,6 +1997,9 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
         fetchWodLogs(); fetchClasament()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
+        fetchSettings()
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -2032,6 +2129,14 @@ function App() {
       .lte('date', `${year}-12-31`)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
     setClaseDB(data || [])
+  }
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from('app_settings').select('key, value')
+    if (data) {
+      const cwh = data.find(s => s.key === 'cancel_window_hours')
+      if (cwh) setCancelWindowHours(parseFloat(cwh.value) || 0)
+    }
   }
 
   const fetchRezervari = async () => {
@@ -2208,6 +2313,18 @@ function App() {
       if (clasa && ocupate >= clasa.max_spots) {
         showToast('❌ Clasa este plină!')
         return
+      }
+    }
+    if (esteRezervat && !isAdmin) {
+      const clasa = claseDB.find(c => c.id === clasaId)
+      if (clasa) {
+        const clasaStart = new Date(`${clasa.date}T${clasa.start_time}`)
+        const hoursUntil = (clasaStart - new Date()) / 3600000
+        if (hoursUntil >= 0 && hoursUntil < cancelWindowHours) {
+          const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} minute`
+          showToast(`❌ Nu poți anula cu mai puțin de ${h} înainte de clasă!`)
+          return
+        }
       }
     }
     if (esteRezervat) {
