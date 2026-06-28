@@ -2302,9 +2302,8 @@ function App() {
             <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                 {/* Navigare dată */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span onClick={() => setDataAcasa(addZile(dataAcasa, -1))} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', padding: '0 4px', userSelect: 'none' }}>‹</span>
-                  <div style={{ textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ textAlign: 'left' }}>
                     <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                       style={{ fontSize: '24px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {selData.getDate()} {selData.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
@@ -2314,7 +2313,6 @@ function App() {
                       <div onClick={() => setDataAcasa(actualToday)} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
                     )}
                   </div>
-                  <span onClick={() => setDataAcasa(addZile(dataAcasa, 1))} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', padding: '0 4px', userSelect: 'none' }}>›</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
