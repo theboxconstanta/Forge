@@ -961,6 +961,16 @@ function Admin({ showToast }) {
     await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
   }
 
+  const getClassNotifParams = (classId) => {
+    const c = clase.find(cl => cl.id === classId)
+    if (!c) return { className: 'Clasă', classDate: '' }
+    const ora = c.start_time?.slice(0, 5) || ''
+    return {
+      className: `${c.name}${ora ? ` · ${ora}` : ''}`,
+      classDate: c.date || '',
+    }
+  }
+
   const adminScoateDinClasa = async (classId, memberId) => {
     const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
     if (error) { showToast('❌ Eroare!'); console.error(error); return }
@@ -968,6 +978,11 @@ function Admin({ showToast }) {
     showToast('✓ Scos din clasă')
     fetchRezervariClasa(classId)
     fetchClase()
+    const member = clienti.find(c => c.id === memberId)
+    if (member?.email) {
+      const { className, classDate } = getClassNotifParams(classId)
+      sendNotification('class_removed', member.email, className, classDate)
+    }
   }
 
   const adminAdaugaInClasa = async (classId, memberId) => {
@@ -980,6 +995,11 @@ function Admin({ showToast }) {
     setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
     fetchRezervariClasa(classId)
     fetchClase()
+    const member = clienti.find(c => c.id === memberId)
+    if (member?.email) {
+      const { className, classDate } = getClassNotifParams(classId)
+      sendNotification('class_added', member.email, className, classDate)
+    }
   }
 
   const toggleZiRepetare = (idx) =>

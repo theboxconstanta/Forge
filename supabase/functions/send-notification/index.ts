@@ -49,6 +49,20 @@ function getContent(type: string, planName: string, endDate: string) {
              <p>Planul <strong>${planName}</strong> expiră mâine, <strong>${dateFmt}</strong>.</p>
              <p>Contactează coachul <strong>urgent</strong> pentru reînnoire!</p>`,
     },
+    class_added: {
+      title: "✅ Ai fost adăugat la clasă!",
+      body: `Ești rezervat la ${planName}${dateFmt ? ` pe ${dateFmt}` : ""}.`,
+      html: `<h2 style="color:#2F6600">Ai fost adăugat la o clasă!</h2>
+             <p>Coachul te-a rezervat la <strong>${planName}</strong>${dateFmt ? ` pe <strong>${dateFmt}</strong>` : ""}.
+             <p>Te așteptăm la antrenament! 💪</p>`,
+    },
+    class_removed: {
+      title: "❌ Rezervare anulată de coach",
+      body: `Rezervarea ta la ${planName}${dateFmt ? ` din ${dateFmt}` : ""} a fost anulată.`,
+      html: `<h2 style="color:#C62828">Rezervarea ta a fost anulată</h2>
+             <p>Coachul a anulat rezervarea ta la <strong>${planName}</strong>${dateFmt ? ` din <strong>${dateFmt}</strong>` : ""}.
+             <p>Contactează-ne dacă ai întrebări.</p>`,
+    },
   };
 
   return map[type] ?? map.subscription_added;
