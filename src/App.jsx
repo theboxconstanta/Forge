@@ -659,7 +659,7 @@ function Feed({ showToast }) {
   }
   const posteaza = () => {
     if (!postText.trim()) return
-    setFeed(prev => [{ id: Date.now(), nume: 'Tu', avatar: 'TU', avatarBg: '#EDFFD4', avatarcolor: '#2F6600', text: postText.trim(), timp: 'acum', reactii: { '🔥': 0, '💪': 0, '❤️': 0 }, comentarii: [], variantaWod: 'RX' }, ...prev])
+    setFeed(prev => [{ id: Date.now(), nume: 'Tu', avatar: 'TU', avatarBg: '#EDFFD4', avatarColor: '#2F6600', text: postText.trim(), timp: 'acum', reactii: { '🔥': 0, '💪': 0, '❤️': 0 }, comentarii: [], variantaWod: 'RX' }, ...prev])
     setPostText(''); showToast('Postat! 🎉')
   }
   return (
@@ -1838,16 +1838,7 @@ function App() {
     const { data } = await supabase.from('classes').select('*')
       .gte('date', de30Str)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
-    const dbData = data || []
-    setClaseDB(dbData)
-    const azi = new Date()
-    const dates = new Set(dbData.map(c => c.date))
-    for (let i = 0; i <= 90; i++) {
-      const d = new Date(azi)
-      d.setDate(d.getDate() + i)
-      dates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
-    }
-    setZileCalendar([...dates].sort())
+    setClaseDB(data || [])
   }
 
   const fetchRezervari = async () => {
@@ -2277,15 +2268,6 @@ function App() {
       {screen === 'home' && (() => {
         const _now = new Date(); const actualToday = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`
         const selData = new Date(dataAcasa + 'T00:00:00')
-        const addZile = (ds, n) => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
-        const dow = selData.getDay()
-        const monday = new Date(selData); monday.setDate(selData.getDate() - (dow === 0 ? 6 : dow - 1))
-        const saptamana = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(monday); d.setDate(monday.getDate() + i)
-          const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-          return { d, ds, areWod: wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); const local = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`; return local === ds }), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
-        })
-        const zileSapt = ['L','Ma','Mi','J','V','S','D']
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
         const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
         const sessTotal = abonamentReal?.sessions_total
@@ -2946,7 +2928,7 @@ function App() {
                       ))}
                     </div>
                   )}
-                  <button onClick={() => { setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+                  <button onClick={() => { setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
                     style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     + Adaugă rezultat nou
                   </button>
@@ -3034,12 +3016,12 @@ function App() {
                           <input
                             value={heroWodNouInput}
                             onChange={e => setHeroWodNouInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}}
+                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}}
                             placeholder="ex: Forge WOD, The C15..."
                             style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
                           />
                           <button
-                            onClick={() => { if (!heroWodNouInput.trim()) return; setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}
+                            onClick={() => { if (!heroWodNouInput.trim()) return; setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}
                             style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#C8FF00' : '#f0f0f0', color: heroWodNouInput.trim() ? '#111' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
                             →
                           </button>
