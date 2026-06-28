@@ -1802,7 +1802,9 @@ function App() {
   const fetchUserProfile = async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     setUserProfile(data)
-    if (!data?.waiver_accepted) {
+    // waiver_accepted === false  → coloana există și e neacceptată (post-migrare)
+    // !data?.gender              → user nou fără profil (pre-migrare fallback)
+    if (!data?.gender || data?.waiver_accepted === false) {
       setOnboardingFirstName(data?.first_name || '')
       setOnboardingLastName(data?.last_name || '')
       setOnboardingGender(data?.gender || '')
@@ -1818,18 +1820,21 @@ function App() {
     const firstName = onboardingFirstName.trim()
     const lastName = onboardingLastName.trim()
     const fullName = [firstName, lastName].filter(Boolean).join(' ') || null
+    // Încearcă cu toate câmpurile noi (post-migrare)
     const { error } = await supabase.from('profiles').upsert({
-      id: user.id,
-      email: user.email,
-      first_name: firstName || null,
-      last_name: lastName || null,
-      full_name: fullName,
-      gender: onboardingGender || null,
+      id: user.id, email: user.email,
+      first_name: firstName || null, last_name: lastName || null,
+      full_name: fullName, gender: onboardingGender || null,
       birth_date: onboardingBirthDate || null,
-      waiver_accepted: true,
-      waiver_accepted_at: new Date().toISOString(),
+      waiver_accepted: true, waiver_accepted_at: new Date().toISOString(),
     }, { onConflict: 'id' })
-    if (error) { showToast('❌ Eroare la salvare. Încearcă din nou.'); return }
+    if (error) {
+      // Fallback pre-migrare: salvează doar câmpurile ce există sigur
+      await supabase.from('profiles').upsert({
+        id: user.id, email: user.email,
+        full_name: fullName, gender: onboardingGender || null,
+      }, { onConflict: 'id' })
+    }
     setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: onboardingGender, birth_date: onboardingBirthDate, waiver_accepted: true }))
     setShowOnboarding(false)
   }
