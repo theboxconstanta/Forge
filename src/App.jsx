@@ -487,6 +487,7 @@ function Timer({ onBack, defaultFortime }) {
 
 function Clasament({ logs, loading, wodZiData, onRefresh }) {
   const [tab, setTab] = useState('RX')
+  const [genderTab, setGenderTab] = useState('toti')
 
   const parseTime = (str) => {
     if (!str) return Infinity
@@ -540,7 +541,10 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
   ]
 
   const currentTab = TABS.find(t => t.id === tab)
-  const tabLogs = sortLogs(logs.filter(l => l.variant_level === tab))
+  const allTabLogs = sortLogs(logs.filter(l => l.variant_level === tab))
+  const tabLogs = genderTab === 'toti' ? allTabLogs
+    : genderTab === 'masculin' ? allTabLogs.filter(l => l.profile?.gender === 'masculin')
+    : allTabLogs.filter(l => l.profile?.gender === 'feminin')
   const isForTime = tabLogs.filter(l => l.time_result).length >= tabLogs.filter(l => l.result).length && tabLogs.some(l => l.time_result)
 
   return (
@@ -554,17 +558,30 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
         {wodZiData ? ` · ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
       </p>
 
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
         {TABS.map(t => {
           const cnt = logs.filter(l => l.variant_level === t.id).length
           return (
-            <div key={t.id} onClick={() => setTab(t.id)}
+            <div key={t.id} onClick={() => { setTab(t.id); setGenderTab('toti') }}
               style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: tab === t.id ? '700' : '400', background: tab === t.id ? t.culoare : '#fff', color: tab === t.id ? '#fff' : '#888', border: `1px solid ${tab === t.id ? t.culoare : '#e0e0e0'}`, whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
               {t.emoji} {t.id}
               {cnt > 0 && <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : '#f0f0f0', color: tab === t.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '700' }}>{cnt}</span>}
             </div>
           )
         })}
+      </div>
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        {[
+          { id: 'toti', label: 'Toți', icon: '👥' },
+          { id: 'masculin', label: 'Masculin', icon: '♂️' },
+          { id: 'feminin', label: 'Feminin', icon: '♀️' },
+        ].map(g => (
+          <div key={g.id} onClick={() => setGenderTab(g.id)}
+            style={{ padding: '5px 12px', borderRadius: '16px', cursor: 'pointer', fontSize: '11px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#1a1a1a' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#1a1a1a' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {g.icon} {g.label}
+          </div>
+        ))}
       </div>
 
       {loading ? (
@@ -1622,6 +1639,10 @@ function App() {
   const [installDismissed, setInstallDismissed] = useState(false)
   const [clasamentLogs, setClasamentLogs] = useState([])
   const [clasamentLoading, setClasamentLoading] = useState(false)
+  const [userProfile, setUserProfile] = useState(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingGender, setOnboardingGender] = useState('')
+  const [onboardingName, setOnboardingName] = useState('')
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -1655,6 +1676,7 @@ function App() {
   useEffect(() => {
     if (user) {
       saveProfile()
+      fetchUserProfile()
       fetchPRuri()
       fetchWodLogs()
       fetchRezervari()
@@ -1757,6 +1779,29 @@ function App() {
     }, { onConflict: 'id' })
   }
 
+  const fetchUserProfile = async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    setUserProfile(data)
+    if (!data?.gender) {
+      setOnboardingName(data?.full_name || user.user_metadata?.full_name || '')
+      setOnboardingGender('')
+      setShowOnboarding(true)
+    }
+  }
+
+  const saveOnboarding = async () => {
+    if (!onboardingGender) return
+    const name = onboardingName.trim() || user.user_metadata?.full_name || null
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email: user.email,
+      full_name: name,
+      gender: onboardingGender,
+    }, { onConflict: 'id' })
+    setUserProfile(prev => ({ ...prev, full_name: name, gender: onboardingGender }))
+    setShowOnboarding(false)
+  }
+
   const checkAdmin = async () => {
     const { data } = await supabase.from('admins').select('id').eq('id', user.id)
     setIsAdmin(data && data.length > 0)
@@ -1842,7 +1887,7 @@ function App() {
       .in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     if (logs && logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', ids)
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender').in('id', ids)
       const map = {}
       if (profiles) profiles.forEach(p => { map[p.id] = p })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
@@ -3133,6 +3178,43 @@ function App() {
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={wodZiData} onRefresh={fetchClasament} />}
       {screen === 'feed' && <Feed showToast={showToast} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
+
+      {showOnboarding && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: '480px' }}>
+            <div style={{ width: '40px', height: '4px', background: '#e0e0e0', borderRadius: '2px', margin: '0 auto 24px' }} />
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', marginBottom: '6px' }}>Bun venit! 👋</div>
+            <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>Completează profilul tău pentru a apărea în clasament.</div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Nume complet</div>
+              <input
+                value={onboardingName}
+                onChange={e => setOnboardingName(e.target.value)}
+                placeholder="ex: Andrei Popescu"
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '28px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Gen</div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[{ val: 'masculin', label: '♂ Masculin' }, { val: 'feminin', label: '♀ Feminin' }].map(g => (
+                  <div key={g.val} onClick={() => setOnboardingGender(g.val)}
+                    style={{ flex: 1, padding: '14px', borderRadius: '14px', border: `2px solid ${onboardingGender === g.val ? '#C8FF00' : '#e0e0e0'}`, background: onboardingGender === g.val ? '#f5ffe0' : '#fafafa', textAlign: 'center', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: onboardingGender === g.val ? '#2a5900' : '#888', transition: 'all 0.15s' }}>
+                    {g.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={saveOnboarding} disabled={!onboardingGender}
+              style={{ width: '100%', padding: '16px', background: onboardingGender ? '#C8FF00' : '#e0e0e0', color: onboardingGender ? '#111' : '#aaa', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: onboardingGender ? 'pointer' : 'default', letterSpacing: '0.5px' }}>
+              Salvează profilul
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: '500', zIndex: 300, whiteSpace: 'nowrap' }}>
