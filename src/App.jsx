@@ -975,9 +975,12 @@ function Admin({ showToast }) {
   }
 
   const adminScoateDinClasa = async (classId, memberId) => {
-    const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
-    if (error) { showToast('❌ Eroare!'); console.error(error); return }
     await adjustMemberSessions(memberId, -1)
+    const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
+    if (error) {
+      await adjustMemberSessions(memberId, +1)
+      showToast('❌ Eroare!'); console.error(error); return
+    }
     showToast('✓ Scos din clasă')
     fetchRezervariClasa(classId)
     fetchClase()
@@ -991,9 +994,12 @@ function Admin({ showToast }) {
   const adminAdaugaInClasa = async (classId, memberId) => {
     const alreadyIn = (rezervariClasa[classId] || []).some(r => r.member_id === memberId)
     if (alreadyIn) { showToast('❌ Deja rezervat!'); return }
-    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId })
-    if (error) { showToast('❌ Eroare!'); console.error(error); return }
     await adjustMemberSessions(memberId, +1)
+    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId })
+    if (error) {
+      await adjustMemberSessions(memberId, -1)
+      showToast('❌ Eroare!'); console.error(error); return
+    }
     showToast('✓ Adăugat la clasă')
     setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
     fetchRezervariClasa(classId)
