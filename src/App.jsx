@@ -3101,7 +3101,14 @@ function App() {
                 })}
               </div>
               {/* Buton azi */}
-              <div onClick={() => { setDataAcasa(todayStr); setShowCalPicker(false) }}
+              <div onClick={() => {
+                setDataAcasa(todayStr); setShowCalPicker(false)
+                setTimeout(() => {
+                  const container = homeCalScrollRef.current
+                  const chip = homeCalTodayRef.current
+                  if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
+                }, 50)
+              }}
                 style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', padding: '8px', background: '#EDFFD4', borderRadius: '10px' }}>
                 Mergi la azi
               </div>
