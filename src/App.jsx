@@ -70,6 +70,30 @@ const MISCARI = [
   'Murph', 'DT', 'Jackie', 'Randy', 'Nancy', 'Amanda',
 ]
 
+const PR_CATEGORII = {
+  WEIGHTLIFTING: [
+    'Back Squat','Front Squat','Overhead Squat','Box Squat','Pause Squat',
+    'Shoulder Press','Push Press','Push Jerk','Split Jerk','Bench Press','Strict Press',
+    'Deadlift','Romanian Deadlift','Sumo Deadlift','Sumo Deadlift High Pull','Stiff Leg Deadlift',
+    'Clean & Jerk','Power Clean','Hang Clean','Hang Power Clean','Squat Clean','Clean Pull',
+    'Snatch','Power Snatch','Hang Snatch','Hang Power Snatch','Squat Snatch','Snatch Pull','Snatch Balance',
+    'Thruster','Farmers Carry','Turkish Get Up','Good Morning','Hip Thrust',
+  ],
+  GYMNASTICS: [
+    'Air Squat',
+    'Pull-up','Chest to Bar Pull-up','Muscle-up','Ring Muscle-up','Bar Muscle-up',
+    'Toes to Bar','Knees to Elbow','Ring Row','Push-up','Handstand Push-up',
+    'Ring Dip','Bar Dip','Handstand Hold','Handstand Walk','L-sit Hold',
+    'Box Jump','Broad Jump','Burpee','Double Under','Single Under',
+    'KB Swing','KB Clean','KB Snatch','KB Goblet Squat','Wall Ball',
+  ],
+  CARDIO: [
+    'Row','Run','Bike Erg','Assault Bike','Ski Erg',
+    'Fran','Grace','Cindy','Helen','Diane','Annie','Barbara','Chelsea',
+    'Murph','DT','Jackie','Randy','Nancy','Amanda',
+  ],
+}
+
 const FEED_INITIAL = [
   { id:1, nume:'Mihai D.', avatar:'MD', avatarBg:'#EDFFD4', avatarColor:'#2F6600', text:'Fran în 3:58 🔥 PR nou cu 24 secunde!', timp:'12 min', reactii:{ '🔥':8, '💪':5, '❤️':3 }, comentarii:[], variantaWod:'RX' },
   { id:2, nume:'Ioana A.', avatar:'IA', avatarBg:'#EAF3DE', avatarColor:'#27500A', text:'Back squat 75kg — prima dată! 🎉 Mulțumesc coach!', timp:'1 oră', reactii:{ '🔥':4, '💪':7, '❤️':12 }, comentarii:[{ autor:'Coach Andrei', text:'Bravo Ioana! 💪' }], variantaWod:'Beginner' },
@@ -2697,41 +2721,128 @@ function App() {
         </div>
       )}
 
-      {screen === 'pr' && (
-        <div style={{ padding: '20px', paddingBottom: '80px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '16px' }}>Recorduri personale 🏆</h1>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '8px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            {prDate.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏆</div>Niciun PR salvat încă
+      {screen === 'pr' && (() => {
+        const prGroups = {}
+        prDate.forEach(pr => { if (!prGroups[pr.movement]) prGroups[pr.movement] = []; prGroups[pr.movement].push(pr) })
+        const bestPR = (records) => {
+          if (!records?.length) return null
+          if (records[0].unit === 'timp') return records[0]
+          const withVal = records.filter(r => r.value != null && parseFloat(r.value) > 0)
+          if (withVal.length > 0) return withVal.reduce((b, r) => parseFloat(r.value) > parseFloat(b.value) ? r : b)
+          const withReps = records.filter(r => r.reps && r.reps > 0)
+          if (withReps.length > 0) return withReps.reduce((b, r) => r.reps > b.reps ? r : b)
+          return records[0]
+        }
+        const PCT_BARA = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
+        const catConfig = {
+          WEIGHTLIFTING: { culoare: '#1a1a1a', bg: '#f5f5f5' },
+          GYMNASTICS:    { culoare: '#2F6600', bg: '#EDFFD4' },
+          CARDIO:        { culoare: '#0C447C', bg: '#E6F1FB' },
+        }
+        const toateMiscariCategorii = Object.values(PR_CATEGORII).flat()
+        const miscariFaraCat = Object.keys(prGroups).filter(m => !toateMiscariCategorii.includes(m))
+        const renderMiscare = (movement, idx, total, cat) => {
+          const records = prGroups[movement]
+          const best = bestPR(records)
+          const isOpen = prSelectat === movement
+          const bestKg = cat === 'WEIGHTLIFTING' && best?.unit === 'kg' && best?.value ? parseFloat(best.value) : null
+          return (
+            <div key={movement} onClick={() => setPrSelectat(isOpen ? null : movement)}
+              style={{ padding: '12px 14px', borderBottom: idx < total - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>{movement}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#2F6600' }}>{best ? formatPR(best) : '—'}</span>
+                  <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+                </div>
               </div>
-            ) : prDate.map((pr, i) => (
-              <div key={i} onClick={() => setPrSelectat(prSelectat === i ? null : i)}
-                style={{ padding: '12px 0', borderBottom: i < prDate.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>{pr.movement}</div>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#2F6600' }}>{formatPR(pr)}</span>
+              {best && !isOpen && (
+                <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>
+                  {new Date(best.recorded_at).toLocaleDateString('ro-RO')}{best.notes ? ' · ' + best.notes : ''}
                 </div>
-                <div style={{ fontSize: '10px', color: '#aaa' }}>
-                  {new Date(pr.recorded_at).toLocaleDateString('ro-RO')}{pr.notes ? ' · ' + pr.notes : ''}
+              )}
+              {isOpen && (
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
+                  {bestKg && (
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} kg</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+                        {PCT_BARA.map(pct => {
+                          const kg = Math.round(bestKg * pct / 100 * 2) / 2
+                          return (
+                            <div key={pct} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: '#f8f8f8', borderRadius: '8px' }}>
+                              <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '600' }}>{pct}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{kg} kg</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {records.length > 1 && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC</div>
+                      {records.slice(0, 5).map((r, j) => (
+                        <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                          <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString('ro-RO')}{r.notes ? ' · ' + r.notes : ''}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => { setLogPentruPR(best); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+                    style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                    + Adaugă rezultat nou
+                  </button>
                 </div>
-                {prSelectat === i && (
-                  <div style={{ marginTop: '10px', background: '#EDFFD4', borderRadius: '10px', padding: '10px 12px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setLogPentruPR(pr); setMiscarePR(pr.movement); setPrValoare(''); setPrReps(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
-                      style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                      + Adaugă rezultat nou
-                    </button>
+              )}
+            </div>
+          )
+        }
+        return (
+          <div style={{ padding: '20px', paddingBottom: '80px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '20px' }}>Recorduri 🏆</h1>
+            {prDate.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
+                <div style={{ fontSize: '14px' }}>Niciun PR salvat încă</div>
+              </div>
+            )}
+            {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO'].map(cat => {
+              const miscariCat = PR_CATEGORII[cat].filter(m => prGroups[m])
+              if (miscariCat.length === 0) return null
+              const cfg = catConfig[cat]
+              return (
+                <div key={cat} style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cat}</div>
+                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+                    <div style={{ fontSize: '10px', color: '#bbb' }}>{miscariCat.length} exerciții</div>
                   </div>
-                )}
+                  <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                    {miscariCat.map((m, idx) => renderMiscare(m, idx, miscariCat.length, cat))}
+                  </div>
+                </div>
+              )
+            })}
+            {miscariFaraCat.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#888', letterSpacing: '1.5px' }}>ALTELE</div>
+                  <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+                </div>
+                <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                  {miscariFaraCat.map((m, idx) => renderMiscare(m, idx, miscariFaraCat.length, null))}
+                </div>
               </div>
-            ))}
+            )}
+            <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+              style={{ width: '100%', padding: '12px', background: '#fff', color: '#2F6600', border: '2px solid #2F6600', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              + Adaugă PR nou
+            </button>
           </div>
-          <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
-            style={{ width: '100%', padding: '12px', background: '#fff', color: '#2F6600', border: '2px solid #2F6600', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-            + Adaugă PR nou
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {screen === 'clase' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
