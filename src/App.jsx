@@ -2353,13 +2353,13 @@ function App() {
                       <div key={ds}
                         ref={eAzi ? homeCalTodayRef : null}
                         onClick={() => setDataAcasa(ds)}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 8px', borderRadius: '12px', flexShrink: 0, cursor: 'pointer', minWidth: '46px',
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
                           background: selectat ? '#1a1a1a' : 'transparent',
                           border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #2F6600' : '1px solid #e8e8e8' }}>
-                        <span style={{ fontSize: '9px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.03em' }}>{ziuaLitera}</span>
-                        <span style={{ fontSize: '17px', fontWeight: selectat || eAzi ? '900' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1.15 }}>{d.getDate()}</span>
-                        <span style={{ fontSize: '9px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
-                        <span style={{ fontSize: '8px', lineHeight: 1, marginTop: '1px', color: '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                        <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
+                        <span style={{ fontSize: '10px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
+                        <span style={{ fontSize: '9px', lineHeight: 1, color: '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
                       </div>
                     )
                   })}
