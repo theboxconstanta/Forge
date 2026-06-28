@@ -2312,34 +2312,6 @@ function App() {
               </div>
               <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
 
-              {/* Calendar săptămânal interactiv + swipe stânga/dreapta = săptămâna anterioară/următoare */}
-              <div
-                style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', touchAction: 'pan-y' }}
-                onTouchStart={e => { calSwipeX.current = e.touches[0].clientX }}
-                onTouchEnd={e => {
-                  if (calSwipeX.current === null) return
-                  const dx = e.changedTouches[0].clientX - calSwipeX.current
-                  calSwipeX.current = null
-                  if (Math.abs(dx) > 40) setDataAcasa(addZile(dataAcasa, dx < 0 ? 7 : -7))
-                }}
-              >
-                {zileSapt.map((z, i) => (
-                  <div key={i} style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.04em', paddingBottom: '6px' }}>{z}</div>
-                ))}
-                {saptamana.map(({ d, ds, areWod, esteAzi: eAzi, esteSelectat }, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'center' }} onClick={() => setDataAcasa(ds)}>
-                    <div style={{
-                      width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer',
-                      background: esteSelectat ? '#1a1a1a' : 'transparent',
-                      border: eAzi && !esteSelectat ? '2px solid #1a1a1a' : 'none',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
-                    }}>
-                      <span style={{ fontSize: '15px', fontWeight: esteSelectat || eAzi ? '900' : '400', color: esteSelectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
-                      {areWod && <span style={{ fontSize: esteSelectat ? '7px' : '9px', lineHeight: 1, color: esteSelectat ? '#C8FF00' : '#C8FF00' }}>⚡</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* ── Clase disponibile ── */}
@@ -2356,12 +2328,13 @@ function App() {
                     const eAzi = i === 0
                     const selectat = ds === dataAcasa
                     const areRez = claseDB.some(c => rezervariMele.includes(c.id) && c.date === ds)
+                    const areWod = wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); const local = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`; return local === ds })
                     return (
                       <div key={ds} onClick={() => setDataAcasa(ds)}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 10px', borderRadius: '12px', border: selectat ? '2px solid #2F6600' : areRez ? '2px solid #C8FF00' : '1px solid #e8e8e8', background: selectat ? '#2F6600' : areRez ? '#f5ffe0' : '#fafafa', cursor: 'pointer', minWidth: '44px', flexShrink: 0 }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : eAzi ? '#2F6600' : '#aaa' }}>{ziuaLitera}</span>
-                        <span style={{ fontSize: '17px', fontWeight: '800', color: selectat ? '#fff' : '#1a1a1a', lineHeight: 1.1 }}>{d.getDate()}</span>
-                        {areRez && <span style={{ fontSize: '8px', color: selectat ? '#C8FF00' : '#2F6600', fontWeight: '700', marginTop: '1px' }}>✓</span>}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 10px', borderRadius: '12px', border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : '1px solid #e8e8e8', background: selectat ? '#1a1a1a' : 'transparent', cursor: 'pointer', minWidth: '44px', flexShrink: 0 }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.03em' }}>{ziuaLitera}</span>
+                        <span style={{ fontSize: '17px', fontWeight: selectat || eAzi ? '900' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1.1 }}>{d.getDate()}</span>
+                        <span style={{ fontSize: '8px', lineHeight: 1, marginTop: '2px', color: selectat ? '#C8FF00' : '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
                       </div>
                     )
                   })}
