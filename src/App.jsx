@@ -589,7 +589,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
                     {nivel.emoji} {nivel.id}
                   </div>
                   <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
-                    {sectionLogs.length} {sectionLogs.length === 1 ? 'participant' : 'participanți'}
+                    {sectionLogs.length} {sectionLogs.length === 1 ? (genderTab === 'feminin' ? 'participantă' : 'participant') : (genderTab === 'feminin' ? 'participante' : 'participanți')}
                   </div>
                   {isForTime && (
                     <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>⏱️ for time</div>
