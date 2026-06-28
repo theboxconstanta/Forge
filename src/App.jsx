@@ -1418,14 +1418,20 @@ function JurnalList({ logs }) {
       <div style={{ fontSize: '14px' }}>Niciun antrenament logat încă</div>
     </div>
   )
+  const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
   return (
     <>
       {logs.map((w, i) => {
         const parts = (w.notes || '').split('\n---\n')
-        const miscariLog = parts.length > 1 ? parts[0] : null
-        const noteLog = parts.length > 1 ? parts[1] : (w.notes || null)
+        const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
+        const noteLog = parts.length > 1 ? parts[1] : null
         const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
         const isOpen = deschis === i
+        const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
+        const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
+        const wodHeader = primaEsteHeader ? linii[0] : null
+        const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
+        const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
         return (
           <div key={i} onClick={() => setDeschis(isOpen ? null : i)}
             style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
@@ -1437,16 +1443,18 @@ function JurnalList({ logs }) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-              {w.result && <span style={{ fontSize: '12px', background: '#EDFFD4', color: '#2F6600', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>🏅 {w.result}</span>}
+              {w.result && <span style={{ fontSize: '12px', background: '#EDFFD4', color: '#2F6600', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
               {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
               {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
             </div>
             {isOpen && (
               <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                {miscariLog && miscariLog.trim() && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>MIȘCĂRI</div>
-                    {miscariLog.trim().split('\n').map((m, j) => (
+                {wodHeader && (
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#2F6600', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
+                )}
+                {miscariAfisate.length > 0 && (
+                  <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                    {miscariAfisate.map((m, j) => (
                       <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
                     ))}
                   </div>
@@ -1457,7 +1465,7 @@ function JurnalList({ logs }) {
                     <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                   </div>
                 )}
-                {!miscariLog && !noteLog && (
+                {!areDetalii && (
                   <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio detaliere suplimentară.</div>
                 )}
               </div>
@@ -1820,11 +1828,18 @@ function App() {
     const areContiut = wodResult.trim() || wodTime.trim() || wodMiscari.length > 0
     if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
     setWodSaving(true)
-    const miscariText = wodMiscari.length > 0 ? wodMiscari.join('\n') : ''
-    const noteFull = [miscariText, wodNote].filter(Boolean).join('\n---\n')
+    const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
+    const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? wodZiData[cheieVarianta] : []
+    const miscariFinale = miscariWodZi.length > 0 ? miscariWodZi : wodMiscari
+    const durStr = wodZiData ? formatWodDurata(wodZiData.duration) : ''
+    const wodHeaderLine = wodZiData
+      ? `${wodZiData.type}${durStr ? ' · ' + durStr : ''}${wodZiData.name ? ' — "' + wodZiData.name + '"' : ''}`
+      : (variantaAleasa === null ? `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}` : null)
+    const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
+    const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id, wod_id: null,
+      member_id: user.id, wod_id: wodZiData?.id || null,
       variant_level: tipSalvat,
       result: wodResult || null, time_result: wodTime || null, notes: noteFull || null,
     })
