@@ -2055,6 +2055,7 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu()
+        setTimeout(() => fetchAbonamentMeu(), 800)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
         fetchAbonamentMeu()
