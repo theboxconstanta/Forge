@@ -2333,7 +2333,14 @@ function App() {
                       <span style={{ fontSize: '14px', color: '#bbb' }}>▾</span>
                     </div>
                     {!esteAzi && (
-                      <div onClick={() => setDataAcasa(actualToday)} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
+                      <div onClick={() => {
+                        setDataAcasa(actualToday)
+                        setTimeout(() => {
+                          const container = homeCalScrollRef.current
+                          const chip = homeCalTodayRef.current
+                          if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
+                        }, 50)
+                      }} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
                     )}
                   </div>
                 </div>
