@@ -1824,6 +1824,18 @@ function App() {
     }
   }
 
+  const scrollChipToDate = (ds) => {
+    setTimeout(() => {
+      const container = homeCalScrollRef.current
+      if (!container) return
+      const now = new Date()
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+      const diffDays = Math.round((new Date(ds + 'T00:00:00') - new Date(todayLocal + 'T00:00:00')) / 86400000)
+      const idx = 60 + diffDays
+      if (idx >= 0 && idx <= 90) container.scrollLeft = Math.max(0, idx * 70 - container.offsetWidth / 2 + 32)
+    }, 50)
+  }
+
   const saveOnboarding = async () => {
     if (!onboardingWaiverAccepted) return
     const firstName = onboardingFirstName.trim()
@@ -2344,14 +2356,8 @@ function App() {
                       <span style={{ fontSize: '14px', color: '#bbb' }}>▾</span>
                     </div>
                     {!esteAzi && (
-                      <div onClick={() => {
-                        setDataAcasa(actualToday)
-                        setTimeout(() => {
-                          const container = homeCalScrollRef.current
-                          const chip = homeCalTodayRef.current
-                          if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
-                        }, 50)
-                      }} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
+                      <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
+                        style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
                     )}
                   </div>
                 </div>
@@ -3154,7 +3160,7 @@ function App() {
                   const areWod = wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); return `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}` === ds })
                   const areRez = claseDB.some(c => rezervariMele.includes(c.id) && c.date === ds)
                   return (
-                    <div key={ds} onClick={() => { setDataAcasa(ds); setShowCalPicker(false) }}
+                    <div key={ds} onClick={() => { setDataAcasa(ds); setShowCalPicker(false); scrollChipToDate(ds) }}
                       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', borderRadius: '10px', cursor: 'pointer',
                         background: selectat ? '#1a1a1a' : 'transparent',
                         border: selectat ? 'none' : esteAzi ? '2px solid #1a1a1a' : 'none' }}>
@@ -3165,14 +3171,7 @@ function App() {
                 })}
               </div>
               {/* Buton azi */}
-              <div onClick={() => {
-                setDataAcasa(todayStr); setShowCalPicker(false)
-                setTimeout(() => {
-                  const container = homeCalScrollRef.current
-                  const chip = homeCalTodayRef.current
-                  if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
-                }, 50)
-              }}
+              <div onClick={() => { setDataAcasa(todayStr); setShowCalPicker(false); scrollChipToDate(todayStr) }}
                 style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', padding: '8px', background: '#EDFFD4', borderRadius: '10px' }}>
                 Mergi la azi
               </div>
