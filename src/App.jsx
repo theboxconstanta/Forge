@@ -485,7 +485,6 @@ function Timer({ onBack, defaultFortime }) {
 }
 
 function Clasament({ logs, loading, wodZiData, onRefresh }) {
-  const [tab, setTab] = useState('RX')
   const [genderTab, setGenderTab] = useState('toti')
 
   const parseTime = (str) => {
@@ -493,7 +492,6 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     const parts = str.trim().split(':').map(Number)
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
     if (parts.length === 2) return parts[0] * 60 + parts[1]
-    // fara ":" — tratat ca minute (ex: "15" = 15 min = 900 sec)
     return (parseFloat(str) || Infinity) * 60
   }
 
@@ -523,28 +521,26 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     const deduped = deduplicateBest(arr)
     const withTime = deduped.filter(l => l.time_result).length
     const withResult = deduped.filter(l => l.result).length
-    if (withTime >= withResult && withTime > 0) {
-      return deduped.sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
-    }
-    if (withResult > 0) {
-      return deduped.sort((a, b) => parseScore(b.result) - parseScore(a.result))
-    }
+    if (withTime >= withResult && withTime > 0) return deduped.sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
+    if (withResult > 0) return deduped.sort((a, b) => parseScore(b.result) - parseScore(a.result))
     return deduped.sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
   }
 
-  const TABS = [
+  const NIVELE = [
     { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴' },
     { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡' },
     { id: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢' },
     { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵' },
   ]
 
-  const currentTab = TABS.find(t => t.id === tab)
-  const allTabLogs = sortLogs(logs.filter(l => l.variant_level === tab))
-  const tabLogs = genderTab === 'toti' ? allTabLogs
-    : genderTab === 'masculin' ? allTabLogs.filter(l => l.profile?.gender === 'masculin')
-    : allTabLogs.filter(l => l.profile?.gender === 'feminin')
-  const isForTime = tabLogs.filter(l => l.time_result).length >= tabLogs.filter(l => l.result).length && tabLogs.some(l => l.time_result)
+  const getSectionLogs = (nivelId) => {
+    const sorted = sortLogs(logs.filter(l => l.variant_level === nivelId))
+    if (genderTab === 'masculin') return sorted.filter(l => l.profile?.gender === 'masculin')
+    if (genderTab === 'feminin') return sorted.filter(l => l.profile?.gender === 'feminin')
+    return sorted
+  }
+
+  const totalLogs = NIVELE.reduce((acc, n) => acc + getSectionLogs(n.id).length, 0)
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -557,19 +553,6 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
         {wodZiData ? ` · ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
       </p>
 
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
-        {TABS.map(t => {
-          const cnt = logs.filter(l => l.variant_level === t.id).length
-          return (
-            <div key={t.id} onClick={() => { setTab(t.id); setGenderTab('toti') }}
-              style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: tab === t.id ? '700' : '400', background: tab === t.id ? t.culoare : '#fff', color: tab === t.id ? '#fff' : '#888', border: `1px solid ${tab === t.id ? t.culoare : '#e0e0e0'}`, whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {t.emoji} {t.id}
-              {cnt > 0 && <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : '#f0f0f0', color: tab === t.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '700' }}>{cnt}</span>}
-            </div>
-          )
-        })}
-      </div>
-
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[
           { id: 'toti', label: 'Toți', icon: '👥' },
@@ -577,7 +560,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
           { id: 'feminin', label: 'Feminin', icon: '♀️' },
         ].map(g => (
           <div key={g.id} onClick={() => setGenderTab(g.id)}
-            style={{ padding: '5px 12px', borderRadius: '16px', cursor: 'pointer', fontSize: '11px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#1a1a1a' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#1a1a1a' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#1a1a1a' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#1a1a1a' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
             {g.icon} {g.label}
           </div>
         ))}
@@ -585,49 +568,65 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
-      ) : tabLogs.length === 0 ? (
+      ) : totalLogs === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
           <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏁</div>
           <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>Niciun rezultat încă</div>
-          <div style={{ fontSize: '12px', color: '#aaa' }}>Fii primul care loghează {tab} azi!</div>
+          <div style={{ fontSize: '12px', color: '#aaa' }}>Fii primul care loghează azi!</div>
         </div>
       ) : (
         <div>
-          {isForTime ? (
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '500', background: '#f5f5f5', borderRadius: '8px', padding: '6px 10px' }}>
-              ⏱️ For Time — timp mai mic = loc mai bun
-            </div>
-          ) : tabLogs.some(l => l.result) ? (
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '500', background: '#f5f5f5', borderRadius: '8px', padding: '6px 10px' }}>
-              🔄 AMRAP — scor mai mare = loc mai bun
-            </div>
-          ) : null}
-
-          {tabLogs.map((log, i) => {
-            const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || 'Anonim'
-            const podium = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
-            const result = log.time_result || log.result || '—'
-            const borderColor = i === 0 ? currentTab.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
+          {NIVELE.map(nivel => {
+            const sectionLogs = getSectionLogs(nivel.id)
+            if (sectionLogs.length === 0) return null
+            const isForTime = sectionLogs.some(l => l.time_result) &&
+              sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length
             return (
-              <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ fontSize: podium ? '22px' : '13px', fontWeight: '700', color: '#888', minWidth: '30px', textAlign: 'center' }}>
-                    {podium || `#${i + 1}`}
+              <div key={nivel.id} style={{ marginBottom: '20px' }}>
+                {/* Header secțiune */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '800', color: nivel.culoare, letterSpacing: '0.04em' }}>
+                    {nivel.emoji} {nivel.id}
                   </div>
-                  <AvatarCircle name={name} size={36} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{name}</div>
-                    <div style={{ fontSize: '11px', color: '#aaa' }}>
-                      {new Date(log.logged_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
+                  <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
+                    {sectionLogs.length} {sectionLogs.length === 1 ? 'participant' : 'participanți'}
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: currentTab.culoare }}>{result}</div>
-                    {log.time_result && log.result && (
-                      <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
-                    )}
-                  </div>
+                  {isForTime && (
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>⏱️ for time</div>
+                  )}
+                  {!isForTime && sectionLogs.some(l => l.result) && (
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>🔄 AMRAP</div>
+                  )}
                 </div>
+                {/* Carduri participanți */}
+                {sectionLogs.map((log, i) => {
+                  const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || 'Anonim'
+                  const podium = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+                  const result = log.time_result || log.result || '—'
+                  const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
+                  return (
+                    <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ fontSize: podium ? '22px' : '13px', fontWeight: '700', color: '#888', minWidth: '30px', textAlign: 'center' }}>
+                          {podium || `#${i + 1}`}
+                        </div>
+                        <AvatarCircle name={name} size={36} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{name}</div>
+                          <div style={{ fontSize: '11px', color: '#aaa' }}>
+                            {new Date(log.logged_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare }}>{result}</div>
+                          {log.time_result && log.result && (
+                            <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
