@@ -1590,7 +1590,6 @@ function App() {
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
-  const calSwipeX = useRef(null)
   const homeCalScrollRef = useRef(null)
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
@@ -1832,11 +1831,11 @@ function App() {
   }
 
   const fetchClaseDB = async () => {
-    const acum30 = new Date()
-    acum30.setDate(acum30.getDate() - 30)
-    const de30Str = `${acum30.getFullYear()}-${String(acum30.getMonth()+1).padStart(2,'0')}-${String(acum30.getDate()).padStart(2,'0')}`
+    const acum60 = new Date()
+    acum60.setDate(acum60.getDate() - 60)
+    const de60Str = `${acum60.getFullYear()}-${String(acum60.getMonth()+1).padStart(2,'0')}-${String(acum60.getDate()).padStart(2,'0')}`
     const { data } = await supabase.from('classes').select('*')
-      .gte('date', de30Str)
+      .gte('date', de60Str)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
     setClaseDB(data || [])
   }
@@ -2045,8 +2044,6 @@ function App() {
   const _azi = new Date()
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
 
-  const rezervarileMeleAfisate = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > new Date())
-
   const VARIANTE_CONFIG = [
     { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', emoji: '🟠', key: 'movements_rx' },
     { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', key: 'movements_intermediate' },
@@ -2065,8 +2062,6 @@ function App() {
     && abonamentInceput
     && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
     && (!sedinteLimitate || (sedinteRamase + sedinteProgramateViitor) > 0)
-  const zileRamaseAbonament = abonamentReal ? Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
-
   if (resetMode) return (
     <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
