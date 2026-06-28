@@ -1479,6 +1479,7 @@ function App() {
   const [clasaSelectata, setClasaSelectata] = useState(null)
   const [clasaTab, setClasaTab] = useState('ore')
   const [claseAziDeschise, setClaseAziDeschise] = useState(true)
+  const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [abonamentReal, setAbonamentReal] = useState(null)
@@ -2206,21 +2207,62 @@ function App() {
                 <span style={{ fontSize: '18px', color: '#888', display: 'inline-block', transform: claseAziDeschise ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>⌄</span>
               </div>
               {claseAziDeschise && (
-                <div style={{ padding: '0 16px 16px', display: 'flex', gap: '10px', overflowX: 'auto' }}>
+                <div style={{ padding: '0 16px 16px' }}>
                   {claseZi.length === 0
                     ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă {esteAzi ? 'azi' : 'în această zi'}</div>
                     : claseZi.map(c => {
                         const rezervat = rezervariMele.includes(c.id)
                         const nrRez = rezervariPerClasa[c.id]?.count || 0
-                        const plin = nrRez >= c.max_spots
-                        const bgCol = rezervat ? '#EDFFD4' : plin ? '#FFEBEE' : '#FFF8E1'
-                        const txtCol = rezervat ? '#2F6600' : plin ? '#C62828' : '#8B6914'
+                        const plin = !rezervat && nrRez >= c.max_spots
+                        const blocat = !rezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
+                        const deschis = clasaHomeSelectata === c.id
+                        const esteInTrecut = c.date < actualToday
                         return (
-                          <div key={c.id} onClick={() => { setScreen('clase') }} style={{ background: bgCol, borderRadius: '14px', padding: '12px 14px', minWidth: '120px', flexShrink: 0, cursor: 'pointer' }}>
-                            <div style={{ fontSize: '17px', fontWeight: '800', color: txtCol, letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</div>
-                            <div style={{ fontSize: '12px', color: txtCol, marginTop: '2px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '110px' }}>{c.name || 'CrossFit WOD'}</div>
-                            {rezervat && <div style={{ fontSize: '10px', color: '#2F6600', marginTop: '5px', fontWeight: '700' }}>✓ Rezervat</div>}
-                            {!rezervat && plin && <div style={{ fontSize: '10px', color: '#C62828', marginTop: '5px' }}>Complet</div>}
+                          <div key={c.id}
+                            onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
+                            style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
+                              background: rezervat ? '#EDFFD4' : deschis ? '#f5f5f5' : '#fafafa',
+                              border: rezervat ? '2px solid #2F6600' : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
+                            {/* Rând principal */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#2F6600' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
+                                <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{c.end_time?.slice(0,5)}</span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                {rezervat
+                                  ? <span style={{ fontSize: '11px', background: '#C8FF00', color: '#111', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>✓ Rezervat</span>
+                                  : plin
+                                  ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600' }}>🔒 Plin</span>
+                                  : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
+
+                            {/* Buton rezervare — apare la tap */}
+                            {deschis && !esteInTrecut && (
+                              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
+                                onClick={e => e.stopPropagation()}>
+                                {rezervat ? (
+                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                                    style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                                    Anulează rezervarea
+                                  </button>
+                                ) : blocat ? (
+                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
+                                ) : plin ? (
+                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#C62828', padding: '6px' }}>Clasa e completă</div>
+                                ) : (
+                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                                    style={{ width: '100%', padding: '9px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+                                    Rezervă locul
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {deschis && esteInTrecut && (
+                              <div style={{ marginTop: '8px', fontSize: '11px', color: '#bbb', textAlign: 'center' }}>Clasă trecută</div>
+                            )}
                           </div>
                         )
                       })
