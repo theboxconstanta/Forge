@@ -1513,14 +1513,15 @@ function JurnalList({ logs }) {
         const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
         const noteLog = parts.length > 1 ? parts[1] : null
         const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-        const isOpen = deschis === i
+        const logKey = w.id || i
+        const isOpen = deschis === logKey
         const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
         const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
         const wodHeader = primaEsteHeader ? linii[0] : null
         const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
         const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
         return (
-          <div key={i} onClick={() => setDeschis(isOpen ? null : i)}
+          <div key={logKey} onClick={() => setDeschis(isOpen ? null : logKey)}
             style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600' }}>{w.variant_level || 'WOD'}</div>
@@ -1772,10 +1773,11 @@ function App() {
   }, [ziSelectata, claseDB, zileCalendar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveProfile = async () => {
+    const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
     await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
-      full_name: user.user_metadata?.full_name || null,
+      full_name: existing?.full_name || user.user_metadata?.full_name || null,
     }, { onConflict: 'id' })
   }
 
@@ -1792,12 +1794,13 @@ function App() {
   const saveOnboarding = async () => {
     if (!onboardingGender) return
     const name = onboardingName.trim() || user.user_metadata?.full_name || null
-    await supabase.from('profiles').upsert({
+    const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
       full_name: name,
       gender: onboardingGender,
     }, { onConflict: 'id' })
+    if (error) { showToast('❌ Eroare la salvare. Încearcă din nou.'); return }
     setUserProfile(prev => ({ ...prev, full_name: name, gender: onboardingGender }))
     setShowOnboarding(false)
   }
@@ -1965,7 +1968,9 @@ function App() {
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
       showToast('WOD salvat! 🎉'); await fetchWodLogs(); fetchClasament()
-      setScreen('home'); setWodDeschis(false); setVariantaAleasa(null)
+      if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
+      else { setScreen('home'); setWodDeschis(false) }
+      setVariantaAleasa(null)
       setWodResult(''); setWodTime(''); setWodNote('')
       setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
@@ -2257,7 +2262,7 @@ function App() {
         </span>
       </div>
 
-      {!isAdmin && !abonamentLoading && !abonamentActiv && screen !== 'abonament' && screen !== 'clase' && screen !== 'clasament' && (
+      {!isAdmin && !abonamentLoading && !abonamentActiv && !showOnboarding && screen !== 'abonament' && screen !== 'clase' && screen !== 'clasament' && screen !== 'logWOD' && screen !== 'logPR' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
@@ -2295,7 +2300,7 @@ function App() {
         const saptamana = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(monday.getDate() + i)
           const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-          return { d, ds, areWod: wodLogs.some(l => l.logged_at && String(l.logged_at).startsWith(ds)), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
+          return { d, ds, areWod: wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); const local = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`; return local === ds }), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
         })
         const zileSapt = ['L','Ma','Mi','J','V','S','D']
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
@@ -2819,9 +2824,16 @@ function App() {
       {screen === 'pr' && (() => {
         const prGroups = {}
         prDate.forEach(pr => { if (!prGroups[pr.movement]) prGroups[pr.movement] = []; prGroups[pr.movement].push(pr) })
+        const parseTimeStr = (s) => {
+          if (!s) return Infinity
+          const parts = String(s).trim().split(':').map(Number)
+          if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+          if (parts.length === 2) return parts[0] * 60 + parts[1]
+          return (parseFloat(s) || Infinity) * 60
+        }
         const bestPR = (records) => {
           if (!records?.length) return null
-          if (records[0].unit === 'timp') return records[0]
+          if (records[0].unit === 'timp') return records.reduce((b, r) => parseTimeStr(r.value) < parseTimeStr(b.value) ? r : b, records[0])
           const withVal = records.filter(r => r.value != null && parseFloat(r.value) > 0)
           if (withVal.length > 0) return withVal.reduce((b, r) => parseFloat(r.value) > parseFloat(b.value) ? r : b)
           const withReps = records.filter(r => r.reps && r.reps > 0)
