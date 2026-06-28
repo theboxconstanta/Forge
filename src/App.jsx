@@ -840,6 +840,7 @@ function Admin({ showToast }) {
   const [abonamente, setAbonamente] = useState([])
   const [_loadingClase, setLoadingClase] = useState(true)
   const [searchClienti, setSearchClienti] = useState('')
+  const bcRef = useRef(null)
 
   const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
   const [dataClasa, setDataClasa] = useState('')
@@ -881,7 +882,12 @@ function Admin({ showToast }) {
   const [savingSettings, setSavingSettings] = useState(false)
   const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
 
-  useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }, [])
+  useEffect(() => {
+    fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin()
+    bcRef.current = supabase.channel('forge-updates')
+    bcRef.current.subscribe()
+    return () => { if (bcRef.current) supabase.removeChannel(bcRef.current) }
+  }, [])
 
   const fetchClase = async () => {
     setLoadingClase(true)
@@ -962,6 +968,7 @@ function Admin({ showToast }) {
     if (!abo) return
     const newUsed = Math.max(0, (abo.sessions_used || 0) + delta)
     await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
+    bcRef.current?.send({ type: 'broadcast', event: 'sessions_changed', payload: { member_id: memberId } })
   }
 
   const getClassNotifParams = (classId) => {
@@ -2070,7 +2077,15 @@ function App() {
         fetchSettings()
       })
       .subscribe()
-    return () => supabase.removeChannel(channel)
+
+    const bcChannel = supabase.channel('forge-updates')
+      .on('broadcast', { event: 'sessions_changed' }, () => {
+        fetchAbonamentMeu()
+        setTimeout(() => fetchAbonamentMeu(), 600)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(bcChannel) }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
