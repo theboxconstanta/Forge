@@ -83,6 +83,7 @@ function fmt(s) {
 }
 
 function formatPR(pr) {
+  if (pr.unit === 'timp') return pr.value ? pr.value : '—'
   if (pr.value && pr.reps) return `${pr.value} ${pr.unit} × ${pr.reps}rep`
   if (pr.value) return `${pr.value} ${pr.unit}`
   if (pr.reps) return `${pr.reps} reps`
@@ -1474,7 +1475,7 @@ function App() {
   const [wodDeschis, setWodDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
-  const [dataAcasa, setDataAcasa] = useState(new Date().toISOString().split('T')[0])
+  const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [prSelectat, setPrSelectat] = useState(null)
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
@@ -1640,19 +1641,16 @@ function App() {
     if (!user) return
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
-        fetchClaseDB(); fetchClase()
+        fetchClaseDB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchRezervari(); fetchClaseDB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
-        fetchAbonamentMeu(); fetchAbonamente()
+        fetchAbonamentMeu()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wods' }, () => {
-        fetchWodZi(); fetchWods()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        fetchClienti()
+        fetchWodZi()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
         fetchWodLogs(); fetchClasament()
@@ -1850,7 +1848,7 @@ function App() {
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { member_id: user.id, movement: miscarePR, notes: prNote || null }
-    if (isBenchmark) { insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
+    if (isBenchmark) { insertData.value = prTimp || null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
     else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = 'm' }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
@@ -2155,7 +2153,7 @@ function App() {
       )}
 
       {screen === 'home' && (() => {
-        const actualToday = new Date().toISOString().split('T')[0]
+        const _now = new Date(); const actualToday = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`
         const selData = new Date(dataAcasa + 'T00:00:00')
         const addZile = (ds, n) => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
         const dow = selData.getDay()
@@ -2516,7 +2514,7 @@ function App() {
             <>
               <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
+                <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
                   style={{ flex: 1, background: '#EDFFD4', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🏋️</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', textAlign: 'center' }}>Mișcare Unică</span>
@@ -2631,7 +2629,7 @@ function App() {
       {screen === 'logPR' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setScreen('pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => setScreen(prevScreen || 'pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{logPentruPR ? `Log — ${logPentruPR.movement}` : 'Log PR nou'}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -2704,7 +2702,7 @@ function App() {
                 </div>
                 {prSelectat === i && (
                   <div style={{ marginTop: '10px', background: '#EDFFD4', borderRadius: '10px', padding: '10px 12px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setLogPentruPR(pr); setMiscarePR(pr.movement); setPrValoare(''); setPrReps(''); setPrNote(''); setScreen('logPR') }}
+                    <button onClick={(e) => { e.stopPropagation(); setLogPentruPR(pr); setMiscarePR(pr.movement); setPrValoare(''); setPrReps(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                       style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                       + Adaugă rezultat nou
                     </button>
@@ -2713,7 +2711,7 @@ function App() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setScreen('logPR') }}
+          <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
             style={{ width: '100%', padding: '12px', background: '#fff', color: '#2F6600', border: '2px solid #2F6600', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
             + Adaugă PR nou
           </button>

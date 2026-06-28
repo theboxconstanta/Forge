@@ -77,11 +77,13 @@ async function sendEmail(to: string, subject: string, html: string) {
       htmlContent: emailTemplate(html),
     }),
   });
+  const body = await res.text();
   if (!res.ok) {
-    const err = await res.text();
-    console.error("Brevo error:", err);
+    console.error("Brevo error", res.status, body);
+  } else {
+    console.log("Brevo ok", res.status, body);
   }
-  return res.ok;
+  return { ok: res.ok, status: res.status, body };
 }
 
 Deno.serve(async (req) => {
@@ -122,9 +124,9 @@ Deno.serve(async (req) => {
     }
 
     // Email via Brevo
-    await sendEmail(member_email, title, html);
+    const emailResult = await sendEmail(member_email, title, html);
 
-    return new Response(JSON.stringify({ success: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, email: emailResult }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Error:", err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS });
