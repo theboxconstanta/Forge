@@ -2073,6 +2073,19 @@ function App() {
     return () => supabase.removeChannel(channel)
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!user) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAbonamentMeu()
+        fetchRezervari()
+        fetchClaseDB()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveProfile = async () => {
     const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
     await supabase.from('profiles').upsert({
