@@ -1,7 +1,28 @@
 ﻿// @ts-nocheck
 /* eslint-disable */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Component } from 'react'
 import { supabase } from './supabase'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  componentDidCatch(error, info) { console.error('App crash:', error, info) }
+  render() {
+    if (this.state.hasError) return (
+      <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+        <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px' }}>Ceva a mers greșit</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Încearcă să reîmprospătezi pagina.</div>
+          <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            Reîmprospătează
+          </button>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
@@ -1773,7 +1794,7 @@ function App() {
     setWodSaving(true)
     const miscariText = wodMiscari.length > 0 ? wodMiscari.join('\n') : ''
     const noteFull = [miscariText, wodNote].filter(Boolean).join('\n---\n')
-    const tipSalvat = variantaAleasa !== null ? ['OnRamp','Beginner','Intermediate','RX'][variantaAleasa] : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
+    const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: null,
       variant_level: tipSalvat,
@@ -2105,7 +2126,7 @@ function App() {
         const saptamana = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(monday.getDate() + i)
           const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-          return { d, ds, areWod: wodLogs.some(l => l.logged_at && new Date(l.logged_at).toISOString().split('T')[0] === ds), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
+          return { d, ds, areWod: wodLogs.some(l => l.logged_at && String(l.logged_at).startsWith(ds)), esteAzi: ds === actualToday, esteSelectat: ds === dataAcasa }
         })
         const zileSapt = ['L','Ma','Mi','J','V','S','D']
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
@@ -2753,6 +2774,8 @@ function App() {
   )
 }
 
-export default App
+export default function AppWithBoundary() {
+  return <ErrorBoundary><App /></ErrorBoundary>
+}
 
 
