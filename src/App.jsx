@@ -1609,6 +1609,12 @@ function App() {
   }, [dataAcasa]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!user || claseDB.length === 0) return
+    const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
+    if (ids.length > 0) fetchRezervariZi(ids)
+  }, [dataAcasa, claseDB]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!user) return
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
@@ -1719,7 +1725,7 @@ function App() {
     classIds.forEach(id => {
       result[id] = { count: grouped[id].length, membri: grouped[id].map(mid => profilesMap[mid] || 'Membru') }
     })
-    setRezervariPerClasa(result)
+    setRezervariPerClasa(prev => ({ ...prev, ...result }))
   }
 
   const fetchClasament = async () => {
@@ -2239,29 +2245,54 @@ function App() {
                             </div>
                             <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
 
-                            {/* Buton rezervare — apare la tap */}
-                            {deschis && !esteInTrecut && (
+                            {/* Detalii expandate */}
+                            {deschis && (
                               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
                                 onClick={e => e.stopPropagation()}>
-                                {rezervat ? (
-                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                                    style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                                    Anulează rezervarea
-                                  </button>
-                                ) : blocat ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
-                                ) : plin ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#C62828', padding: '6px' }}>Clasa e completă</div>
+
+                                {/* Participanți */}
+                                {(() => {
+                                  const membri = rezervariPerClasa[c.id]?.membri || []
+                                  const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
+                                  return membri.length > 0 ? (
+                                    <div style={{ marginBottom: '10px' }}>
+                                      <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                                        PARTICIPANȚI ({cnt}/{c.max_spots})
+                                      </div>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        {membri.map((name, mi) => (
+                                          <span key={mi} style={{ fontSize: '11px', background: rezervat ? '#EDFFD4' : '#f0f0f0', color: rezervat ? '#2F6600' : '#555', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>
+                                            {name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : cnt > 0 ? (
+                                    <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{cnt} participant{cnt !== 1 ? 'ți' : ''}</div>
+                                  ) : null
+                                })()}
+
+                                {/* Buton rezervare */}
+                                {!esteInTrecut ? (
+                                  rezervat ? (
+                                    <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                                      style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                                      Anulează rezervarea
+                                    </button>
+                                  ) : blocat ? (
+                                    <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
+                                  ) : plin ? (
+                                    <div style={{ textAlign: 'center', fontSize: '12px', color: '#C62828', padding: '6px' }}>Clasa e completă</div>
+                                  ) : (
+                                    <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                                      style={{ width: '100%', padding: '9px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+                                      Rezervă locul
+                                    </button>
+                                  )
                                 ) : (
-                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                                    style={{ width: '100%', padding: '9px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                                    Rezervă locul
-                                  </button>
+                                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#bbb', padding: '4px' }}>Clasă trecută</div>
                                 )}
                               </div>
-                            )}
-                            {deschis && esteInTrecut && (
-                              <div style={{ marginTop: '8px', fontSize: '11px', color: '#bbb', textAlign: 'center' }}>Clasă trecută</div>
                             )}
                           </div>
                         )
