@@ -1635,6 +1635,9 @@ function App() {
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showCalPicker, setShowCalPicker] = useState(false)
+  const [calPickerYear, setCalPickerYear] = useState(new Date().getFullYear())
+  const [calPickerMonth, setCalPickerMonth] = useState(new Date().getMonth())
   const [onboardingGender, setOnboardingGender] = useState('')
   const [onboardingName, setOnboardingName] = useState('')
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -2302,8 +2305,10 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span onClick={() => setDataAcasa(addZile(dataAcasa, -1))} style={{ fontSize: '22px', color: '#bbb', cursor: 'pointer', padding: '0 4px', userSelect: 'none' }}>‹</span>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px', lineHeight: 1 }}>
+                    <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
+                      style={{ fontSize: '24px', fontWeight: '900', color: '#1a1a1a', letterSpacing: '-0.5px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {selData.getDate()} {selData.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
+                      <span style={{ fontSize: '14px', color: '#bbb' }}>▾</span>
                     </div>
                     {!esteAzi && (
                       <div onClick={() => setDataAcasa(actualToday)} style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
@@ -3067,6 +3072,68 @@ function App() {
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={wodZiData} onRefresh={fetchClasament} />}
       {screen === 'feed' && <Feed showToast={showToast} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
+
+      {showCalPicker && (() => {
+        const _now2 = new Date(); const todayStr = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`
+        const luniRo = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
+        const firstDay = new Date(calPickerYear, calPickerMonth, 1)
+        const daysInMonth = new Date(calPickerYear, calPickerMonth + 1, 0).getDate()
+        const offset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
+        const cells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => {
+          const d = i + 1
+          return `${calPickerYear}-${String(calPickerMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        })]
+        while (cells.length % 7 !== 0) cells.push(null)
+        const prevLuna = () => calPickerMonth === 0 ? (setCalPickerYear(y => y - 1), setCalPickerMonth(11)) : setCalPickerMonth(m => m - 1)
+        const nextLuna = () => calPickerMonth === 11 ? (setCalPickerYear(y => y + 1), setCalPickerMonth(0)) : setCalPickerMonth(m => m + 1)
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+            onClick={() => setShowCalPicker(false)}>
+            <div style={{ background: '#fff', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '360px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+              onClick={e => e.stopPropagation()}>
+              {/* Header luna */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <span onClick={prevLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>‹</span>
+                <span style={{ fontSize: '15px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.02em' }}>
+                  {luniRo[calPickerMonth].toUpperCase()} {calPickerYear}
+                </span>
+                <span onClick={nextLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>›</span>
+              </div>
+              {/* Zile header */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
+                {['L','Ma','Mi','J','V','S','D'].map(z => (
+                  <div key={z} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
+                ))}
+              </div>
+              {/* Grid zile */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+                {cells.map((ds, i) => {
+                  if (!ds) return <div key={i} />
+                  const d = new Date(ds + 'T00:00:00')
+                  const selectat = ds === dataAcasa
+                  const esteAzi = ds === todayStr
+                  const areWod = wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); return `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}` === ds })
+                  const areRez = claseDB.some(c => rezervariMele.includes(c.id) && c.date === ds)
+                  return (
+                    <div key={ds} onClick={() => { setDataAcasa(ds); setShowCalPicker(false) }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', borderRadius: '10px', cursor: 'pointer',
+                        background: selectat ? '#1a1a1a' : 'transparent',
+                        border: selectat ? 'none' : esteAzi ? '2px solid #1a1a1a' : 'none' }}>
+                      <span style={{ fontSize: '14px', fontWeight: selectat || esteAzi ? '800' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
+                      {(areWod || areRez) && <span style={{ fontSize: '7px', color: areRez ? '#2F6600' : '#C8FF00', lineHeight: 1, marginTop: '1px' }}>{areRez ? '✓' : '⚡'}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Buton azi */}
+              <div onClick={() => { setDataAcasa(todayStr); setShowCalPicker(false) }}
+                style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', padding: '8px', background: '#EDFFD4', borderRadius: '10px' }}>
+                Mergi la azi
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {showOnboarding && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
