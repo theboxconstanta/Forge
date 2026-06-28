@@ -1801,15 +1801,26 @@ function App() {
   const fetchUserProfile = async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     setUserProfile(data)
-    const waiverInLS = localStorage.getItem(`waiver_${user?.id}`) === '1'
-    const needsOnboarding = !data?.gender || data?.waiver_accepted === false
+    const currentYear = new Date().getFullYear()
+    const waiverInLS = localStorage.getItem(`waiver_${user?.id}_${currentYear}`) === '1'
+    // Waiver expirat = nu a fost acceptat SAU a trecut mai mult de 1 an de la acceptare
+    let waiverExpired = false
+    if (data?.waiver_accepted_at) {
+      const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+      waiverExpired = new Date(data.waiver_accepted_at) < oneYearAgo
+    } else {
+      waiverExpired = data?.waiver_accepted === false
+    }
+    const needsOnboarding = !data?.gender || waiverExpired
     if (needsOnboarding && !waiverInLS) {
       setOnboardingFirstName(data?.first_name || '')
       setOnboardingLastName(data?.last_name || '')
       setOnboardingGender(data?.gender || '')
       setOnboardingBirthDate(data?.birth_date || '')
       setOnboardingWaiverAccepted(false)
-      setOnboardingStep(1)
+      // Daca datele exista deja (reinnoire anuala), sare direct la pasul waiver
+      const isRenewal = !!(data?.gender && data?.first_name && data?.birth_date && data?.waiver_accepted)
+      setOnboardingStep(isRenewal ? 3 : 1)
       setShowOnboarding(true)
     }
   }
@@ -1832,8 +1843,9 @@ function App() {
         full_name: fullName, gender: onboardingGender || null,
       }).eq('id', user.id)
     }
-    // Marchez acceptarea și în localStorage ca safety net
-    localStorage.setItem(`waiver_${user.id}`, '1')
+    // Marchez acceptarea în localStorage (cheia include anul — se reinnoieste anual)
+    localStorage.setItem(`waiver_${user.id}_${new Date().getFullYear()}`, '1')
+    localStorage.removeItem(`waiver_${user.id}`) // sterge formatul vechi daca exista
     setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: onboardingGender, birth_date: onboardingBirthDate, waiver_accepted: true }))
     setShowOnboarding(false)
   }
@@ -3238,8 +3250,12 @@ function App() {
             {/* PASUL 3 — Waiver */}
             {onboardingStep === 3 && (
               <>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#1a1a1a', marginBottom: '4px' }}>Acord de participare</div>
-                <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Citește și acceptă acordul pentru a continua.</div>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: '#1a1a1a', marginBottom: '4px' }}>
+                  {onboardingFirstName && onboardingGender ? `Reînnoire acord ${new Date().getFullYear()}` : 'Acord de participare'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>
+                  {onboardingFirstName && onboardingGender ? 'Acordul de participare se reînnoiește anual. Citește și acceptă pentru a continua.' : 'Citește și acceptă acordul pentru a continua.'}
+                </div>
                 <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.5px', marginBottom: '10px' }}>DECLARAȚIE DE CONSIMȚĂMÂNT — CrossFit C15 / Forge</div>
                   <p style={{ marginBottom: '8px' }}><strong>1. Starea de sănătate</strong><br />Declar că sunt apt/ă din punct de vedere medical pentru activități fizice de intensitate ridicată și nu am contraindicații medicale cunoscute. Am consultat sau mă angajez să consult un medic înainte de începerea programului.</p>
