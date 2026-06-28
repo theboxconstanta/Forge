@@ -1653,7 +1653,6 @@ function App() {
   const [authScreen, setAuthScreen] = useState('login')
   const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('forge_remember_email') || '')
   const [authPassword, setAuthPassword] = useState('')
-  const [authNume, setAuthNume] = useState('')
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('forge_remember_email'))
@@ -1975,7 +1974,7 @@ function App() {
 
   const handleRegister = async () => {
     setAuthSubmitting(true); setAuthError('')
-    const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword, options: { data: { full_name: authNume } } })
+    const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
     if (error) setAuthError(error.message)
     else setAuthError('✓ Verifică emailul pentru confirmare!')
     setAuthSubmitting(false)
@@ -2225,12 +2224,6 @@ function App() {
           <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>Forge</h1>
           <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? 'Bine ai revenit!' : 'Creează cont nou'}</p>
         </div>
-        {authScreen === 'register' && (
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Nume complet</div>
-            <input value={authNume} onChange={e => setAuthNume(e.target.value)} placeholder="ex: Alex Ionescu" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
-          </div>
-        )}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Email</div>
           <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="email@exemplu.com" type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
