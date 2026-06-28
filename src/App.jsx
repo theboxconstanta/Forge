@@ -1582,6 +1582,8 @@ function App() {
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
   const calSwipeX = useRef(null)
+  const homeCalScrollRef = useRef(null)
+  const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
   const [rezervariPerClasa, setRezervariPerClasa] = useState({})
   const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
@@ -1697,6 +1699,15 @@ function App() {
 
   useEffect(() => {
     if (screen === 'clasament' && user) fetchClasament()
+    if (screen === 'home') {
+      const d = new Date()
+      setDataAcasa(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+      setTimeout(() => {
+        const container = homeCalScrollRef.current
+        const chip = homeCalTodayRef.current
+        if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
+      }, 50)
+    }
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -2318,23 +2329,29 @@ function App() {
             <div style={{ background: '#fff', marginBottom: '10px' }}>
               <div style={{ padding: '14px 20px 10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>CLASE DISPONIBILE</div>
-                {/* Chip scroll 14 zile */}
-                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                  {Array.from({ length: 14 }, (_, i) => {
+                {/* Chip scroll: 60 zile trecut + azi + 30 viitor */}
+                <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                  {Array.from({ length: 91 }, (_, i) => {
                     const d = new Date(actualToday + 'T00:00:00')
-                    d.setDate(d.getDate() + i)
+                    d.setDate(d.getDate() - 60 + i)
                     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
                     const ziuaLitera = ['D','L','Ma','Mi','J','V','S'][d.getDay()]
-                    const eAzi = i === 0
+                    const luna = ['Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+                    const eAzi = ds === actualToday
                     const selectat = ds === dataAcasa
                     const areRez = claseDB.some(c => rezervariMele.includes(c.id) && c.date === ds)
                     const areWod = wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); const local = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`; return local === ds })
                     return (
-                      <div key={ds} onClick={() => setDataAcasa(ds)}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 10px', borderRadius: '12px', border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : '1px solid #e8e8e8', background: selectat ? '#1a1a1a' : 'transparent', cursor: 'pointer', minWidth: '44px', flexShrink: 0 }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.03em' }}>{ziuaLitera}</span>
-                        <span style={{ fontSize: '17px', fontWeight: selectat || eAzi ? '900' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1.1 }}>{d.getDate()}</span>
-                        <span style={{ fontSize: '8px', lineHeight: 1, marginTop: '2px', color: selectat ? '#C8FF00' : '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                      <div key={ds}
+                        ref={eAzi ? homeCalTodayRef : null}
+                        onClick={() => setDataAcasa(ds)}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 8px', borderRadius: '12px', flexShrink: 0, cursor: 'pointer', minWidth: '46px',
+                          background: selectat ? '#1a1a1a' : 'transparent',
+                          border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #2F6600' : '1px solid #e8e8e8' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.03em' }}>{ziuaLitera}</span>
+                        <span style={{ fontSize: '17px', fontWeight: selectat || eAzi ? '900' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1.15 }}>{d.getDate()}</span>
+                        <span style={{ fontSize: '9px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
+                        <span style={{ fontSize: '8px', lineHeight: 1, marginTop: '1px', color: '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
                       </div>
                     )
                   })}
