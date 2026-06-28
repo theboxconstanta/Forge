@@ -730,7 +730,8 @@ function Feed({ showToast, user, userProfile }) {
   const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
     const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
-    if (!error) { setComentariuText(''); setComentariuDeschis(null); showToast('Comentariu adăugat!') }
+    if (error) { showToast('❌ Eroare la comentariu!'); console.error(error) }
+    else { setComentariuText(''); setComentariuDeschis(null); showToast('Comentariu adăugat!') }
   }
 
   const myName = userProfile?.full_name || user?.email?.split('@')[0] || 'Tu'
@@ -792,7 +793,7 @@ function Feed({ showToast, user, userProfile }) {
                   </button>
                 )
               })}
-              <button onClick={() => setComentariuDeschis(comentariuDeschis === post.id ? null : post.id)}
+              <button onClick={() => { setComentariuDeschis(comentariuDeschis === post.id ? null : post.id); setComentariuText('') }}
                 style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: '20px', border: '1px solid #e0e0e0', background: '#f5f5f5', cursor: 'pointer', fontSize: '11px', color: '#888' }}>
                 💬{postComments.length > 0 ? ` ${postComments.length}` : ''}
               </button>
@@ -1077,7 +1078,7 @@ function Admin({ showToast }) {
             const memberBookings = bks.filter(b => b.member_id === prof.id).length
             const { data: abo } = await supabase.from('subscriptions')
               .select('id, sessions_used')
-              .eq('member_email', email)
+              .ilike('member_email', email)
               .eq('is_active', true)
               .not('sessions_total', 'is', null)
               .order('created_at', { ascending: false })
@@ -1112,7 +1113,7 @@ function Admin({ showToast }) {
           if (!email) continue
           const { data: abo } = await supabase.from('subscriptions')
             .select('id, sessions_used')
-            .eq('member_email', email)
+            .ilike('member_email', email)
             .eq('is_active', true)
             .not('sessions_total', 'is', null)
             .order('created_at', { ascending: false })
