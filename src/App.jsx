@@ -916,30 +916,17 @@ function Admin({ showToast }) {
   }
 
   const fetchRezervariClasa = async (classId) => {
-    const { data } = await supabase.from('bookings')
-      .select('member_id, profiles(id, full_name, email)')
-      .eq('class_id', classId)
-    if (data && data.length > 0 && data[0].profiles !== undefined) {
-      const rezultat = data.map(b => ({
-        member_id: b.member_id,
-        id: b.profiles?.id,
-        full_name: b.profiles?.full_name,
-        email: b.profiles?.email,
-      }))
-      setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
-      return
-    }
-    // fallback: join manual dacă FK nu e direct pe profiles
-    const memberIds = (data || []).map(b => b.member_id)
+    const { data: bookData } = await supabase.from('bookings').select('member_id').eq('class_id', classId)
+    const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
-    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email').in('id', memberIds)
+    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberIds)
     const profsMap = {}
     ;(profsData || []).forEach(p => { profsMap[p.id] = p })
     const rezultat = memberIds.map(mid => ({
       member_id: mid,
-      id: profsMap[mid]?.id,
       full_name: profsMap[mid]?.full_name,
       email: profsMap[mid]?.email,
+      avatar_url: profsMap[mid]?.avatar_url,
     }))
     setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
   }
@@ -1600,7 +1587,7 @@ function Admin({ showToast }) {
                     : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
                     : rezervariClasa[c.id].map((r, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                      <AvatarCircle name={r.full_name || r.email || r.member_id} size={28} />
+                      <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
                         <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
