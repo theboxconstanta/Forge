@@ -1777,13 +1777,9 @@ function Admin({ showToast }) {
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Preț (RON)</div>
             <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder="ex: 250"
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Valabilitate</div>
-            <select value={durataPlan} onChange={e => setDurataPlan(parseInt(e.target.value))}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }}>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                <option key={n} value={n}>{n} {n === 1 ? 'lună' : 'luni'}</option>
-              ))}
-            </select>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Valabilitate (luni)</div>
+            <input type="number" min="1" value={durataPlan} onChange={e => setDurataPlan(Math.max(1, parseInt(e.target.value) || 1))} placeholder="ex: 1"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
               {savingPlan ? 'Se salvează...' : '+ Adaugă plan'}
             </button>
