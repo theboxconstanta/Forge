@@ -60,7 +60,7 @@ async function checkAndBookFromWaitlist(classId) {
   if (!next) return
 
   const { data: cls } = await supabase.from('classes').select('date, start_time, name').eq('id', classId).maybeSingle()
-  if (cls && new Date(`${cls.date}T${cls.start_time}`) <= new Date()) return
+  if (!cls || new Date(`${cls.date}T${cls.start_time}`) <= new Date()) return
 
   const todayStr = new Date().toISOString().split('T')[0]
   const { data: abo } = await supabase.from('subscriptions')
@@ -101,6 +101,55 @@ async function checkAndBookFromWaitlist(classId) {
   const ora = cls?.start_time?.slice(0, 5) || ''
   const className = `${cls?.name || 'Clasă'}${ora ? ` · ${ora}` : ''}`
   sendNotification('waitlist_booked', next.member_email, className, cls?.date || '')
+}
+
+async function activateQueuedSubscription(memberEmail) {
+  const { data: queued } = await supabase.from('subscriptions')
+    .select('*, subscription_plans(duration_months, name)')
+    .eq('member_email', memberEmail.toLowerCase())
+    .eq('is_active', false)
+    .eq('queued', true)
+    .order('created_at', { ascending: true })
+    .limit(1).maybeSingle()
+  if (!queued) return null
+
+  const duration = queued.subscription_plans?.duration_months || 1
+  const startDate = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  const startStr = `${startDate.getFullYear()}-${pad(startDate.getMonth()+1)}-${pad(startDate.getDate())}`
+  const endDate = new Date(startDate)
+  const targetMonth = endDate.getMonth() + duration
+  endDate.setMonth(targetMonth)
+  if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
+  const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+
+  let sessUsed = 0
+  if (queued.sessions_total != null) {
+    const { data: profil } = await supabase.from('profiles').select('id').ilike('email', memberEmail).maybeSingle()
+    if (profil?.id) {
+      const { data: futureCls } = await supabase.from('classes').select('id').gte('date', startStr)
+      const futureIds = futureCls?.map(c => c.id) || []
+      if (futureIds.length > 0) {
+        const { data: bks } = await supabase.from('bookings').select('id').eq('member_id', profil.id).in('class_id', futureIds)
+        sessUsed = bks?.length || 0
+      }
+    }
+  }
+
+  const { error } = await supabase.from('subscriptions').update({
+    is_active: true, queued: false,
+    start_date: startStr, end_date: endStr, sessions_used: sessUsed,
+  }).eq('id', queued.id)
+  if (error) { console.error('activateQueuedSubscription error:', error); return null }
+
+  // dezactiveaza abonamentul vechi (epuizat/expirat)
+  await supabase.from('subscriptions')
+    .update({ is_active: false })
+    .eq('member_email', memberEmail.toLowerCase())
+    .eq('is_active', true)
+    .neq('id', queued.id)
+
+  return queued.id
 }
 
 const MISCARI = [
@@ -237,7 +286,7 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
-function NavBar({ screen, setScreen, isAdmin }) {
+function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
     <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
       {[
@@ -249,7 +298,31 @@ function NavBar({ screen, setScreen, isAdmin }) {
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
         <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#2F6600' : '#aaa' }}>
-          <span style={{ fontSize: '20px' }}>{n.icon}</span>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '20px', lineHeight: 1 }}>{n.icon}</span>
+            {n.sc === 'feed' && feedUnread > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-5px',
+                right: '-10px',
+                background: '#E8192C',
+                color: '#fff',
+                borderRadius: '999px',
+                minWidth: '18px',
+                height: '18px',
+                fontSize: '11px',
+                fontWeight: '800',
+                lineHeight: '18px',
+                textAlign: 'center',
+                padding: '0 5px',
+                boxSizing: 'border-box',
+                boxShadow: '0 1px 4px rgba(232,25,44,0.5)',
+                border: '1.5px solid #fff',
+              }}>
+                {feedUnread > 99 ? '99+' : feedUnread}
+              </span>
+            )}
+          </div>
           <span style={{ fontSize: '10px', fontWeight: screen === n.sc ? '600' : '400' }}>{n.lbl}</span>
         </div>
       ))}
@@ -957,7 +1030,8 @@ function Admin({ showToast }) {
   }
 
   const fetchAbonamente = async () => {
-    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)').eq('is_active', true).order('created_at', { ascending: false })
+    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)')
+      .or('is_active.eq.true,queued.eq.true').order('created_at', { ascending: false })
     if (data) setAbonamente(data)
     const azi = new Date(); const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
     const { data: claseViit } = await supabase.from('classes').select('id').gte('date', aziStr)
@@ -1018,7 +1092,7 @@ function Admin({ showToast }) {
       .limit(1).maybeSingle()
     if (error) { console.error('adjustMemberSessions:', error); return }
     if (!abo) return
-    const newUsed = Math.max(0, (abo.sessions_used || 0) + delta)
+    const newUsed = Math.max(0, Math.min(abo.sessions_total ?? 9999, (abo.sessions_used || 0) + delta))
     await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
     const bc = supabase.channel('member-sessions-' + memberId)
     bc.subscribe((status) => {
@@ -1095,6 +1169,14 @@ function Admin({ showToast }) {
       ...prev,
       [classId]: (prev[classId] || []).map(r => r.member_id === memberId ? { ...r, checked_in: !currentValue } : r),
     }))
+  }
+
+  const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
+    const newUsed = Math.max(0, Math.min(currentTotal ?? 9999, (currentUsed || 0) + delta))
+    const { error } = await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', aboId)
+    if (error) { showToast('❌ Eroare la actualizare!'); return }
+    setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
+    showToast(delta < 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
   }
 
   const toggleZiRepetare = (idx) =>
@@ -1249,51 +1331,81 @@ function Admin({ showToast }) {
     if (!emailAbonament || !planSelectat) { showToast('❌ Completează emailul și planul!'); return }
     setSavingAbonament(true)
     const emailNorm = emailAbonament.toLowerCase().trim()
-    // dezactivam abonamentele vechi active pentru acelasi email
-    await supabase.from('subscriptions')
-      .update({ is_active: false })
-      .eq('member_email', emailNorm)
-      .eq('is_active', true)
     const plan = planuri.find(p => p.id === planSelectat)
-    const endDate = new Date(dataStartAbonament + 'T00:00:00')
-    const targetMonth = endDate.getMonth() + (plan?.duration_months || 1)
-    endDate.setMonth(targetMonth)
-    if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
-    const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`
-    // pentru planuri cu sedinte limitate, preluam rezervarile viitoare existente
-    let sessUsedInitial = 0
-    if (plan?.sessions != null) {
-      const { data: profil } = await supabase.from('profiles').select('id').ilike('email', emailNorm).maybeSingle()
-      if (profil?.id) {
-        const _az = new Date()
-        const azStr = `${_az.getFullYear()}-${String(_az.getMonth()+1).padStart(2,'0')}-${String(_az.getDate()).padStart(2,'0')}`
-        const { data: futureCls } = await supabase.from('classes').select('id').gte('date', azStr)
-        const futureIds = futureCls?.map(c => c.id) || []
-        if (futureIds.length > 0) {
-          const { data: existingBks } = await supabase.from('bookings')
-            .select('id').eq('member_id', profil.id).in('class_id', futureIds)
-          sessUsedInitial = existingBks?.length || 0
+    const pad = n => String(n).padStart(2, '0')
+    const _az = new Date()
+    const azStr = `${_az.getFullYear()}-${pad(_az.getMonth()+1)}-${pad(_az.getDate())}`
+
+    // verifica daca membrul are deja abonament valid (neexpirat + cu sedinte ramase)
+    const { data: existingActive } = await supabase.from('subscriptions')
+      .select('id, sessions_used, sessions_total, end_date')
+      .eq('member_email', emailNorm).eq('is_active', true).eq('queued', false)
+      .gte('end_date', azStr)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+    const hasValidActive = existingActive && (
+      existingActive.sessions_total == null ||
+      Math.max(0, existingActive.sessions_total - (existingActive.sessions_used || 0)) > 0
+    )
+
+    if (hasValidActive) {
+      // salveaza ca programat — va activa automat cand cel curent se termina
+      const { error } = await supabase.from('subscriptions').insert({
+        member_email: emailNorm,
+        plan_id: planSelectat,
+        sessions_total: plan?.sessions || null,
+        sessions_used: 0,
+        start_date: azStr,
+        end_date: azStr,
+        is_active: false,
+        queued: true,
+        notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
+      })
+      if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
+      else {
+        showToast('✓ Abonament programat! Va activa automat când cel curent se epuizează.')
+        await fetchAbonamente()
+        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+      }
+    } else {
+      // nu are abonament valid — activeaza imediat
+      await supabase.from('subscriptions').update({ is_active: false }).eq('member_email', emailNorm).eq('is_active', true)
+      const endDate = new Date(dataStartAbonament + 'T00:00:00')
+      const targetMonth = endDate.getMonth() + (plan?.duration_months || 1)
+      endDate.setMonth(targetMonth)
+      if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
+      const endDateStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+      let sessUsedInitial = 0
+      if (plan?.sessions != null) {
+        const { data: profil } = await supabase.from('profiles').select('id').ilike('email', emailNorm).maybeSingle()
+        if (profil?.id) {
+          const { data: futureCls } = await supabase.from('classes').select('id').gte('date', dataStartAbonament)
+          const futureIds = futureCls?.map(c => c.id) || []
+          if (futureIds.length > 0) {
+            const { data: existingBks } = await supabase.from('bookings').select('id').eq('member_id', profil.id).in('class_id', futureIds)
+            sessUsedInitial = existingBks?.length || 0
+          }
         }
       }
-    }
-    const { error } = await supabase.from('subscriptions').insert({
-      member_email: emailNorm,
-      plan_id: planSelectat,
-      sessions_total: plan?.sessions || null,
-      sessions_used: sessUsedInitial,
-      start_date: dataStartAbonament,
-      end_date: endDateStr,
-      is_active: true,
-      notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
-    })
-    if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
-    else {
-      showToast('✓ Abonament adăugat!')
-      await fetchAbonamente()
-      const _az2 = new Date()
-      setDataStartAbonament(`${_az2.getFullYear()}-${String(_az2.getMonth()+1).padStart(2,'0')}-${String(_az2.getDate()).padStart(2,'0')}`)
-      setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
-      sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
+      const { error } = await supabase.from('subscriptions').insert({
+        member_email: emailNorm,
+        plan_id: planSelectat,
+        sessions_total: plan?.sessions || null,
+        sessions_used: sessUsedInitial,
+        start_date: dataStartAbonament,
+        end_date: endDateStr,
+        is_active: true,
+        queued: false,
+        notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
+      })
+      if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
+      else {
+        showToast('✓ Abonament adăugat!')
+        await fetchAbonamente()
+        setDataStartAbonament(azStr)
+        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+        sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
+      }
     }
     setSavingAbonament(false)
   }
@@ -1343,7 +1455,8 @@ function Admin({ showToast }) {
     }
   }
 
-  const getAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.is_active)
+  const getAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.is_active && !a.queued)
+  const getQueuedAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.queued)
 
   const esteClientActiv = (email) => {
     const abo = getAbonamentClient(email)
@@ -1409,6 +1522,7 @@ function Admin({ showToast }) {
             </div>
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
+            const aboQueued = getQueuedAbonamentClient(c.email)
             const zileRamase = abo ? Math.ceil((new Date(abo.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
             const sedinteEpuizate = abo?.sessions_total != null && Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) === 0
             const neInceput = abo ? new Date(abo.start_date + 'T00:00:00') > new Date() : false
@@ -1432,7 +1546,8 @@ function Admin({ showToast }) {
                         {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} șed.</span>}
                       </div>
                     )}
-                    {!abo && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Fără abonament</div>}
+                    {!abo && !aboQueued && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Fără abonament</div>}
+                    {!abo && aboQueued && <div style={{ fontSize: '10px', color: '#5B7FCC', marginTop: '2px', fontWeight: '600' }}>📅 Abonament programat</div>}
                   </div>
                 </div>
                 {isOpen && (
@@ -1484,17 +1599,44 @@ function Admin({ showToast }) {
                           <span style={{ fontWeight: '600', color: expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : '#1a1a1a' }}>{new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}</span>
                         </div>
                         {abo.sessions_total && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
                             <span style={{ color: '#888' }}>Ședințe</span>
-                            <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#1a1a1a' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#1a1a1a' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
+                              <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+                                <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, -1)}
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #27500A', background: '#EAF3DE', color: '#27500A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, +1)}
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                              </div>
+                            </div>
                           </div>
                         )}
                         {abo.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{abo.notes}</div>}
                       </div>
                     ) : null}
+                    {aboQueued && (
+                      <div style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', borderLeft: '3px solid #5B7FCC' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px' }}>📅 ABONAMENT PROGRAMAT</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                          <span style={{ color: '#888' }}>Plan</span>
+                          <span style={{ fontWeight: '600' }}>{aboQueued.subscription_plans?.name || '—'}</span>
+                        </div>
+                        {aboQueued.sessions_total && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                            <span style={{ color: '#888' }}>Ședințe</span>
+                            <span style={{ fontWeight: '600' }}>{aboQueued.sessions_total}</span>
+                          </div>
+                        )}
+                        <div style={{ fontSize: '11px', color: '#5B7FCC', marginTop: '4px' }}>
+                          Activare automată la epuizarea abonamentului curent
+                        </div>
+                        {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{aboQueued.notes}</div>}
+                      </div>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); setAdminTab('abonamente'); setEmailAbonament(c.email); setNumeAbonament(c.full_name || '') }}
                       style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                      {abo ? '🔄 Reînnoiește abonament' : '+ Adaugă abonament'}
+                      {abo ? (aboQueued ? '➕ Abonament suplimentar' : '🔄 Reînnoiește abonament') : '+ Adaugă abonament'}
                     </button>
                   </div>
                 )}
@@ -1989,6 +2131,8 @@ function JurnalList({ logs }) {
 function App() {
   const [screen, setScreen] = useState('home')
   const [prevScreen, setPrevScreen] = useState('home')
+  const [feedUnread, setFeedUnread] = useState(0)
+  const screenRef = useRef('home')
   const [wodDeschis, setWodDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
@@ -2003,6 +2147,8 @@ function App() {
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
+  const [claseDBLoaded, setClaseDBLoaded] = useState(false)
+  const [rezervariIncarcate, setRezervariIncarcate] = useState(false)
   const [cancelWindowHours, setCancelWindowHours] = useState(2)
   const homeCalScrollRef = useRef(null)
   const homeCalTodayRef = useRef(null)
@@ -2077,6 +2223,8 @@ function App() {
     setInstallPrompt(null)
   }
 
+  const recalcFeedUnreadRef = useRef(null)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null); setAuthLoading(false)
@@ -2136,6 +2284,7 @@ function App() {
   }
 
   useEffect(() => {
+    screenRef.current = screen
     if (screen === 'clasament' && user) fetchClasament()
     if (screen === 'home') {
       const d = new Date()
@@ -2145,6 +2294,14 @@ function App() {
         const chip = homeCalTodayRef.current
         if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
       }, 50)
+    }
+    if (screen === 'feed' && user) {
+      setFeedUnread(0)
+      supabase.from('feed_posts').select('id, member_id').order('created_at', { ascending: false }).limit(200)
+        .then(({ data: posts }) => {
+          const cnt = (posts || []).filter(p => p.member_id !== user.id).length
+          localStorage.setItem('feed_seen_count_' + user.id, String(cnt))
+        })
     }
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2160,6 +2317,19 @@ function App() {
 
   useEffect(() => {
     if (!user) return
+    const recalcFeedUnread = async () => {
+      const { data: posts, error } = await supabase.from('feed_posts')
+        .select('id, member_id').order('created_at', { ascending: false }).limit(200)
+      if (error) { console.error('[Feed] query error:', error); return }
+      const othersTotal = (posts || []).filter(p => p.member_id !== user.id).length
+      const seenCount = parseInt(localStorage.getItem('feed_seen_count_' + user.id) || '0')
+      const unread = Math.max(0, othersTotal - seenCount)
+      setFeedUnread(unread)
+    }
+    recalcFeedUnreadRef.current = recalcFeedUnread
+    recalcFeedUnread()
+    const feedPoll = setInterval(recalcFeedUnread, 15000)
+
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
         fetchClaseDB()
@@ -2182,6 +2352,12 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
         fetchSettings()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_posts' }, () => {
+        recalcFeedUnreadRef.current?.()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_comments' }, () => {
+        recalcFeedUnreadRef.current?.()
       })
       .subscribe()
 
@@ -2207,6 +2383,7 @@ function App() {
       supabase.removeChannel(myChannel)
       supabase.removeChannel(sessionsChannel)
       clearInterval(poll)
+      clearInterval(feedPoll)
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2217,6 +2394,7 @@ function App() {
         fetchAbonamentMeu()
         fetchRezervari()
         fetchClaseDB()
+        recalcFeedUnreadRef.current?.()
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -2318,15 +2496,30 @@ function App() {
 
   const fetchAbonamentMeu = async () => {
     setAbonamentLoading(true)
-    const { data, error } = await supabase.from('subscriptions')
-      .select('*, subscription_plans(name, sessions)')
-      .eq('member_email', user.email.toLowerCase())
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-    if (error) console.error('fetchAbonamentMeu error:', error)
-    if (data && data.length > 0) setAbonamentReal(data[0])
-    else setAbonamentReal(null)
+    const fetchActive = async () => {
+      const { data, error } = await supabase.from('subscriptions')
+        .select('*, subscription_plans(name, sessions)')
+        .eq('member_email', user.email.toLowerCase())
+        .eq('is_active', true)
+        .eq('queued', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (error) console.error('fetchAbonamentMeu error:', error)
+      return data?.[0] || null
+    }
+    let abo = await fetchActive()
+    if (abo) {
+      const isExpired = new Date(abo.end_date + 'T23:59:59') < new Date()
+      const isExhausted = abo.sessions_total != null && (abo.sessions_used || 0) >= abo.sessions_total
+      if (isExpired || isExhausted) {
+        const activatedId = await activateQueuedSubscription(user.email)
+        if (activatedId) abo = await fetchActive()
+      }
+    } else {
+      const activatedId = await activateQueuedSubscription(user.email)
+      if (activatedId) abo = await fetchActive()
+    }
+    setAbonamentReal(abo)
     setAbonamentLoading(false)
   }
 
@@ -2347,6 +2540,7 @@ function App() {
       .lte('date', `${year}-12-31`)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
     setClaseDB(data || [])
+    setClaseDBLoaded(true)
   }
 
   const fetchSettings = async () => {
@@ -2360,6 +2554,7 @@ function App() {
   const fetchRezervari = async () => {
     const { data } = await supabase.from('bookings').select('class_id').eq('member_id', user.id)
     if (data) setRezervariMele(data.map(b => b.class_id))
+    setRezervariIncarcate(true)
   }
 
   const fetchWaitlistMea = async () => {
@@ -2528,7 +2723,7 @@ function App() {
     const esteRezervat = rezervariMele.includes(clasaId)
     if (!esteRezervat && !isAdmin) {
       const clasaPtRez = claseDB.find(c => c.id === clasaId)
-      if (clasaPtRez && new Date(`${clasaPtRez.date}T${clasaPtRez.start_time}`) <= new Date()) {
+      if (!clasaPtRez || new Date(`${clasaPtRez.date}T${clasaPtRez.start_time}`) <= new Date()) {
         showToast('❌ Clasa a început deja!')
         return
       }
@@ -2582,8 +2777,8 @@ function App() {
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = Math.max(0, (abonamentReal.sessions_used || 0) - 1)
-        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
+        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
       }
       supabase.from('class_reminders').delete().eq('class_id', clasaId).eq('member_email', user.email.toLowerCase())
       checkAndBookFromWaitlist(clasaId)
@@ -2786,6 +2981,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+          <span style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600' }}>
           <span style={{ color: '#fff' }}>CrossFit </span>
@@ -2793,7 +2989,7 @@ function App() {
         </span>
       </div>
 
-      {!isAdmin && !abonamentLoading && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
+      {!isAdmin && !abonamentLoading && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
@@ -3797,7 +3993,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} />
+      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} feedUnread={feedUnread} />
     </div>
   )
 }

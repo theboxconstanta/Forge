@@ -3,6 +3,15 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+let swRefreshing = false
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swRefreshing) return
+    swRefreshing = true
+    window.location.reload()
+  })
+}
+
 const lockPortrait = () => {
   // Modern API (Android Chrome, Edge)
   if (screen?.orientation?.lock) {
