@@ -2429,20 +2429,30 @@ function App() {
       .limit(1).maybeSingle()
     if (!next) return
 
+    const email = next.member_email
+    const todayStr = new Date().toISOString().split('T')[0]
+    const { data: abo } = await supabase.from('subscriptions')
+      .select('id, sessions_used, sessions_total, end_date')
+      .ilike('member_email', email)
+      .eq('is_active', true)
+      .gte('end_date', todayStr)
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle()
+
+    const aboLipseste = !abo
+    const sesiuniEpuizate = abo?.sessions_total != null && Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) <= 0
+    if (aboLipseste || sesiuniEpuizate) {
+      await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
+      await checkAndBookFromWaitlist(classId)
+      return
+    }
+
     const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: next.member_id })
     if (error) { console.error('waitlist auto-book error', error); return }
 
     await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
 
-    const email = next.member_email
-    const { data: abo } = await supabase.from('subscriptions')
-      .select('id, sessions_used, sessions_total')
-      .ilike('member_email', email)
-      .eq('is_active', true)
-      .not('sessions_total', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(1).maybeSingle()
-    if (abo) {
+    if (abo.sessions_total != null) {
       await supabase.from('subscriptions').update({ sessions_used: (abo.sessions_used || 0) + 1 }).eq('id', abo.id)
     }
 
