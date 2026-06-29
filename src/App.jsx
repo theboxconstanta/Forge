@@ -918,7 +918,11 @@ function Admin({ showToast }) {
   }
 
   const fetchRezervariClasa = async (classId) => {
-    const { data: bookData } = await supabase.from('bookings').select('member_id, checked_in').eq('class_id', classId)
+    let { data: bookData, error } = await supabase.from('bookings').select('member_id, checked_in').eq('class_id', classId)
+    if (error) {
+      const { data: fallback } = await supabase.from('bookings').select('member_id').eq('class_id', classId)
+      bookData = (fallback || []).map(b => ({ ...b, checked_in: false }))
+    }
     const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
     const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberIds)
