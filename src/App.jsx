@@ -962,6 +962,13 @@ function Admin({ showToast }) {
     if (!abo) return
     const newUsed = Math.max(0, (abo.sessions_used || 0) + delta)
     await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
+    const bc = supabase.channel('member-sessions-' + memberId)
+    bc.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        bc.send({ type: 'broadcast', event: 'refresh', payload: {} })
+        setTimeout(() => supabase.removeChannel(bc), 2000)
+      }
+    })
   }
 
   const getClassNotifParams = (classId) => {
@@ -2082,11 +2089,16 @@ function App() {
       )
       .subscribe()
 
-    const poll = setInterval(() => fetchAbonamentMeu(), 8000)
+    const sessionsChannel = supabase.channel('member-sessions-' + user.id)
+      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu() })
+      .subscribe()
+
+    const poll = setInterval(() => fetchAbonamentMeu(), 3000)
 
     return () => {
       supabase.removeChannel(channel)
       supabase.removeChannel(myChannel)
+      supabase.removeChannel(sessionsChannel)
       clearInterval(poll)
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
