@@ -988,6 +988,8 @@ function Admin({ showToast }) {
       await adjustMemberSessions(memberId, +1)
       showToast('❌ Eroare!'); console.error(error); return
     }
+    const memberEmail = clienti.find(c => c.id === memberId)?.email?.toLowerCase()
+    if (memberEmail) supabase.from('class_reminders').delete().eq('class_id', classId).eq('member_email', memberEmail)
     showToast('✓ Scos din clasă')
     fetchRezervariClasa(classId)
     fetchClase()
@@ -1008,14 +1010,22 @@ function Admin({ showToast }) {
       showToast('❌ Eroare!'); console.error(error); return
     }
     showToast('✓ Adăugat la clasă')
+    const member = clienti.find(c => c.id === memberId)
+    if (member?.email) {
+      const memberEmail = member.email.toLowerCase()
+      const cls = claseDB.find(c => c.id === classId) || clase.find(c => c.id === classId)
+      if (cls?.date && cls?.start_time) {
+        const remindAt = new Date(`${cls.date}T${cls.start_time}`)
+        remindAt.setHours(remindAt.getHours() - 1)
+        if (remindAt > new Date())
+          supabase.from('class_reminders').upsert({ class_id: classId, member_email: memberEmail, remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
+      }
+      const { className, classDate } = getClassNotifParams(classId)
+      sendNotification('class_added', memberEmail, className, classDate)
+    }
     setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
     fetchRezervariClasa(classId)
     fetchClase()
-    const member = clienti.find(c => c.id === memberId)
-    if (member?.email) {
-      const { className, classDate } = getClassNotifParams(classId)
-      sendNotification('class_added', member.email, className, classDate)
-    }
   }
 
   const toggleZiRepetare = (idx) =>
@@ -2447,6 +2457,7 @@ function App() {
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
+      supabase.from('class_reminders').delete().eq('class_id', clasaId).eq('member_email', user.email.toLowerCase())
       showToast('✓ Rezervare anulată')
     } else {
       const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
@@ -2456,6 +2467,13 @@ function App() {
         const newUsed = (abonamentReal.sessions_used || 0) + 1
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
+      }
+      const cls = claseDB.find(c => c.id === clasaId)
+      if (cls?.date && cls?.start_time) {
+        const remindAt = new Date(`${cls.date}T${cls.start_time}`)
+        remindAt.setHours(remindAt.getHours() - 1)
+        if (remindAt > new Date())
+          supabase.from('class_reminders').upsert({ class_id: clasaId, member_email: user.email.toLowerCase(), remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
       }
       showToast('✓ Loc rezervat! Te așteptăm!')
     }
