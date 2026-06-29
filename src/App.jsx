@@ -2532,6 +2532,11 @@ function App() {
   const toggleRezervare = async (clasaId) => {
     const esteRezervat = rezervariMele.includes(clasaId)
     if (!esteRezervat && !isAdmin) {
+      const clasaPtRez = claseDB.find(c => c.id === clasaId)
+      if (clasaPtRez && new Date(`${clasaPtRez.date}T${clasaPtRez.start_time}`) <= new Date()) {
+        showToast('❌ Clasa a început deja!')
+        return
+      }
       if (!abonamentReal) {
         showToast('❌ Nu ai un abonament activ!')
         return
