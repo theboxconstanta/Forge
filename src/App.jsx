@@ -1188,7 +1188,9 @@ function Admin({ showToast }) {
       .eq('is_active', true)
     const plan = planuri.find(p => p.id === planSelectat)
     const endDate = new Date(dataStartAbonament + 'T00:00:00')
-    endDate.setMonth(endDate.getMonth() + (plan?.duration_months || 1))
+    const targetMonth = endDate.getMonth() + (plan?.duration_months || 1)
+    endDate.setMonth(targetMonth)
+    if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`
     // pentru planuri cu sedinte limitate, preluam rezervarile viitoare existente
     let sessUsedInitial = 0
