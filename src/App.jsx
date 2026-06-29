@@ -870,6 +870,7 @@ function Admin({ showToast }) {
   const [numePlan, setNumePlan] = useState('')
   const [sedintePlan, setSedintePlan] = useState('')
   const [pretPlan, setPretPlan] = useState('')
+  const [durataPlan, setDurataPlan] = useState(1)
   const [savingPlan, setSavingPlan] = useState(false)
 
   const [rezervariClasa, setRezervariClasa] = useState({})
@@ -1186,9 +1187,8 @@ function Admin({ showToast }) {
       .eq('member_email', emailNorm)
       .eq('is_active', true)
     const plan = planuri.find(p => p.id === planSelectat)
-    // end date = start + 30 zile (local time, fara bug de timezone)
     const endDate = new Date(dataStartAbonament + 'T00:00:00')
-    endDate.setDate(endDate.getDate() + 30)
+    endDate.setMonth(endDate.getMonth() + (plan?.duration_months || 1))
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`
     // pentru planuri cu sedinte limitate, preluam rezervarile viitoare existente
     let sessUsedInitial = 0
@@ -1232,10 +1232,10 @@ function Admin({ showToast }) {
     if (!numePlan) { showToast('❌ Introdu numele!'); return }
     setSavingPlan(true)
     const { error } = await supabase.from('subscription_plans').insert({
-      name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : null,
+      name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : null, duration_months: durataPlan,
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('✓ Plan adăugat!'); await fetchPlanuri(); setNumePlan(''); setSedintePlan(''); setPretPlan('') }
+    else { showToast('✓ Plan adăugat!'); await fetchPlanuri(); setNumePlan(''); setSedintePlan(''); setPretPlan(''); setDurataPlan(1) }
     setSavingPlan(false)
   }
 
@@ -1776,7 +1776,14 @@ function Admin({ showToast }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Preț (RON)</div>
             <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder="ex: 250"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Valabilitate</div>
+            <select value={durataPlan} onChange={e => setDurataPlan(parseInt(e.target.value))}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }}>
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                <option key={n} value={n}>{n} {n === 1 ? 'lună' : 'luni'}</option>
+              ))}
+            </select>
             <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
               {savingPlan ? 'Se salvează...' : '+ Adaugă plan'}
             </button>
@@ -1788,7 +1795,7 @@ function Admin({ showToast }) {
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>{p.name}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                    {p.sessions ? `${p.sessions} ședințe` : 'Nelimitat'} · {p.price != null ? `${p.price} RON` : 'Preț nesetat'}
+                    {p.sessions ? `${p.sessions} ședințe` : 'Nelimitat'} · {p.price != null ? `${p.price} RON` : 'Preț nesetat'} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? 'lună' : 'luni'}
                   </div>
                 </div>
                 <button onClick={() => stergePlan(p.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
