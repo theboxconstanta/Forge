@@ -1015,8 +1015,7 @@ function Admin({ showToast }) {
       const memberEmail = member.email.toLowerCase()
       const cls = claseDB.find(c => c.id === classId) || clase.find(c => c.id === classId)
       if (cls?.date && cls?.start_time) {
-        const remindAt = new Date(`${cls.date}T${cls.start_time}`)
-        remindAt.setHours(remindAt.getHours() - 1)
+        const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
         if (remindAt > new Date())
           supabase.from('class_reminders').upsert({ class_id: classId, member_email: memberEmail, remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
       }
@@ -2470,8 +2469,7 @@ function App() {
       }
       const cls = claseDB.find(c => c.id === clasaId)
       if (cls?.date && cls?.start_time) {
-        const remindAt = new Date(`${cls.date}T${cls.start_time}`)
-        remindAt.setHours(remindAt.getHours() - 1)
+        const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
         if (remindAt > new Date())
           supabase.from('class_reminders').upsert({ class_id: clasaId, member_email: user.email.toLowerCase(), remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
       }

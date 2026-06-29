@@ -57,9 +57,6 @@ Deno.serve(async () => {
   let sent = 0;
 
   for (const reminder of reminders) {
-    // Marcheaza inainte de trimitere — previne duplicatele chiar daca trimiterea esueaza
-    await supabase.from("class_reminders").update({ sent: true }).eq("id", reminder.id);
-
     const cls = classMap[reminder.class_id];
     const ora = cls?.start_time?.slice(0, 5) || "";
     const title = `⏰ Clasă în 1 oră${ora ? ` · ${ora}` : ""}`;
@@ -107,6 +104,8 @@ Deno.serve(async () => {
       console.error("Brevo fetch failed for", email, e);
     }
 
+    // Marcheaza dupa trimitere — daca functia pica inainte, cron-ul urmator retrimite (mai bine decat sa se piarda)
+    await supabase.from("class_reminders").update({ sent: true }).eq("id", reminder.id);
     sent++;
   }
 
