@@ -2510,7 +2510,7 @@ function App() {
       if (clasa) {
         const clasaStart = new Date(`${clasa.date}T${clasa.start_time}`)
         const hoursUntil = (clasaStart - new Date()) / 3600000
-        if (hoursUntil >= 0 && hoursUntil < cancelWindowHours) {
+        if (hoursUntil < cancelWindowHours) {
           const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} minute`
           showToast(`❌ Nu poți anula cu mai puțin de ${h} înainte de clasă!`)
           return
