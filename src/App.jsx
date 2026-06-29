@@ -1179,6 +1179,25 @@ function Admin({ showToast }) {
     showToast(delta < 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
   }
 
+  const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
+    const pad = n => String(n).padStart(2, '0')
+    const startDate = new Date()
+    const startStr = `${startDate.getFullYear()}-${pad(startDate.getMonth()+1)}-${pad(startDate.getDate())}`
+    const duration = aboQueued.subscription_plans?.duration_months || 1
+    const endDate = new Date(startDate)
+    const targetMonth = endDate.getMonth() + duration
+    endDate.setMonth(targetMonth)
+    if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
+    const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+    await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', memberEmail).eq('is_active', true).neq('id', aboQueued.id)
+    const { error } = await supabase.from('subscriptions').update({
+      is_active: true, queued: false, start_date: startStr, end_date: endStr, sessions_used: 0,
+    }).eq('id', aboQueued.id)
+    if (error) { showToast('❌ Eroare la activare!'); return }
+    showToast('✅ Abonament activat!')
+    await fetchAbonamente()
+  }
+
   const toggleZiRepetare = (idx) =>
     setZileRepetare(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort((a, b) => a - b))
 
@@ -1339,8 +1358,8 @@ function Admin({ showToast }) {
     // verifica daca membrul are deja abonament valid (neexpirat + cu sedinte ramase)
     const { data: existingActive } = await supabase.from('subscriptions')
       .select('id, sessions_used, sessions_total, end_date')
-      .eq('member_email', emailNorm).eq('is_active', true).eq('queued', false)
-      .gte('end_date', azStr)
+      .ilike('member_email', emailNorm).eq('is_active', true).eq('queued', false)
+      .gt('end_date', azStr)
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
     const hasValidActive = existingActive && (
@@ -1369,7 +1388,7 @@ function Admin({ showToast }) {
       }
     } else {
       // nu are abonament valid — activeaza imediat
-      await supabase.from('subscriptions').update({ is_active: false }).eq('member_email', emailNorm).eq('is_active', true)
+      await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', emailNorm).eq('is_active', true)
       const endDate = new Date(dataStartAbonament + 'T00:00:00')
       const targetMonth = endDate.getMonth() + (plan?.duration_months || 1)
       endDate.setMonth(targetMonth)
@@ -1628,10 +1647,14 @@ function Admin({ showToast }) {
                             <span style={{ fontWeight: '600' }}>{aboQueued.sessions_total}</span>
                           </div>
                         )}
-                        <div style={{ fontSize: '11px', color: '#5B7FCC', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: '#5B7FCC', marginTop: '4px', marginBottom: '8px' }}>
                           Activare automată la epuizarea abonamentului curent
                         </div>
-                        {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{aboQueued.notes}</div>}
+                        {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{aboQueued.notes}</div>}
+                        <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email) }}
+                          style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                          ⚡ Activează acum
+                        </button>
                       </div>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); setAdminTab('abonamente'); setEmailAbonament(c.email); setNumeAbonament(c.full_name || '') }}
