@@ -1702,10 +1702,15 @@ function Admin({ showToast }) {
                                 <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
                                 <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
                               </div>
-                              <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
-                                style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #2F6600' : '1px solid #d0d0d0', background: r.checked_in ? '#EDFFD4' : '#f5f5f5', color: r.checked_in ? '#2F6600' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
-                                {r.checked_in ? '✓ Prezent' : '○ Absent'}
-                              </button>
+                              {(() => {
+                                const clasaInceput = new Date(`${c.date}T${c.start_time}`) <= new Date()
+                                return (
+                                  <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
+                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #2F6600' : '1px solid #d0d0d0', background: r.checked_in ? '#EDFFD4' : '#f5f5f5', color: r.checked_in ? '#2F6600' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
+                                    {r.checked_in ? '✓ Prezent' : clasaInceput ? '○ Absent' : '○ Marchează'}
+                                  </button>
+                                )
+                              })()}
                               <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
                                 style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                             </div>
@@ -2554,14 +2559,21 @@ function App() {
     }
     if (esteRezervat && !isAdmin) {
       const clasa = claseDB.find(c => c.id === clasaId)
-      if (clasa) {
-        const clasaStart = new Date(`${clasa.date}T${clasa.start_time}`)
-        const hoursUntil = (clasaStart - new Date()) / 3600000
-        if (hoursUntil < cancelWindowHours) {
-          const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} minute`
-          showToast(`❌ Nu poți anula cu mai puțin de ${h} înainte de clasă!`)
-          return
-        }
+      if (!clasa) {
+        showToast('❌ Nu poți anula această clasă!')
+        return
+      }
+      const clasaEnd = new Date(`${clasa.date}T${clasa.end_time}`)
+      if (clasaEnd <= new Date()) {
+        showToast('❌ Clasa s-a terminat, nu mai poți anula!')
+        return
+      }
+      const clasaStart = new Date(`${clasa.date}T${clasa.start_time}`)
+      const hoursUntil = (clasaStart - new Date()) / 3600000
+      if (hoursUntil < cancelWindowHours) {
+        const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} minute`
+        showToast(`❌ Nu poți anula cu mai puțin de ${h} înainte de clasă!`)
+        return
       }
     }
     if (esteRezervat) {
