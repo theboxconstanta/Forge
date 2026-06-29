@@ -990,6 +990,7 @@ function Admin({ showToast }) {
     }
     const memberEmail = clienti.find(c => c.id === memberId)?.email?.toLowerCase()
     if (memberEmail) supabase.from('class_reminders').delete().eq('class_id', classId).eq('member_email', memberEmail)
+    checkAndBookFromWaitlist(classId)
     showToast('✓ Scos din clasă')
     fetchRezervariClasa(classId)
     fetchClase()
@@ -1915,6 +1916,7 @@ function App() {
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
   const [rezervariPerClasa, setRezervariPerClasa] = useState({})
+  const [waitlistMea, setWaitlistMea] = useState([])
   const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
@@ -2004,6 +2006,7 @@ function App() {
       fetchPRuri()
       fetchWodLogs()
       fetchRezervari()
+      fetchWaitlistMea()
       fetchClaseDB()
       fetchSettings()
       fetchWodZi()
@@ -2072,6 +2075,9 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu()
         setTimeout(() => fetchAbonamentMeu(), 800)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'class_waitlist' }, () => {
+        fetchWaitlistMea()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
         fetchAbonamentMeu()
@@ -2264,6 +2270,11 @@ function App() {
     if (data) setRezervariMele(data.map(b => b.class_id))
   }
 
+  const fetchWaitlistMea = async () => {
+    const { data } = await supabase.from('class_waitlist').select('class_id').eq('member_id', user.id)
+    if (data) setWaitlistMea(data.map(w => w.class_id))
+  }
+
   const fetchRezervariZi = async (classIds) => {
     if (!classIds || classIds.length === 0) return
     const { data } = await supabase.from('bookings').select('class_id, member_id').in('class_id', classIds)
@@ -2404,6 +2415,65 @@ function App() {
     setPrSaving(false)
   }
 
+  const checkAndBookFromWaitlist = async (classId) => {
+    const { data: next } = await supabase
+      .from('class_waitlist')
+      .select('member_id, member_email')
+      .eq('class_id', classId)
+      .order('joined_at', { ascending: true })
+      .limit(1).maybeSingle()
+    if (!next) return
+
+    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: next.member_id })
+    if (error) { console.error('waitlist auto-book error', error); return }
+
+    await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
+
+    const email = next.member_email
+    const { data: abo } = await supabase.from('subscriptions')
+      .select('id, sessions_used, sessions_total')
+      .ilike('member_email', email)
+      .eq('is_active', true)
+      .not('sessions_total', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle()
+    if (abo) {
+      await supabase.from('subscriptions').update({ sessions_used: (abo.sessions_used || 0) + 1 }).eq('id', abo.id)
+    }
+
+    const cls = claseDB.find(c => c.id === classId)
+    if (cls?.date && cls?.start_time) {
+      const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
+      if (remindAt > new Date())
+        supabase.from('class_reminders').upsert({ class_id: classId, member_email: email, remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
+    }
+
+    const bc = supabase.channel('member-sessions-' + next.member_id)
+    bc.subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        bc.send({ type: 'broadcast', event: 'refresh', payload: {} })
+        setTimeout(() => supabase.removeChannel(bc), 2000)
+      }
+    })
+
+    const { className, classDate } = getClassNotifParams(classId)
+    sendNotification('waitlist_booked', email, className, classDate)
+  }
+
+  const toggleWaitlist = async (clasaId) => {
+    const peWaitlist = waitlistMea.includes(clasaId)
+    if (peWaitlist) {
+      await supabase.from('class_waitlist').delete().eq('class_id', clasaId).eq('member_id', user.id)
+      setWaitlistMea(prev => prev.filter(id => id !== clasaId))
+      showToast('✓ Ai ieșit din lista de așteptare')
+    } else {
+      const { error } = await supabase.from('class_waitlist').insert({ class_id: clasaId, member_id: user.id, member_email: user.email.toLowerCase() })
+      if (error) { showToast('❌ Eroare!'); console.error(error); return }
+      setWaitlistMea(prev => [...prev, clasaId])
+      showToast('✓ Ești pe lista de așteptare!')
+    }
+  }
+
   const sedinteLimitate = abonamentReal?.sessions_total != null
   const sedinteRamase = sedinteLimitate ? Math.max(0, (abonamentReal.sessions_total) - (abonamentReal.sessions_used || 0)) : null
 
@@ -2431,7 +2501,7 @@ function App() {
       const clasa = claseDB.find(c => c.id === clasaId)
       const ocupate = rezervariPerClasa[clasaId]?.count ?? 0
       if (clasa && ocupate >= clasa.max_spots) {
-        showToast('❌ Clasa este plină!')
+        await toggleWaitlist(clasaId)
         return
       }
     }
@@ -2457,6 +2527,7 @@ function App() {
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
       supabase.from('class_reminders').delete().eq('class_id', clasaId).eq('member_email', user.email.toLowerCase())
+      checkAndBookFromWaitlist(clasaId)
       showToast('✓ Rezervare anulată')
     } else {
       const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
@@ -2792,6 +2863,7 @@ function App() {
                       const rezervat = rezervariMele.includes(c.id)
                       const nrRez = rezervariPerClasa[c.id]?.count || 0
                       const plin = !rezervat && nrRez >= c.max_spots
+                      const peWaitlist = !rezervat && waitlistMea.includes(c.id)
                       const blocat = !rezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                       const deschis = clasaHomeSelectata === c.id
                       const esteInTrecut = c.date < actualToday
@@ -2809,7 +2881,9 @@ function App() {
                             <div style={{ textAlign: 'right' }}>
                               {rezervat
                                 ? <span style={{ fontSize: '11px', background: '#C8FF00', color: '#111', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>✓ Rezervat</span>
-                                : plin
+                                : peWaitlist
+                                ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>⏳ Așteptare</span>
+                              : plin
                                 ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600' }}>🔒 Plin</span>
                                 : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
                             </div>
@@ -2842,8 +2916,16 @@ function App() {
                                   </button>
                                 ) : blocat ? (
                                   <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
+                                ) : peWaitlist ? (
+                                  <button onClick={() => toggleWaitlist(c.id)}
+                                    style={{ width: '100%', padding: '9px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                                    ⏳ Pe lista de așteptare · Renunță
+                                  </button>
                                 ) : plin ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#C62828', padding: '6px' }}>Clasa e completă</div>
+                                  <button onClick={() => toggleWaitlist(c.id)}
+                                    style={{ width: '100%', padding: '9px', background: '#f5f5f5', color: '#555', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                                    Intră pe lista de așteptare
+                                  </button>
                                 ) : (
                                   <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
                                     style={{ width: '100%', padding: '9px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>

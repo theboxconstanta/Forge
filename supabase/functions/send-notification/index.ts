@@ -63,6 +63,14 @@ function getContent(type: string, planName: string, endDate: string) {
              <p>Coachul a anulat rezervarea ta la <strong>${planName}</strong>${dateFmt ? ` din <strong>${dateFmt}</strong>` : ""}.
              <p>Contactează-ne dacă ai întrebări.</p>`,
     },
+    waitlist_booked: {
+      title: "🎉 Loc disponibil — ești rezervat!",
+      body: `S-a eliberat un loc la ${planName}${dateFmt ? ` pe ${dateFmt}` : ""}. Ești acum rezervat automat!`,
+      html: `<h2 style="color:#2F6600">S-a eliberat un loc!</h2>
+             <p>Erai pe lista de așteptare pentru <strong>${planName}</strong>${dateFmt ? ` pe <strong>${dateFmt}</strong>` : ""}.
+             <p>Ești acum <strong>rezervat automat</strong>. Te așteptăm! 💪</p>
+             <p style="font-size:12px;color:#888">Dacă nu poți ajunge, anulează din aplicație.</p>`,
+    },
   };
 
   return map[type] ?? map.subscription_added;
