@@ -2105,7 +2105,7 @@ function App() {
       .subscribe()
 
     const sessionsChannel = supabase.channel('member-sessions-' + user.id)
-      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu() })
+      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea() })
       .subscribe()
 
     const poll = setInterval(() => fetchAbonamentMeu(), 3000)
