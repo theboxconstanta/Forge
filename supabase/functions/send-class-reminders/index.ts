@@ -29,9 +29,10 @@ Deno.serve(async () => {
   );
 
   const now = new Date();
-  // Fereastra: clase care incep intre 50 si 70 minute de acum
-  const windowStart = new Date(now.getTime() + 50 * 60 * 1000);
-  const windowEnd   = new Date(now.getTime() + 70 * 60 * 1000);
+  // Fereastra: clase care incep intre 55 si 65 minute de acum
+  // 10 minute latime = exact intervalul dintre cron-uri → fiecare clasa e prinsa de un singur run
+  const windowStart = new Date(now.getTime() + 55 * 60 * 1000);
+  const windowEnd   = new Date(now.getTime() + 65 * 60 * 1000);
 
   // Extrage data si intervalul de ore pentru query
   const toDateStr = (d: Date) => d.toISOString().split("T")[0];
