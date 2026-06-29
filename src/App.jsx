@@ -918,17 +918,20 @@ function Admin({ showToast }) {
   }
 
   const fetchRezervariClasa = async (classId) => {
-    const { data: bookData } = await supabase.from('bookings').select('member_id').eq('class_id', classId)
+    const { data: bookData } = await supabase.from('bookings').select('member_id, checked_in').eq('class_id', classId)
     const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
     const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberIds)
     const profsMap = {}
     ;(profsData || []).forEach(p => { profsMap[p.id] = p })
+    const checkinMap = {}
+    ;(bookData || []).forEach(b => { checkinMap[b.member_id] = b.checked_in })
     const rezultat = memberIds.map(mid => ({
       member_id: mid,
       full_name: profsMap[mid]?.full_name,
       email: profsMap[mid]?.email,
       avatar_url: profsMap[mid]?.avatar_url,
+      checked_in: checkinMap[mid] || false,
     }))
     setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
   }
@@ -1027,6 +1030,17 @@ function Admin({ showToast }) {
     setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
     fetchRezervariClasa(classId)
     fetchClase()
+  }
+
+  const adminToggleCheckIn = async (classId, memberId, currentValue) => {
+    const { error } = await supabase.from('bookings')
+      .update({ checked_in: !currentValue })
+      .eq('class_id', classId).eq('member_id', memberId)
+    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    setRezervariClasa(prev => ({
+      ...prev,
+      [classId]: (prev[classId] || []).map(r => r.member_id === memberId ? { ...r, checked_in: !currentValue } : r),
+    }))
   }
 
   const toggleZiRepetare = (idx) =>
@@ -1664,7 +1678,17 @@ function Admin({ showToast }) {
                       </div>
                       {clasaDeschisa === c.id && (
                         <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>REZERVĂRI ({rezervariClasa[c.id]?.length || 0}/{c.max_spots})</div>
+                          {(() => {
+                            const rez = rezervariClasa[c.id]
+                            const nrCheckin = (rez || []).filter(r => r.checked_in).length
+                            const nrTotal = rez?.length || 0
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>REZERVĂRI ({nrTotal}/{c.max_spots})</div>
+                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#2F6600' : '#aaa', background: nrCheckin > 0 ? '#EDFFD4' : '#f5f5f5', padding: '2px 8px', borderRadius: '20px' }}>✓ {nrCheckin}/{nrTotal} prezenți</div>}
+                              </div>
+                            )
+                          })()}
                           {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
                             : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
                             : rezervariClasa[c.id].map((r, i) => (
@@ -1674,8 +1698,12 @@ function Admin({ showToast }) {
                                 <div style={{ fontSize: '12px', fontWeight: '500', color: '#1a1a1a' }}>{r.full_name || 'Utilizator'}</div>
                                 <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
                               </div>
+                              <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
+                                style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #2F6600' : '1px solid #d0d0d0', background: r.checked_in ? '#EDFFD4' : '#f5f5f5', color: r.checked_in ? '#2F6600' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
+                                {r.checked_in ? '✓ Prezent' : '○ Absent'}
+                              </button>
                               <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
-                                style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕ Scoate</button>
+                                style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                             </div>
                           ))}
                           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f5f5f5' }}>
