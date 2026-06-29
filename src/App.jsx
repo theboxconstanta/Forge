@@ -2160,6 +2160,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [abonamentReal, setAbonamentReal] = useState(null)
   const [abonamentLoading, setAbonamentLoading] = useState(true)
+  const [abonamentInitialized, setAbonamentInitialized] = useState(false)
   const [prValoare, setPrValoare] = useState('')
   const [prReps, setPrReps] = useState('')
   const [prTimp, setPrTimp] = useState('')
@@ -2251,7 +2252,7 @@ function App() {
       fetchSettings()
       fetchWodZi()
       checkAdmin()
-      fetchAbonamentMeu()
+      fetchAbonamentMeu(true)
       fetchClasament()
       registerPushSubscription()
       setTimeout(() => {
@@ -2494,8 +2495,8 @@ function App() {
     setIsAdmin(data && data.length > 0)
   }
 
-  const fetchAbonamentMeu = async () => {
-    setAbonamentLoading(true)
+  const fetchAbonamentMeu = async (isFirstLoad = false) => {
+    if (isFirstLoad) setAbonamentLoading(true)
     const fetchActive = async () => {
       const { data, error } = await supabase.from('subscriptions')
         .select('*, subscription_plans(name, sessions)')
@@ -2520,7 +2521,8 @@ function App() {
       if (activatedId) abo = await fetchActive()
     }
     setAbonamentReal(abo)
-    setAbonamentLoading(false)
+    if (isFirstLoad) { setAbonamentLoading(false); setAbonamentInitialized(true) }
+    else setAbonamentInitialized(true)
   }
 
   const fetchPRuri = async () => {
@@ -2989,7 +2991,7 @@ function App() {
         </span>
       </div>
 
-      {!isAdmin && !abonamentLoading && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
+      {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
