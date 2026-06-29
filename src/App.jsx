@@ -2930,7 +2930,7 @@ function App() {
                       const peWaitlist = !rezervat && waitlistMea.includes(c.id)
                       const blocat = !rezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
                       const deschis = clasaHomeSelectata === c.id
-                      const esteInTrecut = c.date < actualToday
+                      const esteInTrecut = new Date(`${c.date}T${c.start_time}`) <= new Date()
                       return (
                         <div key={c.id}
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
