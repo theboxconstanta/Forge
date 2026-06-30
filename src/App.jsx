@@ -3152,7 +3152,7 @@ function App() {
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
           {authScreen === 'login' ? 'Nu ai cont? ' : 'Ai deja cont? '}
-          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>
+          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#C8FF00', fontWeight: '600', cursor: 'pointer' }}>
             {authScreen === 'login' ? 'Înregistrează-te' : 'Intră în cont'}
           </span>
         </div>
