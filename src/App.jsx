@@ -3346,7 +3346,7 @@ function App() {
             <div style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#bbb', fontWeight: '700', letterSpacing: '0.1em', marginBottom: '3px' }}>WORKOUT OF THE DAY</div>
+                  <div style={{ display: 'inline-block', fontSize: '10px', color: '#C8FF00', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px', background: '#1a1a1a', padding: '3px 10px', borderRadius: '6px' }}>WORKOUT OF THE DAY</div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>
                     {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : 'Niciun WOD azi'}
                   </div>
