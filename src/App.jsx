@@ -2692,7 +2692,7 @@ function App() {
       const todayStr = new Date().toISOString().split('T')[0]
       const { data, error } = await supabase.from('subscriptions')
         .select('*, subscription_plans(name, sessions)')
-        .eq('member_email', user.email.toLowerCase())
+        .ilike('member_email', user.email.trim())
         .eq('is_active', true)
         .eq('queued', false)
         .lte('start_date', todayStr)
@@ -3210,7 +3210,10 @@ function App() {
                     ? 'Ai consumat toate ședințele din abonament. Contactează coachul pentru a achiziționa un abonament nou.'
                     : 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'}
             </div>
-            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '13px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+            <button onClick={() => fetchAbonamentMeu()} style={{ width: '100%', padding: '13px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+              Reîncarcă
+            </button>
+            <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#555', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '10px' }}>
               Vezi abonamentul →
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
