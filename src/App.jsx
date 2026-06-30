@@ -106,7 +106,7 @@ async function checkAndBookFromWaitlist(classId) {
 async function activateQueuedSubscription(memberEmail) {
   const { data: queued } = await supabase.from('subscriptions')
     .select('*, subscription_plans(duration_months, name)')
-    .eq('member_email', memberEmail.toLowerCase())
+    .ilike('member_email', memberEmail)
     .eq('is_active', false)
     .eq('queued', true)
     .order('created_at', { ascending: true })
@@ -132,7 +132,7 @@ async function activateQueuedSubscription(memberEmail) {
   // dezactiveaza abonamentul vechi (epuizat/expirat)
   await supabase.from('subscriptions')
     .update({ is_active: false })
-    .eq('member_email', memberEmail.toLowerCase())
+    .ilike('member_email', memberEmail)
     .eq('is_active', true)
     .neq('id', queued.id)
 
