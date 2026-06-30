@@ -123,22 +123,9 @@ async function activateQueuedSubscription(memberEmail) {
   if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
   const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
 
-  let sessUsed = 0
-  if (queued.sessions_total != null) {
-    const { data: profil } = await supabase.from('profiles').select('id').ilike('email', memberEmail).maybeSingle()
-    if (profil?.id) {
-      const { data: futureCls } = await supabase.from('classes').select('id').gte('date', startStr)
-      const futureIds = futureCls?.map(c => c.id) || []
-      if (futureIds.length > 0) {
-        const { data: bks } = await supabase.from('bookings').select('id').eq('member_id', profil.id).in('class_id', futureIds)
-        sessUsed = bks?.length || 0
-      }
-    }
-  }
-
   const { error } = await supabase.from('subscriptions').update({
     is_active: true, queued: false,
-    start_date: startStr, end_date: endStr, sessions_used: sessUsed,
+    start_date: startStr, end_date: endStr, sessions_used: 0,
   }).eq('id', queued.id)
   if (error) { console.error('activateQueuedSubscription error:', error); return null }
 
