@@ -2534,10 +2534,10 @@ function App() {
         fetchClaseDB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu()
+        fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu(); setRefreshZiTrigger(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'class_waitlist' }, () => {
-        fetchWaitlistMea()
+        fetchWaitlistMea(); fetchRezervari(); setRefreshZiTrigger(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
         fetchAbonamentMeu()
