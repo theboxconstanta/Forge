@@ -2217,14 +2217,13 @@ function JurnalList({ logs }) {
         const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
         const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
         return (
-          <div key={logKey} onClick={() => setDeschis(isOpen ? null : logKey)}
-            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
+          <div key={logKey}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
+          <div onClick={() => setDeschis(isOpen ? null : logKey)}
+            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600' }}>{w.variant_level || 'WOD'}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#aaa' }}>{data}</div>
-                <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
-              </div>
+              <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
               {w.result && <span style={{ fontSize: '12px', background: '#EDFFD4', color: '#2F6600', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
@@ -2254,6 +2253,7 @@ function JurnalList({ logs }) {
                 )}
               </div>
             )}
+          </div>
           </div>
         )
       })}
