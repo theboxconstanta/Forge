@@ -2249,6 +2249,7 @@ function App() {
   const [installDismissed, setInstallDismissed] = useState(false)
   const [clasamentLogs, setClasamentLogs] = useState([])
   const [clasamentLoading, setClasamentLoading] = useState(false)
+  const [clasamentWodData, setClasamentWodData] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
@@ -2647,12 +2648,15 @@ function App() {
     setClasamentLoading(true)
     const _td = new Date()
     const today = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
-    const { data: logs } = await supabase
-      .from('wod_logs')
-      .select('*')
-      .gte('logged_at', today + 'T00:00:00')
-      .lte('logged_at', today + 'T23:59:59')
-      .in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
+    const { data: todayWod } = await supabase.from('wods').select('id, type, duration, name').eq('date', today).maybeSingle()
+    setClasamentWodData(todayWod || null)
+    let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
+    if (todayWod?.id) {
+      q = q.eq('wod_id', todayWod.id)
+    } else {
+      q = q.gte('logged_at', today + 'T00:00:00').lte('logged_at', today + 'T23:59:59')
+    }
+    const { data: logs } = await q
     if (logs && logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender').in('id', ids)
@@ -3881,7 +3885,7 @@ function App() {
 
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={wodZiData} onRefresh={fetchClasament} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={fetchClasament} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
