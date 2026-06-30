@@ -2586,13 +2586,6 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Polling doar cand membrul nu are abonament activ — detecteaza adaugarea/reactivarea in max 5s
-  useEffect(() => {
-    if (!user || isAdmin || !abonamentInitialized || abonamentActiv) return
-    const interval = setInterval(() => fetchAbonamentMeu(), 5000)
-    return () => clearInterval(interval)
-  }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const saveProfile = async () => {
     const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
     await supabase.from('profiles').upsert({
@@ -3027,6 +3020,15 @@ function App() {
     && abonamentInceput
     && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
     && (!sedinteLimitate || (sedinteRamase + sedinteProgramateViitor) > 0)
+
+  // Polling 5s doar cand membrul nu are abonament activ (plasat dupa abonamentActiv pentru a evita TDZ)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!user || isAdmin || !abonamentInitialized || abonamentActiv) return
+    const interval = setInterval(() => fetchAbonamentMeu(), 5000)
+    return () => clearInterval(interval)
+  }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (resetMode) return (
     <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
