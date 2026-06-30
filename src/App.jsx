@@ -2529,6 +2529,12 @@ function App() {
     recalcFeedUnread()
     const feedPoll = setInterval(recalcFeedUnread, 15000)
 
+    const bookingsPoll = setInterval(() => {
+      fetchRezervari()
+      fetchWaitlistMea()
+      setRefreshZiTrigger(t => t + 1)
+    }, 8000)
+
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
         fetchClaseDB()
@@ -2579,6 +2585,7 @@ function App() {
       supabase.removeChannel(myChannel)
       supabase.removeChannel(sessionsChannel)
       clearInterval(feedPoll)
+      clearInterval(bookingsPoll)
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
