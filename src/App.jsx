@@ -2912,7 +2912,10 @@ function App() {
       showToast('✓ Ai ieșit din lista de așteptare')
     } else {
       const { error } = await supabase.from('class_waitlist').insert({ class_id: clasaId, member_id: user.id, member_email: user.email.toLowerCase() })
-      if (error) { showToast('❌ ' + (error.message || error.code || 'Eroare')); console.error(error); return }
+      if (error) {
+        if (error.code === '23505') { setWaitlistMea(prev => prev.includes(clasaId) ? prev : [...prev, clasaId]); showToast('✓ Ești deja pe lista de așteptare!'); return }
+        showToast('❌ ' + (error.message || error.code || 'Eroare')); console.error(error); return
+      }
       setWaitlistMea(prev => [...prev, clasaId])
       showToast('✓ Ești pe lista de așteptare!')
     }
