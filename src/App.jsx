@@ -2550,10 +2550,15 @@ function App() {
       })
       .subscribe()
 
+    const refreshZi = () => {
+      const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
+      if (ids.length > 0) fetchRezervariZi(ids)
+    }
+
     const myChannel = supabase.channel('my-bookings-' + user.id)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'bookings', filter: `member_id=eq.${user.id}` },
-        () => { fetchRezervari(); fetchAbonamentMeu() }
+        () => { fetchRezervari(); fetchAbonamentMeu(); refreshZi() }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'subscriptions' },
@@ -2562,7 +2567,7 @@ function App() {
       .subscribe()
 
     const sessionsChannel = supabase.channel('member-sessions-' + user.id)
-      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea() })
+      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea(); refreshZi() })
       .subscribe()
 
     return () => {
