@@ -597,8 +597,15 @@ function Timer({ onBack, defaultFortime }) {
   )
 }
 
-function Clasament({ logs, loading, wodZiData, onRefresh }) {
+function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateChange }) {
   const [genderTab, setGenderTab] = useState('toti')
+  const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+  const isToday = selectedDate === todayStr
+  const goDay = (delta) => {
+    const d = new Date(selectedDate + 'T00:00:00'); d.setDate(d.getDate() + delta)
+    const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    onDateChange(s)
+  }
 
   const parseTime = (str) => {
     if (!str) return Infinity
@@ -657,14 +664,20 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' }}>Clasament 🏅</h1>
-        <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
+        <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>↻</button>
       </div>
-      <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
-        {new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}
-        {wodZiData ? ` · ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#f5f5f5', borderRadius: '12px', padding: '8px 12px' }}>
+        <button onClick={() => goDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#1a1a1a', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>
+            {isToday ? 'Azi' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </div>
+          {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>Niciun WOD</div>}
+        </div>
+        <button onClick={() => goDay(+1)} disabled={isToday} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: isToday ? '#e0e0e0' : '#1a1a1a', color: isToday ? '#bbb' : '#fff', fontSize: '16px', cursor: isToday ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+      </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[
@@ -2334,6 +2347,7 @@ function App() {
   const [clasamentLogs, setClasamentLogs] = useState([])
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
+  const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [userProfile, setUserProfile] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
@@ -2730,17 +2744,18 @@ function App() {
     setRezervariPerClasa(prev => ({ ...prev, ...result }))
   }
 
-  const fetchClasament = async () => {
+  const fetchClasament = async (dateStr) => {
     setClasamentLoading(true)
     const _td = new Date()
-    const today = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
-    const { data: todayWod } = await supabase.from('wods').select('id, type, duration, name').eq('date', today).maybeSingle()
-    setClasamentWodData(todayWod || null)
+    const todayFallback = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
+    const targetDate = dateStr || clasamentDate || todayFallback
+    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name').eq('date', targetDate).maybeSingle()
+    setClasamentWodData(wodZi || null)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
-    if (todayWod?.id) {
-      q = q.eq('wod_id', todayWod.id)
+    if (wodZi?.id) {
+      q = q.eq('wod_id', wodZi.id)
     } else {
-      q = q.gte('logged_at', today + 'T00:00:00').lte('logged_at', today + 'T23:59:59')
+      q = q.gte('logged_at', targetDate + 'T00:00:00').lte('logged_at', targetDate + 'T23:59:59')
     }
     const { data: logs } = await q
     if (logs && logs.length > 0) {
@@ -3974,7 +3989,7 @@ function App() {
 
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={fetchClasament} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
