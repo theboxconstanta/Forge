@@ -9,7 +9,7 @@ class ErrorBoundary extends Component {
   componentDidCatch(error, info) { console.error('App crash:', error, info) }
   render() {
     if (this.state.hasError) return (
-      <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100dvh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+      <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
         <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px' }}>Ceva a mers greșit</div>
@@ -285,7 +285,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
-        { icon: '🏅', lbl: 'Leaderboard', sc: 'clasament' },
+        { icon: '🏅', lbl: 'Cls.', sc: 'clasament' },
         { icon: '💬', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
@@ -441,7 +441,7 @@ function Timer({ onBack, defaultFortime }) {
   const culoareRing = gata ? '#1a1a1a' : mod === 'tabata' && tabataFaza === 'odihna' ? '#1D9E75' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
   const culoareText = gata ? '#1a1a1a' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
   return (
-    <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a' }}>Timer ⏱️</h1>
@@ -663,7 +663,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   const totalLogs = NIVELE.reduce((acc, n) => acc + getSectionLogs(n.id).length, 0)
 
   return (
-    <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' }}>Clasament 🏅</h1>
         <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>↻</button>
@@ -771,7 +771,6 @@ function Feed({ showToast, user, userProfile }) {
   const [posting, setPosting] = useState(false)
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
-  const [membri, setMembri] = useState([])
 
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#1a1a1a', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
@@ -825,9 +824,6 @@ function Feed({ showToast, user, userProfile }) {
 
   useEffect(() => {
     fetchAll(true)
-    supabase.from('profiles').select('id, full_name, avatar_url, email').order('full_name').then(({ data }) => {
-      if (data) setMembri(data)
-    })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_reactions' }, () => fetchAll(false))
@@ -870,26 +866,8 @@ function Feed({ showToast, user, userProfile }) {
   const myAvatar = userProfile?.avatar_url
 
   return (
-    <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Feed 👥</h1>
-
-      {/* Comunitate */}
-      {membri.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.08em', marginBottom: '10px' }}>COMUNITATE</div>
-          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-            {membri.map(m => {
-              const name = m.full_name || m.email?.split('@')[0] || 'Membru'
-              return (
-                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                  <AvatarCircle name={name} avatarUrl={m.avatar_url} size={44} />
-                  <span style={{ fontSize: '10px', color: '#555', fontWeight: '500', maxWidth: '50px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name.split(' ')[0]}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Compose */}
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -1553,7 +1531,7 @@ function Admin({ showToast }) {
     })
 
   return (
-    <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+    <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a' }}>⚙️ Admin</h1>
         <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>COACH</span>
@@ -3043,7 +3021,7 @@ function App() {
   )
 
   if (authLoading) return (
-    <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100dvh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+    <div style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏋️</div>
         <div style={{ fontSize: '14px', color: '#888' }}>Se încarcă...</div>
@@ -3161,7 +3139,7 @@ function App() {
   )
 
   return (
-    <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100dvh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none' }}>
+    <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none' }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3217,7 +3195,7 @@ function App() {
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
         return (
-          <div style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', background: '#f5f5f5' }}>
+          <div style={{ paddingBottom: '80px', background: '#f5f5f5' }}>
 
             {/* ── Card dată + calendar săptămânal ── */}
             <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
@@ -3490,7 +3468,7 @@ function App() {
       })()}
 
       {screen === 'abonament' && (
-        <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Abonamentul meu</h1>
@@ -3605,7 +3583,7 @@ function App() {
       )}
 
       {screen === 'log' && (
-        <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
             {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
@@ -3642,7 +3620,7 @@ function App() {
       )}
 
       {screen === 'logWOD' && (
-        <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Log WOD</h1>
@@ -3734,7 +3712,7 @@ function App() {
       )}
 
       {screen === 'logPR' && (
-        <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen(prevScreen || 'pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{logPentruPR ? `Log — ${logPentruPR.movement}` : 'Log PR nou'}</h1>
@@ -3896,7 +3874,7 @@ function App() {
           )
         }
         return (
-          <div style={{ padding: '20px', paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+          <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Recorduri 🏆</h1>
               <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
