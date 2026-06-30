@@ -1460,7 +1460,7 @@ function Admin({ showToast }) {
     if (abo?.queued) {
       await supabase.from('subscriptions').delete().eq('id', id)
       showToast('✓ Abonament programat șters!')
-      await fetchAbonamente()
+      await fetchAbonamente(); fetchRapoarte()
       return
     }
     if (abo?.member_email) {
@@ -1481,7 +1481,7 @@ function Admin({ showToast }) {
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
     showToast('✓ Abonament anulat și rezervările viitoare șterse!')
-    await fetchAbonamente()
+    await fetchAbonamente(); fetchRapoarte()
     if (abo?.member_email) {
       const planName = abo.subscription_plans?.name || 'Abonament'
       sendNotification('subscription_cancelled', abo.member_email, planName, abo.end_date)
