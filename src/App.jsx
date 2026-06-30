@@ -961,6 +961,7 @@ function Admin({ showToast }) {
   const [clienti, setClienti] = useState([])
   const [planuri, setPlanuri] = useState([])
   const [abonamente, setAbonamente] = useState([])
+  const [aboExpandat, setAboExpandat] = useState({})
   const [_loadingClase, setLoadingClase] = useState(true)
   const [searchClienti, setSearchClienti] = useState('')
 
@@ -1738,36 +1739,93 @@ function Admin({ showToast }) {
               {savingAbonament ? 'Se salvează...' : '+ Adaugă abonament'}
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>ABONAMENTE ({abonamente.length})</div>
-          {abonamente.map(a => {
-            const zileRamase = Math.ceil((new Date(a.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24))
-            const aSedinteEpuizate = a.sessions_total != null && Math.max(0, a.sessions_total - (a.sessions_used || 0)) === 0
-            const aNeInceput = new Date(a.start_date + 'T00:00:00') > new Date()
-            const expirat = zileRamase < 0 || aSedinteEpuizate
-            const aActiv = !expirat && !aNeInceput
-            const culoareData = expirat ? '#E24B4A' : aNeInceput ? '#E24B4A' : '#27500A'
-            const membruNume = clienti.find(c => c.email?.toLowerCase() === a.member_email?.toLowerCase())?.full_name
+          {(() => {
             const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            const grouped = {}
+            abonamente.forEach(a => {
+              const key = a.member_email?.toLowerCase()
+              if (!grouped[key]) grouped[key] = []
+              grouped[key].push(a)
+            })
+            const emails = Object.keys(grouped)
             return (
-              <div key={a.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${expirat ? '#E24B4A' : aNeInceput ? '#E24B4A' : '#27500A'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{membruNume || a.member_email}</div>
-                    {membruNume && <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{a.member_email}</div>}
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{a.subscription_plans?.name}</div>
-                    <div style={{ fontSize: '11px', fontWeight: '500', color: culoareData, marginTop: '2px' }}>
-                      {aSedinteEpuizate ? '⚠️ ' : aActiv ? '✓ ' : '📅 '}
-                      {fmtData(a.start_date)} → {fmtData(a.end_date)}
-                      {aSedinteEpuizate ? ' · epuizat' : ''}
+              <>
+                <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>ABONAMENTE — {emails.length} membri, {abonamente.length} total</div>
+                {emails.map(email => {
+                  const list = grouped[email]
+                  const activ = list.find(a => a.is_active && !a.queued)
+                  const queued = list.filter(a => a.queued)
+                  const membruNume = clienti.find(c => c.email?.toLowerCase() === email)?.full_name
+                  const expanded = !!aboExpandat[email]
+                  const zileRamase = activ ? Math.ceil((new Date(activ.end_date + 'T23:59:59') - new Date()) / 86400000) : null
+                  const epuizat = activ && activ.sessions_total != null && Math.max(0, activ.sessions_total - (activ.sessions_used || 0)) === 0
+                  const neinceput = activ && new Date(activ.start_date + 'T00:00:00') > new Date()
+                  const expirat = activ && (zileRamase < 0 || epuizat)
+                  const statusColor = !activ ? '#aaa' : expirat ? '#E24B4A' : neinceput ? '#BA7517' : '#27500A'
+                  const statusLabel = !activ ? 'Fără abonament' : expirat ? 'Expirat' : neinceput ? 'Neînceput' : 'Activ'
+                  return (
+                    <div key={email} style={{ background: '#fff', borderRadius: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                      <div onClick={() => setAboExpandat(prev => ({ ...prev, [email]: !prev[email] }))}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer', borderLeft: `4px solid ${statusColor}` }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{membruNume || email}</div>
+                          <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{email}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px', flexShrink: 0 }}>
+                          {queued.length > 0 && <span style={{ fontSize: '10px', background: '#E8EEFF', color: '#5B7FCC', borderRadius: '6px', padding: '2px 6px', fontWeight: '600' }}>+{queued.length} programat</span>}
+                          <span style={{ fontSize: '11px', fontWeight: '600', color: statusColor }}>{statusLabel}</span>
+                          <span style={{ fontSize: '14px', color: '#aaa', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
+                        </div>
+                      </div>
+                      {expanded && (
+                        <div style={{ borderTop: '1px solid #f0f0f0', padding: '10px 14px 14px' }}>
+                          {activ ? (
+                            <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#F4FDE8', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px' }}>
+                                {expirat ? '⚠️ EXPIRAT' : neinceput ? '📅 NEÎNCEPUT' : '✓ ACTIV'}
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a' }}>{activ.subscription_plans?.name}</div>
+                              <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>{fmtData(activ.start_date)} → {fmtData(activ.end_date)}</div>
+                              {activ.sessions_total != null && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                                  <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>Ședințe: {activ.sessions_used || 0}/{activ.sessions_total}</span>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, -1) }}
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #27500A', background: '#EAF3DE', color: '#27500A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                    <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, +1) }}
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                  </div>
+                                </div>
+                              )}
+                              {activ.notes && <div style={{ fontSize: '11px', color: '#2F6600', marginTop: '3px' }}>{activ.notes}</div>}
+                              <button onClick={e => { e.stopPropagation(); stergeAbonament(activ.id) }}
+                                style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️ Șterge</button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '8px 0' }}>Niciun abonament activ</div>
+                          )}
+                          {queued.map(q => (
+                            <div key={q.id} style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginTop: '8px', borderLeft: '3px solid #5B7FCC' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px' }}>📅 PROGRAMAT</div>
+                              <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a1a' }}>{q.subscription_plans?.name}</div>
+                              {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Ședințe: {q.sessions_total}</div>}
+                              {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
+                              <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                                <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email) }}
+                                  style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>⚡ Activează acum</button>
+                                <button onClick={e => { e.stopPropagation(); stergeAbonament(q.id) }}
+                                  style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {a.sessions_total && <div style={{ fontSize: '11px', color: aSedinteEpuizate ? '#E24B4A' : '#888' }}>Ședințe: {a.sessions_used || 0}/{a.sessions_total}</div>}
-                    <div style={{ fontSize: '11px', color: '#2F6600', marginTop: '2px' }}>{a.notes || 'Plătit: 0 RON'}</div>
-                  </div>
-                  <button onClick={() => stergeAbonament(a.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', marginLeft: '8px' }}>🗑️</button>
-                </div>
-              </div>
+                  )
+                })}
+              </>
             )
-          })}
+          })()}
         </>
       )}
 
