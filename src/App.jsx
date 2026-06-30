@@ -771,6 +771,7 @@ function Feed({ showToast, user, userProfile }) {
   const [posting, setPosting] = useState(false)
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
+  const [membri, setMembri] = useState([])
 
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#1a1a1a', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
@@ -824,6 +825,9 @@ function Feed({ showToast, user, userProfile }) {
 
   useEffect(() => {
     fetchAll(true)
+    supabase.from('profiles').select('id, full_name, avatar_url, email').order('full_name').then(({ data }) => {
+      if (data) setMembri(data)
+    })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_reactions' }, () => fetchAll(false))
@@ -868,6 +872,24 @@ function Feed({ showToast, user, userProfile }) {
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#1a1a1a', marginBottom: '14px' }}>Feed 👥</h1>
+
+      {/* Comunitate */}
+      {membri.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.08em', marginBottom: '10px' }}>COMUNITATE</div>
+          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+            {membri.map(m => {
+              const name = m.full_name || m.email?.split('@')[0] || 'Membru'
+              return (
+                <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <AvatarCircle name={name} avatarUrl={m.avatar_url} size={44} />
+                  <span style={{ fontSize: '10px', color: '#555', fontWeight: '500', maxWidth: '50px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name.split(' ')[0]}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Compose */}
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -3141,7 +3163,7 @@ function App() {
   return (
     <div style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none' }}>
 
-      <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 8px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
