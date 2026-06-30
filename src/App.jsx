@@ -1528,7 +1528,9 @@ function Admin({ showToast }) {
         const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
         const futureBookingIds = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.id)
         if (futureBookingIds.length > 0) {
+          const affectedClassIds = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.class_id)
           await supabase.from('bookings').delete().in('id', futureBookingIds)
+          affectedClassIds.forEach(cid => checkAndBookFromWaitlist(cid))
         }
       }
     }
