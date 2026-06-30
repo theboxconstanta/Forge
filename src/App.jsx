@@ -1194,11 +1194,11 @@ function Admin({ showToast }) {
   }
 
   const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
-    const newUsed = Math.max(0, Math.min(currentTotal ?? 9999, (currentUsed || 0) + delta))
-    const { error } = await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', aboId)
+    const newTotal = Math.max((currentUsed || 0), (currentTotal || 0) + delta)
+    const { error } = await supabase.from('subscriptions').update({ sessions_total: newTotal }).eq('id', aboId)
     if (error) { showToast('❌ Eroare la actualizare!'); return }
-    setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
-    showToast(delta < 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
+    setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_total: newTotal } : a))
+    showToast(delta > 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
@@ -1638,9 +1638,9 @@ function Admin({ showToast }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#1a1a1a' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
                               <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
-                                <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, -1)}
-                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, +1)}
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, -1)}
                                   style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                               </div>
                             </div>
@@ -1803,9 +1803,9 @@ function Admin({ showToast }) {
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                                   <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>Ședințe: {activ.sessions_used || 0}/{activ.sessions_total}</span>
                                   <div style={{ display: 'flex', gap: '4px' }}>
-                                    <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, -1) }}
-                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, +1) }}
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                    <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, -1) }}
                                       style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                                   </div>
                                 </div>
