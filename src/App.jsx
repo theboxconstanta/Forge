@@ -1021,7 +1021,7 @@ function Admin({ showToast }) {
   }
 
   const fetchAbonamente = async () => {
-    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions)')
+    const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions, duration_months)')
       .or('is_active.eq.true,queued.eq.true').order('created_at', { ascending: false })
     if (data) setAbonamente(data)
     const azi = new Date(); const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
@@ -1085,6 +1085,7 @@ function Admin({ showToast }) {
       .select('notes')
       .gte('created_at', lunaStart + 'T00:00:00')
       .lte('created_at', lunaEnd + 'T23:59:59')
+      .or('is_active.eq.true,queued.eq.true')
     const venituriLuna = (aboLuna || []).reduce((sum, a) => {
       const m = (a.notes || '').match(/Plătit:\s*([\d.,]+)\s*RON/)
       return sum + (m ? parseFloat(m[1].replace(',', '.')) : 0)
@@ -2638,6 +2639,7 @@ function App() {
         .eq('is_active', true)
         .eq('queued', false)
         .lte('start_date', todayStr)
+        .gt('end_date', todayStr)
         .order('created_at', { ascending: false })
         .limit(1)
       if (error) console.error('fetchAbonamentMeu error:', error)
