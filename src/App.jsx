@@ -286,7 +286,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         { icon: '✏️', lbl: 'Log', sc: 'log' },
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
         { icon: '🏅', lbl: 'Clasament', sc: 'clasament' },
-        { icon: '👥', lbl: 'Feed', sc: 'feed' },
+        { icon: '💬', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
         <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#1a1a1a' : '#aaa' }}>
