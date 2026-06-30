@@ -3342,7 +3342,7 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a' }}>{abonamentReal.subscription_plans?.name || 'Abonament'}</div>
-                    <div style={{ fontSize: '22px', marginTop: '4px' }}>🏅</div>
+                    <div style={{ fontSize: '22px', marginTop: '4px' }}>💳</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
