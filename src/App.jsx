@@ -951,6 +951,7 @@ function Admin({ showToast }) {
   const [aboExpandat, setAboExpandat] = useState({})
   const [_loadingClase, setLoadingClase] = useState(true)
   const [searchClienti, setSearchClienti] = useState('')
+  const [rapoarteData, setRapoarteData] = useState(null)
 
   const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
   const [dataClasa, setDataClasa] = useState('')
@@ -995,6 +996,7 @@ function Admin({ showToast }) {
   const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
 
   useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }, [])
+  useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
 
   const fetchClase = async () => {
     setLoadingClase(true)
@@ -1059,6 +1061,40 @@ function Admin({ showToast }) {
       const cwh = data.find(s => s.key === 'cancel_window_hours')
       if (cwh) setCancelWindowSetting(parseFloat(cwh.value) || 0)
     }
+  }
+
+  const fetchRapoarte = async () => {
+    const now = new Date()
+    const pad = n => String(n).padStart(2, '0')
+    const azi = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`
+    const lunaStart = `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`
+    const lunaEnd = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(new Date(now.getFullYear(), now.getMonth()+1, 0).getDate())}`
+
+    const { data: aboActive } = await supabase.from('subscriptions')
+      .select('member_email').eq('is_active', true).eq('queued', false)
+      .lte('start_date', azi).gt('end_date', azi)
+    const membriActivi = new Set((aboActive || []).map(a => a.member_email?.toLowerCase())).size
+
+    const { data: claseAcum } = await supabase.from('classes').select('id')
+      .gte('date', lunaStart).lte('date', lunaEnd)
+    const classIds = (claseAcum || []).map(c => c.id)
+    let prezenteLuna = 0
+    if (classIds.length > 0) {
+      const { count } = await supabase.from('bookings')
+        .select('id', { count: 'exact', head: true }).in('class_id', classIds)
+      prezenteLuna = count || 0
+    }
+
+    const { data: aboLuna } = await supabase.from('subscriptions')
+      .select('notes')
+      .gte('created_at', lunaStart + 'T00:00:00')
+      .lte('created_at', lunaEnd + 'T23:59:59')
+    const venituriLuna = (aboLuna || []).reduce((sum, a) => {
+      const m = (a.notes || '').match(/Plătit:\s*([\d.,]+)\s*RON/)
+      return sum + (m ? parseFloat(m[1].replace(',', '.')) : 0)
+    }, 0)
+
+    setRapoarteData({ membriActivi, prezenteLuna, venituriLuna })
   }
 
   const saveSettings = async () => {
@@ -2102,6 +2138,33 @@ function Admin({ showToast }) {
 
       {/* SETĂRI */}
       {adminTab === 'setari' && (
+        <>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>📊 Rapoarte</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' })}</div>
+              <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#EDFFD4', color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>↻</button>
+            </div>
+          </div>
+          {rapoarteData ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              {[
+                { label: 'Membri activi', value: rapoarteData.membriActivi, icon: '👥', color: '#5B7FCC', bg: '#EEF2FF' },
+                { label: 'Prezențe luna', value: rapoarteData.prezenteLuna, icon: '📅', color: '#2F6600', bg: '#EDFFD4' },
+                { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: '💰', color: '#B86E00', bg: '#FFF8EC' },
+              ].map(({ label, value, icon, color, bg }) => (
+                <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{icon}</div>
+                  <div style={{ fontSize: '22px', fontWeight: '800', color, lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', lineHeight: '1.3' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#aaa', fontSize: '13px', padding: '20px 0' }}>Se încarcă...</div>
+          )}
+        </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>Fereastră de anulare clase</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Membrii nu pot anula cu mai puțin de X ore înainte de start. Admin-ul poate anula oricând.</div>
@@ -2123,6 +2186,7 @@ function Admin({ showToast }) {
             {savingSettings ? 'Se salvează...' : '✓ Salvează setările'}
           </button>
         </div>
+        </>
       )}
     </div>
   )
