@@ -1517,21 +1517,14 @@ function Admin({ showToast }) {
     }
     if (abo?.member_email) {
       const email = abo.member_email.toLowerCase().trim()
-      // Prioritar: ID-ul din lista de clienti deja incarcata (evita un query async care poate esua)
       let memberId = clienti.find(c => c.email?.toLowerCase() === email)?.id
-      // Fallback: query la profiles
       if (!memberId) {
         const { data: profil } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
         memberId = profil?.id
       }
       if (memberId) {
         const aziStr = new Date().toISOString().split('T')[0]
-        const futureIds = clase.filter(c => c.date >= aziStr).map(c => c.id)
-        // Chunk de 50 ca sa nu depasim limita URL PostgREST (~8KB)
-        for (let i = 0; i < futureIds.length; i += 50) {
-          const chunk = futureIds.slice(i, i + 50)
-          await supabase.from('bookings').delete().eq('member_id', memberId).in('class_id', chunk)
-        }
+        await supabase.rpc('delete_member_future_bookings', { p_member_id: memberId, p_from_date: aziStr })
       }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
