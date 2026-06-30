@@ -2529,6 +2529,7 @@ function App() {
         fetchAbonamentMeu()
         fetchRezervari()
         fetchClaseDB()
+        fetchSettings()
         recalcFeedUnreadRef.current?.()
       }
     }
