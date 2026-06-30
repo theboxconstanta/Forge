@@ -1060,6 +1060,13 @@ function Admin({ showToast }) {
     if (data) { setPlanuri(data); if (data.length > 0 && !planSelectat) setPlanSelectat(data[0].id) }
   }
 
+  const notifyMember = async (email) => {
+    const { data: p } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
+    if (!p?.id) return
+    const bc = supabase.channel('member-sessions-' + p.id)
+    bc.subscribe(s => { if (s === 'SUBSCRIBED') { bc.send({ type: 'broadcast', event: 'refresh', payload: {} }); setTimeout(() => supabase.removeChannel(bc), 2000) } })
+  }
+
   const fetchAbonamente = async () => {
     const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions, duration_months)')
       .or('is_active.eq.true,queued.eq.true').order('created_at', { ascending: false })
@@ -1478,6 +1485,7 @@ function Admin({ showToast }) {
         setDataStartAbonament(azStr)
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
         sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
+        notifyMember(emailNorm)
       }
     }
     setSavingAbonament(false)
@@ -1529,6 +1537,7 @@ function Admin({ showToast }) {
     if (abo?.member_email) {
       const planName = abo.subscription_plans?.name || 'Abonament'
       sendNotification('subscription_cancelled', abo.member_email, planName, abo.end_date)
+      notifyMember(abo.member_email)
     }
   }
 
