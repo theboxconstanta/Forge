@@ -285,7 +285,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
-        { icon: '🏅', lbl: 'Cls.', sc: 'clasament' },
+        { icon: '🏅', lbl: 'Leaderboard', sc: 'clasament' },
         { icon: '💬', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
