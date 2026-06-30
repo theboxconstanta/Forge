@@ -1522,10 +1522,14 @@ function Admin({ showToast }) {
         const { data: profil } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
         memberId = profil?.id
       }
-      if (memberId) {
-        const aziStr = new Date().toISOString().split('T')[0]
-        await supabase.rpc('delete_member_future_bookings', { p_member_id: memberId, p_from_date: aziStr })
+      if (!memberId) {
+        showToast('⚠️ DEBUG: memberId negasit pt ' + email)
+        return
       }
+      const aziStr = new Date().toISOString().split('T')[0]
+      const { error: rpcErr } = await supabase.rpc('delete_member_future_bookings', { p_member_id: memberId, p_from_date: aziStr })
+      if (rpcErr) { showToast('❌ DEBUG RPC: ' + rpcErr.message); return }
+      showToast('✓ DEBUG: rezervari sterse pt ' + memberId.slice(0,8))
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
     showToast('✓ Abonament anulat și rezervările viitoare șterse!')
