@@ -1258,6 +1258,11 @@ function Admin({ showToast }) {
     if (error) { showToast('❌ Eroare la activare!'); return }
     showToast('✅ Abonament activat!')
     await fetchAbonamente()
+    supabase.from('profiles').select('id').ilike('email', memberEmail).maybeSingle().then(({ data: p }) => {
+      if (!p?.id) return
+      const bc = supabase.channel('member-sessions-' + p.id)
+      bc.subscribe(s => { if (s === 'SUBSCRIBED') { bc.send({ type: 'broadcast', event: 'refresh', payload: {} }); setTimeout(() => supabase.removeChannel(bc), 2000) } })
+    })
   }
 
   const toggleZiRepetare = (idx) =>
@@ -1478,6 +1483,11 @@ function Admin({ showToast }) {
         setDataStartAbonament(azStr)
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
         sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
+        supabase.from('profiles').select('id').ilike('email', emailNorm).maybeSingle().then(({ data: p }) => {
+          if (!p?.id) return
+          const bc = supabase.channel('member-sessions-' + p.id)
+          bc.subscribe(s => { if (s === 'SUBSCRIBED') { bc.send({ type: 'broadcast', event: 'refresh', payload: {} }); setTimeout(() => supabase.removeChannel(bc), 2000) } })
+        })
       }
     }
     setSavingAbonament(false)
@@ -2576,6 +2586,13 @@ function App() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling cand membrul nu are abonament activ — detecteaza instant activarea de catre admin
+  useEffect(() => {
+    if (!user || isAdmin || abonamentActiv) return
+    const interval = setInterval(() => fetchAbonamentMeu(), 5000)
+    return () => clearInterval(interval)
+  }, [user, isAdmin, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveProfile = async () => {
     const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
