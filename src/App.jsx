@@ -1075,15 +1075,11 @@ function Admin({ showToast }) {
       .lte('start_date', azi).gt('end_date', azi)
     const membriActivi = new Set((aboActive || []).map(a => a.member_email?.toLowerCase())).size
 
-    const { data: claseAcum } = await supabase.from('classes').select('id')
-      .gte('date', lunaStart).lte('date', lunaEnd)
-    const classIds = (claseAcum || []).map(c => c.id)
-    let prezenteLuna = 0
-    if (classIds.length > 0) {
-      const { count } = await supabase.from('bookings')
-        .select('id', { count: 'exact', head: true }).in('class_id', classIds)
-      prezenteLuna = count || 0
-    }
+    const { count: aboVandute } = await supabase.from('subscriptions')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', lunaStart + 'T00:00:00')
+      .lte('created_at', lunaEnd + 'T23:59:59')
+      .eq('queued', false)
 
     const { data: aboLuna } = await supabase.from('subscriptions')
       .select('notes')
@@ -1094,7 +1090,7 @@ function Admin({ showToast }) {
       return sum + (m ? parseFloat(m[1].replace(',', '.')) : 0)
     }, 0)
 
-    setRapoarteData({ membriActivi, prezenteLuna, venituriLuna })
+    setRapoarteData({ membriActivi, aboVandute: aboVandute || 0, venituriLuna })
   }
 
   const saveSettings = async () => {
@@ -2151,7 +2147,7 @@ function Admin({ showToast }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               {[
                 { label: 'Membri activi', value: rapoarteData.membriActivi, icon: '👥', color: '#5B7FCC', bg: '#EEF2FF' },
-                { label: 'Prezențe luna', value: rapoarteData.prezenteLuna, icon: '📅', color: '#2F6600', bg: '#EDFFD4' },
+                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: '🎟️', color: '#2F6600', bg: '#EDFFD4' },
                 { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: '💰', color: '#B86E00', bg: '#FFF8EC' },
               ].map(({ label, value, icon, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
