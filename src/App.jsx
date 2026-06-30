@@ -81,8 +81,14 @@ async function checkAndBookFromWaitlist(classId) {
 
   await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
 
-  if (abo.sessions_total != null)
-    await supabase.from('subscriptions').update({ sessions_used: (abo.sessions_used || 0) + 1 }).eq('id', abo.id)
+  if (abo.sessions_total != null) {
+    const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abo.id).maybeSingle()
+    const { error: sessErr } = await supabase.from('subscriptions').update({ sessions_used: (freshAbo?.sessions_used || 0) + 1 }).eq('id', abo.id)
+    if (sessErr) {
+      await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', next.member_id)
+      return
+    }
+  }
 
   if (cls?.date && cls?.start_time) {
     const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
@@ -123,18 +129,17 @@ async function activateQueuedSubscription(memberEmail) {
   if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
   const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
 
+  // dezactiveaza abonamentul vechi INAINTE de a activa cel nou
+  await supabase.from('subscriptions')
+    .update({ is_active: false })
+    .ilike('member_email', memberEmail)
+    .eq('is_active', true)
+
   const { error } = await supabase.from('subscriptions').update({
     is_active: true, queued: false,
     start_date: startStr, end_date: endStr, sessions_used: 0,
   }).eq('id', queued.id)
   if (error) { console.error('activateQueuedSubscription error:', error); return null }
-
-  // dezactiveaza abonamentul vechi (epuizat/expirat)
-  await supabase.from('subscriptions')
-    .update({ is_active: false })
-    .ilike('member_email', memberEmail)
-    .eq('is_active', true)
-    .neq('id', queued.id)
 
   return queued.id
 }
@@ -1317,9 +1322,12 @@ function Admin({ showToast }) {
   }
 
   const stergeClasa = async (id) => {
-    // returnăm ședințele membrilor cu abonamente limitate care aveau rezervare
+    // returnăm ședințele doar pentru clase viitoare (nu pentru cele din trecut, deja consumate)
+    const { data: cls } = await supabase.from('classes').select('date').eq('id', id).maybeSingle()
+    const _azis = new Date()
+    const aziStr2 = `${_azis.getFullYear()}-${String(_azis.getMonth()+1).padStart(2,'0')}-${String(_azis.getDate()).padStart(2,'0')}`
     const { data: bks } = await supabase.from('bookings').select('member_id').eq('class_id', id)
-    if (bks?.length > 0) {
+    if (bks?.length > 0 && cls?.date >= aziStr2) {
       const memberIds = bks.map(b => b.member_id)
       const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
       if (profs?.length > 0) {
@@ -2919,7 +2927,8 @@ function App() {
       if (delErr) { showToast('❌ Eroare la anularea rezervării!'); console.error(delErr); return }
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
-        const newUsed = Math.max(0, (abonamentReal.sessions_used || 0) - 1)
+        const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abonamentReal.id).maybeSingle()
+        const newUsed = Math.max(0, (freshAbo?.sessions_used || 0) - 1)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
       }
@@ -2931,7 +2940,8 @@ function App() {
       if (insErr) { showToast('❌ Eroare la rezervare!'); console.error(insErr); return }
       setRezervariMele(prev => [...prev, clasaId])
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
-        const newUsed = (abonamentReal.sessions_used || 0) + 1
+        const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abonamentReal.id).maybeSingle()
+        const newUsed = (freshAbo?.sessions_used || 0) + 1
         await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
         setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
