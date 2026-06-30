@@ -1355,10 +1355,11 @@ function Admin({ showToast }) {
     const _az = new Date()
     const azStr = `${_az.getFullYear()}-${pad(_az.getMonth()+1)}-${pad(_az.getDate())}`
 
-    // verifica daca membrul are deja abonament valid (neexpirat + cu sedinte ramase)
+    // verifica daca membrul are deja abonament valid (deja inceput, neexpirat, cu sedinte ramase)
     const { data: existingActive } = await supabase.from('subscriptions')
-      .select('id, sessions_used, sessions_total, end_date')
+      .select('id, sessions_used, sessions_total, end_date, start_date')
       .ilike('member_email', emailNorm).eq('is_active', true).eq('queued', false)
+      .lte('start_date', azStr)
       .gt('end_date', azStr)
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
@@ -2521,11 +2522,13 @@ function App() {
   const fetchAbonamentMeu = async (isFirstLoad = false) => {
     if (isFirstLoad) setAbonamentLoading(true)
     const fetchActive = async () => {
+      const todayStr = new Date().toISOString().split('T')[0]
       const { data, error } = await supabase.from('subscriptions')
         .select('*, subscription_plans(name, sessions)')
         .eq('member_email', user.email.toLowerCase())
         .eq('is_active', true)
         .eq('queued', false)
+        .lte('start_date', todayStr)
         .order('created_at', { ascending: false })
         .limit(1)
       if (error) console.error('fetchAbonamentMeu error:', error)
