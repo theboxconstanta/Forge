@@ -285,7 +285,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
         { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
-        { icon: '🏅', lbl: 'Clasament', sc: 'clasament' },
+        { icon: '🏅', lbl: 'Cls.', sc: 'clasament' },
         { icon: '💬', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
@@ -911,7 +911,7 @@ function Feed({ showToast, user, userProfile }) {
               </div>
             </div>
             <div style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5', marginBottom: '12px' }}>{post.text}</div>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: postComments.length > 0 ? '10px' : '0' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: postComments.length > 0 ? '10px' : '0', flexWrap: 'wrap' }}>
               {['❤️', '👍', '😂', '😮', '😢', '🙏'].map(emoji => {
                 const r = postReactions[emoji] || { count: 0, iMine: false }
                 return (
@@ -1540,7 +1540,7 @@ function Admin({ showToast }) {
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }, { id: 'setari', emoji: '⚙️', lbl: 'Setări' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#1a1a1a' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#1a1a1a' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
             {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
           </div>
         ))}
@@ -2493,7 +2493,6 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu()
-        setTimeout(() => fetchAbonamentMeu(), 800)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'class_waitlist' }, () => {
         fetchWaitlistMea()
@@ -2521,7 +2520,7 @@ function App() {
     const myChannel = supabase.channel('my-bookings-' + user.id)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'bookings', filter: `member_id=eq.${user.id}` },
-        () => { fetchRezervari(); fetchAbonamentMeu(); setTimeout(() => fetchAbonamentMeu(), 500) }
+        () => { fetchRezervari(); fetchAbonamentMeu() }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'subscriptions' },
@@ -2533,13 +2532,10 @@ function App() {
       .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea() })
       .subscribe()
 
-    const poll = setInterval(() => fetchAbonamentMeu(), 3000)
-
     return () => {
       supabase.removeChannel(channel)
       supabase.removeChannel(myChannel)
       supabase.removeChannel(sessionsChannel)
-      clearInterval(poll)
       clearInterval(feedPoll)
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -2699,7 +2695,7 @@ function App() {
     const year = new Date().getFullYear()
     const { data } = await supabase.from('classes').select('*')
       .gte('date', `${year}-01-01`)
-      .lte('date', `${year}-12-31`)
+      .lte('date', `${year + 1}-06-30`)
       .order('date', { ascending: true }).order('start_time', { ascending: true })
     setClaseDB(data || [])
     setClaseDBLoaded(true)
@@ -3115,10 +3111,10 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentcolor: '#1a1a1a', cursor: 'pointer' }} />
+                style={{ width: '16px', height: '16px', accentColor: '#1a1a1a', cursor: 'pointer' }} />
               <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
             </label>
-            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#1a1a1a', cursor: 'pointer', fontWeight: '500' }}>
+            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#888', cursor: 'pointer', fontWeight: '500' }}>
               Forgot password?
             </span>
           </div>
@@ -3660,8 +3656,8 @@ function App() {
             const miscariWod = wodZiData[cheie] || []
             return (
               <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
-                <div style={{ background: '#f5fff0', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
+                <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
                     {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                   </div>
@@ -4157,7 +4153,7 @@ function App() {
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: '500', zIndex: 300, whiteSpace: 'nowrap' }}>
+        <div style={{ position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', color: '#fff', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: '500', zIndex: 300, maxWidth: '90vw', textAlign: 'center', wordBreak: 'break-word' }}>
           {toast}
         </div>
       )}
