@@ -1875,7 +1875,7 @@ function Admin({ showToast }) {
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>Culoare clasă</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              {[null, '#E24B4A', '#E67E22', '#F1C40F', '#C8FF00', '#27AE60', '#5B7FCC', '#9B59B6', '#555555'].map(col => (
+              {[null, '#FF3B30', '#FF9500', '#FFD60A', '#C8FF00', '#30D158', '#32ADE6', '#BF5AF2', '#1a1a1a'].map(col => (
                 <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
                   style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
                     background: col || '#e0e0e0',
@@ -3269,8 +3269,8 @@ function App() {
                         <div key={c.id}
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
                           style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
-                            background: rezervat ? '#f0f0f0' : c.color ? c.color + '22' : deschis ? '#f5f5f5' : '#fafafa',
-                            border: rezervat ? '2px solid #1a1a1a' : c.color ? `1.5px solid ${c.color}70` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
+                            background: rezervat ? '#f0f0f0' : c.color ? c.color + '33' : deschis ? '#f5f5f5' : '#fafafa',
+                            border: rezervat ? '2px solid #1a1a1a' : c.color ? `2px solid ${c.color}` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
