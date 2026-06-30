@@ -3114,7 +3114,7 @@ function App() {
                 style={{ width: '16px', height: '16px', accentColor: '#1a1a1a', cursor: 'pointer' }} />
               <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
             </label>
-            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#888', cursor: 'pointer', fontWeight: '500' }}>
+            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#C8FF00', cursor: 'pointer', fontWeight: '500' }}>
               Forgot password?
             </span>
           </div>
