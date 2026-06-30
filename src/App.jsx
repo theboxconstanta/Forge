@@ -1079,7 +1079,7 @@ function Admin({ showToast }) {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', lunaStart + 'T00:00:00')
       .lte('created_at', lunaEnd + 'T23:59:59')
-      .eq('queued', false)
+      .or('is_active.eq.true,queued.eq.true')
 
     const { data: aboLuna } = await supabase.from('subscriptions')
       .select('notes')
