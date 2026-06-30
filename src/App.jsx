@@ -958,6 +958,7 @@ function Admin({ showToast }) {
   const [oraSfarsit, setOraSfarsit] = useState('08:00')
   const [coachClasa, setCoachClasa] = useState('')
   const [locuriClasa, setLocuriClasa] = useState(12)
+  const [culoarClasa, setCuloarClasa] = useState(null)
   const [repetitiva, setRepetitiva] = useState(false)
   const [saptamaniRepetare, setSaptamaniRepetare] = useState(4)
   const [zileRepetare, setZileRepetare] = useState([])
@@ -1219,7 +1220,7 @@ function Admin({ showToast }) {
     if (!dataClasa) { showToast('❌ Completează data!'); return }
     if (repetitiva && zileRepetare.length === 0) { showToast('❌ Alege cel puțin o zi!'); return }
     setSavingClasa(true)
-    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa }
+    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null }
     const records = repetitiva
       ? genereazaDateRepetare().map(date => ({ ...baza, date }))
       : [{ ...baza, date: dataClasa }]
@@ -1228,7 +1229,7 @@ function Admin({ showToast }) {
     if (error) { showToast('❌ ' + (error.message || 'Eroare!')); console.error(error) }
     else {
       showToast(repetitiva ? `✓ ${records.length} clase create!` : '✓ Clasă creată!')
-      await fetchClase(); setDataClasa(''); setCoachClasa('')
+      await fetchClase(); setDataClasa(''); setCoachClasa(''); setCuloarClasa(null)
     }
     setSavingClasa(false)
   }
@@ -1834,6 +1835,16 @@ function Admin({ showToast }) {
               <button onClick={() => setLocuriClasa(l => Math.max(1, l - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>−</button>
               <span style={{ fontSize: '18px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{locuriClasa}</span>
               <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '16px', cursor: 'pointer' }}>+</button>
+            </div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>Culoare clasă</div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              {[null, '#E24B4A', '#E67E22', '#F1C40F', '#C8FF00', '#27AE60', '#5B7FCC', '#9B59B6', '#555555'].map(col => (
+                <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
+                  style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
+                    background: col || '#e0e0e0',
+                    border: culoarClasa === col ? '3px solid #1a1a1a' : col ? '2px solid transparent' : '2px dashed #bbb',
+                    boxShadow: culoarClasa === col ? '0 0 0 2px #fff inset' : 'none' }} />
+              ))}
             </div>
             <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]); setLaInfinit(false) }}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EDFFD4' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #2F6600' : '1.5px solid transparent' }}>
@@ -3192,7 +3203,8 @@ function App() {
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
                           style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
                             background: rezervat ? '#EDFFD4' : deschis ? '#f5f5f5' : '#fafafa',
-                            border: rezervat ? '2px solid #2F6600' : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
+                            border: rezervat ? '2px solid #2F6600' : deschis ? '2px solid #1a1a1a' : '1px solid #ececec',
+                            borderLeft: c.color ? `4px solid ${c.color}` : undefined }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#2F6600' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
@@ -3208,7 +3220,10 @@ function App() {
                                 : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
+                          <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {c.color && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.color, flexShrink: 0, display: 'inline-block' }} />}
+                            {c.name || 'CrossFit WOD'} · {c.coach}
+                          </div>
                           {deschis && (
                             <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
                               onClick={e => e.stopPropagation()}>
