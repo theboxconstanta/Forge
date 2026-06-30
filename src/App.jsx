@@ -1457,6 +1457,12 @@ function Admin({ showToast }) {
 
   const stergeAbonament = async (id) => {
     const abo = abonamente.find(a => a.id === id)
+    if (abo?.queued) {
+      await supabase.from('subscriptions').delete().eq('id', id)
+      showToast('✓ Abonament programat șters!')
+      await fetchAbonamente()
+      return
+    }
     if (abo?.member_email) {
       const email = abo.member_email.toLowerCase().trim()
       const { data: profil } = await supabase.from('profiles')
@@ -1471,8 +1477,6 @@ function Admin({ showToast }) {
             .delete().eq('member_id', profil.id).in('class_id', futureIds)
           if (delErr) console.error('Eroare stergere rezervari:', delErr)
         }
-      } else {
-        console.warn('Profil negasit pentru email:', email)
       }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
