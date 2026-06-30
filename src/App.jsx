@@ -2335,6 +2335,7 @@ function App() {
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
   const [claseDBLoaded, setClaseDBLoaded] = useState(false)
+  const [refreshZiTrigger, setRefreshZiTrigger] = useState(0)
   const [rezervariIncarcate, setRezervariIncarcate] = useState(false)
   const [cancelWindowHours, setCancelWindowHours] = useState(2)
   const homeCalScrollRef = useRef(null)
@@ -2506,6 +2507,12 @@ function App() {
   }, [dataAcasa, claseDB]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!refreshZiTrigger || !user || claseDB.length === 0) return
+    const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
+    if (ids.length > 0) fetchRezervariZi(ids)
+  }, [refreshZiTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!user) return
     const recalcFeedUnread = async () => {
       const { data: posts, error } = await supabase.from('feed_posts')
@@ -2550,15 +2557,10 @@ function App() {
       })
       .subscribe()
 
-    const refreshZi = () => {
-      const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
-      if (ids.length > 0) fetchRezervariZi(ids)
-    }
-
     const myChannel = supabase.channel('my-bookings-' + user.id)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'bookings', filter: `member_id=eq.${user.id}` },
-        () => { fetchRezervari(); fetchAbonamentMeu(); refreshZi() }
+        () => { fetchRezervari(); fetchAbonamentMeu(); setRefreshZiTrigger(t => t + 1) }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'subscriptions' },
@@ -2567,7 +2569,7 @@ function App() {
       .subscribe()
 
     const sessionsChannel = supabase.channel('member-sessions-' + user.id)
-      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea(); refreshZi() })
+      .on('broadcast', { event: 'refresh' }, () => { fetchAbonamentMeu(); fetchRezervari(); fetchWaitlistMea(); setRefreshZiTrigger(t => t + 1) })
       .subscribe()
 
     return () => {
