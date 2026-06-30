@@ -1525,18 +1525,24 @@ function Admin({ showToast }) {
         memberId = profil?.id
       }
       if (memberId) {
-        const aziStr = new Date().toISOString().split('T')[0]
-        // Prioritar: clasa deja incarcata in Admin (evita un query async)
-        const futureIds = clase.filter(c => c.date >= aziStr).map(c => c.id)
-        if (futureIds.length > 0) {
-          const { error: delErr } = await supabase.from('bookings')
-            .delete().eq('member_id', memberId).in('class_id', futureIds)
-          if (delErr) console.error('Eroare stergere rezervari:', delErr)
+        // Luam booking-urile membrului (rezultat mic), filtram client-side, stergem dupa booking ID
+        // Evita .in(class_id, sute_de_uuid) care depaseste limita URL a PostgREST
+        const { data: memberBookings } = await supabase.from('bookings')
+          .select('id, class_id').eq('member_id', memberId)
+        if (memberBookings?.length > 0) {
+          const aziStr = new Date().toISOString().split('T')[0]
+          const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
+          const toDelete = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.id)
+          if (toDelete.length > 0) {
+            const { error: delErr } = await supabase.from('bookings').delete().in('id', toDelete)
+            if (delErr) console.error('Eroare stergere rezervari:', delErr)
+          }
         }
       }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
     showToast('✓ Abonament anulat și rezervările viitoare șterse!')
+    setRezervariClasa({})
     await fetchAbonamente(); fetchRapoarte()
     if (abo?.member_email) {
       const planName = abo.subscription_plans?.name || 'Abonament'
