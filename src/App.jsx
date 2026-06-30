@@ -1509,7 +1509,6 @@ function Admin({ showToast }) {
 
   const stergeAbonament = async (id) => {
     const abo = abonamente.find(a => a.id === id)
-    showToast(`DBG email: ${abo?.member_email || 'NULL'} queued:${abo?.queued}`)
     if (abo?.queued) {
       await supabase.from('subscriptions').delete().eq('id', id)
       showToast('✓ Abonament programat șters!')
@@ -1522,15 +1521,19 @@ function Admin({ showToast }) {
       const { data: profil } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
       memberId = profil?.id
     }
-    showToast(`DBG memberId: ${memberId ? memberId.slice(0,8) : 'NULL'}`)
     if (memberId) {
       const aziStr = new Date().toISOString().split('T')[0]
-      const { count: cntBefore } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('member_id', memberId)
-      const { error: rpcErr } = await supabase.rpc('delete_member_future_bookings', { p_member_id: memberId, p_from_date: aziStr })
-      const { count: cntAfter } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('member_id', memberId)
-      showToast(rpcErr ? `❌ RPC: ${rpcErr.message}` : `rez: ${cntBefore} → ${cntAfter}`)
+      const { data: memberBookings } = await supabase.from('bookings').select('id, class_id').eq('member_id', memberId)
+      if (memberBookings?.length > 0) {
+        const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
+        const futureBookingIds = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.id)
+        if (futureBookingIds.length > 0) {
+          await supabase.from('bookings').delete().in('id', futureBookingIds)
+        }
+      }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
+    showToast('✓ Abonament anulat și rezervările viitoare șterse!')
     setRezervariClasa({})
     await fetchAbonamente(); fetchRapoarte()
     if (abo?.member_email) {
