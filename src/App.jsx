@@ -1517,16 +1517,20 @@ function Admin({ showToast }) {
     }
     if (abo?.member_email) {
       const email = abo.member_email.toLowerCase().trim()
-      const { data: profil } = await supabase.from('profiles')
-        .select('id').ilike('email', email).maybeSingle()
-      if (profil?.id) {
-        const _azis = new Date()
-        const aziStr = `${_azis.getFullYear()}-${String(_azis.getMonth()+1).padStart(2,'0')}-${String(_azis.getDate()).padStart(2,'0')}`
-        const { data: futureCls } = await supabase.from('classes').select('id').gte('date', aziStr)
-        const futureIds = futureCls?.map(c => c.id) || []
+      // Prioritar: ID-ul din lista de clienti deja incarcata (evita un query async care poate esua)
+      let memberId = clienti.find(c => c.email?.toLowerCase() === email)?.id
+      // Fallback: query la profiles
+      if (!memberId) {
+        const { data: profil } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
+        memberId = profil?.id
+      }
+      if (memberId) {
+        const aziStr = new Date().toISOString().split('T')[0]
+        // Prioritar: clasa deja incarcata in Admin (evita un query async)
+        const futureIds = clase.filter(c => c.date >= aziStr).map(c => c.id)
         if (futureIds.length > 0) {
           const { error: delErr } = await supabase.from('bookings')
-            .delete().eq('member_id', profil.id).in('class_id', futureIds)
+            .delete().eq('member_id', memberId).in('class_id', futureIds)
           if (delErr) console.error('Eroare stergere rezervari:', delErr)
         }
       }
