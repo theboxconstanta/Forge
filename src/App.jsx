@@ -2218,7 +2218,7 @@ function JurnalList({ logs }) {
         const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
         return (
           <div key={logKey}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#2F6600', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
           <div onClick={() => setDeschis(isOpen ? null : logKey)}
             style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3565,7 +3565,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
-            {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }, { id: 'progres', lbl: '📈 Progres' }].map(t => (
+            {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
               <div key={t.id} onClick={() => setLogTab(t.id)}
                 style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#2F6600' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
                 {t.lbl}
@@ -3595,80 +3595,6 @@ function App() {
             <JurnalList logs={wodLogs} />
           )}
 
-          {logTab === 'progres' && (() => {
-            const parseTime = s => { if (!s) return null; const p = s.trim().split(':').map(Number); if (p.length === 3) return p[0]*3600+p[1]*60+p[2]; if (p.length === 2) return p[0]*60+p[1]; return parseFloat(s)*60 || null }
-            const fmtTime = s => s
-            const grouped = {}
-            wodLogs.forEach(l => {
-              const name = l.wods?.name
-              if (!name) return
-              if (!grouped[name]) grouped[name] = { name, type: l.wods?.type, entries: [] }
-              grouped[name].entries.push(l)
-            })
-            const wodGroups = Object.values(grouped).filter(g => g.entries.length >= 1).sort((a, b) => b.entries.length - a.entries.length)
-            if (wodGroups.length === 0) return (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
-                <div style={{ fontSize: '36px', marginBottom: '10px' }}>📈</div>
-                <div style={{ fontSize: '14px' }}>Niciun WOD cu nume logat încă</div>
-                <div style={{ fontSize: '12px', marginTop: '6px' }}>Progresul apare pentru WOD-urile programate cu nume (ex: Fran, Grace)</div>
-              </div>
-            )
-            return (
-              <div>
-                {wodGroups.map(g => {
-                  const entries = [...g.entries].sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
-                  const first = entries[0]
-                  const last = entries[entries.length - 1]
-                  const withTime = entries.some(e => e.time_result)
-                  let trend = null
-                  if (entries.length >= 2) {
-                    if (withTime) {
-                      const t1 = parseTime(first.time_result), t2 = parseTime(last.time_result)
-                      if (t1 && t2) trend = t2 < t1 ? '↓ mai rapid' : t2 > t1 ? '↑ mai lent' : '→ același'
-                    } else {
-                      const v1 = parseFloat(first.result), v2 = parseFloat(last.result)
-                      if (!isNaN(v1) && !isNaN(v2)) trend = v2 > v1 ? '↑ mai bun' : v2 < v1 ? '↓ mai slab' : '→ același'
-                    }
-                  }
-                  return (
-                    <div key={g.name} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <div>
-                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#1a1a1a' }}>{g.name}</div>
-                          <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{g.type} · {entries.length} {entries.length === 1 ? 'logare' : 'logări'}</div>
-                        </div>
-                        {trend && (
-                          <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '20px',
-                            background: trend.startsWith('↓ mai r') || trend.startsWith('↑ mai b') ? '#EDFFD4' : trend.includes('lent') || trend.includes('slab') ? '#FCEBEB' : '#f5f5f5',
-                            color: trend.startsWith('↓ mai r') || trend.startsWith('↑ mai b') ? '#2F6600' : trend.includes('lent') || trend.includes('slab') ? '#C62828' : '#888' }}>
-                            {trend}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {entries.map((e, i) => {
-                          const data = new Date(e.logged_at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' })
-                          const isLast = i === entries.length - 1
-                          return (
-                            <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '10px', background: isLast ? '#EDFFD4' : '#fafafa' }}>
-                              <div style={{ fontSize: '11px', color: '#aaa', minWidth: '90px' }}>{data}</div>
-                              <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                                {e.result && <span style={{ fontSize: '12px', fontWeight: '700', color: isLast ? '#2F6600' : '#555' }}>{e.result}</span>}
-                                {e.time_result && <span style={{ fontSize: '12px', fontWeight: '700', color: isLast ? '#2F6600' : '#555' }}>⏱ {fmtTime(e.time_result)}</span>}
-                                {!e.result && !e.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
-                              </div>
-                              <div style={{ fontSize: '10px', color: '#aaa' }}>{e.variant_level}</div>
-                              {isLast && entries.length > 1 && <span style={{ fontSize: '10px', background: '#C8FF00', color: '#111', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>LAST</span>}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
         </div>
       )}
 
