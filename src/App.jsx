@@ -1525,18 +1525,12 @@ function Admin({ showToast }) {
         memberId = profil?.id
       }
       if (memberId) {
-        // Luam booking-urile membrului (rezultat mic), filtram client-side, stergem dupa booking ID
-        // Evita .in(class_id, sute_de_uuid) care depaseste limita URL a PostgREST
-        const { data: memberBookings } = await supabase.from('bookings')
-          .select('id, class_id').eq('member_id', memberId)
-        if (memberBookings?.length > 0) {
-          const aziStr = new Date().toISOString().split('T')[0]
-          const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
-          const toDelete = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.id)
-          if (toDelete.length > 0) {
-            const { error: delErr } = await supabase.from('bookings').delete().in('id', toDelete)
-            if (delErr) console.error('Eroare stergere rezervari:', delErr)
-          }
+        const aziStr = new Date().toISOString().split('T')[0]
+        const futureIds = clase.filter(c => c.date >= aziStr).map(c => c.id)
+        // Chunk de 50 ca sa nu depasim limita URL PostgREST (~8KB)
+        for (let i = 0; i < futureIds.length; i += 50) {
+          const chunk = futureIds.slice(i, i + 50)
+          await supabase.from('bookings').delete().eq('member_id', memberId).in('class_id', chunk)
         }
       }
     }
