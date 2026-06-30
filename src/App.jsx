@@ -3202,9 +3202,8 @@ function App() {
                         <div key={c.id}
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
                           style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
-                            background: rezervat ? '#EDFFD4' : deschis ? '#f5f5f5' : '#fafafa',
-                            border: rezervat ? '2px solid #2F6600' : deschis ? '2px solid #1a1a1a' : '1px solid #ececec',
-                            borderLeft: c.color ? `4px solid ${c.color}` : undefined }}>
+                            background: rezervat ? '#EDFFD4' : c.color ? c.color + '22' : deschis ? '#f5f5f5' : '#fafafa',
+                            border: rezervat ? '2px solid #2F6600' : c.color ? `1.5px solid ${c.color}70` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#2F6600' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
@@ -3220,10 +3219,7 @@ function App() {
                                 : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            {c.color && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.color, flexShrink: 0, display: 'inline-block' }} />}
-                            {c.name || 'CrossFit WOD'} · {c.coach}
-                          </div>
+                          <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
                           {deschis && (
                             <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
                               onClick={e => e.stopPropagation()}>
