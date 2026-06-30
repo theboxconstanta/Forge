@@ -60,7 +60,7 @@ async function checkAndBookFromWaitlist(classId) {
   if (!next) return
 
   const { data: cls } = await supabase.from('classes').select('date, start_time, name').eq('id', classId).maybeSingle()
-  if (!cls || new Date(`${cls.date}T${cls.start_time}`) <= new Date()) return
+  if (!cls) return
 
   const todayStr = new Date().toISOString().split('T')[0]
   const { data: abo } = await supabase.from('subscriptions')
