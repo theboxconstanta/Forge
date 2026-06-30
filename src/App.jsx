@@ -1522,7 +1522,7 @@ function Admin({ showToast }) {
       memberId = profil?.id
     }
     if (memberId) {
-      const aziStr = new Date().toISOString().split('T')[0]
+      const _d = new Date(); const aziStr = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`
       const { data: memberBookings } = await supabase.from('bookings').select('id, class_id').eq('member_id', memberId)
       if (memberBookings?.length > 0) {
         const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
