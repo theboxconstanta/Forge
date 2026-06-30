@@ -2586,6 +2586,13 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Polling doar cand membrul nu are abonament activ — detecteaza adaugarea/reactivarea in max 5s
+  useEffect(() => {
+    if (!user || isAdmin || !abonamentInitialized || abonamentActiv) return
+    const interval = setInterval(() => fetchAbonamentMeu(), 5000)
+    return () => clearInterval(interval)
+  }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveProfile = async () => {
     const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
     await supabase.from('profiles').upsert({
