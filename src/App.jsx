@@ -1793,7 +1793,7 @@ function Admin({ showToast }) {
                       {expanded && (
                         <div style={{ borderTop: '1px solid #f0f0f0', padding: '10px 14px 14px' }}>
                           {activ ? (
-                            <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#F4FDE8', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
+                            <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#f5f5f5', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px' }}>
                                 {expirat ? '⚠️ EXPIRAT' : neinceput ? '📅 NEÎNCEPUT' : '✓ ACTIV'}
                               </div>
