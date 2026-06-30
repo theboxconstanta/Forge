@@ -1383,23 +1383,11 @@ function Admin({ showToast }) {
       endDate.setMonth(targetMonth)
       if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
       const endDateStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
-      let sessUsedInitial = 0
-      if (plan?.sessions != null) {
-        const { data: profil } = await supabase.from('profiles').select('id').ilike('email', emailNorm).maybeSingle()
-        if (profil?.id) {
-          const { data: futureCls } = await supabase.from('classes').select('id').gte('date', dataStartAbonament)
-          const futureIds = futureCls?.map(c => c.id) || []
-          if (futureIds.length > 0) {
-            const { data: existingBks } = await supabase.from('bookings').select('id').eq('member_id', profil.id).in('class_id', futureIds)
-            sessUsedInitial = existingBks?.length || 0
-          }
-        }
-      }
       const { error } = await supabase.from('subscriptions').insert({
         member_email: emailNorm,
         plan_id: planSelectat,
         sessions_total: plan?.sessions || null,
-        sessions_used: sessUsedInitial,
+        sessions_used: 0,
         start_date: dataStartAbonament,
         end_date: endDateStr,
         is_active: true,
