@@ -238,8 +238,30 @@ function fmt(s) {
   return m + ':' + String(sec).padStart(2, '0')
 }
 
+function secToTime(sec) {
+  const s = Math.round(sec)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+  return `${m}:${String(ss).padStart(2, '0')}`
+}
+function timeToSec(str) {
+  if (!str) return null
+  const parts = String(str).trim().split(':').map(Number)
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  return parseFloat(str) || null
+}
 function formatPR(pr) {
-  if (pr.unit === 'timp') return pr.value ? pr.value : '—'
+  if (pr.unit === 'timp') {
+    if (!pr.value && pr.value !== 0) return '—'
+    const v = String(pr.value)
+    // valoare veche stocată ca "4:22" sau nouă ca secunde
+    if (v.includes(':')) return v
+    const sec = parseFloat(v)
+    return isNaN(sec) ? v : secToTime(sec)
+  }
   if (pr.value && pr.reps) return `${pr.value} ${pr.unit} × ${pr.reps}rep`
   if (pr.value) return `${pr.value} ${pr.unit}`
   if (pr.reps) return `${pr.reps} reps`
@@ -2853,7 +2875,7 @@ function App() {
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { member_id: user.id, movement: miscarePR, notes: prNote || null }
-    if (isBenchmark) { insertData.value = prTimp || null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
+    if (isBenchmark) { insertData.value = prTimp ? timeToSec(prTimp) : null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
     else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = 'm' }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
@@ -3772,10 +3794,13 @@ function App() {
         prDate.forEach(pr => { if (!prGroups[pr.movement]) prGroups[pr.movement] = []; prGroups[pr.movement].push(pr) })
         const parseTimeStr = (s) => {
           if (!s) return Infinity
-          const parts = String(s).trim().split(':').map(Number)
-          if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-          if (parts.length === 2) return parts[0] * 60 + parts[1]
-          return (parseFloat(s) || Infinity) * 60
+          const str = String(s).trim()
+          if (str.includes(':')) {
+            const parts = str.split(':').map(Number)
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+            if (parts.length === 2) return parts[0] * 60 + parts[1]
+          }
+          return parseFloat(str) || Infinity  // deja în secunde
         }
         const bestPR = (records) => {
           if (!records?.length) return null
