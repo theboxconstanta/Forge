@@ -1526,10 +1526,12 @@ function Admin({ showToast }) {
         showToast('⚠️ DEBUG: memberId negasit pt ' + email)
         return
       }
+      const { count: cntBefore } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('member_id', memberId)
       const aziStr = new Date().toISOString().split('T')[0]
       const { error: rpcErr } = await supabase.rpc('delete_member_future_bookings', { p_member_id: memberId, p_from_date: aziStr })
-      if (rpcErr) { showToast('❌ DEBUG RPC: ' + rpcErr.message); return }
-      showToast('✓ DEBUG: rezervari sterse pt ' + memberId.slice(0,8))
+      const { count: cntAfter } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('member_id', memberId)
+      if (rpcErr) { showToast('❌ RPC: ' + rpcErr.message); return }
+      showToast(`DEBUG: ${cntBefore} rezervari → ${cntAfter} dupa stergere (id:${memberId.slice(0,6)})`)
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
     showToast('✓ Abonament anulat și rezervările viitoare șterse!')
