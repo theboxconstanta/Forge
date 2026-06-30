@@ -247,8 +247,8 @@ function getInitiale(name) {
 }
 
 function AvatarCircle({ name, avatarUrl, size = 38 }) {
-  const culori = ['#EDFFD4', '#EAF3DE', '#FAEEDA', '#E6F1FB', '#FCE8E8']
-  const textCulori = ['#2F6600', '#27500A', '#633806', '#0C447C', '#791F1F']
+  const culori = ['#f0f0f0', '#f0f0f0', '#FAEEDA', '#E6F1FB', '#FCE8E8']
+  const textCulori = ['#1a1a1a', '#1a1a1a', '#633806', '#0C447C', '#791F1F']
   const idx = name ? name.charCodeAt(0) % culori.length : 0
   if (avatarUrl) return (
     <img src={avatarUrl} alt={name || ''} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -284,7 +284,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         { icon: '👥', lbl: 'Feed', sc: 'feed' },
         ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
       ].map((n, i) => (
-        <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#2F6600' : '#aaa' }}>
+        <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#1a1a1a' : '#aaa' }}>
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '20px', lineHeight: 1 }}>{n.icon}</span>
             {n.sc === 'feed' && feedUnread > 0 && (
@@ -335,13 +335,13 @@ function CautareMiscare({ onAleage, preFill }) {
     <div style={{ position: 'relative', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Exercițiu / Mișcare</div>
       <input value={query} onChange={e => cauta(e.target.value)} placeholder="Scrie pentru a căuta..."
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #2F6600' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #1a1a1a' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
       {sugestii.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
           {sugestii.map((s, i) => (
             <div key={i} onClick={() => alege(s)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f5f5f5' : 'none' }}>{s}</div>
           ))}
-          <div onClick={() => alege(query)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '12px', color: '#2F6600', fontWeight: '500', background: '#EDFFD4' }}>
+          <div onClick={() => alege(query)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '12px', color: '#1a1a1a', fontWeight: '500', background: '#f0f0f0' }}>
             + Adaugă "{query}" ca mișcare nouă
           </div>
         </div>
@@ -433,8 +433,8 @@ function Timer({ onBack, defaultFortime }) {
   const pct = Math.max(0, secunde / totalSec)
   const circumferinta = 2 * Math.PI * 80
   const offset = circumferinta * (1 - pct)
-  const culoareRing = gata ? '#27500A' : mod === 'tabata' && tabataFaza === 'odihna' ? '#1D9E75' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#2F6600'
-  const culoareText = gata ? '#27500A' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
+  const culoareRing = gata ? '#1a1a1a' : mod === 'tabata' && tabataFaza === 'odihna' ? '#1D9E75' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
+  const culoareText = gata ? '#1a1a1a' : secunde <= 5 ? '#E24B4A' : secunde <= 15 ? '#BA7517' : '#1a1a1a'
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
@@ -444,9 +444,9 @@ function Timer({ onBack, defaultFortime }) {
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
         {moduri.map(m => (
           <div key={m.id} onClick={() => setMod(m.id)}
-            style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #2F6600' : '1px solid #e0e0e0', background: mod === m.id ? '#EDFFD4' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #1a1a1a' : '1px solid #e0e0e0', background: mod === m.id ? '#f0f0f0' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <div style={{ fontSize: '18px' }}>{m.icon}</div>
-            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#2F6600' : '#888' }}>{m.lbl}</div>
+            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#1a1a1a' : '#888' }}>{m.lbl}</div>
           </div>
         ))}
       </div>
@@ -523,7 +523,7 @@ function Timer({ onBack, defaultFortime }) {
         </div>
       )}
       {countdown !== null && (
-        <div style={{ background: '#2F6600', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
+        <div style={{ background: '#1a1a1a', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
           <div style={{ fontSize: '13px', color: '#C8FF00', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pregătește-te!</div>
           <div style={{ fontSize: '80px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>{countdown}</div>
           <div style={{ fontSize: '14px', color: '#C8FF00', marginTop: '8px' }}>
@@ -537,7 +537,7 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'tabata' && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>Runda {tabataRunda} / {config.tabataRunde}</div>
-              <div style={{ display: 'inline-block', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#EAF3DE', color: tabataFaza === 'lucru' ? '#791F1F' : '#27500A', fontSize: '12px', fontWeight: '600' }}>
+              <div style={{ display: 'inline-block', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#1a1a1a', fontSize: '12px', fontWeight: '600' }}>
                 {tabataFaza === 'lucru' ? `🔥 LUCRU — ${config.tabataLucru} sec` : `😴 ODIHNĂ — ${config.tabataOdihna} sec`}
               </div>
             </div>
@@ -551,7 +551,7 @@ function Timer({ onBack, defaultFortime }) {
             </svg>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
               <div style={{ fontSize: '44px', fontWeight: '700', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
-              {gata && <div style={{ fontSize: '14px', color: '#27500A', fontWeight: '600', marginTop: '6px' }}>GATA! 💪</div>}
+              {gata && <div style={{ fontSize: '14px', color: '#1a1a1a', fontWeight: '600', marginTop: '6px' }}>GATA! 💪</div>}
               {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>în desfășurare</div>}
               {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? 'apasă ▶ start' : 'pauză'}</div>}
             </div>
@@ -564,20 +564,20 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'amrap' && (
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>RUNDE</div>
-              <div style={{ fontSize: '42px', fontWeight: '700', color: '#2F6600' }}>{runde}</div>
+              <div style={{ fontSize: '42px', fontWeight: '700', color: '#1a1a1a' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
                 <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '18px', cursor: 'pointer' }}>−</button>
-                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #2F6600', background: '#EDFFD4', fontSize: '18px', color: '#2F6600', fontWeight: '700', cursor: 'pointer' }}>+</button>
+                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #1a1a1a', background: '#f0f0f0', fontSize: '18px', color: '#1a1a1a', fontWeight: '700', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
             <button onClick={reset} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f5f5f5', fontSize: '20px', cursor: 'pointer' }}>↺</button>
-            <button onClick={toggleTimer} style={{ width: '64px', height: '64px', borderRadius: '50%', border: 'none', background: gata ? '#EAF3DE' : running ? '#BA7517' : '#2F6600', color: gata ? '#27500A' : '#fff', fontSize: '24px', cursor: gata ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+            <button onClick={toggleTimer} style={{ width: '64px', height: '64px', borderRadius: '50%', border: 'none', background: gata ? '#f0f0f0' : running ? '#BA7517' : '#1a1a1a', color: gata ? '#1a1a1a' : '#fff', fontSize: '24px', cursor: gata ? 'default' : 'pointer', transition: 'background 0.2s' }}>
               {gata ? '✓' : running ? '⏸' : '▶'}
             </button>
             {mod === 'amrap'
-              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #2F6600', background: '#EDFFD4', color: '#2F6600', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+1</button>
+              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+1</button>
               : <div style={{ width: '48px' }} />
             }
           </div>
@@ -637,7 +637,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
   const NIVELE = [
     { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴' },
     { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡' },
-    { id: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢' },
+    { id: 'Beginner', culoare: '#1a1a1a', bg: '#f0f0f0', emoji: '🟢' },
     { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵' },
   ]
 
@@ -654,7 +654,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh }) {
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' }}>Clasament 🏅</h1>
-        <button onClick={onRefresh} style={{ background: '#EDFFD4', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
+        <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>↻ Actualizează</button>
       </div>
       <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
         {new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -754,8 +754,8 @@ function Feed({ showToast, user, userProfile }) {
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
 
-  const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#27500A', 'Intermediate': '#633806', 'RX': '#791F1F' }
-  const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#EAF3DE', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
+  const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#1a1a1a', 'Intermediate': '#633806', 'RX': '#791F1F' }
+  const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
 
   const relativeTime = (ts) => {
     const diff = Date.now() - new Date(ts).getTime()
@@ -898,7 +898,7 @@ function Feed({ showToast, user, userProfile }) {
                 const r = postReactions[emoji] || { count: 0, iMine: false }
                 return (
                   <button key={emoji} onClick={() => toggleReactie(post.id, emoji)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: r.iMine ? '1.5px solid #2F6600' : '1px solid #e0e0e0', background: r.iMine ? '#EDFFD4' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: r.iMine ? '#2F6600' : '#555', fontWeight: r.iMine ? '600' : '400' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '20px', border: r.iMine ? '1.5px solid #1a1a1a' : '1px solid #e0e0e0', background: r.iMine ? '#f0f0f0' : '#f5f5f5', cursor: 'pointer', fontSize: '12px', color: r.iMine ? '#1a1a1a' : '#555', fontWeight: r.iMine ? '600' : '400' }}>
                     {emoji}{r.count > 0 ? ` ${r.count}` : ''}
                   </button>
                 )
@@ -1519,7 +1519,7 @@ function Admin({ showToast }) {
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }, { id: 'setari', emoji: '⚙️', lbl: 'Setări' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#2F6600' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#1a1a1a' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
           </div>
         ))}
@@ -1540,7 +1540,7 @@ function Admin({ showToast }) {
               { id: 'inactivi', lbl: '⚠️ Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
             ].map(s => (
               <div key={s.id} onClick={() => setSortClienti(s.id)}
-                style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#2F6600' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#1a1a1a' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {s.lbl}
                 <span style={{ background: sortClienti === s.id ? 'rgba(255,255,255,0.25)' : '#f0f0f0', color: sortClienti === s.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{s.count}</span>
               </div>
@@ -1565,7 +1565,7 @@ function Admin({ showToast }) {
             const isOpen = clientSelectat === c.id
             return (
               <div key={c.id} onClick={() => setClientSelectat(isOpen ? null : c.id)}
-                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#2F6600' : abo ? '#27500A' : '#e0e0e0'}` }}>
+                style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#1a1a1a' : abo ? '#1a1a1a' : '#e0e0e0'}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <AvatarCircle name={c.full_name || c.email} size={42} />
                   <div style={{ flex: 1 }}>
@@ -1573,7 +1573,7 @@ function Admin({ showToast }) {
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#EAF3DE', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#2F6600' : '#27500A', fontWeight: '500' }}>
+                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#f0f0f0', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#1a1a1a' : '#1a1a1a', fontWeight: '500' }}>
                           {sedinteEpuizate ? '⚠️ Epuizat' : expirat ? '⚠️ Expirat' : neInceput ? `📅 Din ${new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
@@ -1613,7 +1613,7 @@ function Admin({ showToast }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                         <span style={{ color: '#888' }}>Waiver</span>
                         {c.waiver_accepted ? (
-                          <span style={{ fontWeight: '600', color: '#27500A' }}>✓ Acceptat {c.waiver_accepted_at ? new Date(c.waiver_accepted_at).toLocaleDateString('ro-RO') : ''}</span>
+                          <span style={{ fontWeight: '600', color: '#1a1a1a' }}>✓ Acceptat {c.waiver_accepted_at ? new Date(c.waiver_accepted_at).toLocaleDateString('ro-RO') : ''}</span>
                         ) : (
                           <span style={{ fontWeight: '600', color: '#E24B4A' }}>✗ Neacceptat</span>
                         )}
@@ -1639,7 +1639,7 @@ function Admin({ showToast }) {
                               <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#1a1a1a' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
                               <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, -1)}
-                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #27500A', background: '#EAF3DE', color: '#27500A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, +1)}
                                   style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                               </div>
@@ -1693,7 +1693,7 @@ function Admin({ showToast }) {
             {(() => {
               const emailVal = emailAbonament.trim()
               const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)
-              const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#27500A' : '#E24B4A'
+              const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#1a1a1a' : '#E24B4A'
               return (
                 <>
                   <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder="email@exemplu.com" type="email"
@@ -1741,7 +1741,7 @@ function Admin({ showToast }) {
               const planStd = planuri.find(p => p.id === planSelectat)
               if (!planStd?.price || !pretPlatit) return <div style={{ marginBottom: '10px' }} />
               const diff = parseFloat(pretPlatit) - planStd.price
-              if (diff === 0) return <div style={{ fontSize: '11px', color: '#27500A', marginBottom: '10px' }}>✓ Suma corespunde prețului standard</div>
+              if (diff === 0) return <div style={{ fontSize: '11px', color: '#1a1a1a', marginBottom: '10px' }}>✓ Suma corespunde prețului standard</div>
               return (
                 <div style={{ fontSize: '11px', color: diff < 0 ? '#E24B4A' : '#BA7517', marginBottom: '10px' }}>
                   {diff < 0 ? `⚠️ Cu ${Math.abs(diff)} RON mai puțin decât prețul standard (${planStd.price} RON)` : `ℹ️ Cu ${diff} RON mai mult decât prețul standard (${planStd.price} RON)`}
@@ -1774,7 +1774,7 @@ function Admin({ showToast }) {
                   const epuizat = activ && activ.sessions_total != null && Math.max(0, activ.sessions_total - (activ.sessions_used || 0)) === 0
                   const neinceput = activ && new Date(activ.start_date + 'T00:00:00') > new Date()
                   const expirat = activ && (zileRamase < 0 || epuizat)
-                  const statusColor = !activ ? '#aaa' : expirat ? '#E24B4A' : neinceput ? '#BA7517' : '#27500A'
+                  const statusColor = !activ ? '#aaa' : expirat ? '#E24B4A' : neinceput ? '#BA7517' : '#1a1a1a'
                   const statusLabel = !activ ? 'Fără abonament' : expirat ? 'Expirat' : neinceput ? 'Neînceput' : 'Activ'
                   return (
                     <div key={email} style={{ background: '#fff', borderRadius: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -1804,13 +1804,13 @@ function Admin({ showToast }) {
                                   <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>Ședințe: {activ.sessions_used || 0}/{activ.sessions_total}</span>
                                   <div style={{ display: 'flex', gap: '4px' }}>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, -1) }}
-                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #27500A', background: '#EAF3DE', color: '#27500A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #1a1a1a', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, +1) }}
                                       style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                                   </div>
                                 </div>
                               )}
-                              {activ.notes && <div style={{ fontSize: '11px', color: '#2F6600', marginTop: '3px' }}>{activ.notes}</div>}
+                              {activ.notes && <div style={{ fontSize: '11px', color: '#1a1a1a', marginTop: '3px' }}>{activ.notes}</div>}
                               <button onClick={e => { e.stopPropagation(); stergeAbonament(activ.id) }}
                                 style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️ Șterge</button>
                             </div>
@@ -1884,22 +1884,22 @@ function Admin({ showToast }) {
               ))}
             </div>
             <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]); setLaInfinit(false) }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#EDFFD4' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #2F6600' : '1.5px solid transparent' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#f0f0f0' : '#f5f5f5', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #1a1a1a' : '1.5px solid transparent' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: '#1a1a1a' }}>Repetă săptămânal</div>
                 <div style={{ fontSize: '11px', color: '#888' }}>Creează automat pe zilele alese</div>
               </div>
-              <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#2F6600' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+              <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#1a1a1a' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: '3px', left: repetitiva ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
               </div>
             </div>
             {repetitiva && (
-              <div style={{ background: '#EDFFD4', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600', marginBottom: '8px' }}>ZILELE SĂPTĂMÂNII</div>
+              <div style={{ background: '#f0f0f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', color: '#1a1a1a', fontWeight: '600', marginBottom: '8px' }}>ZILELE SĂPTĂMÂNII</div>
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
                   {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((z, i) => (
                     <div key={i} onClick={() => toggleZiRepetare(i)}
-                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#2F6600' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #2F6600' : '1px solid #C5C2F5' }}>
+                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#1a1a1a' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #1a1a1a' : '1px solid #C5C2F5' }}>
                       {z}
                     </div>
                   ))}
@@ -1907,7 +1907,7 @@ function Admin({ showToast }) {
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                   {[{ id: false, lbl: 'Nr. săptămâni' }, { id: true, lbl: 'Până opresc eu' }].map(opt => (
                     <div key={String(opt.id)} onClick={() => setLaInfinit(opt.id)}
-                      style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#2F6600' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #2F6600' : '1px solid #C5C2F5' }}>
+                      style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#1a1a1a' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #1a1a1a' : '1px solid #C5C2F5' }}>
                       {opt.lbl}
                     </div>
                   ))}
@@ -1915,19 +1915,19 @@ function Admin({ showToast }) {
                 {!laInfinit && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#2F6600', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
+                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
                     <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
                   </div>
                 )}
                 {laInfinit && (
-                  <div style={{ fontSize: '11px', color: '#2F6600', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
+                  <div style={{ fontSize: '11px', color: '#1a1a1a', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
                 )}
                 {dataClasa && zileRepetare.length > 0 && (() => {
                   const dates = genereazaDateRepetare()
                   if (dates.length === 0) return null
                   const last = new Date(dates[dates.length - 1] + 'T00:00:00')
                   return (
-                    <div style={{ fontSize: '11px', color: '#2F6600', lineHeight: '1.6' }}>
+                    <div style={{ fontSize: '11px', color: '#1a1a1a', lineHeight: '1.6' }}>
                       {dates.length} clase · până în {last.toLocaleDateString('ro-RO')}
                     </div>
                   )
@@ -1957,7 +1957,7 @@ function Admin({ showToast }) {
                 <div key={date} style={{ marginBottom: '18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#2F6600' : eTrecut ? '#f0f0f0' : '#1a1a1a', borderRadius: '20px', padding: '5px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#1a1a1a' : eTrecut ? '#f0f0f0' : '#1a1a1a', borderRadius: '20px', padding: '5px 14px' }}>
                       {eAzi && <span style={{ fontSize: '10px', color: '#C8FF00', fontWeight: '800', letterSpacing: '0.08em' }}>AZI</span>}
                       <span style={{ fontSize: '13px', fontWeight: '700', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
                     </div>
@@ -1986,7 +1986,7 @@ function Admin({ showToast }) {
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                                 <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>REZERVĂRI ({nrTotal}/{c.max_spots})</div>
-                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#2F6600' : '#aaa', background: nrCheckin > 0 ? '#EDFFD4' : '#f5f5f5', padding: '2px 8px', borderRadius: '20px' }}>✓ {nrCheckin}/{nrTotal} prezenți</div>}
+                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#1a1a1a' : '#aaa', background: nrCheckin > 0 ? '#f0f0f0' : '#f5f5f5', padding: '2px 8px', borderRadius: '20px' }}>✓ {nrCheckin}/{nrTotal} prezenți</div>}
                               </div>
                             )
                           })()}
@@ -2003,7 +2003,7 @@ function Admin({ showToast }) {
                                 const clasaInceput = new Date(`${c.date}T${c.start_time}`) <= new Date()
                                 return (
                                   <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
-                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #2F6600' : '1px solid #d0d0d0', background: r.checked_in ? '#EDFFD4' : '#f5f5f5', color: r.checked_in ? '#2F6600' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
+                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #1a1a1a' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#f5f5f5', color: r.checked_in ? '#1a1a1a' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
                                     {r.checked_in ? '✓ Prezent' : clasaInceput ? '○ Absent' : '○ Marchează'}
                                   </button>
                                 )
@@ -2032,7 +2032,7 @@ function Admin({ showToast }) {
                                         <div style={{ fontWeight: '500', color: '#1a1a1a' }}>{cl.full_name || cl.email}</div>
                                         <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
                                       </div>
-                                      <span style={{ fontSize: '11px', color: '#2F6600', fontWeight: '600' }}>+ Adaugă</span>
+                                      <span style={{ fontSize: '11px', color: '#1a1a1a', fontWeight: '600' }}>+ Adaugă</span>
                                     </div>
                                   ))}
                                 </div>
@@ -2068,7 +2068,7 @@ function Admin({ showToast }) {
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
               { key: 'onramp', label: '🔵 OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
-              { key: 'beginner', label: '🟢 Beginner', culoare: '#27500A', bg: '#EAF3DE' },
+              { key: 'beginner', label: '🟢 Beginner', culoare: '#1a1a1a', bg: '#f0f0f0' },
               { key: 'intermediate', label: '🟡 Intermediate', culoare: '#633806', bg: '#FAEEDA' },
               { key: 'rx', label: '🔴 RX', culoare: '#791F1F', bg: '#FCEBEB' },
             ].map(v => (
@@ -2145,14 +2145,14 @@ function Admin({ showToast }) {
             <div style={{ fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>📊 Rapoarte</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' })}</div>
-              <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#EDFFD4', color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>↻</button>
+              <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#f0f0f0', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>↻</button>
             </div>
           </div>
           {rapoarteData ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               {[
                 { label: 'Membri activi', value: rapoarteData.membriActivi, icon: '👥', color: '#5B7FCC', bg: '#EEF2FF' },
-                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: '🎟️', color: '#2F6600', bg: '#EDFFD4' },
+                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: '🎟️', color: '#1a1a1a', bg: '#f0f0f0' },
                 { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: '💰', color: '#B86E00', bg: '#FFF8EC' },
               ].map(({ label, value, icon, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
@@ -2180,7 +2180,7 @@ function Admin({ showToast }) {
               style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
           </div>
           {cancelWindowSetting === 0 && (
-            <div style={{ fontSize: '11px', color: '#2F6600', background: '#EDFFD4', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>Membrii pot anula oricând (fără restricții).</div>
+            <div style={{ fontSize: '11px', color: '#1a1a1a', background: '#f0f0f0', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>Membrii pot anula oricând (fără restricții).</div>
           )}
           <button onClick={saveSettings} disabled={savingSettings}
             style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
@@ -2218,22 +2218,22 @@ function JurnalList({ logs }) {
         const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
         return (
           <div key={logKey}>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#2F6600', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
           <div onClick={() => setDeschis(isOpen ? null : logKey)}
-            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #2F6600', cursor: 'pointer' }}>
+            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #1a1a1a', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600' }}>{w.variant_level || 'WOD'}</div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{w.variant_level || 'WOD'}</div>
               <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-              {w.result && <span style={{ fontSize: '12px', background: '#EDFFD4', color: '#2F6600', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
-              {w.time_result && <span style={{ fontSize: '12px', background: '#EAF3DE', color: '#27500A', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
+              {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#1a1a1a', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
+              {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#1a1a1a', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
               {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
             </div>
             {isOpen && (
               <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                 {wodHeader && (
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#2F6600', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
                 )}
                 {miscariAfisate.length > 0 && (
                   <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
@@ -2953,7 +2953,7 @@ function App() {
   const VARIANTE_CONFIG = [
     { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', emoji: '🟠', key: 'movements_rx' },
     { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', key: 'movements_intermediate' },
-    { nivel: 'Beginner', culoare: '#27500A', bg: '#EAF3DE', emoji: '🟢', key: 'movements_beginner' },
+    { nivel: 'Beginner', culoare: '#1a1a1a', bg: '#f0f0f0', emoji: '🟢', key: 'movements_beginner' },
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
   ]
 
@@ -3028,7 +3028,7 @@ function App() {
                 { nr: '3', text: 'Apasă', icon: '✓', sub: '"Add" în colțul din dreapta sus' },
               ].map(s => (
                 <div key={s.nr} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
                   <div>
                     <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
@@ -3047,7 +3047,7 @@ function App() {
                 { icon: '＋', text: 'Alege opțiunea', sub: '"Adaugă pe ecranul principal"' },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
                   <div>
                     <div style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{s.text}</div>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{s.sub}</div>
@@ -3090,10 +3090,10 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentcolor: '#2F6600', cursor: 'pointer' }} />
+                style={{ width: '16px', height: '16px', accentcolor: '#1a1a1a', cursor: 'pointer' }} />
               <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
             </label>
-            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#2F6600', cursor: 'pointer', fontWeight: '500' }}>
+            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#1a1a1a', cursor: 'pointer', fontWeight: '500' }}>
               Forgot password?
             </span>
           </div>
@@ -3109,7 +3109,7 @@ function App() {
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
           {authScreen === 'login' ? 'Nu ai cont? ' : 'Ai deja cont? '}
-          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#2F6600', fontWeight: '600', cursor: 'pointer' }}>
+          <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#1a1a1a', fontWeight: '600', cursor: 'pointer' }}>
             {authScreen === 'login' ? 'Înregistrează-te' : 'Intră în cont'}
           </span>
         </div>
@@ -3189,13 +3189,13 @@ function App() {
                     </div>
                     {!esteAzi && (
                       <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                        style={{ fontSize: '10px', color: '#2F6600', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
+                        style={{ fontSize: '10px', color: '#1a1a1a', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
                     )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#2F6600', lineHeight: 1 }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#1a1a1a', lineHeight: 1 }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>SESIUNI</div>
                   </div>
                   <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
@@ -3243,7 +3243,7 @@ function App() {
                           onClick={() => setDataAcasa(ds)}
                           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
                             background: selectat ? '#1a1a1a' : 'transparent',
-                            border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #2F6600' : '1px solid #e8e8e8' }}>
+                            border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #1a1a1a' : '1px solid #e8e8e8' }}>
                           <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
                           <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
                           <span style={{ fontSize: '10px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
@@ -3269,11 +3269,11 @@ function App() {
                         <div key={c.id}
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
                           style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
-                            background: rezervat ? '#EDFFD4' : c.color ? c.color + '22' : deschis ? '#f5f5f5' : '#fafafa',
-                            border: rezervat ? '2px solid #2F6600' : c.color ? `1.5px solid ${c.color}70` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
+                            background: rezervat ? '#f0f0f0' : c.color ? c.color + '22' : deschis ? '#f5f5f5' : '#fafafa',
+                            border: rezervat ? '2px solid #1a1a1a' : c.color ? `1.5px solid ${c.color}70` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#2F6600' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
+                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
                               <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{c.end_time?.slice(0,5)}</span>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -3286,7 +3286,7 @@ function App() {
                                 : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: '12px', color: rezervat ? '#2F6600' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
+                          <div style={{ fontSize: '12px', color: rezervat ? '#1a1a1a' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
                           {deschis && (
                             <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
                               onClick={e => e.stopPropagation()}>
@@ -3298,7 +3298,7 @@ function App() {
                                     <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>PARTICIPANȚI ({cnt}/{c.max_spots})</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                       {membri.map((name, mi) => (
-                                        <span key={mi} style={{ fontSize: '11px', background: rezervat ? '#EDFFD4' : '#f0f0f0', color: rezervat ? '#2F6600' : '#555', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>{name}</span>
+                                        <span key={mi} style={{ fontSize: '11px', background: rezervat ? '#f0f0f0' : '#f0f0f0', color: rezervat ? '#1a1a1a' : '#555', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>{name}</span>
                                       ))}
                                     </div>
                                   </div>
@@ -3355,7 +3355,7 @@ function App() {
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
                 </div>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#1a1a1a' : '#EDFFD4', color: wodDeschis ? '#C8FF00' : '#2F6600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#1a1a1a' : '#f0f0f0', color: wodDeschis ? '#C8FF00' : '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                   {wodDeschis ? '−' : '+'}
                 </div>
               </div>
@@ -3414,19 +3414,19 @@ function App() {
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
                       <div style={{ fontSize: '18px', fontWeight: '800', lineHeight: 1 }}>
-                        <span style={{ color: '#2F6600' }}>{sessUsed}</span>
+                        <span style={{ color: '#1a1a1a' }}>{sessUsed}</span>
                         <span style={{ color: '#ddd', fontWeight: '400', fontSize: '16px' }}> / </span>
-                        <span style={{ color: '#2F6600' }}>{sessTotal}</span>
+                        <span style={{ color: '#1a1a1a' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: '#2F6600', fontWeight: '700' }}>Nelimitat</div>
+                      <div style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: '700' }}>Nelimitat</div>
                     )}
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{zileRamase} zile rămase</div>
                   </div>
                 </div>
                 {sessTotal && (
                   <div style={{ height: '7px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#2F6600', borderRadius: '4px' }} />
+                    <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#1a1a1a', borderRadius: '4px' }} />
                   </div>
                 )}
               </div>
@@ -3459,16 +3459,16 @@ function App() {
               <div style={{ fontSize: '12px', color: '#888' }}>Contactează coachul pentru a adăuga un abonament.</div>
             </div>
           ) : !abonamentActiv ? (
-            <div style={{ background: !abonamentInceput ? '#EDFFD4' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
+            <div style={{ background: !abonamentInceput ? '#f0f0f0' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>
                 {!abonamentInceput ? '📅' : sedinteLimitate && sedinteRamase === 0 ? '🏁' : '🔒'}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#2F6600' : '#791F1F', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#1a1a1a' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? 'Abonament programat'
                   : sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate'
                   : 'Abonament expirat'}
               </div>
-              <div style={{ fontSize: '12px', color: !abonamentInceput ? '#2F6600' : '#A32D2D' }}>
+              <div style={{ fontSize: '12px', color: !abonamentInceput ? '#1a1a1a' : '#A32D2D' }}>
                 {!abonamentInceput
                   ? `Începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}.`
                   : sedinteLimitate && sedinteRamase === 0
@@ -3477,13 +3477,13 @@ function App() {
               </div>
             </div>
           ) : (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #2F6600' }}>
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #1a1a1a' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Plan activ</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>{abonamentReal.subscription_plans?.name}</div>
                 </div>
-                <span style={{ background: '#EAF3DE', color: '#27500A', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>✓ Activ</span>
+                <span style={{ background: '#f0f0f0', color: '#1a1a1a', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>✓ Activ</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ fontSize: '12px', color: '#888' }}>📅 Valabil</span>
@@ -3504,8 +3504,8 @@ function App() {
               )}
             </div>
           )}
-          <div style={{ background: '#EDFFD4', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#2F6600' }}>Pentru reînnoire sau întrebări contactează coachul.</div>
+          <div style={{ background: '#f0f0f0', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: '#1a1a1a' }}>Pentru reînnoire sau întrebări contactează coachul.</div>
           </div>
 
           {/* Rezervările mele */}
@@ -3522,16 +3522,16 @@ function App() {
                 <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>REZERVĂRILE MELE</div>
                 {viitoare.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: '#2F6600', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>URMEAZĂ</div>
+                    <div style={{ fontSize: '10px', color: '#1a1a1a', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>URMEAZĂ</div>
                     {viitoare.map(c => (
-                      <div key={c.id} style={{ background: '#EDFFD4', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #2F6600' }}>
+                      <div key={c.id} style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #1a1a1a' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div>
                             <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{c.name || 'CrossFit WOD'}</div>
-                            <div style={{ fontSize: '11px', color: '#2F6600', marginTop: '3px' }}>
+                            <div style={{ fontSize: '11px', color: '#1a1a1a', marginTop: '3px' }}>
                               📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#2F6600' }}>👤 {c.coach}</div>
+                            <div style={{ fontSize: '11px', color: '#1a1a1a' }}>👤 {c.coach}</div>
                           </div>
                           <button onClick={() => toggleRezervare(c.id)}
                             style={{ background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -3567,7 +3567,7 @@ function App() {
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
             {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
               <div key={t.id} onClick={() => setLogTab(t.id)}
-                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#2F6600' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#1a1a1a' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
                 {t.lbl}
               </div>
             ))}
@@ -3578,9 +3578,9 @@ function App() {
               <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
-                  style={{ flex: 1, background: '#EDFFD4', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  style={{ flex: 1, background: '#f0f0f0', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🏋️</span>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', textAlign: 'center' }}>Mișcare Unică</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>Mișcare Unică</span>
                 </div>
                 <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
                   style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
@@ -3620,7 +3620,7 @@ function App() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
                 {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
                   <div key={t} onClick={() => setWodTip(t)}
-                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #2F6600' : '1px solid #e0e0e0', background: wodTip === t ? '#EDFFD4' : '#fafafa', color: wodTip === t ? '#2F6600' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
+                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #1a1a1a' : '1px solid #e0e0e0', background: wodTip === t ? '#f0f0f0' : '#fafafa', color: wodTip === t ? '#1a1a1a' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
                     {t}
                   </div>
                 ))}
@@ -3637,7 +3637,7 @@ function App() {
               <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>ANTRENAMENTUL DE AZI</div>
                 <div style={{ background: '#f5fff0', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#2F6600', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
                     {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                   </div>
                   {miscariWod.length > 0 ? miscariWod.map((m, i) => (
@@ -3654,8 +3654,8 @@ function App() {
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
               {wodMiscari.map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#EDFFD4', borderRadius: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#2F6600' }}>• {m}</span>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
                   <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                 </div>
               ))}
@@ -3768,7 +3768,7 @@ function App() {
         const PCT_BARA = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
         const catConfig = {
           WEIGHTLIFTING: { culoare: '#1a1a1a', label: 'WEIGHTLIFTING' },
-          GYMNASTICS:    { culoare: '#2F6600', label: 'GYMNASTICS' },
+          GYMNASTICS:    { culoare: '#1a1a1a', label: 'GYMNASTICS' },
           CARDIO:        { culoare: '#0C447C', label: 'CARDIO' },
           HERO_WODS:     { culoare: '#8B1A1A', label: 'HERO WODs' },
         }
@@ -3786,7 +3786,7 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#2F6600' : '#ccc' }}>{best ? formatPR(best) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#1a1a1a' : '#ccc' }}>{best ? formatPR(best) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -4015,14 +4015,14 @@ function App() {
                         background: selectat ? '#1a1a1a' : 'transparent',
                         border: selectat ? 'none' : esteAzi ? '2px solid #1a1a1a' : 'none' }}>
                       <span style={{ fontSize: '14px', fontWeight: selectat || esteAzi ? '800' : '400', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
-                      {(areWod || areRez) && <span style={{ fontSize: '7px', color: areRez ? '#2F6600' : '#C8FF00', lineHeight: 1, marginTop: '1px' }}>{areRez ? '✓' : '⚡'}</span>}
+                      {(areWod || areRez) && <span style={{ fontSize: '7px', color: areRez ? '#1a1a1a' : '#C8FF00', lineHeight: 1, marginTop: '1px' }}>{areRez ? '✓' : '⚡'}</span>}
                     </div>
                   )
                 })}
               </div>
               {/* Buton azi */}
               <div onClick={() => { setDataAcasa(todayStr); setShowCalPicker(false); scrollChipToDate(todayStr) }}
-                style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#2F6600', cursor: 'pointer', padding: '8px', background: '#EDFFD4', borderRadius: '10px' }}>
+                style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#1a1a1a', cursor: 'pointer', padding: '8px', background: '#f0f0f0', borderRadius: '10px' }}>
                 Mergi la azi
               </div>
             </div>
@@ -4114,7 +4114,7 @@ function App() {
                 </div>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={onboardingWaiverAccepted} onChange={e => setOnboardingWaiverAccepted(e.target.checked)}
-                    style={{ width: '20px', height: '20px', marginTop: '1px', accentColor: '#2F6600', flexShrink: 0, cursor: 'pointer' }} />
+                    style={{ width: '20px', height: '20px', marginTop: '1px', accentColor: '#1a1a1a', flexShrink: 0, cursor: 'pointer' }} />
                   <span style={{ fontSize: '13px', color: '#1a1a1a', lineHeight: '1.5' }}>Am citit, înțeles și sunt de acord cu termenii acordului de mai sus.</span>
                 </label>
                 <div style={{ display: 'flex', gap: '10px' }}>
