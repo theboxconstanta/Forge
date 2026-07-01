@@ -2446,7 +2446,7 @@ function App() {
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
   const [wodDeschis, setWodDeschis] = useState(false)
-  const [claseHomeDeschis, setClaseHomeDeschis] = useState(true)
+  const [claseHomeDeschis, setClaseHomeDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
