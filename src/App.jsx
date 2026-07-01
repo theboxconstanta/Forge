@@ -144,6 +144,9 @@ async function activateQueuedSubscription(memberEmail) {
   return queued.id
 }
 
+const CARDIO_MISCARI = ['Row', 'Run', 'Bike Erg', 'Assault Bike', 'Air Bike', 'Ski Erg']
+const CARDIO_CU_CALORII = CARDIO_MISCARI.filter(c => c !== 'Run')
+
 const MISCARI = [
   'Air Squat', 'Back Squat', 'Front Squat', 'Overhead Squat', 'Box Squat', 'Pause Squat',
   'Shoulder Press', 'Push Press', 'Push Jerk', 'Split Jerk', 'Bench Press', 'Strict Press',
@@ -155,7 +158,7 @@ const MISCARI = [
   'Toes to Bar', 'Knees to Elbow', 'Ring Row', 'Push-up', 'Handstand Push-up',
   'Ring Dip', 'Bar Dip', 'Handstand Hold', 'Handstand Walk', 'L-sit Hold',
   'Box Jump', 'Broad Jump', 'Burpee', 'Double Under', 'Single Under',
-  'Row', 'Run', 'Bike Erg', 'Assault Bike', 'Ski Erg',
+  ...CARDIO_MISCARI,
   'KB Swing', 'KB Clean', 'KB Snatch', 'KB Goblet Squat', 'Wall Ball',
   // Girls
   'Angie','Annie','Amanda','Barbara','Chelsea','Cindy','Diane','Elizabeth','Eva',
@@ -227,7 +230,7 @@ const PR_CATEGORII = {
     'Box Jump','Broad Jump','Burpee','Double Under','Single Under',
     'KB Swing','KB Clean','KB Snatch','KB Goblet Squat','Wall Ball',
   ],
-  CARDIO: ['Row','Run','Bike Erg','Assault Bike','Ski Erg'],
+  CARDIO: CARDIO_MISCARI,
   HERO_WODS: Object.keys(HERO_WODS_INFO),
 }
 
@@ -272,6 +275,7 @@ function formatPR(pr, preferredUnit) {
   const isWeight = pr.unit === 'kg' || pr.unit === 'lbs'
   const unit = isWeight && preferredUnit ? preferredUnit : pr.unit
   const value = isWeight && preferredUnit ? convertWeight(pr.value, pr.unit, preferredUnit) : pr.value
+  if (value && (pr.unit === 'm' || pr.unit === 'cal')) return `${value} ${pr.unit}` + (pr.time_result ? ` — ${pr.time_result}` : '')
   if (value && pr.reps) return `${value} ${unit} × ${pr.reps}rep`
   if (value) return `${value} ${unit}`
   if (pr.reps) return `${pr.reps} reps`
@@ -2528,6 +2532,7 @@ function App() {
   const [prReps, setPrReps] = useState('')
   const [prTimp, setPrTimp] = useState('')
   const [prDistanta, setPrDistanta] = useState('')
+  const [prCardioUnit, setPrCardioUnit] = useState('m')
   const [prNote, setPrNote] = useState('')
   const [prVarianta, setPrVarianta] = useState('RX')
   const [prSaving, setPrSaving] = useState(false)
@@ -3003,7 +3008,7 @@ function App() {
       else {
         setCustomHeroWods(prev => [...prev, data])
         showToast('Hero WOD salvat! 💪')
-        setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
+        setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
         setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
         setPrevScreen('pr'); setScreen('logPR')
       }
@@ -3201,13 +3206,13 @@ function App() {
     if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
     setPrSaving(true)
     const isBenchmark = miscarePR in heroWodsInfoAll
-    const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR)
+    const isCardio = CARDIO_MISCARI.includes(miscarePR)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { movement: miscarePR, notes: prNote || null }
     if (!editPrId) insertData.member_id = user.id
     if (isBenchmark) { insertData.value = prTimp ? timeToSec(prTimp) : null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
-    else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = 'm' }
+    else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = CARDIO_CU_CALORII.includes(miscarePR) ? prCardioUnit : 'm'; insertData.time_result = prTimp.trim() || null }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
     else { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = userProfile?.weight_unit || 'kg' }
@@ -3218,7 +3223,7 @@ function App() {
     else {
       showToast(editPrId ? '✓ PR actualizat!' : 'PR salvat! 🏆')
       await fetchPRuri(); setScreen('pr')
-      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
+      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
       setEditPrId(null); setLogPentruPR(null)
     }
     setPrSaving(false)
@@ -3226,11 +3231,11 @@ function App() {
 
   const startEditPR = (record, movement) => {
     const isBenchmark = movement in heroWodsInfoAll
-    const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(movement)
+    const isCardio = CARDIO_MISCARI.includes(movement)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(movement)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(movement)
     setMiscarePR(movement)
-    setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrVarianta('RX')
+    setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrVarianta('RX')
     if (isBenchmark) {
       setPrTimp(record.value != null ? secToTime(parseFloat(record.value)) : '')
       const varianteValide = ['RX', 'Intermediate', 'Beginner', 'OnRamp']
@@ -3238,7 +3243,8 @@ function App() {
       if (varianteValide.includes(poss)) { setPrVarianta(poss); setPrNote(rest.join(' | ')) }
       else { setPrNote(record.notes || '') }
     } else if (isCardio) {
-      setPrDistanta(record.value != null ? String(record.value) : ''); setPrNote(record.notes || '')
+      setPrDistanta(record.value != null ? String(record.value) : ''); setPrCardioUnit(record.unit === 'cal' ? 'cal' : 'm')
+      setPrTimp(record.time_result || ''); setPrNote(record.notes || '')
     } else if (isGym) {
       setPrReps(record.reps != null ? String(record.reps) : ''); setPrNote(record.notes || '')
     } else if (isHold) {
@@ -4009,7 +4015,7 @@ function App() {
             <>
               <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <div onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
+                <div onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
                   style={{ flex: 1, background: '#f0f0f0', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🏋️</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>Mișcare Unică</span>
@@ -4203,10 +4209,23 @@ function App() {
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
                     </select>
                   </>
-                ) : ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR) ? (
+                ) : CARDIO_MISCARI.includes(miscarePR) ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Distanță (m)</div>
-                    <input type="number" value={prDistanta} onChange={e => setPrDistanta(e.target.value)} placeholder="ex: 1000" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    {CARDIO_CU_CALORII.includes(miscarePR) && (
+                      <>
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Scor în</div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                          {[{ val: 'm', label: 'Metri' }, { val: 'cal', label: 'Calorii' }].map(o => (
+                            <div key={o.val} onClick={() => setPrCardioUnit(o.val)}
+                              style={{ flex: 1, padding: '9px', textAlign: 'center', borderRadius: '10px', border: prCardioUnit === o.val ? '2px solid #1a1a1a' : '1px solid #e0e0e0', background: prCardioUnit === o.val ? '#f0f0f0' : '#fafafa', color: prCardioUnit === o.val ? '#1a1a1a' : '#888', fontSize: '13px', fontWeight: prCardioUnit === o.val ? '700' : '400', cursor: 'pointer' }}>
+                              {o.label}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{prCardioUnit === 'cal' ? 'Calorii' : 'Distanță (m)'}</div>
+                    <input type="number" value={prDistanta} onChange={e => setPrDistanta(e.target.value)} placeholder={prCardioUnit === 'cal' ? 'ex: 50' : 'ex: 1000'} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
                     <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 3:52" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
@@ -4359,7 +4378,7 @@ function App() {
                       ))}
                     </div>
                   )}
-                  <button onClick={() => { setEditPrId(null); setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
+                  <button onClick={() => { setEditPrId(null); setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
                     style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     + Adaugă rezultat nou
                   </button>
@@ -4372,7 +4391,7 @@ function App() {
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Recorduri 🏆</h1>
-              <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+              <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                 style={{ padding: '8px 14px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
                 + PR nou
               </button>
