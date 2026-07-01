@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 /* eslint-disable */
-import { useState, useEffect, useRef, Component } from 'react'
+import { useState, useEffect, useRef, useMemo, Component } from 'react'
 import { supabase } from './supabase'
 
 class ErrorBoundary extends Component {
@@ -2604,6 +2604,40 @@ function App() {
   })
   const heroWodsListAll = [...PR_CATEGORII.HERO_WODS, ...customHeroWods.map(w => w.name)]
 
+  const _now = new Date()
+  const actualToday = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
+
+  // Chipurile de zi din "Clase disponibile" (365/366 pe an) - memoizate ca sa
+  // nu se recalculeze (data-math + scanari prin claseDB/wodLogs pt fiecare
+  // zi) la orice re-render al ecranului home (polling la 8-15s, realtime
+  // etc.), ceea ce bloca thread-ul principal si dadea impresia de "ecran
+  // inghetat/alb" la tap pe o data.
+  const homeCalendarChips = useMemo(() => {
+    const rezervateDates = new Set(claseDB.filter(c => rezervariMele.includes(c.id)).map(c => c.date))
+    const wodLogDates = new Set(wodLogs.filter(l => l.logged_at).map(l => {
+      const ld = new Date(l.logged_at)
+      return `${ld.getFullYear()}-${String(ld.getMonth() + 1).padStart(2, '0')}-${String(ld.getDate()).padStart(2, '0')}`
+    }))
+    const yr = parseInt(actualToday.slice(0, 4))
+    const isLeap = yr % 4 === 0 && (yr % 100 !== 0 || yr % 400 === 0)
+    const totalDays = isLeap ? 366 : 365
+    const yearStart = new Date(`${yr}-01-01T00:00:00`)
+    return Array.from({ length: totalDays }, (_, i) => {
+      const d = new Date(yearStart)
+      d.setDate(d.getDate() + i)
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return {
+        ds,
+        dayNum: d.getDate(),
+        ziuaLitera: ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S'][d.getDay()],
+        luna: ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()],
+        eAzi: ds === actualToday,
+        areRez: rezervateDates.has(ds),
+        areWod: wodLogDates.has(ds),
+      }
+    })
+  }, [actualToday, claseDB, rezervariMele, wodLogs])
+
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
   const showInstall = !isStandalone && !installDismissed
@@ -3591,7 +3625,6 @@ function App() {
       )}
 
       {screen === 'home' && (() => {
-        const _now = new Date(); const actualToday = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`
         const selData = new Date(dataAcasa + 'T00:00:00')
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
         const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
@@ -3653,36 +3686,22 @@ function App() {
                 <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>CLASE DISPONIBILE</div>
                 {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
                 <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                  {(() => {
-                    const yr = parseInt(actualToday.slice(0, 4))
-                    const isLeap = yr % 4 === 0 && (yr % 100 !== 0 || yr % 400 === 0)
-                    const totalDays = isLeap ? 366 : 365
-                    const yearStart = new Date(`${yr}-01-01T00:00:00`)
-                    return Array.from({ length: totalDays }, (_, i) => {
-                      const d = new Date(yearStart)
-                      d.setDate(d.getDate() + i)
-                      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-                      const ziuaLitera = ['D','L','Ma','Mi','J','V','S'][d.getDay()]
-                      const luna = ['Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
-                      const eAzi = ds === actualToday
-                      const selectat = ds === dataAcasa
-                      const areRez = claseDB.some(c => rezervariMele.includes(c.id) && c.date === ds)
-                      const areWod = wodLogs.some(l => { if (!l.logged_at) return false; const ld = new Date(l.logged_at); const local = `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,'0')}-${String(ld.getDate()).padStart(2,'0')}`; return local === ds })
-                      return (
-                        <div key={ds}
-                          ref={eAzi ? homeCalTodayRef : null}
-                          onClick={() => setDataAcasa(ds)}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
-                            background: selectat ? '#1a1a1a' : 'transparent',
-                            border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #1a1a1a' : '1px solid #e8e8e8' }}>
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                          <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{d.getDate()}</span>
-                          <span style={{ fontSize: '10px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
-                          <span style={{ fontSize: '9px', lineHeight: 1, color: '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
-                        </div>
-                      )
-                    })
-                  })()}
+                  {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
+                    const selectat = ds === dataAcasa
+                    return (
+                      <div key={ds}
+                        ref={eAzi ? homeCalTodayRef : null}
+                        onClick={() => setDataAcasa(ds)}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
+                          background: selectat ? '#1a1a1a' : 'transparent',
+                          border: selectat ? 'none' : eAzi ? '2px solid #1a1a1a' : areRez ? '2px solid #1a1a1a' : '1px solid #e8e8e8' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#C8FF00' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                        <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: selectat ? '#C8FF00' : '#1a1a1a', lineHeight: 1 }}>{dayNum}</span>
+                        <span style={{ fontSize: '10px', color: selectat ? '#C8FF00' : '#aaa', fontWeight: '500' }}>{luna}</span>
+                        <span style={{ fontSize: '9px', lineHeight: 1, color: '#C8FF00', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
               <div style={{ padding: '0 20px 14px' }}>
