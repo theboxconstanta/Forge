@@ -2516,6 +2516,11 @@ function App() {
   const [onboardingWaiverAccepted, setOnboardingWaiverAccepted] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const avatarInputRef = useRef(null)
+  const [profileFirstName, setProfileFirstName] = useState('')
+  const [profileLastName, setProfileLastName] = useState('')
+  const [profileGender, setProfileGender] = useState('')
+  const [profileBirthDate, setProfileBirthDate] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -2794,6 +2799,23 @@ function App() {
     localStorage.removeItem(`waiver_${user.id}`) // sterge formatul vechi daca exista
     setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: onboardingGender, birth_date: onboardingBirthDate, waiver_accepted: true }))
     setShowOnboarding(false)
+  }
+
+  const saveMyProfile = async () => {
+    const firstName = profileFirstName.trim()
+    const lastName = profileLastName.trim()
+    if (!firstName || !lastName || !profileBirthDate) { showToast('❌ Completează toate câmpurile obligatorii!'); return }
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || null
+    setProfileSaving(true)
+    const { error } = await supabase.from('profiles').update({
+      first_name: firstName, last_name: lastName, full_name: fullName,
+      gender: profileGender || null, birth_date: profileBirthDate || null,
+    }).eq('id', user.id)
+    setProfileSaving(false)
+    if (error) { showToast('❌ Eroare la salvare!'); console.error(error); return }
+    setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: profileGender, birth_date: profileBirthDate }))
+    showToast('✓ Profil actualizat!')
+    setScreen(prevScreen || 'home')
   }
 
   const uploadAvatar = async (file) => {
@@ -3429,7 +3451,11 @@ function App() {
                     <div style={{ fontSize: '20px', fontWeight: '900', color: '#1a1a1a', lineHeight: 1 }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>SESIUNI</div>
                   </div>
-                  <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+                  <div onClick={() => {
+                    setProfileFirstName(userProfile?.first_name || ''); setProfileLastName(userProfile?.last_name || '')
+                    setProfileGender(userProfile?.gender || ''); setProfileBirthDate(userProfile?.birth_date || '')
+                    setPrevScreen('home'); setScreen('profile')
+                  }}
                     style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
                     {avatarUploading ? (
                       <span style={{ fontSize: '10px', color: '#C8FF00', animation: 'spin 1s linear infinite' }}>⏳</span>
@@ -3439,8 +3465,6 @@ function App() {
                       <span style={{ fontSize: '13px', fontWeight: '800', color: '#C8FF00', letterSpacing: '-0.5px' }}>{initiale}</span>
                     )}
                   </div>
-                  <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                    onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]); e.target.value = '' }} />
                 </div>
               </div>
               <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
@@ -4238,6 +4262,79 @@ function App() {
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
+
+      {screen === 'profile' && (
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+            <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Profilul meu</h1>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}>
+            <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+              style={{ width: '84px', height: '84px', borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+              {avatarUploading ? (
+                <span style={{ fontSize: '20px', color: '#C8FF00', animation: 'spin 1s linear infinite' }}>⏳</span>
+              ) : userProfile?.avatar_url ? (
+                <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '26px', fontWeight: '800', color: '#C8FF00', letterSpacing: '-0.5px' }}>
+                  {[profileFirstName, profileLastName].map(w => w[0]).filter(Boolean).join('').toUpperCase() || 'U'}
+                </span>
+              )}
+            </div>
+            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]); e.target.value = '' }} />
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Email</div>
+              <div style={{ fontSize: '15px', color: '#888' }}>{user?.email}</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Prenume *</div>
+                <input value={profileFirstName} onChange={e => setProfileFirstName(e.target.value)}
+                  placeholder="ex: Andrei"
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Nume *</div>
+                <input value={profileLastName} onChange={e => setProfileLastName(e.target.value)}
+                  placeholder="ex: Popescu"
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
+              <input type="date" value={profileBirthDate} onChange={e => setProfileBirthDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box', background: '#fff' }} />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Gen</div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {[{ val: 'masculin', label: '♂', sub: 'Masculin' }, { val: 'feminin', label: '♀', sub: 'Feminin' }].map(g => (
+                  <div key={g.val} onClick={() => setProfileGender(g.val)}
+                    style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${profileGender === g.val ? '#1a1a1a' : '#e0e0e0'}`, background: profileGender === g.val ? '#1a1a1a' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ fontSize: '22px', marginBottom: '4px', color: profileGender === g.val ? '#C8FF00' : '#888' }}>{g.label}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: profileGender === g.val ? '#C8FF00' : '#888' }}>{g.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={saveMyProfile} disabled={profileSaving}
+              style={{ width: '100%', padding: '16px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
+              {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showCalPicker && (() => {
         const _now2 = new Date(); const todayStr = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`
