@@ -2280,6 +2280,7 @@ function SortableList({ items, onReorder, onRemove }) {
   }, [items, onReorder])
 
   const startDrag = (e, i) => {
+    e.stopPropagation()
     drag.current = { on: true, idx: i, startY: e.touches[0].clientY }
     setActiveIdx(i)
   }
@@ -2292,7 +2293,7 @@ function SortableList({ items, onReorder, onRemove }) {
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#C8FF00' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none', cursor: 'grab' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px' }}>☰</span>
           <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
-          <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto' }}>×</button>
+          {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto' }}>×</button>}
         </div>
       ))}
     </div>
@@ -2427,6 +2428,7 @@ function App() {
   const [editLogHeader, setEditLogHeader] = useState('')
   const [editLogMiscari, setEditLogMiscari] = useState([])
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
+  const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
   const [logTab, setLogTab] = useState('nou')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -2948,7 +2950,7 @@ function App() {
     if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
     setWodSaving(true)
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
-    const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? wodZiData[cheieVarianta] : []
+    const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? (wodMiscariCustom ?? wodZiData[cheieVarianta]) : []
     const miscariFinale = miscariWodZi.length > 0 ? miscariWodZi : wodMiscari
     const durStr = wodZiData ? formatWodDurata(wodZiData.duration) : ''
     const wodHeaderLine = wodZiData
@@ -2967,7 +2969,7 @@ function App() {
       showToast('WOD salvat! 🎉'); await fetchWodLogs(); fetchClasament()
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
-      setVariantaAleasa(null)
+      setVariantaAleasa(null); setWodMiscariCustom(null)
       setWodResult(''); setWodTime(''); setWodNote('')
       setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
@@ -3531,7 +3533,7 @@ function App() {
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
                     return (
-                      <div key={i} onClick={() => setVariantaAleasa(variantaAleasa === i ? null : i)}
+                      <div key={i} onClick={() => { setVariantaAleasa(variantaAleasa === i ? null : i); setWodMiscariCustom(null) }}
                         style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
                           <span>{v.emoji}</span>
@@ -3547,11 +3549,10 @@ function App() {
                               </div>
                               {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
                             </div>
-                            {miscari.map((m, j) => (
-                              <div key={j} style={{ padding: '5px 0', borderBottom: j < miscari.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-                                <span style={{ fontSize: '12px', color: '#555' }}>• {m}</span>
-                              </div>
-                            ))}
+                            <SortableList
+                              items={wodMiscariCustom ?? miscari}
+                              onReorder={setWodMiscariCustom}
+                            />
                           </>
                         )}
                       </div>
