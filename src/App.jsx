@@ -2374,6 +2374,9 @@ function App() {
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
   const [editLogId, setEditLogId] = useState(null)
   const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
+  const [editLogHeader, setEditLogHeader] = useState('')
+  const [editLogMiscari, setEditLogMiscari] = useState([])
+  const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [logTab, setLogTab] = useState('nou')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -2872,7 +2875,9 @@ function App() {
   const saveWodLog = async () => {
     if (editLogId) {
       setWodSaving(true)
-      const noteFull = [editLogNotesPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
+      const liniiPrefix = [...(editLogHeader ? [editLogHeader] : []), ...editLogMiscari]
+      const newPrefix = liniiPrefix.join('\n')
+      const noteFull = [newPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
       const { error } = await supabase.from('wod_logs').update({
         result: wodResult.trim() || null,
         time_result: wodTime.trim() || null,
@@ -2883,7 +2888,7 @@ function App() {
         showToast('✓ WOD actualizat!')
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
-        setEditLogId(null); setEditLogNotesPrefix('')
+        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
         setWodResult(''); setWodTime(''); setWodNote('')
       }
       setWodSaving(false)
@@ -3705,9 +3710,15 @@ function App() {
 
           {logTab === 'jurnal' && (
             <JurnalList logs={wodLogs} onEdit={(log) => {
+              const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
               const parts = (log.notes || '').split('\n---\n')
+              const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
+              const linii = prefix.split('\n').filter(Boolean)
+              const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
               setEditLogId(log.id)
-              setEditLogNotesPrefix(parts.length > 1 ? parts[0] : (parts[0] || ''))
+              setEditLogHeader(primaEsteHeader ? linii[0] : '')
+              setEditLogMiscari(linii.slice(primaEsteHeader ? 1 : 0))
+              setEditLogMiscareCurenta('')
               setWodResult(log.result || '')
               setWodTime(log.time_result || '')
               setWodNote(parts.length > 1 ? parts[1] : '')
@@ -3722,19 +3733,30 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
           </div>
 
           {editLogId ? (
-            editLogNotesPrefix ? (
-              <div style={{ background: '#f5f5f5', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', marginBottom: '6px', letterSpacing: '0.05em' }}>ANTRENAMENT LOGAT</div>
-                {editLogNotesPrefix.split('\n').map((line, i) => (
-                  <div key={i} style={{ fontSize: '12px', color: '#555', lineHeight: 1.5 }}>{line}</div>
-                ))}
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              {editLogHeader ? (
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
+              ) : null}
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>MIȘCĂRI</div>
+              {editLogMiscari.map((m, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
+                  <button onClick={() => setEditLogMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={editLogMiscareCurenta} onChange={e => setEditLogMiscareCurenta(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
+                  placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <button onClick={() => { if (editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
+                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
               </div>
-            ) : null
+            </div>
           ) : (
             <>
               {variantaAleasa !== null && (
