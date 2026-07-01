@@ -2446,6 +2446,7 @@ function App() {
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
   const [wodDeschis, setWodDeschis] = useState(false)
+  const [claseHomeDeschis, setClaseHomeDeschis] = useState(true)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
@@ -3506,7 +3507,10 @@ function App() {
             {/* ── Clase disponibile ── */}
             <div style={{ background: '#fff', marginBottom: '10px' }}>
               <div style={{ padding: '14px 20px 10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>CLASE DISPONIBILE</div>
+                <div onClick={() => setClaseHomeDeschis(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em' }}>CLASE DISPONIBILE</div>
+                  <span style={{ fontSize: '11px', color: '#bbb' }}>{claseHomeDeschis ? '▲' : '▼'}</span>
+                </div>
                 {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
                 <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                   {(() => {
@@ -3541,6 +3545,7 @@ function App() {
                   })()}
                 </div>
               </div>
+              {claseHomeDeschis && (
               <div style={{ padding: '0 16px 16px' }}>
                 {claseZi.length === 0
                   ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă {esteAzi ? 'azi' : 'în această zi'}</div>
@@ -3627,6 +3632,7 @@ function App() {
                     })
                 }
               </div>
+              )}
             </div>
 
             {/* ── WOD ── */}
