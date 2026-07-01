@@ -3878,21 +3878,21 @@ function App() {
               {variantaAleasa !== null && wodZiData ? (() => {
                 const cheie = VARIANTE_CONFIG[variantaAleasa].key
                 const miscariWod = wodZiData[cheie] || []
+                const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
-                    <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
-                        {wodZiData.type} {formatWodDurata(wodZiData.duration)}
-                      </div>
-                      {miscariWod.length > 0 ? miscariWod.map((m, i) => (
-                        <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #d4f0c0' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
-                          {m}
-                        </div>
-                      )) : (
-                        <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
-                      )}
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px' }}>
+                      {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                     </div>
+                    {miscariAfisate.length > 0 ? (
+                      <SortableList
+                        items={miscariAfisate}
+                        onReorder={setWodMiscariCustom}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
+                    )}
                   </div>
                 )
               })() : (
