@@ -2482,6 +2482,12 @@ function App() {
   const [prNote, setPrNote] = useState('')
   const [prVarianta, setPrVarianta] = useState('RX')
   const [prSaving, setPrSaving] = useState(false)
+  const [customHeroWods, setCustomHeroWods] = useState([])
+  const [newHeroWodName, setNewHeroWodName] = useState('')
+  const [newHeroWodFormat, setNewHeroWodFormat] = useState('')
+  const [newHeroWodMiscari, setNewHeroWodMiscari] = useState([])
+  const [newHeroWodMiscareCurenta, setNewHeroWodMiscareCurenta] = useState('')
+  const [newHeroWodSaving, setNewHeroWodSaving] = useState(false)
   const [wodResult, setWodResult] = useState('')
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
@@ -2536,6 +2542,10 @@ function App() {
   const [profileNewPasswordConfirm, setProfileNewPasswordConfirm] = useState('')
   const [passwordSaving, setPasswordSaving] = useState(false)
 
+  const heroWodsInfoAll = { ...HERO_WODS_INFO }
+  customHeroWods.forEach(w => { heroWodsInfoAll[w.name] = w.description })
+  const heroWodsListAll = [...PR_CATEGORII.HERO_WODS, ...customHeroWods.map(w => w.name)]
+
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
   const showInstall = !isStandalone && !installDismissed
@@ -2575,6 +2585,7 @@ function App() {
       saveProfile()
       fetchUserProfile()
       fetchPRuri()
+      fetchCustomHeroWods()
       fetchWodLogs()
       fetchRezervari()
       fetchWaitlistMea()
@@ -2909,6 +2920,30 @@ function App() {
     if (data) setPrDate(data)
   }
 
+  const fetchCustomHeroWods = async () => {
+    const { data } = await supabase.from('custom_hero_wods').select('*').eq('member_id', user.id).order('created_at', { ascending: true })
+    if (data) setCustomHeroWods(data)
+  }
+
+  const saveNewHeroWod = async () => {
+    const name = newHeroWodName.trim()
+    if (!name) { showToast('❌ Dă un nume WOD-ului!'); return }
+    if (!newHeroWodFormat.trim() && newHeroWodMiscari.length === 0) { showToast('❌ Adaugă formatul sau cel puțin o mișcare!'); return }
+    if (heroWodsInfoAll[name]) { showToast('❌ Există deja un Hero WOD cu acest nume!'); return }
+    setNewHeroWodSaving(true)
+    const description = [newHeroWodFormat.trim(), ...newHeroWodMiscari].filter(Boolean).join('\n')
+    const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, name, description }).select().single()
+    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    else {
+      setCustomHeroWods(prev => [...prev, data])
+      showToast('Hero WOD salvat! 💪')
+      setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
+      setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+      setPrevScreen('pr'); setScreen('logPR')
+    }
+    setNewHeroWodSaving(false)
+  }
+
   const fetchWodLogs = async () => {
     const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration)').eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
@@ -3098,7 +3133,7 @@ function App() {
     const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prDistanta.trim()
     if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
     setPrSaving(true)
-    const isBenchmark = miscarePR in HERO_WODS_INFO
+    const isBenchmark = miscarePR in heroWodsInfoAll
     const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
@@ -4023,6 +4058,42 @@ function App() {
         </div>
       )}
 
+      {screen === 'newHeroWod' && (
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <button onClick={() => setScreen(prevScreen || 'pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Hero WOD nou</h1>
+          </div>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NUME WOD</div>
+            <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder="ex: Forge WOD, The C15..."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>FORMAT</div>
+            <input value={newHeroWodFormat} onChange={e => setNewHeroWodFormat(e.target.value)} placeholder="ex: For Time, AMRAP 20 min, 5 rounds..."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
+            <SortableList
+              items={newHeroWodMiscari}
+              onReorder={setNewHeroWodMiscari}
+              onRemove={(i) => setNewHeroWodMiscari(prev => prev.filter((_, j) => j !== i))}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input value={newHeroWodMiscareCurenta} onChange={e => setNewHeroWodMiscareCurenta(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newHeroWodMiscareCurenta.trim()) { setNewHeroWodMiscari(prev => [...prev, newHeroWodMiscareCurenta.trim()]); setNewHeroWodMiscareCurenta('') }}}
+                placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              <button onClick={() => { if (newHeroWodMiscareCurenta.trim()) { setNewHeroWodMiscari(prev => [...prev, newHeroWodMiscareCurenta.trim()]); setNewHeroWodMiscareCurenta('') }}}
+                style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+            </div>
+          </div>
+          <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
+            style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
+            {newHeroWodSaving ? 'Se salvează...' : 'Salvează Hero WOD'}
+          </button>
+        </div>
+      )}
+
       {screen === 'logPR' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -4033,7 +4104,7 @@ function App() {
             <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} />
             {miscarePR && (
               <>
-                {miscarePR in HERO_WODS_INFO ? (
+                {miscarePR in heroWodsInfoAll ? (
                   <>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
                     <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 4:22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
@@ -4108,7 +4179,7 @@ function App() {
           CARDIO:        { culoare: '#0C447C', label: 'CARDIO' },
           HERO_WODS:     { culoare: '#8B1A1A', label: 'HERO WODs' },
         }
-        const toateMiscariCategorii = Object.values(PR_CATEGORII).flat()
+        const toateMiscariCategorii = [...PR_CATEGORII.WEIGHTLIFTING, ...PR_CATEGORII.GYMNASTICS, ...PR_CATEGORII.CARDIO, ...heroWodsListAll]
         const miscariFaraCat = Object.keys(prGroups).filter(m => !toateMiscariCategorii.includes(m))
         const preferredUnit = userProfile?.weight_unit || 'kg'
         const renderMiscare = (movement, idx, total, cat) => {
@@ -4117,7 +4188,7 @@ function App() {
           const isOpen = prSelectat === movement
           const isWeightBest = cat === 'WEIGHTLIFTING' && (best?.unit === 'kg' || best?.unit === 'lbs') && best?.value
           const bestKg = isWeightBest ? convertWeight(parseFloat(best.value), best.unit, preferredUnit) : null
-          const wodInfo = HERO_WODS_INFO[movement]
+          const wodInfo = heroWodsInfoAll[movement]
           return (
             <div key={movement} onClick={() => setPrSelectat(isOpen ? null : movement)}
               style={{ padding: '12px 14px', borderBottom: idx < total - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
@@ -4245,7 +4316,7 @@ function App() {
             {/* ── HERO WODs — dropdown collapsibil ── */}
             {(() => {
               const cfg = catConfig['HERO_WODS']
-              const toateHero = PR_CATEGORII['HERO_WODS']
+              const toateHero = heroWodsListAll
               const cuPR = toateHero.filter(m => prGroups[m]).length
               return (
                 <div style={{ marginBottom: '20px' }}>
@@ -4269,12 +4340,12 @@ function App() {
                           <input
                             value={heroWodNouInput}
                             onChange={e => setHeroWodNouInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}}
+                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
                             placeholder="ex: Forge WOD, The C15..."
                             style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
                           />
                           <button
-                            onClick={() => { if (!heroWodNouInput.trim()) return; setMiscarePR(heroWodNouInput.trim()); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR'); setHeroWodNouInput('') }}
+                            onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
                             style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#C8FF00' : '#f0f0f0', color: heroWodNouInput.trim() ? '#111' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
                             →
                           </button>
