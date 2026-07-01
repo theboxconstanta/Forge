@@ -2289,7 +2289,7 @@ function SortableList({ items, onReorder, onRemove }) {
     <div ref={containerRef}>
       {items.map((m, i) => (
         <div key={i} onTouchStart={(e) => startDrag(e, i)} onTouchEnd={endDrag}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#eef5ff' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none', cursor: 'grab' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#C8FF00' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none', cursor: 'grab' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px' }}>☰</span>
           <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
           <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto' }}>×</button>
