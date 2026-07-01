@@ -3002,7 +3002,7 @@ function App() {
         showToast('✓ WOD actualizat!')
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
-        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setEditReorderIndex(null)
+        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
         setWodResult(''); setWodTime(''); setWodNote('')
       }
       setWodSaving(false)
@@ -3846,7 +3846,7 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setEditReorderIndex(null); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
           </div>
 
