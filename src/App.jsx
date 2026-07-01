@@ -3718,13 +3718,10 @@ function App() {
               </div>
             )}
 
-            {/* ── Timer + logout ── */}
+            {/* ── Timer ── */}
             <div style={{ background: '#fff', marginBottom: '10px' }}>
-              <button onClick={goTimer} style={{ width: '100%', padding: '14px 20px', background: 'none', border: 'none', borderBottom: '1px solid #f5f5f5', fontSize: '14px', fontWeight: '600', color: '#1a1a1a', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button onClick={goTimer} style={{ width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: '14px', fontWeight: '600', color: '#1a1a1a', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span>⏱️</span> Pornește Timer
-              </button>
-              <button onClick={handleLogout} style={{ width: '100%', padding: '12px 20px', background: 'none', border: 'none', fontSize: '12px', color: '#bbb', cursor: 'pointer', textAlign: 'left' }}>
-                Deconectează-te
               </button>
             </div>
 
@@ -4402,6 +4399,10 @@ function App() {
               {passwordSaving ? 'Se salvează...' : 'Schimbă parola'}
             </button>
           </div>
+
+          <button onClick={handleLogout} style={{ width: '100%', padding: '14px', marginTop: '16px', background: 'none', border: 'none', fontSize: '13px', color: '#aaa', cursor: 'pointer', textAlign: 'center' }}>
+            Deconectează-te
+          </button>
         </div>
       )}
 
