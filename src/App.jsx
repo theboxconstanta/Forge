@@ -2488,6 +2488,8 @@ function App() {
   const [newHeroWodMiscari, setNewHeroWodMiscari] = useState([])
   const [newHeroWodMiscareCurenta, setNewHeroWodMiscareCurenta] = useState('')
   const [newHeroWodSaving, setNewHeroWodSaving] = useState(false)
+  const [editHeroWodId, setEditHeroWodId] = useState(null)
+  const [editPrId, setEditPrId] = useState(null)
   const [wodResult, setWodResult] = useState('')
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
@@ -2543,7 +2545,9 @@ function App() {
   const [passwordSaving, setPasswordSaving] = useState(false)
 
   const heroWodsInfoAll = { ...HERO_WODS_INFO }
-  customHeroWods.forEach(w => { heroWodsInfoAll[w.name] = w.description })
+  customHeroWods.forEach(w => {
+    heroWodsInfoAll[w.name] = [w.format, ...(w.movements ? w.movements.split('\n') : [])].filter(Boolean).join('\n')
+  })
   const heroWodsListAll = [...PR_CATEGORII.HERO_WODS, ...customHeroWods.map(w => w.name)]
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -2929,17 +2933,31 @@ function App() {
     const name = newHeroWodName.trim()
     if (!name) { showToast('❌ Dă un nume WOD-ului!'); return }
     if (!newHeroWodFormat.trim() && newHeroWodMiscari.length === 0) { showToast('❌ Adaugă formatul sau cel puțin o mișcare!'); return }
-    if (heroWodsInfoAll[name]) { showToast('❌ Există deja un Hero WOD cu acest nume!'); return }
+    const nameTaken = editHeroWodId
+      ? customHeroWods.some(w => w.id !== editHeroWodId && w.name.toLowerCase() === name.toLowerCase())
+      : !!heroWodsInfoAll[name]
+    if (nameTaken) { showToast('❌ Există deja un Hero WOD cu acest nume!'); return }
     setNewHeroWodSaving(true)
-    const description = [newHeroWodFormat.trim(), ...newHeroWodMiscari].filter(Boolean).join('\n')
-    const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, name, description }).select().single()
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else {
-      setCustomHeroWods(prev => [...prev, data])
-      showToast('Hero WOD salvat! 💪')
-      setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
-      setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
-      setPrevScreen('pr'); setScreen('logPR')
+    const payload = { name, format: newHeroWodFormat.trim() || null, movements: newHeroWodMiscari.join('\n') || null }
+    if (editHeroWodId) {
+      const { data, error } = await supabase.from('custom_hero_wods').update(payload).eq('id', editHeroWodId).select().single()
+      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      else {
+        setCustomHeroWods(prev => prev.map(w => w.id === editHeroWodId ? data : w))
+        showToast('✓ Hero WOD actualizat!')
+        setEditHeroWodId(null); setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+        setScreen('pr')
+      }
+    } else {
+      const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, ...payload }).select().single()
+      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      else {
+        setCustomHeroWods(prev => [...prev, data])
+        showToast('Hero WOD salvat! 💪')
+        setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
+        setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+        setPrevScreen('pr'); setScreen('logPR')
+      }
     }
     setNewHeroWodSaving(false)
   }
@@ -3137,16 +3155,51 @@ function App() {
     const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(miscarePR)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
-    let insertData = { member_id: user.id, movement: miscarePR, notes: prNote || null }
+    let insertData = { movement: miscarePR, notes: prNote || null }
+    if (!editPrId) insertData.member_id = user.id
     if (isBenchmark) { insertData.value = prTimp ? timeToSec(prTimp) : null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
     else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = 'm' }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
     else { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = userProfile?.weight_unit || 'kg' }
-    const { error } = await supabase.from('personal_records').insert(insertData)
+    const { error } = editPrId
+      ? await supabase.from('personal_records').update(insertData).eq('id', editPrId)
+      : await supabase.from('personal_records').insert(insertData)
     if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('PR salvat! 🏆'); await fetchPRuri(); setScreen('pr'); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX') }
+    else {
+      showToast(editPrId ? '✓ PR actualizat!' : 'PR salvat! 🏆')
+      await fetchPRuri(); setScreen('pr')
+      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX')
+      setEditPrId(null); setLogPentruPR(null)
+    }
     setPrSaving(false)
+  }
+
+  const startEditPR = (record, movement) => {
+    const isBenchmark = movement in heroWodsInfoAll
+    const isCardio = ['Row','Run','Bike Erg','Assault Bike','Ski Erg'].includes(movement)
+    const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(movement)
+    const isHold = ['Handstand Hold','L-sit Hold'].includes(movement)
+    setMiscarePR(movement)
+    setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrVarianta('RX')
+    if (isBenchmark) {
+      setPrTimp(record.value != null ? secToTime(parseFloat(record.value)) : '')
+      const varianteValide = ['RX', 'Intermediate', 'Beginner', 'OnRamp']
+      const [poss, ...rest] = (record.notes || '').split(' | ')
+      if (varianteValide.includes(poss)) { setPrVarianta(poss); setPrNote(rest.join(' | ')) }
+      else { setPrNote(record.notes || '') }
+    } else if (isCardio) {
+      setPrDistanta(record.value != null ? String(record.value) : ''); setPrNote(record.notes || '')
+    } else if (isGym) {
+      setPrReps(record.reps != null ? String(record.reps) : ''); setPrNote(record.notes || '')
+    } else if (isHold) {
+      setPrValoare(record.value != null ? String(record.value) : ''); setPrNote(record.notes || '')
+    } else {
+      const val = record.value != null ? convertWeight(parseFloat(record.value), record.unit, userProfile?.weight_unit || 'kg') : null
+      setPrValoare(val != null ? String(val) : ''); setPrReps(record.reps != null ? String(record.reps) : ''); setPrNote(record.notes || '')
+    }
+    setEditPrId(record.id); setLogPentruPR(null)
+    setPrevScreen('pr'); setScreen('logPR')
   }
 
   const toggleWaitlist = async (clasaId) => {
@@ -3907,7 +3960,7 @@ function App() {
             <>
               <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <div onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
+                <div onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
                   style={{ flex: 1, background: '#f0f0f0', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🏋️</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>Mișcare Unică</span>
@@ -4061,8 +4114,8 @@ function App() {
       {screen === 'newHeroWod' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setScreen(prevScreen || 'pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Hero WOD nou</h1>
+            <button onClick={() => { setEditHeroWodId(null); setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editHeroWodId ? 'Editează Hero WOD' : 'Hero WOD nou'}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NUME WOD</div>
@@ -4089,7 +4142,7 @@ function App() {
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
             style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
-            {newHeroWodSaving ? 'Se salvează...' : 'Salvează Hero WOD'}
+            {newHeroWodSaving ? 'Se salvează...' : editHeroWodId ? 'Salvează modificările' : 'Salvează Hero WOD'}
           </button>
         </div>
       )}
@@ -4097,8 +4150,8 @@ function App() {
       {screen === 'logPR' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setScreen(prevScreen || 'pr')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{logPentruPR ? `Log — ${logPentruPR.movement}` : 'Log PR nou'}</h1>
+            <button onClick={() => { setEditPrId(null); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editPrId ? `Editează — ${miscarePR}` : logPentruPR ? `Log — ${logPentruPR.movement}` : 'Log PR nou'}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} />
@@ -4142,7 +4195,7 @@ function App() {
                 <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder="Belt? Knee sleeves? Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                 <button onClick={savePR} disabled={prSaving}
                   style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
-                  {prSaving ? 'Se salvează...' : 'Salvează PR'}
+                  {prSaving ? 'Se salvează...' : editPrId ? 'Salvează modificările' : 'Salvează PR'}
                 </button>
               </>
             )}
@@ -4225,6 +4278,16 @@ function App() {
                       ))}
                     </div>
                   )}
+                  {cat === 'HERO_WODS' && customHeroWods.some(w => w.name === movement) && (
+                    <button onClick={() => {
+                        const cw = customHeroWods.find(w => w.name === movement)
+                        setEditHeroWodId(cw.id); setNewHeroWodName(cw.name); setNewHeroWodFormat(cw.format || ''); setNewHeroWodMiscari(cw.movements ? cw.movements.split('\n') : []); setNewHeroWodMiscareCurenta('')
+                        setPrevScreen('pr'); setScreen('newHeroWod')
+                      }}
+                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#1a1a1a', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px' }}>
+                      ✎ Editează Hero WOD-ul
+                    </button>
+                  )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
                       <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} {preferredUnit}</div>
@@ -4241,18 +4304,22 @@ function App() {
                       </div>
                     </div>
                   )}
-                  {records && records.length > 1 && (
+                  {records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC <span style={{ fontWeight: '400', fontSize: '9px' }}>(tap pentru editare)</span></div>
                       {records.slice(0, 5).map((r, j) => (
-                        <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                        <div key={j} onClick={() => startEditPR(r, movement)}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none', cursor: 'pointer' }}>
                           <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString('ro-RO')}{r.notes ? ' · ' + r.notes : ''}</span>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
+                            <span style={{ fontSize: '11px', color: '#bbb' }}>✎</span>
+                          </span>
                         </div>
                       ))}
                     </div>
                   )}
-                  <button onClick={() => { setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
+                  <button onClick={() => { setEditPrId(null); setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
                     style={{ width: '100%', padding: '8px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     + Adaugă rezultat nou
                   </button>
@@ -4265,7 +4332,7 @@ function App() {
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Recorduri 🏆</h1>
-              <button onClick={() => { setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
+              <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                 style={{ padding: '8px 14px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
                 + PR nou
               </button>
