@@ -3822,10 +3822,13 @@ function App() {
                               </div>
                               {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
                             </div>
-                            <SortableList
-                              items={wodMiscariCustom ?? miscari}
-                              onReorder={setWodMiscariCustom}
-                            />
+                            <div>
+                              {miscari.map((m, mi) => (
+                                <div key={mi} style={{ padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
+                                  <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
+                                </div>
+                              ))}
+                            </div>
                           </>
                         )}
                       </div>
