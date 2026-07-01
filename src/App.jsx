@@ -3856,13 +3856,12 @@ function App() {
                 )
               })() : (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
-                  {wodMiscari.map((m, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
-                      <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
-                    </div>
-                  ))}
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
+                  <SortableList
+                    items={wodMiscari}
+                    onReorder={setWodMiscari}
+                    onRemove={(i) => setWodMiscari(prev => prev.filter((_, j) => j !== i))}
+                  />
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
