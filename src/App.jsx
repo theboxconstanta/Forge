@@ -2377,6 +2377,8 @@ function App() {
   const [editLogHeader, setEditLogHeader] = useState('')
   const [editLogMiscari, setEditLogMiscari] = useState([])
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
+  const [editReorderIndex, setEditReorderIndex] = useState(null)
+  const editLongPressRef = useRef(null)
   const [logTab, setLogTab] = useState('nou')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -2888,7 +2890,7 @@ function App() {
         showToast('✓ WOD actualizat!')
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
-        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
+        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setEditReorderIndex(null)
         setWodResult(''); setWodTime(''); setWodNote('')
       }
       setWodSaving(false)
@@ -3733,7 +3735,7 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setEditReorderIndex(null); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
           </div>
 
@@ -3742,13 +3744,36 @@ function App() {
               {editLogHeader ? (
                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
               ) : null}
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>MIȘCĂRI</div>
-              {editLogMiscari.map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
-                  <button onClick={() => setEditLogMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
-                </div>
-              ))}
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(ține apăsat pentru reordonare)</span></div>
+              {editLogMiscari.map((m, i) => {
+                const inReorder = editReorderIndex === i
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: inReorder ? '#eef5ff' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', border: inReorder ? '1.5px solid #4a90e2' : '1.5px solid transparent', transition: 'all 0.15s' }}>
+                    {inReorder ? (
+                      <>
+                        <button onClick={() => { if (i > 0) { setEditLogMiscari(prev => { const a = [...prev]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a }); setEditReorderIndex(i-1) } }}
+                          style={{ background: 'none', border: 'none', fontSize: '18px', cursor: i > 0 ? 'pointer' : 'default', opacity: i > 0 ? 1 : 0.25, lineHeight: 1, padding: '0 2px' }}>↑</button>
+                        <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
+                        <button onClick={() => { if (i < editLogMiscari.length - 1) { setEditLogMiscari(prev => { const a = [...prev]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a }); setEditReorderIndex(i+1) } }}
+                          style={{ background: 'none', border: 'none', fontSize: '18px', cursor: i < editLogMiscari.length - 1 ? 'pointer' : 'default', opacity: i < editLogMiscari.length - 1 ? 1 : 0.25, lineHeight: 1, padding: '0 2px' }}>↓</button>
+                        <button onClick={() => setEditReorderIndex(null)}
+                          style={{ background: 'none', border: 'none', fontSize: '14px', color: '#4a90e2', fontWeight: '700', cursor: 'pointer', padding: '0 2px' }}>✓</button>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: '13px', color: '#ccc', cursor: 'grab', padding: '0 4px', userSelect: 'none' }}
+                          onTouchStart={() => { editLongPressRef.current = setTimeout(() => setEditReorderIndex(i), 500) }}
+                          onTouchEnd={() => clearTimeout(editLongPressRef.current)}
+                          onMouseDown={() => { editLongPressRef.current = setTimeout(() => setEditReorderIndex(i), 500) }}
+                          onMouseUp={() => clearTimeout(editLongPressRef.current)}
+                          onMouseLeave={() => clearTimeout(editLongPressRef.current)}>☰</span>
+                        <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
+                        <button onClick={() => setEditLogMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input value={editLogMiscareCurenta} onChange={e => setEditLogMiscareCurenta(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
