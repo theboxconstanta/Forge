@@ -2521,6 +2521,9 @@ function App() {
   const [profileGender, setProfileGender] = useState('')
   const [profileBirthDate, setProfileBirthDate] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
+  const [profileNewPassword, setProfileNewPassword] = useState('')
+  const [profileNewPasswordConfirm, setProfileNewPasswordConfirm] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -2816,6 +2819,17 @@ function App() {
     setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: profileGender, birth_date: profileBirthDate }))
     showToast('✓ Profil actualizat!')
     setScreen(prevScreen || 'home')
+  }
+
+  const changeMyPassword = async () => {
+    if (profileNewPassword.length < 6) { showToast('❌ Parola trebuie să aibă minim 6 caractere!'); return }
+    if (profileNewPassword !== profileNewPasswordConfirm) { showToast('❌ Parolele nu coincid!'); return }
+    setPasswordSaving(true)
+    const { error } = await supabase.auth.updateUser({ password: profileNewPassword })
+    setPasswordSaving(false)
+    if (error) { showToast('❌ Eroare la schimbarea parolei!'); console.error(error); return }
+    setProfileNewPassword(''); setProfileNewPasswordConfirm('')
+    showToast('✓ Parolă schimbată!')
   }
 
   const uploadAvatar = async (file) => {
@@ -4331,6 +4345,24 @@ function App() {
             <button onClick={saveMyProfile} disabled={profileSaving}
               style={{ width: '100%', padding: '16px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
               {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
+            </button>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#1a1a1a', marginBottom: '16px' }}>Schimbă parola</div>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Parolă nouă</div>
+              <input value={profileNewPassword} onChange={e => setProfileNewPassword(e.target.value)} type="password" placeholder="minimum 6 caractere"
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Confirmă parola</div>
+              <input value={profileNewPasswordConfirm} onChange={e => setProfileNewPasswordConfirm(e.target.value)} type="password" placeholder="repetă parola"
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box' }} />
+            </div>
+            <button onClick={changeMyPassword} disabled={passwordSaving}
+              style={{ width: '100%', padding: '16px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.6 : 1 }}>
+              {passwordSaving ? 'Se salvează...' : 'Schimbă parola'}
             </button>
           </div>
         </div>
