@@ -44,6 +44,18 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* App.jsx cape la 430px (max-width inline) ca sa arate ca un "telefon" cand
+   e deschis pe desktop intr-o fereastra larga. Pe un telefon real acel plafon
+   poate fi mai mic decat latimea reala a viewport-ului (in functie de
+   dispozitiv/zoom), lasand dungi goale pe laterale - eliminam plafonul doar
+   pe touch devices (niciodata pe desktop). !important e necesar ca sa bata
+   style-ul inline din React. */
+@media (hover: none) and (pointer: coarse) {
+  .app-frame {
+    max-width: 100% !important;
+  }
+}
+
 /* Pe telefon in landscape: rotim continutul inapoi la portret (fallback CSS) */
 /* hover:none + pointer:coarse = touch device (telefon/tableta), niciodata desktop */
 @media screen and (orientation: landscape) and (max-height: 600px) and (hover: none) and (pointer: coarse) {
