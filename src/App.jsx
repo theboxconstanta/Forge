@@ -4306,14 +4306,17 @@ function App() {
                   )}
                   {records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC <span style={{ fontWeight: '400', fontSize: '9px' }}>(tap pentru editare)</span></div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC</div>
                       {records.slice(0, 5).map((r, j) => (
-                        <div key={j} onClick={() => startEditPR(r, movement)}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none', cursor: 'pointer' }}>
+                        <div key={j}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none' }}>
                           <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString('ro-RO')}{r.notes ? ' · ' + r.notes : ''}</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
-                            <span style={{ fontSize: '11px', color: '#bbb' }}>✎</span>
+                            <button onClick={() => startEditPR(r, movement)}
+                              style={{ background: '#f0f0f0', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              ✎
+                            </button>
                           </span>
                         </div>
                       ))}
