@@ -316,7 +316,7 @@ function formatWodDurata(durataStr) {
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
-    <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(16px, env(safe-area-inset-bottom))', zIndex: 100 }}>
+    <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(16px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 60px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -3395,7 +3395,7 @@ function App() {
   }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (resetMode) return (
-    <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', boxShadow: '0 60px 0 0 #111' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
       <div style={{ width: '100%', background: '#1a1a1a', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
@@ -3435,8 +3435,8 @@ function App() {
   )
 
   if (!user) return (
-    <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', overflowY: 'auto' }}>
-      {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setInstallDismissed(false)}>
+    <div style={{ position: 'fixed', inset: 0, background: '#111', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', overflowY: 'auto', boxShadow: '0 60px 0 0 #111' }}>
+      {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxShadow: '0 60px 0 0 rgba(0,0,0,0.75)' }} onClick={() => setInstallDismissed(false)}>
         <div style={{ background: '#1c1c1e', borderRadius: '24px 24px 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: '430px' }} onClick={e => e.stopPropagation()}>
           <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px', margin: '0 auto 24px' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
@@ -3559,7 +3559,7 @@ function App() {
       </div>
 
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
@@ -4632,7 +4632,7 @@ function App() {
         const prevLuna = () => calPickerMonth === 0 ? (setCalPickerYear(y => y - 1), setCalPickerMonth(11)) : setCalPickerMonth(m => m - 1)
         const nextLuna = () => calPickerMonth === 11 ? (setCalPickerYear(y => y + 1), setCalPickerMonth(0)) : setCalPickerMonth(m => m + 1)
         return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.55)' }}
             onClick={() => setShowCalPicker(false)}>
             <div style={{ background: '#fff', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '360px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
               onClick={e => e.stopPropagation()}>
@@ -4681,7 +4681,7 @@ function App() {
       })()}
 
       {showOnboarding && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxShadow: '0 60px 0 0 rgba(0,0,0,0.75)' }}>
           <div style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '28px 24px 40px', width: '100%', maxWidth: '480px' }}>
             {/* Progress dots */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '24px' }}>
