@@ -3507,10 +3507,7 @@ function App() {
             {/* ── Clase disponibile ── */}
             <div style={{ background: '#fff', marginBottom: '10px' }}>
               <div style={{ padding: '14px 20px 10px' }}>
-                <div onClick={() => setClaseHomeDeschis(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em' }}>CLASE DISPONIBILE</div>
-                  <span style={{ fontSize: '11px', color: '#bbb' }}>{claseHomeDeschis ? '▲' : '▼'}</span>
-                </div>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>CLASE DISPONIBILE</div>
                 {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
                 <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                   {(() => {
@@ -3543,6 +3540,15 @@ function App() {
                       )
                     })
                   })()}
+                </div>
+              </div>
+              <div style={{ padding: '0 20px 14px' }}>
+                <div onClick={() => setClaseHomeDeschis(v => !v)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', background: '#fafafa' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>
+                    {claseZi.length === 0 ? `Nicio clasă ${esteAzi ? 'azi' : 'în această zi'}` : `${claseZi.length} clas${claseZi.length === 1 ? 'ă' : 'e'} disponibil${claseZi.length === 1 ? 'ă' : 'e'}`}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#888', display: 'inline-block', transform: claseHomeDeschis ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▼</span>
                 </div>
               </div>
               {claseHomeDeschis && (
