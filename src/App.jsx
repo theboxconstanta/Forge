@@ -2249,7 +2249,7 @@ function Admin({ showToast }) {
   )
 }
 
-function JurnalList({ logs }) {
+function JurnalList({ logs, onEdit }) {
   const [deschis, setDeschis] = useState(null)
   if (logs.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
@@ -2306,6 +2306,12 @@ function JurnalList({ logs }) {
                 )}
                 {!areDetalii && (
                   <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio detaliere suplimentară.</div>
+                )}
+                {onEdit && (
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(w) }}
+                    style={{ marginTop: '12px', padding: '7px 16px', background: '#f0f0f0', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                    ✎ Editează
+                  </button>
                 )}
               </div>
             )}
@@ -2366,6 +2372,8 @@ function App() {
   const [wodDurata, setWodDurata] = useState('')
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
+  const [editLogId, setEditLogId] = useState(null)
+  const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
   const [logTab, setLogTab] = useState('nou')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -2862,6 +2870,25 @@ function App() {
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
   const saveWodLog = async () => {
+    if (editLogId) {
+      setWodSaving(true)
+      const noteFull = [editLogNotesPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
+      const { error } = await supabase.from('wod_logs').update({
+        result: wodResult.trim() || null,
+        time_result: wodTime.trim() || null,
+        notes: noteFull || null,
+      }).eq('id', editLogId)
+      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      else {
+        showToast('✓ WOD actualizat!')
+        await fetchWodLogs(); fetchClasament()
+        setScreen('log'); setLogTab('jurnal')
+        setEditLogId(null); setEditLogNotesPrefix('')
+        setWodResult(''); setWodTime(''); setWodNote('')
+      }
+      setWodSaving(false)
+      return
+    }
     const areContiut = wodResult.trim() || wodTime.trim() || wodMiscari.length > 0
     if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
     setWodSaving(true)
@@ -3475,7 +3502,7 @@ function App() {
                       </div>
                     )
                   })}
-                  <button onClick={() => { setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
+                  <button onClick={() => { setEditLogId(null); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                     style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#C8FF00' : '#ccc', color: variantaAleasa !== null ? '#111' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
                   </button>
@@ -3667,7 +3694,7 @@ function App() {
                   <span style={{ fontSize: '32px' }}>🏋️</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>Mișcare Unică</span>
                 </div>
-                <div onClick={() => { setVariantaAleasa(null); setPrevScreen('log'); setScreen('logWOD') }}
+                <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setPrevScreen('log'); setScreen('logWOD') }}
                   style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <span style={{ fontSize: '32px' }}>🔥</span>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
@@ -3677,7 +3704,16 @@ function App() {
           )}
 
           {logTab === 'jurnal' && (
-            <JurnalList logs={wodLogs} />
+            <JurnalList logs={wodLogs} onEdit={(log) => {
+              const parts = (log.notes || '').split('\n---\n')
+              setEditLogId(log.id)
+              setEditLogNotesPrefix(parts.length > 1 ? parts[0] : (parts[0] || ''))
+              setWodResult(log.result || '')
+              setWodTime(log.time_result || '')
+              setWodNote(parts.length > 1 ? parts[1] : '')
+              setPrevScreen('log')
+              setScreen('logWOD')
+            }} />
           )}
 
         </div>
@@ -3686,72 +3722,86 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>Log WOD</h1>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
           </div>
-          {variantaAleasa !== null && (
-            <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare }}>
-                {VARIANTE_CONFIG[variantaAleasa].emoji} {VARIANTE_CONFIG[variantaAleasa].nivel}
-                {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
-              </div>
-            </div>
-          )}
 
-          {variantaAleasa === null && (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIP ANTRENAMENT</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-                {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
-                  <div key={t} onClick={() => setWodTip(t)}
-                    style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #1a1a1a' : '1px solid #e0e0e0', background: wodTip === t ? '#f0f0f0' : '#fafafa', color: wodTip === t ? '#1a1a1a' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
-                    {t}
-                  </div>
+          {editLogId ? (
+            editLogNotesPrefix ? (
+              <div style={{ background: '#f5f5f5', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', marginBottom: '6px', letterSpacing: '0.05em' }}>ANTRENAMENT LOGAT</div>
+                {editLogNotesPrefix.split('\n').map((line, i) => (
+                  <div key={i} style={{ fontSize: '12px', color: '#555', lineHeight: 1.5 }}>{line}</div>
                 ))}
               </div>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>DURATĂ / RUNDE</div>
-              <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder="ex: 20 minute, 5 runde" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-            </div>
-          )}
-
-          {variantaAleasa !== null && wodZiData ? (() => {
-            const cheie = VARIANTE_CONFIG[variantaAleasa].key
-            const miscariWod = wodZiData[cheie] || []
-            return (
-              <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
-                <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
-                    {wodZiData.type} {formatWodDurata(wodZiData.duration)}
+            ) : null
+          ) : (
+            <>
+              {variantaAleasa !== null && (
+                <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare }}>
+                    {VARIANTE_CONFIG[variantaAleasa].emoji} {VARIANTE_CONFIG[variantaAleasa].nivel}
+                    {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
                   </div>
-                  {miscariWod.length > 0 ? miscariWod.map((m, i) => (
-                    <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #d4f0c0' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
-                      {m}
+                </div>
+              )}
+
+              {variantaAleasa === null && (
+                <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIP ANTRENAMENT</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                    {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
+                      <div key={t} onClick={() => setWodTip(t)}
+                        style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #1a1a1a' : '1px solid #e0e0e0', background: wodTip === t ? '#f0f0f0' : '#fafafa', color: wodTip === t ? '#1a1a1a' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
+                        {t}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>DURATĂ / RUNDE</div>
+                  <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder="ex: 20 minute, 5 runde" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                </div>
+              )}
+
+              {variantaAleasa !== null && wodZiData ? (() => {
+                const cheie = VARIANTE_CONFIG[variantaAleasa].key
+                const miscariWod = wodZiData[cheie] || []
+                return (
+                  <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
+                    <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '8px' }}>
+                        {wodZiData.type} {formatWodDurata(wodZiData.duration)}
+                      </div>
+                      {miscariWod.length > 0 ? miscariWod.map((m, i) => (
+                        <div key={i} style={{ fontSize: '14px', color: '#1a1a1a', paddingBottom: '4px', borderBottom: i < miscariWod.length - 1 ? '1px solid #d4f0c0' : 'none', marginBottom: i < miscariWod.length - 1 ? '4px' : '0' }}>
+                          {m}
+                        </div>
+                      )) : (
+                        <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
+                      )}
                     </div>
-                  )) : (
-                    <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
-                  )}
+                  </div>
+                )
+              })() : (
+                <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
+                  {wodMiscari.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
+                      <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                      placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
+                      style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+                  </div>
                 </div>
-              </div>
-            )
-          })() : (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI</div>
-              {wodMiscari.map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {m}</span>
-                  <button onClick={() => setWodMiscari(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                  placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -3769,7 +3819,7 @@ function App() {
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
               style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
-              {wodSaving ? 'Se salvează...' : 'Salvează WOD'}
+              {wodSaving ? 'Se salvează...' : editLogId ? 'Salvează modificările' : 'Salvează WOD'}
             </button>
           </div>
         </div>
