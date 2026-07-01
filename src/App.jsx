@@ -2251,16 +2251,23 @@ function Admin({ showToast }) {
 
 function SortableList({ items, onReorder, onRemove }) {
   const containerRef = useRef(null)
-  const drag = useRef({ on: false, idx: null, startY: 0 })
+  const drag = useRef({ on: false, idx: null, startY: 0, initialY: 0 })
   const [activeIdx, setActiveIdx] = useState(null)
+  const [editIdx, setEditIdx] = useState(null)
+  const [editVal, setEditVal] = useState('')
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const onMove = (e) => {
-      if (!drag.current.on) return
-      e.preventDefault()
+      if (drag.current.idx === null) return
       const y = e.touches[0].clientY
+      const totalDy = y - drag.current.initialY
+      if (!drag.current.on) {
+        if (Math.abs(totalDy) < 8) return
+        drag.current.on = true
+      }
+      e.preventDefault()
       const dy = y - drag.current.startY
       const STEP = 48
       if (Math.abs(dy) < STEP / 2) return
@@ -2280,20 +2287,53 @@ function SortableList({ items, onReorder, onRemove }) {
   }, [items, onReorder])
 
   const startDrag = (e, i) => {
+    if (editIdx !== null) return
     e.stopPropagation()
-    drag.current = { on: true, idx: i, startY: e.touches[0].clientY }
+    const y = e.touches[0].clientY
+    drag.current = { on: false, idx: i, startY: y, initialY: y }
     setActiveIdx(i)
   }
-  const endDrag = () => { drag.current.on = false; setActiveIdx(null) }
+
+  const endDrag = (i) => {
+    if (!drag.current.on && drag.current.idx !== null) {
+      setEditIdx(i)
+      setEditVal(items[i])
+    }
+    drag.current = { on: false, idx: null, startY: 0, initialY: 0 }
+    setActiveIdx(null)
+  }
+
+  const commitEdit = (i) => {
+    if (editVal.trim()) {
+      const next = [...items]
+      next[i] = editVal.trim()
+      onReorder(next)
+    }
+    setEditIdx(null)
+    setEditVal('')
+  }
 
   return (
     <div ref={containerRef}>
       {items.map((m, i) => (
-        <div key={i} onTouchStart={(e) => startDrag(e, i)} onTouchEnd={endDrag}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#C8FF00' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none', cursor: 'grab' }}>
-          <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px' }}>☰</span>
-          <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
-          {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto' }}>×</button>}
+        <div key={i}
+          onTouchStart={(e) => startDrag(e, i)}
+          onTouchEnd={() => endDrag(i)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#C8FF00' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
+          <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
+          {editIdx === i ? (
+            <input
+              autoFocus
+              value={editVal}
+              onChange={e => setEditVal(e.target.value)}
+              onBlur={() => commitEdit(i)}
+              onKeyDown={e => { if (e.key === 'Enter') commitEdit(i) }}
+              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', color: '#1a1a1a', outline: 'none', padding: '0', touchAction: 'auto' }}
+            />
+          ) : (
+            <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
+          )}
+          {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto', flexShrink: 0 }}>×</button>}
         </div>
       ))}
     </div>
