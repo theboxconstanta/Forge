@@ -30,10 +30,12 @@ body {
   bottom: 0;
 }
 
-/* Pe telefon body e inchis (app umple tot ecranul, nu conteaza) */
+/* Fallback vizibil in spatele containerelor cu minHeight: 100dvh (bara de
+   adresa mobila care apare/dispare poate lasa un gol sub continut) -
+   deschis, nu negru, ca sa nu arate ca "ecran negru" cand se vede o clipa */
 @media (hover: none) and (pointer: coarse) {
   body {
-    background: #111;
+    background: #f5f5f5;
   }
 }
 
