@@ -2340,8 +2340,9 @@ function SortableList({ items, onReorder, onRemove }) {
   )
 }
 
-function JurnalList({ logs, onEdit }) {
+function JurnalList({ logs, onEdit, onDelete }) {
   const [deschis, setDeschis] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
   if (logs.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
       <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
@@ -2366,11 +2367,26 @@ function JurnalList({ logs, onEdit }) {
         return (
           <div key={logKey}>
             <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
-          <div onClick={() => setDeschis(isOpen ? null : logKey)}
-            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #1a1a1a', cursor: 'pointer' }}>
+          <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
+            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #1a1a1a', cursor: 'pointer', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{w.variant_level || 'WOD'}</div>
-              <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {onDelete && (
+                  confirmDelete === logKey ? (
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(w.id); setConfirmDelete(null) }}
+                      style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                      Șterge?
+                    </button>
+                  ) : (
+                    <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(logKey) }}
+                      style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+                      ×
+                    </button>
+                  )
+                )}
+                <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
               {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#1a1a1a', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
@@ -2963,6 +2979,12 @@ function App() {
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
+
+  const stergeWodLog = async (id) => {
+    const { error } = await supabase.from('wod_logs').delete().eq('id', id)
+    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error) }
+    else { showToast('✓ Antrenament șters!'); await fetchWodLogs() }
+  }
 
   const saveWodLog = async () => {
     if (editLogId) {
@@ -3800,7 +3822,7 @@ function App() {
           )}
 
           {logTab === 'jurnal' && (
-            <JurnalList logs={wodLogs} onEdit={(log) => {
+            <JurnalList logs={wodLogs} onDelete={stergeWodLog} onEdit={(log) => {
               const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
               const parts = (log.notes || '').split('\n---\n')
               const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
