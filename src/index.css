@@ -36,12 +36,14 @@ body {
   bottom: 0;
 }
 
+/* #root nu are propriul lui scroll - body e singurul container care
+   scroleaza (vezi mai sus). Doua containere de scroll imbricate (body +
+   #root) e motivul principal pentru care position:fixed (NavBar, modale)
+   se poate "dezlipi" de marginea reala a ecranului si scrola cu continutul
+   in loc sa ramana fix, mai ales pe Safari iOS. */
 #root {
   width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  min-height: 100%;
 }
 
 /* App.jsx cape la 430px (max-width inline) ca sa arate ca un "telefon" cand
