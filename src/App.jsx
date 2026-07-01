@@ -387,6 +387,44 @@ function CautareMiscare({ onAleage, preFill }) {
   )
 }
 
+// Sugerează mișcări din MISCARI pe măsură ce se scrie ultimul cuvânt dintr-un
+// text liber gen "21 Thrusters @ 43kg" (nu doar potriviri de la începutul
+// stringului, ca la CautareMiscare, fiindcă aici textul conține și reps/greutate).
+function miscareSugestii(text) {
+  const cuvant = text.trim().split(/\s+/).pop()
+  if (!cuvant || cuvant.length < 2) return []
+  return MISCARI.filter(m => m.toLowerCase().includes(cuvant.toLowerCase())).slice(0, 5)
+}
+
+function MiscareQuickAdd({ value, onChange, onAdd, placeholder }) {
+  const sugestii = miscareSugestii(value)
+  const alege = (m) => {
+    const parts = value.split(/\s+/)
+    parts[parts.length - 1] = m
+    onChange(parts.join(' ') + ' ')
+  }
+  const add = () => { if (value.trim()) onAdd(value.trim()) }
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input value={value} onChange={e => onChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && value.trim()) add() }}
+          placeholder={placeholder} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+        <button onClick={add}
+          style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+      </div>
+      {sugestii.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: '46px', zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+          {sugestii.map((s, i) => (
+            <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => alege(s)}
+              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f5f5f5' : 'none' }}>{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Timer({ onBack, defaultFortime }) {
   const [mod, setMod] = useState('fortime')
   const [running, setRunning] = useState(false)
@@ -2332,14 +2370,25 @@ function SortableList({ items, onReorder, onRemove }) {
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#C8FF00' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
           {editIdx === i ? (
-            <input
-              autoFocus
-              value={editVal}
-              onChange={e => setEditVal(e.target.value)}
-              onBlur={() => commitEdit(i)}
-              onKeyDown={e => { if (e.key === 'Enter') commitEdit(i) }}
-              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '13px', color: '#1a1a1a', outline: 'none', padding: '0', touchAction: 'auto' }}
-            />
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                autoFocus
+                value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                onBlur={() => commitEdit(i)}
+                onKeyDown={e => { if (e.key === 'Enter') commitEdit(i) }}
+                style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '13px', color: '#1a1a1a', outline: 'none', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
+              />
+              {miscareSugestii(editVal).length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+                  {miscareSugestii(editVal).map((s, si) => (
+                    <div key={si} onMouseDown={e => e.preventDefault()}
+                      onClick={() => { const parts = editVal.split(/\s+/); parts[parts.length - 1] = s; setEditVal(parts.join(' ') + ' ') }}
+                      style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#1a1a1a' }}>{s}</div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <span style={{ fontSize: '13px', color: '#1a1a1a', flex: 1 }}>• {m}</span>
           )}
@@ -4014,13 +4063,9 @@ function App() {
                 onReorder={setEditLogMiscari}
                 onRemove={(i) => setEditLogMiscari(prev => prev.filter((_, j) => j !== i))}
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={editLogMiscareCurenta} onChange={e => setEditLogMiscareCurenta(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
-                  placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <button onClick={() => { if (editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
-                  style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
-              </div>
+              <MiscareQuickAdd value={editLogMiscareCurenta} onChange={setEditLogMiscareCurenta}
+                onAdd={(v) => { setEditLogMiscari(prev => [...prev, v]); setEditLogMiscareCurenta('') }}
+                placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
             </div>
           ) : (
             <>
@@ -4078,13 +4123,9 @@ function App() {
                     onReorder={setWodMiscari}
                     onRemove={(i) => setWodMiscari(prev => prev.filter((_, j) => j !== i))}
                   />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                      placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                    <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                      style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
-                  </div>
+                  <MiscareQuickAdd value={wodMiscareCurenta} onChange={setWodMiscareCurenta}
+                    onAdd={(v) => { setWodMiscari(prev => [...prev, v]); setWodMiscareCurenta('') }}
+                    placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
                 </div>
               )}
             </>
@@ -4132,13 +4173,9 @@ function App() {
               onReorder={setNewHeroWodMiscari}
               onRemove={(i) => setNewHeroWodMiscari(prev => prev.filter((_, j) => j !== i))}
             />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input value={newHeroWodMiscareCurenta} onChange={e => setNewHeroWodMiscareCurenta(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && newHeroWodMiscareCurenta.trim()) { setNewHeroWodMiscari(prev => [...prev, newHeroWodMiscareCurenta.trim()]); setNewHeroWodMiscareCurenta('') }}}
-                placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-              <button onClick={() => { if (newHeroWodMiscareCurenta.trim()) { setNewHeroWodMiscari(prev => [...prev, newHeroWodMiscareCurenta.trim()]); setNewHeroWodMiscareCurenta('') }}}
-                style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
-            </div>
+            <MiscareQuickAdd value={newHeroWodMiscareCurenta} onChange={setNewHeroWodMiscareCurenta}
+              onAdd={(v) => { setNewHeroWodMiscari(prev => [...prev, v]); setNewHeroWodMiscareCurenta('') }}
+              placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
             style={{ width: '100%', padding: '12px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
