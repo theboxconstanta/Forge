@@ -253,7 +253,14 @@ function timeToSec(str) {
   if (parts.length === 2) return parts[0] * 60 + parts[1]
   return parseFloat(str) || null
 }
-function formatPR(pr) {
+const KG_TO_LBS = 2.20462
+function convertWeight(value, fromUnit, toUnit) {
+  if (value == null || fromUnit === toUnit) return value
+  if (fromUnit === 'kg' && toUnit === 'lbs') return Math.round(value * KG_TO_LBS * 2) / 2
+  if (fromUnit === 'lbs' && toUnit === 'kg') return Math.round(value / KG_TO_LBS * 2) / 2
+  return value
+}
+function formatPR(pr, preferredUnit) {
   if (pr.unit === 'timp') {
     if (!pr.value && pr.value !== 0) return '—'
     const v = String(pr.value)
@@ -262,8 +269,11 @@ function formatPR(pr) {
     const sec = parseFloat(v)
     return isNaN(sec) ? v : secToTime(sec)
   }
-  if (pr.value && pr.reps) return `${pr.value} ${pr.unit} × ${pr.reps}rep`
-  if (pr.value) return `${pr.value} ${pr.unit}`
+  const isWeight = pr.unit === 'kg' || pr.unit === 'lbs'
+  const unit = isWeight && preferredUnit ? preferredUnit : pr.unit
+  const value = isWeight && preferredUnit ? convertWeight(pr.value, pr.unit, preferredUnit) : pr.value
+  if (value && pr.reps) return `${value} ${unit} × ${pr.reps}rep`
+  if (value) return `${value} ${unit}`
   if (pr.reps) return `${pr.reps} reps`
   return '—'
 }
@@ -2821,6 +2831,14 @@ function App() {
     setScreen(prevScreen || 'home')
   }
 
+  const changeWeightUnit = async (unit) => {
+    if (unit === userProfile?.weight_unit) return
+    setUserProfile(prev => ({ ...prev, weight_unit: unit }))
+    const { error } = await supabase.from('profiles').update({ weight_unit: unit }).eq('id', user.id)
+    if (error) { showToast('❌ Eroare la salvare!'); console.error(error); return }
+    showToast(`✓ Unitate schimbată în ${unit}`)
+  }
+
   const changeMyPassword = async () => {
     if (profileNewPassword.length < 6) { showToast('❌ Parola trebuie să aibă minim 6 caractere!'); return }
     if (profileNewPassword !== profileNewPasswordConfirm) { showToast('❌ Parolele nu coincid!'); return }
@@ -3088,7 +3106,7 @@ function App() {
     else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = 'm' }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
-    else { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'kg' }
+    else { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = userProfile?.weight_unit || 'kg' }
     const { error } = await supabase.from('personal_records').insert(insertData)
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else { showToast('PR salvat! 🏆'); await fetchPRuri(); setScreen('pr'); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrNote(''); setPrVarianta('RX') }
@@ -3902,7 +3920,7 @@ function App() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input value={editLogMiscareCurenta} onChange={e => setEditLogMiscareCurenta(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
-                  placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 <button onClick={() => { if (editLogMiscareCurenta.trim()) { setEditLogMiscari(prev => [...prev, editLogMiscareCurenta.trim()]); setEditLogMiscareCurenta('') }}}
                   style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
               </div>
@@ -3966,7 +3984,7 @@ function App() {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input value={wodMiscareCurenta} onChange={e => setWodMiscareCurenta(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
-                      placeholder="ex: 21 Thrusters @ 43kg" style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                     <button onClick={() => { if (wodMiscareCurenta.trim()) { setWodMiscari(prev => [...prev, wodMiscareCurenta.trim()]); setWodMiscareCurenta('') }}}
                       style={{ padding: '10px 14px', borderRadius: '10px', background: '#C8FF00', color: '#111', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
                   </div>
@@ -4034,8 +4052,8 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Greutate (kg)</div>
-                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder="ex: 120" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Greutate ({userProfile?.weight_unit || 'kg'})</div>
+                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 265' : 'ex: 120'} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Repetări</div>
                     <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder="ex: 1 (pentru 1RM)" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
@@ -4083,11 +4101,13 @@ function App() {
         }
         const toateMiscariCategorii = Object.values(PR_CATEGORII).flat()
         const miscariFaraCat = Object.keys(prGroups).filter(m => !toateMiscariCategorii.includes(m))
+        const preferredUnit = userProfile?.weight_unit || 'kg'
         const renderMiscare = (movement, idx, total, cat) => {
           const records = prGroups[movement]
           const best = bestPR(records)
           const isOpen = prSelectat === movement
-          const bestKg = cat === 'WEIGHTLIFTING' && best?.unit === 'kg' && best?.value ? parseFloat(best.value) : null
+          const isWeightBest = cat === 'WEIGHTLIFTING' && (best?.unit === 'kg' || best?.unit === 'lbs') && best?.value
+          const bestKg = isWeightBest ? convertWeight(parseFloat(best.value), best.unit, preferredUnit) : null
           const wodInfo = HERO_WODS_INFO[movement]
           return (
             <div key={movement} onClick={() => setPrSelectat(isOpen ? null : movement)}
@@ -4095,7 +4115,7 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#1a1a1a' : '#ccc' }}>{best ? formatPR(best) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#1a1a1a' : '#ccc' }}>{best ? formatPR(best, preferredUnit) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -4127,14 +4147,14 @@ function App() {
                   )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} kg</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} {preferredUnit}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
                         {PCT_BARA.map(pct => {
-                          const kg = Math.round(bestKg * pct / 100 * 2) / 2
+                          const w = Math.round(bestKg * pct / 100 * 2) / 2
                           return (
                             <div key={pct} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: '#f8f8f8', borderRadius: '8px' }}>
                               <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '600' }}>{pct}%</span>
-                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{kg} kg</span>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>{w} {preferredUnit}</span>
                             </div>
                           )
                         })}
@@ -4147,7 +4167,7 @@ function App() {
                       {records.slice(0, 5).map((r, j) => (
                         <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #f5f5f5' : 'none' }}>
                           <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString('ro-RO')}{r.notes ? ' · ' + r.notes : ''}</span>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r)}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
                         </div>
                       ))}
                     </div>
@@ -4346,6 +4366,23 @@ function App() {
               style={{ width: '100%', padding: '16px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
               {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
             </button>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>Unitate de măsură</div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>Folosită pentru greutățile din Recorduri.</div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {[{ val: 'kg', label: 'Kilograme' }, { val: 'lbs', label: 'Lbs' }].map(u => {
+                const active = (userProfile?.weight_unit || 'kg') === u.val
+                return (
+                  <div key={u.val} onClick={() => changeWeightUnit(u.val)}
+                    style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${active ? '#1a1a1a' : '#e0e0e0'}`, background: active ? '#1a1a1a' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: active ? '#C8FF00' : '#888', textTransform: 'uppercase' }}>{u.val}</div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: active ? '#C8FF00' : '#888', marginTop: '2px' }}>{u.label}</div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
