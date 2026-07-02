@@ -2676,7 +2676,7 @@ function App() {
   const [editLogMiscari, setEditLogMiscari] = useState([])
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
-  const [logTab, setLogTab] = useState('nou')
+  const [logTab, setLogTab] = useState('jurnal')
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
@@ -4167,31 +4167,15 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
-            {[{ id: 'nou', lbl: '+ Logare nouă' }, { id: 'jurnal', lbl: '📓 Jurnal' }].map(t => (
-              <div key={t.id} onClick={() => setLogTab(t.id)}
-                style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === t.id ? '700' : '400', background: logTab === t.id ? '#fff' : 'transparent', color: logTab === t.id ? '#1a1a1a' : '#888', cursor: 'pointer', boxShadow: logTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                {t.lbl}
-              </div>
-            ))}
+            <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setPrevScreen('log'); setScreen('logWOD') }}
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
+              + Logare nouă
+            </div>
+            <div onClick={() => setLogTab('jurnal')}
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: '#fff', color: '#1a1a1a', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: 'all 0.15s' }}>
+              📓 Jurnal
+            </div>
           </div>
-
-          {logTab === 'nou' && (
-            <>
-              <p style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>Câte mișcări are antrenamentul tău?</p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('log'); setScreen('logPR') }}
-                  style={{ flex: 1, background: '#f0f0f0', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '32px' }}>🏋️</span>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>Mișcare Unică</span>
-                </div>
-                <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setPrevScreen('log'); setScreen('logWOD') }}
-                  style={{ flex: 1, background: '#FFF8E6', borderRadius: '16px', padding: '24px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '32px' }}>🔥</span>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#7D5A00', textAlign: 'center' }}>Mișcări Multiple</span>
-                </div>
-              </div>
-            </>
-          )}
 
           {logTab === 'jurnal' && (
             <JurnalList logs={wodLogs} onDelete={stergeWodLog} onEdit={(log) => {
