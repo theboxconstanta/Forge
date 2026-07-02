@@ -366,21 +366,23 @@ function handleDebugLogoTap() {
   }
 }
 
-function NavBarDebug({ navRef, bottomGap }) {
+function NavBarDebug({ navRef, fillerRef, bottomGap }) {
   const [txt, setTxt] = useState('masor...')
   useEffect(() => {
     const measure = () => {
       const r = navRef.current?.getBoundingClientRect()
+      const f = fillerRef.current?.getBoundingClientRect()
+      const fBg = fillerRef.current ? getComputedStyle(fillerRef.current).backgroundColor : '?'
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
       setTxt(
-        `innerH:${window.innerHeight} screenH:${window.screen.height} standalone:${String(isStandalone)} bottomGap:${bottomGap} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} dpr:${window.devicePixelRatio}`
+        `innerH:${window.innerHeight} screenH:${window.screen.height} standalone:${String(isStandalone)} bottomGap:${bottomGap} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} fillerTop:${f ? Math.round(f.top) : 'LIPSA'} fillerBottom:${f ? Math.round(f.bottom) : 'LIPSA'} fillerBg:${fBg} dpr:${window.devicePixelRatio}`
       )
     }
     measure()
     const t = setTimeout(measure, 500)
     window.addEventListener('resize', measure)
     return () => { clearTimeout(t); window.removeEventListener('resize', measure) }
-  }, [navRef, bottomGap])
+  }, [navRef, fillerRef, bottomGap])
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#E8192C', color: '#fff', fontSize: '11px', lineHeight: 1.4, padding: '4px 6px', zIndex: 99999, wordBreak: 'break-all', fontFamily: 'monospace' }}>
       {txt}
@@ -398,6 +400,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // diferenta reala runtime (screen.height - innerHeight) in loc sa presupunem o valoare fixa.
   const [bottomGap, setBottomGap] = useState(0)
   const navRef = useRef(null)
+  const fillerRef = useRef(null)
   useEffect(() => {
     if (!isStandalone) return
     // La pornire "rece" din icon (nu reload), innerHeight/screen.height nu sunt mereu
@@ -419,13 +422,14 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
     <>
-    {showDebug && <NavBarDebug navRef={navRef} bottomGap={bottomGap} />}
+    {showDebug && <NavBarDebug navRef={navRef} fillerRef={fillerRef} bottomGap={bottomGap} />}
     {/* Filler decorativ - NU misca NavBar-ul real (care ramane la bottom:0, pozitie sigura/
         testata), doar acopera vizual orice petic gri ramas dedesubt cu o marja generoasa.
         Daca se calculeaza gresit, cel mult acopera prea mult sau prea putin dintr-o zona goala -
-        nu poate ascunde iconițele, spre deosebire de a muta NavBar-ul insusi. */}
-    {isStandalone && bottomGap > 0 && (
-      <div style={{ position: 'fixed', bottom: `-${bottomGap + 60}px`, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: `${bottomGap + 70}px`, background: '#fff', zIndex: 99 }} />
+        nu poate ascunde iconițele, spre deosebire de a muta NavBar-ul insusi. NECONDITIONAT de
+        bottomGap (foloseste minim 100px) ca sa nu depinda de reusita masuratorii runtime. */}
+    {isStandalone && (
+      <div ref={fillerRef} style={{ position: 'fixed', bottom: `-${Math.max(bottomGap, 40) + 60}px`, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: `${Math.max(bottomGap, 40) + 70}px`, background: '#fff', zIndex: 99 }} />
     )}
     <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
