@@ -55,35 +55,6 @@ body {
   height: 100%;
 }
 
-/* In standalone/PWA (fara bara de adresa), body { position:fixed; inset:0 }
-   se raporteaza la "layout viewport"-ul iOS, care pe unele device-uri nu
-   coincide cu marginea fizica reala a ecranului (gap sub NavBar). Simplul
-   height:100dvh pe body (varianta incercata initial) nu a fost suficient -
-   #root tot mostenea dimensiunea prin inset:0/100% in loc sa aiba o
-   dimensiune proprie explicita. Mutam #root la aceeasi reteta ca la
-   landscape (mai jos): fixed, top:0/left:0, dimensiune explicita in dvh,
-   singurul container de scroll (body devine overflow:hidden) - doar ca
-   fara rotatie, ca in portrait nu e nevoie de ea.
-
-   Folosim clasa .pwa-standalone (adaugata din JS in main.jsx, verificata
-   cu navigator.standalone in plus fata de matchMedia) in loc de
-   @media (display-mode: standalone) direct - media query-ul CSS pur nu
-   s-a dovedit suficient de sigur pe device-ul de test (fix-ul anterior cu
-   @media nu a avut niciun efect vizibil, desi era prezent in bundle-ul
-   deployat). */
-html.pwa-standalone body {
-  overflow: hidden;
-}
-html.pwa-standalone #root {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100dvh;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
 /* App.jsx cape la 430px (max-width inline) ca sa arate ca un "telefon" cand
    e deschis pe desktop intr-o fereastra larga. Pe un telefon real acel plafon
    poate fi mai mic decat latimea reala a viewport-ului (in functie de
@@ -116,6 +87,28 @@ html.pwa-standalone #root {
     height: 100dvw;
     transform: rotate(-90deg) translateX(-100%);
     transform-origin: top left;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+/* Acelasi tratament ca la landscape (mai sus), aplicat si in portrait -
+   fara conditie de standalone/@media (display-mode), care nu s-a dovedit
+   de incredere pe device-ul de test. #root devine el insusi fixed, cu
+   dimensiune proprie explicita in dvh, in loc sa mosteneasca inaltimea
+   prin inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
+   standalone - vezi [[project-navbar-safe-area]]). Fara rotatie, portrait
+   nu are nevoie de ea. */
+@media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  body {
+    overflow: hidden;
+  }
+  #root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
   }
