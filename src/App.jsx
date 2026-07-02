@@ -314,8 +314,44 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+function NavBarDebug() {
+  const [info, setInfo] = useState('')
+  const ref = useRef(null)
+  useEffect(() => {
+    const measure = () => {
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;'
+      document.body.appendChild(probe)
+      const safeBottom = getComputedStyle(probe).paddingBottom
+      document.body.removeChild(probe)
+      const nav = ref.current?.previousSibling
+      const navRect = nav?.getBoundingClientRect?.()
+      setInfo(JSON.stringify({
+        innerHeight: window.innerHeight,
+        vv: window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a',
+        vvOffsetTop: window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 'n/a',
+        safeBottom,
+        navBottom: navRect ? Math.round(navRect.bottom) : 'n/a',
+        navTop: navRect ? Math.round(navRect.top) : 'n/a',
+        docH: document.documentElement.clientHeight,
+        standalone: window.navigator.standalone ?? window.matchMedia('(display-mode: standalone)').matches,
+      }, null, 1))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('resize', measure)
+    return () => { window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure) }
+  }, [])
+  return (
+    <div ref={ref} style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(255,0,0,0.85)', color: '#fff', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre', zIndex: 999, padding: '4px 6px' }}>
+      {info}
+    </div>
+  )
+}
+
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
+    <>
     <div className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
@@ -355,6 +391,8 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
+    <NavBarDebug />
+    </>
   )
 }
 
