@@ -41,9 +41,16 @@ body {
    #root) e motivul principal pentru care position:fixed (NavBar, modale)
    se poate "dezlipi" de marginea reala a ecranului si scrola cu continutul
    in loc sa ramana fix, mai ales pe Safari iOS. */
+/* height (nu doar min-height): un copil cu min-height/height in % (ex:
+   .app-frame) se poate ancora doar la un parinte cu inaltime definita - iar
+   min-height pe parinte nu conteaza ca "definita" pt asta, ramane auto. Cu
+   height:100% aici, .app-frame ajunge sa umple efectiv ecranul cand
+   continutul e scurt (necesar ca NavBar cu marginTop:auto sa se ancoreze jos),
+   dar tot poate creste peste asta cand continutul e mai inalt (overflow
+   normal, nu clipping - scroll-ul se intampla tot pe body). */
 #root {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
 }
 
 /* App.jsx cape la 430px (max-width inline) ca sa arate ca un "telefon" cand

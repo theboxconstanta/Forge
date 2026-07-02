@@ -9,7 +9,7 @@ class ErrorBoundary extends Component {
   componentDidCatch(error, info) { console.error('App crash:', error, info) }
   render() {
     if (this.state.hasError) return (
-      <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+      <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
         <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px' }}>Ceva a mers greșit</div>
@@ -316,7 +316,7 @@ function formatWodDurata(durataStr) {
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
-    <div className="app-frame" style={{ position: 'sticky', bottom: 0, width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100 }}>
+    <div className="app-frame" style={{ position: 'sticky', bottom: 0, marginTop: 'auto', width: '100%', maxWidth: '430px', flexShrink: 0, background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100 }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -2719,6 +2719,12 @@ function App() {
 
   useEffect(() => {
     screenRef.current = screen
+    // body e singurul container de scroll (vezi index.css) - fara reset aici,
+    // la schimbarea ecranului ramane cu offset-ul de scroll de pe ecranul
+    // anterior, ceea ce face ca NavBar-ul (sticky) sa para ca "sare"/se
+    // deplaseaza fata de continutul nou, mai ales intre ecrane cu inaltimi
+    // foarte diferite.
+    document.body.scrollTop = 0
     if (screen === 'clasament' && user) fetchClasament()
     if (screen === 'home') {
       const d = new Date()
@@ -3460,7 +3466,7 @@ function App() {
   )
 
   if (authLoading) return (
-    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏋️</div>
         <div style={{ fontSize: '14px', color: '#888' }}>Se încarcă...</div>
@@ -3578,7 +3584,7 @@ function App() {
   )
 
   return (
-    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
