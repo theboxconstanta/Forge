@@ -350,62 +350,11 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
-// TEMPORAR - PWA standalone are storage izolat de Safari, deci ?navdebug=1 din Safari
-// nu ajunge in app-ul instalat pe home screen. 5 tap-uri rapide pe "v2" seteaza flag-ul
-// direct in contextul curent (Safari SAU standalone) si reincarca. De scos dupa diagnostic.
-let _debugTapCount = 0
-let _debugTapTimer = null
-function handleDebugLogoTap() {
-  _debugTapCount++
-  clearTimeout(_debugTapTimer)
-  _debugTapTimer = setTimeout(() => { _debugTapCount = 0 }, 2000)
-  if (_debugTapCount >= 5) {
-    _debugTapCount = 0
-    if (localStorage.getItem('navDebug') === '1') localStorage.removeItem('navDebug')
-    else localStorage.setItem('navDebug', '1')
-    window.location.reload()
-  }
-}
-
-// TEMPORAR - overlay de debug pt masurat gap-ul real din NavBar pe device. De scos dupa diagnostic.
-function NavBarDebug({ navRef }) {
-  const probeRef = useRef(null)
-  const [txt, setTxt] = useState('masor...')
-  useEffect(() => {
-    const measure = () => {
-      const r = navRef.current?.getBoundingClientRect()
-      const probePad = probeRef.current ? getComputedStyle(probeRef.current).paddingBottom : '?'
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
-      setTxt(
-        `innerH:${window.innerHeight} vvH:${Math.round(window.visualViewport?.height)} screenH:${window.screen.height} docClientH:${document.documentElement.clientHeight} standalone:${String(isStandalone)} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} safeAreaPx:${probePad} dpr:${window.devicePixelRatio} ua:${navigator.userAgent}`
-      )
-    }
-    measure()
-    const t = setTimeout(measure, 500)
-    window.addEventListener('resize', measure)
-    window.visualViewport?.addEventListener('resize', measure)
-    return () => {
-      clearTimeout(t)
-      window.removeEventListener('resize', measure)
-      window.visualViewport?.removeEventListener('resize', measure)
-    }
-  }, [navRef])
-  return (
-    <>
-      <div ref={probeRef} style={{ position: 'fixed', top: '-9999px', left: 0, paddingBottom: 'env(safe-area-inset-bottom)' }} />
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#E8192C', color: '#fff', fontSize: '9px', lineHeight: 1.4, padding: '4px 6px', zIndex: 99999, wordBreak: 'break-all', fontFamily: 'monospace' }}>
-        {txt}
-      </div>
-    </>
-  )
-}
-
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // innerHeight nu include env(safe-area-inset-bottom) DOAR in standalone/PWA pe iOS -
   // in Safari normal sau intr-un WebView (ex. browser-ul din WhatsApp), bara de jos a
   // browser-ului/WebView-ului ocupa deja acea zona, deci offset-ul negativ nu trebuie aplicat acolo.
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
-  const navRef = useRef(null)
   // Masurat pe device real: gap-ul innerHeight vs ecranul fizic in standalone NU e mereu egal
   // cu env(safe-area-inset-bottom) (ex. 62px masurat vs 34px raportat de env()) - masuram
   // diferenta reala runtime (screen.height - innerHeight) in loc sa presupunem o valoare fixa.
@@ -418,16 +367,8 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
     window.addEventListener('orientationchange', masoara)
     return () => { clearTimeout(t); window.removeEventListener('orientationchange', masoara) }
   }, [isStandalone])
-  // debug ascuns pt toata lumea - activat doar cu ?navdebug=1 (se retine in localStorage)
-  if (typeof window !== 'undefined') {
-    if (new URLSearchParams(window.location.search).get('navdebug') === '1') localStorage.setItem('navDebug', '1')
-    if (new URLSearchParams(window.location.search).get('navdebug') === '0') localStorage.removeItem('navDebug')
-  }
-  const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
-    <>
-    {showDebug && <NavBarDebug navRef={navRef} />}
-    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <div className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -466,7 +407,6 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
-    </>
   )
 }
 
@@ -3716,7 +3656,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
-          <span onClick={handleDebugLogoTap} style={{ color: '#444', fontSize: '10px', padding: '8px', margin: '-8px' }}>v2</span>
+          <span style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600' }}>
           <span style={{ color: '#fff' }}>CrossFit </span>
