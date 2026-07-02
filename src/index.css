@@ -95,21 +95,26 @@ body {
 /* Acelasi tratament ca la landscape (mai sus), aplicat si in portrait -
    fara conditie de standalone/@media (display-mode), care nu s-a dovedit
    de incredere pe device-ul de test. #root devine el insusi fixed, cu
-   dimensiune proprie explicita in dvh, in loc sa mosteneasca inaltimea
-   prin inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
+   dimensiune proprie explicita, in loc sa mosteneasca inaltimea prin
+   inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
    standalone - vezi [[project-navbar-safe-area]]).
 
-   IMPORTANT, gasit dupa 4 incercari esuate: NavBar e position:fixed, care
-   se ancoreaza normal de fereastra reala - CU EXCEPTIA cazului in care un
-   parinte are `transform`, caz in care fixed se ancoreaza de parintele
-   transformat. La landscape, #root are `transform: rotate(-90deg)` (pt
-   rotatie) care, ca efect secundar, face NavBar sa se ancoreze de cutia
-   #root (corect dimensionata in dvh) in loc de fereastra reala (cea cu
-   bug-ul de masurare in standalone). Fara rotatie, portrait tot are nevoie
-   de UN transform pe #root (chiar daca vizual neutru) ca sa obtina acelasi
-   efect - simpla schimbare de height/position fara transform nu are niciun
-   efect asupra unde se ancoreaza NavBar, pentru ca fixed ignora inaltimea
-   parintelui daca parintele nu e si el un containing block. */
+   Gasit dupa 4 incercari esuate: NavBar e position:fixed, care se ancoreaza
+   normal de fereastra reala - CU EXCEPTIA cazului in care un parinte are
+   `transform`, caz in care fixed se ancoreaza de parintele transformat. La
+   landscape, #root are `transform: rotate(-90deg)` (pt rotatie) care, ca
+   efect secundar, face NavBar sa se ancoreze de cutia #root in loc de
+   fereastra reala. Fara rotatie, portrait tot are nevoie de UN transform
+   pe #root (chiar daca vizual neutru) ca sa obtina acelasi efect.
+
+   A 5-a incercare (100dvh pe #root) tot a esuat: pe iOS PWA standalone,
+   100dvh/innerHeight raporteaza o valoare inghetata, mai mica decat ecranul
+   real, la cold-start - si nu se corecteaza decat dupa o schimbare fizica
+   de geometrie (rotatie). De-aia landscape (care necesita rotirea telefonului)
+   functiona corect, dar portrait la lansare la rece ramanea blocat cu valoarea
+   gresita. `--app-vh` (setat din src/main.jsx, cu recalculare fortata prin
+   toggle pe viewport-fit=cover) inlocuieste 100dvh cu inaltimea reala
+   masurata in JS. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   body {
     overflow: hidden;
@@ -119,7 +124,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100dvh;
+    height: var(--app-vh, 100dvh);
     transform: translateZ(0);
     overflow-y: auto;
     overflow-x: hidden;
