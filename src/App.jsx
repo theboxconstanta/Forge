@@ -351,16 +351,11 @@ function formatWodDurata(durataStr) {
 }
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
-  // REBUILD 2026-07-02: am renuntat la toate incercarile de a "calcula" sau "extinde" gap-ul
-  // in standalone (env(safe-area-inset-bottom) custom, screen.height - innerHeight masurat
-  // runtime, filler decorativ agresiv) - niciuna nu a rezolvat gap-ul confirmat pe device,
-  // desi codul deployat era corect. Tratament acum IDENTIC in toate contextele (Safari tab,
-  // WhatsApp in-app browser, standalone) - exact reteta care functioneaza deja demonstrat in
-  // Safari/WhatsApp: fixed + bottom:0 + padding-bottom cu env(safe-area-inset-bottom) simplu,
-  // fara nicio logica JS suplimentara. Daca gap-ul standalone persista si dupa asta, cauza nu
-  // e in acest CSS, ci undeva mai adanc (device/OS specific) - vezi [[project-navbar-safe-area]].
+  // 2026-07-02: revenit la reteta simpla dovedita fara gap (folosita pana pe 30 iunie, inainte
+  // sa inceapa incercarile cu env(safe-area-inset-bottom)/masuratori JS/filler care nu au facut
+  // decat sa introduca un gap vizibil sub NavBar in standalone iOS - vezi [[project-navbar-safe-area]].
   return (
-    <div className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <div className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
