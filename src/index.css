@@ -57,18 +57,25 @@ body {
 
 /* In standalone/PWA (fara bara de adresa), body { position:fixed; inset:0 }
    se raporteaza la "layout viewport"-ul iOS, care pe unele device-uri nu
-   coincide cu marginea fizica reala a ecranului (gap sub NavBar). In
-   landscape (mai jos) folosim deja 100dvh/100dvw, care raporteaza corect
-   safe-area-ul - aplicam acelasi principiu si in portrait, dar doar in
-   standalone, ca sa nu reaparea flash-ul alb din tab normal (bara de adresa
-   care apare/dispare recalculeaza dvh live). */
+   coincide cu marginea fizica reala a ecranului (gap sub NavBar). Simplul
+   height:100dvh pe body (varianta incercata initial) nu a fost suficient -
+   #root tot mostenea dimensiunea prin inset:0/100% in loc sa aiba o
+   dimensiune proprie explicita. Mutam #root la aceeasi reteta ca la
+   landscape (mai jos): fixed, top:0/left:0, dimensiune explicita in dvh,
+   singurul container de scroll (body devine overflow:hidden) - doar ca
+   fara rotatie, ca in portrait nu e nevoie de ea. */
 @media (display-mode: standalone) {
   body {
-    height: 100dvh;
-    bottom: auto;
+    overflow: hidden;
   }
   #root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
     height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 
