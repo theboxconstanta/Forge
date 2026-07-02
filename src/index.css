@@ -112,9 +112,20 @@ body {
    real, la cold-start - si nu se corecteaza decat dupa o schimbare fizica
    de geometrie (rotatie). De-aia landscape (care necesita rotirea telefonului)
    functiona corect, dar portrait la lansare la rece ramanea blocat cu valoarea
-   gresita. `--app-vh` (setat din src/main.jsx, cu recalculare fortata prin
-   toggle pe viewport-fit=cover) inlocuieste 100dvh cu inaltimea reala
-   masurata in JS. */
+   gresita. `--app-vh` (setat din src/main.jsx) inlocuieste 100dvh cu
+   inaltimea reala masurata in JS.
+
+   A 6-a problema, gasita dupa ce gap-ul a fost rezolvat: NavBar arata bine
+   in repaus, dar "nu mai e fixat" - se scrola odata cu continutul. Cauza:
+   #root avea SI transform (necesar ca NavBar sa se ancoreze de el, vezi mai
+   sus) SI overflow-y:auto (era el insusi containerul de scroll). Cand
+   acelasi element e si containing block pt fixed, si containerul care
+   scroleaza, elementul fixed devine efectiv "absolute" fata de continutul
+   care scroleaza - deci se misca odata cu el. Fix: scroll-ul se muta pe
+   .app-frame (copil normal, fara transform), iar #root ramane doar
+   containing block-ul stabil, fara scroll propriu - NavBar (descendent al
+   .app-frame, dar cu containing block #root) ramane fix indiferent cum
+   scroleaza .app-frame. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   body {
     overflow: hidden;
@@ -126,8 +137,13 @@ body {
     width: 100%;
     height: var(--app-vh, 100dvh);
     transform: translateZ(0);
+    overflow: hidden;
+  }
+  .app-frame {
+    height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
