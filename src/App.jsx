@@ -406,6 +406,18 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // browser-ului/WebView-ului ocupa deja acea zona, deci offset-ul negativ nu trebuie aplicat acolo.
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
   const navRef = useRef(null)
+  // Masurat pe device real: gap-ul innerHeight vs ecranul fizic in standalone NU e mereu egal
+  // cu env(safe-area-inset-bottom) (ex. 62px masurat vs 34px raportat de env()) - masuram
+  // diferenta reala runtime (screen.height - innerHeight) in loc sa presupunem o valoare fixa.
+  const [bottomGap, setBottomGap] = useState(0)
+  useEffect(() => {
+    if (!isStandalone) return
+    const masoara = () => setBottomGap(Math.max(0, window.screen.height - window.innerHeight))
+    masoara()
+    const t = setTimeout(masoara, 300)
+    window.addEventListener('orientationchange', masoara)
+    return () => { clearTimeout(t); window.removeEventListener('orientationchange', masoara) }
+  }, [isStandalone])
   // debug ascuns pt toata lumea - activat doar cu ?navdebug=1 (se retine in localStorage)
   if (typeof window !== 'undefined') {
     if (new URLSearchParams(window.location.search).get('navdebug') === '1') localStorage.setItem('navDebug', '1')
@@ -415,7 +427,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
-    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? 'calc(-1 * env(safe-area-inset-bottom, 0px))' : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
