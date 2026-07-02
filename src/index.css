@@ -97,8 +97,19 @@ body {
    de incredere pe device-ul de test. #root devine el insusi fixed, cu
    dimensiune proprie explicita in dvh, in loc sa mosteneasca inaltimea
    prin inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
-   standalone - vezi [[project-navbar-safe-area]]). Fara rotatie, portrait
-   nu are nevoie de ea. */
+   standalone - vezi [[project-navbar-safe-area]]).
+
+   IMPORTANT, gasit dupa 4 incercari esuate: NavBar e position:fixed, care
+   se ancoreaza normal de fereastra reala - CU EXCEPTIA cazului in care un
+   parinte are `transform`, caz in care fixed se ancoreaza de parintele
+   transformat. La landscape, #root are `transform: rotate(-90deg)` (pt
+   rotatie) care, ca efect secundar, face NavBar sa se ancoreze de cutia
+   #root (corect dimensionata in dvh) in loc de fereastra reala (cea cu
+   bug-ul de masurare in standalone). Fara rotatie, portrait tot are nevoie
+   de UN transform pe #root (chiar daca vizual neutru) ca sa obtina acelasi
+   efect - simpla schimbare de height/position fara transform nu are niciun
+   efect asupra unde se ancoreaza NavBar, pentru ca fixed ignora inaltimea
+   parintelui daca parintele nu e si el un containing block. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   body {
     overflow: hidden;
@@ -109,6 +120,7 @@ body {
     left: 0;
     width: 100%;
     height: 100dvh;
+    transform: translateZ(0);
     overflow-y: auto;
     overflow-x: hidden;
   }
