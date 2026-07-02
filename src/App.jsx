@@ -2719,6 +2719,12 @@ function App() {
 
   useEffect(() => {
     screenRef.current = screen
+    // body e singurul container de scroll (vezi index.css) - fara reset aici,
+    // la schimbarea ecranului ramane cu offset-ul de scroll de pe ecranul
+    // anterior, ceea ce face ca NavBar-ul (sticky) sa para ca "sare"/se
+    // deplaseaza fata de continutul nou, mai ales intre ecrane cu inaltimi
+    // foarte diferite.
+    document.body.scrollTop = 0
     if (screen === 'clasament' && user) fetchClasament()
     if (screen === 'home') {
       const d = new Date()
