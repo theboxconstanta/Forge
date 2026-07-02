@@ -30,31 +30,16 @@ window.addEventListener('orientationchange', lockPortrait)
 // valoare mai mica decat ecranul real si nu se corecteaza singura decat dupa
 // o schimbare fizica de geometrie (ex. rotatie) - de-aia landscape (care
 // necesita rotirea telefonului) nu are gap-ul, dar portrait la cold-start da.
-// Fortam recalcularea prin toggle pe viewport-fit=cover (fara sa fie nevoie
-// de rotatie reala) si expunem inaltimea corecta ca variabila CSS.
+// Expunem inaltimea reala ca variabila CSS, remasurata din timp in timp -
+// FARA sa umblam la meta viewport (a desincronizat visual viewport-ul de
+// layout viewport pe iOS Safari, facand tap-urile sa nu mai nimereasca
+// butoanele - vezi [[project-navbar-safe-area]]).
 const setAppHeight = () => {
   const h = window.visualViewport ? window.visualViewport.height : window.innerHeight
   document.documentElement.style.setProperty('--app-vh', `${h}px`)
 }
 
-const forceViewportRecalc = () => {
-  const meta = document.querySelector('meta[name="viewport"]')
-  if (!meta) return
-  const original = meta.getAttribute('content')
-  const stripped = original.replace(/,?\s*viewport-fit=cover/, '')
-  meta.setAttribute('content', stripped)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      meta.setAttribute('content', original)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(setAppHeight)
-      })
-    })
-  })
-}
-
 setAppHeight()
-forceViewportRecalc()
 setTimeout(setAppHeight, 300)
 setTimeout(setAppHeight, 1000)
 window.addEventListener('resize', setAppHeight)
