@@ -350,6 +350,23 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+// TEMPORAR - PWA standalone are storage izolat de Safari, deci ?navdebug=1 din Safari
+// nu ajunge in app-ul instalat pe home screen. 5 tap-uri rapide pe "v2" seteaza flag-ul
+// direct in contextul curent (Safari SAU standalone) si reincarca. De scos dupa diagnostic.
+let _debugTapCount = 0
+let _debugTapTimer = null
+function handleDebugLogoTap() {
+  _debugTapCount++
+  clearTimeout(_debugTapTimer)
+  _debugTapTimer = setTimeout(() => { _debugTapCount = 0 }, 2000)
+  if (_debugTapCount >= 5) {
+    _debugTapCount = 0
+    if (localStorage.getItem('navDebug') === '1') localStorage.removeItem('navDebug')
+    else localStorage.setItem('navDebug', '1')
+    window.location.reload()
+  }
+}
+
 // TEMPORAR - overlay de debug pt masurat gap-ul real din NavBar pe device. De scos dupa diagnostic.
 function NavBarDebug({ navRef }) {
   const probeRef = useRef(null)
@@ -3687,7 +3704,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
-          <span style={{ color: '#444', fontSize: '10px' }}>v2</span>
+          <span onClick={handleDebugLogoTap} style={{ color: '#444', fontSize: '10px', padding: '8px', margin: '-8px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600' }}>
           <span style={{ color: '#fff' }}>CrossFit </span>
