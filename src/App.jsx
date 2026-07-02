@@ -415,7 +415,7 @@ const NAV_TABS = [
   { id: 'home', label: 'Acasă', icon: Home },
   { id: 'log', label: 'Log', icon: PenLine },
   { id: 'pr', label: 'PR-uri', icon: Trophy },
-  { id: 'clasament', label: 'Cls.', icon: Medal },
+  { id: 'clasament', label: 'Leaderboard', icon: Medal },
   { id: 'feed', label: 'Feed', icon: MessageCircle },
 ]
 
@@ -447,8 +447,8 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
               onClick={() => setScreen(id)}
               className="relative flex flex-col items-center gap-1 px-2 py-1"
             >
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#0E0E0E' : '#aaa'} />
-              <span className="text-[10px]" style={{ color: isActive ? '#0E0E0E' : '#aaa', fontWeight: isActive ? 600 : 400 }}>
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#afe607' : '#000000'} />
+              <span className="text-[10px]" style={{ color: '#000000', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}>
                 {label}
               </span>
               {badge != null && (
