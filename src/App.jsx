@@ -400,11 +400,21 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   const navRef = useRef(null)
   useEffect(() => {
     if (!isStandalone) return
-    const masoara = () => setBottomGap(Math.max(0, window.screen.height - window.innerHeight))
+    // La pornire "rece" din icon (nu reload), innerHeight/screen.height nu sunt mereu
+    // stabilizate imediat - o singura masuratoare la 300ms poate prinde valori tranzitorii.
+    // Masuram repetat in prima secunda + la orice resize/orientationchange ulterior.
+    const masoara = () => setBottomGap(Math.min(150, Math.max(0, window.screen.height - window.innerHeight)))
     masoara()
-    const t = setTimeout(masoara, 300)
+    const timeouts = [100, 300, 600, 1000, 2000].map(ms => setTimeout(masoara, ms))
+    window.addEventListener('resize', masoara)
     window.addEventListener('orientationchange', masoara)
-    return () => { clearTimeout(t); window.removeEventListener('orientationchange', masoara) }
+    window.visualViewport?.addEventListener('resize', masoara)
+    return () => {
+      timeouts.forEach(clearTimeout)
+      window.removeEventListener('resize', masoara)
+      window.removeEventListener('orientationchange', masoara)
+      window.visualViewport?.removeEventListener('resize', masoara)
+    }
   }, [isStandalone])
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
