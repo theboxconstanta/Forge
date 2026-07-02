@@ -58,12 +58,16 @@ setAppHeight()
 forceViewportRecalc()
 setTimeout(setAppHeight, 300)
 setTimeout(setAppHeight, 1000)
-window.addEventListener('resize', setAppHeight)
+// NU ascultam resize pe orice trigger (inclusiv window.resize si
+// visualViewport.resize) - pe iOS, deschiderea tastaturii declanseaza si ea
+// visualViewport.resize (micsorand height-ul), ceea ce facea #root/NavBar sa
+// se micsoreze si sa "sara" deasupra tastaturii, cu un gol gri intre ele
+// (masuratoarea nu prindea exact inaltimea tastaturii). Recalculam DOAR la
+// schimbari reale de geometrie (rotatie, revenire din fundal) - o tastatura
+// deschisa/inchisa nu mai muta NavBar-ul, doar il acopera temporar, ca in
+// majoritatea aplicatiilor native.
 window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 300))
 window.addEventListener('pageshow', forceViewportRecalc)
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', setAppHeight)
-}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
