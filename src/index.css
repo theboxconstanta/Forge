@@ -119,7 +119,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100dvh;
+    height: var(--app-vh, 100dvh);
     transform: translateZ(0);
     overflow-y: auto;
     overflow-x: hidden;
