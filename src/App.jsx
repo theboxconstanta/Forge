@@ -350,12 +350,57 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+function NavBarDebug({ navRef }) {
+  const [info, setInfo] = useState(null)
+  useEffect(() => {
+    const measure = () => {
+      const rect = navRef.current?.getBoundingClientRect()
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden'
+      document.body.appendChild(probe)
+      const safeAreaPx = getComputedStyle(probe).height
+      document.body.removeChild(probe)
+      setInfo({
+        innerHeight: window.innerHeight,
+        visualViewportHeight: window.visualViewport?.height ?? 'n/a',
+        screenHeight: window.screen?.height ?? 'n/a',
+        standalone: window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone || false,
+        navTop: rect?.top,
+        navBottom: rect?.bottom,
+        gap: rect ? (window.innerHeight - rect.bottom) : 'n/a',
+        safeAreaPx,
+      })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('resize', measure)
+    }
+  }, [navRef])
+  if (!info) return null
+  return (
+    <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(0,0,0,0.92)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', padding: '16px', borderRadius: '10px', zIndex: 999, lineHeight: 1.6, maxWidth: '90vw' }}>
+      {Object.entries(info).map(([k, v]) => <div key={k}>{k}: {String(v)}</div>)}
+      <div onClick={() => { localStorage.removeItem('navDebug'); window.location.reload() }} style={{ marginTop: '10px', color: '#f66', cursor: 'pointer' }}>[inchide]</div>
+    </div>
+  )
+}
+
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // 2026-07-02: revenit la reteta simpla dovedita fara gap (folosita pana pe 30 iunie, inainte
   // sa inceapa incercarile cu env(safe-area-inset-bottom)/masuratori JS/filler care nu au facut
   // decat sa introduca un gap vizibil sub NavBar in standalone iOS - vezi [[project-navbar-safe-area]].
+  // Gap-ul a persistat si dupa revenirea la padding simplu, deci am readaugat un overlay de debug
+  // (activabil cu 5 tap-uri pe "v2" din header) ca sa masuram valorile REALE pe device in loc sa
+  // mai ghicim - vezi [[project-navbar-safe-area]].
+  const navRef = useRef(null)
+  const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
-    <div className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
+    <>
+    {showDebug && <NavBarDebug navRef={navRef} />}
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -394,6 +439,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
+    </>
   )
 }
 
@@ -2545,6 +2591,7 @@ function App() {
   const [prevScreen, setPrevScreen] = useState('home')
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
+  const debugTapRef = useRef(0)
   const [wodDeschis, setWodDeschis] = useState(false)
   const [claseHomeDeschis, setClaseHomeDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
@@ -3643,7 +3690,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
-          <span style={{ color: '#444', fontSize: '10px' }}>v2</span>
+          <span onClick={() => { debugTapRef.current += 1; if (debugTapRef.current >= 5) { localStorage.setItem('navDebug', '1'); window.location.reload() } }} style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600' }}>
           <span style={{ color: '#fff' }}>CrossFit </span>
