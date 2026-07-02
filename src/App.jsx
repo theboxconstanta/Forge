@@ -2617,6 +2617,7 @@ function App() {
   const [wodZiData, setWodZiData] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [prSelectat, setPrSelectat] = useState(null)
+  const [prConfirmDelete, setPrConfirmDelete] = useState(null)
   const [catDeschise, setCatDeschise] = useState({})
   const [catSearch, setCatSearch] = useState({})
   const [heroWodsDeschis, setHeroWodsDeschis] = useState(false)
@@ -3418,6 +3419,14 @@ function App() {
     }
     setEditPrId(record.id); setLogPentruPR(null)
     setPrevScreen('pr'); setScreen('logPR')
+  }
+
+  const deleteMiscarePR = async (movement) => {
+    const { error } = await supabase.from('personal_records').delete().eq('member_id', user.id).eq('movement', movement)
+    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    setPrDate(prev => prev.filter(r => r.movement !== movement))
+    if (prSelectat === movement) setPrSelectat(null)
+    showToast('✓ Exercițiu șters')
   }
 
   const toggleWaitlist = async (clasaId) => {
@@ -4449,14 +4458,26 @@ function App() {
           const isWeightBest = cat === 'WEIGHTLIFTING' && (best?.unit === 'kg' || best?.unit === 'lbs') && best?.value
           const bestKg = isWeightBest ? convertWeight(parseFloat(best.value), best.unit, preferredUnit) : null
           const wodInfo = heroWodsInfoAll[movement]
+          const isConfirmingDelete = prConfirmDelete === movement
           return (
-            <div key={movement} onClick={() => setPrSelectat(isOpen ? null : movement)}
+            <div key={movement} onClick={() => { setPrSelectat(isOpen ? null : movement); setPrConfirmDelete(null) }}
               style={{ padding: '12px 14px', borderBottom: idx < total - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#1a1a1a' : '#ccc' }}>{best ? formatPR(best, preferredUnit) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+                  {isConfirmingDelete ? (
+                    <button onClick={(e) => { e.stopPropagation(); deleteMiscarePR(movement) }}
+                      style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
+                      Șterge?
+                    </button>
+                  ) : (
+                    <button onClick={(e) => { e.stopPropagation(); setPrConfirmDelete(movement) }}
+                      style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>
+                      ×
+                    </button>
+                  )}
                 </div>
               </div>
               {best && !isOpen && (
