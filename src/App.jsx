@@ -389,20 +389,19 @@ function NavBarDebug({ navRef }) {
 }
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
-  // Pe iOS standalone (icon de pe home screen), NavBar-ul (position:fixed, bottom:0) ramane
-  // uneori cu un gap mic intre el si marginea fizica a ecranului. NavBar-ul INTERACTIV (cu
-  // iconițele) ramane mereu la bottom:0 - pozitia dovedita sigura (cand a fost impins ~50px
-  // mai jos, iconițele au disparut complet, deci exista undeva un plafon de randare pt
-  // continut INTERACTIV). Filler-ul de mai jos e DOAR decorativ (fara continut, fara tap
-  // targets) - poate sa se extinda mult mai agresiv fara niciun risc, pentru ca in cel mai
-  // rau caz partea care depaseste plafonul de randare pur si simplu nu se vede (nu strica
-  // nimic), dar partea care SE vede tot acopera gap-ul cu alb pana acolo unde poate randa.
+  // REBUILD 2026-07-02: am renuntat la toate incercarile de a "calcula" sau "extinde" gap-ul
+  // in standalone (env(safe-area-inset-bottom) custom, screen.height - innerHeight masurat
+  // runtime, filler decorativ agresiv) - niciuna nu a rezolvat gap-ul confirmat pe device,
+  // desi codul deployat era corect. Tratament acum IDENTIC in toate contextele (Safari tab,
+  // WhatsApp in-app browser, standalone) - exact reteta care functioneaza deja demonstrat in
+  // Safari/WhatsApp: fixed + bottom:0 + padding-bottom cu env(safe-area-inset-bottom) simplu,
+  // fara nicio logica JS suplimentara. Daca gap-ul standalone persista si dupa asta, cauza nu
+  // e in acest CSS, ci undeva mai adanc (device/OS specific) - vezi [[project-navbar-safe-area]].
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
-    <div style={{ position: 'fixed', bottom: '-150px', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: '200px', background: '#fff', zIndex: 99 }} />
     <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
