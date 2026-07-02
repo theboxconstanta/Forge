@@ -25,8 +25,8 @@ html {
      minHeight: 100svh (static, nu recalculeaza la fiecare aparitie/disparitie
      a barei de adresa ca 100dvh, ca sa nu clipeasca) - cand bara se ascunde
      si viewport-ul real creste peste 100svh, orice petic ramas neacoperit
-     trebuie sa fie acelasi gri, nu alb implicit de browser */
-  background: #f5f5f5;
+     trebuie sa fie acelasi alb ca fundalul aplicatiei */
+  background: #FFFFFF;
 }
 
 body {
@@ -34,7 +34,7 @@ body {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #f5f5f5;
+  background: #FFFFFF;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
