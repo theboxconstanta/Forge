@@ -27,6 +27,16 @@ class ErrorBoundary extends Component {
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
+// Data de azi in fusul orar LOCAL, ca string YYYY-MM-DD. NU folosi
+// new Date().toISOString().split('T')[0] pentru asta - e ora UTC, care in
+// Romania (UTC+2/+3) e in urma cu ora locala intre miezul noptii si ~2-3
+// dimineata, ducand la comparatii de data gresite exact in acel interval
+// (abonamente/clase tratate ca "de maine" sau "expirate cu o zi in avans").
+function todayLocalStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function levenshtein(a, b) {
   const m = a.length, n = b.length
   const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0))
@@ -40,6 +50,27 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = atob(base64)
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+// Ajusteaza sessions_used printr-un citeste-apoi-scrie cu verificare optimista
+// (WHERE sessions_used = valoarea citita) - fara asta, doua booking/anulari
+// aproape simultane (ex: acelasi membru pe doua device-uri, sau o rezervare
+// care se suprapune cu promovarea din waitlist) pot citi aceeasi valoare
+// veche si scrie acelasi rezultat, pierzand un increment/decrement. Daca
+// update-ul nu afecteaza niciun rand (altcineva a scris intre timp), reia.
+async function adjustSessionsUsedAtomic(subId, delta, { max } = {}) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: fresh } = await supabase.from('subscriptions').select('sessions_used').eq('id', subId).maybeSingle()
+    if (!fresh) return null
+    const current = fresh.sessions_used || 0
+    let next = current + delta
+    if (next < 0) next = 0
+    if (max != null) next = Math.min(next, max)
+    const { data: updated } = await supabase.from('subscriptions')
+      .update({ sessions_used: next }).eq('id', subId).eq('sessions_used', current).select('sessions_used')
+    if (updated && updated.length > 0) return next
+  }
+  return null
 }
 
 async function sendNotification(type, memberEmail, planName, endDate) {
@@ -62,7 +93,8 @@ async function checkAndBookFromWaitlist(classId) {
   const { data: cls } = await supabase.from('classes').select('date, start_time, name').eq('id', classId).maybeSingle()
   if (!cls) return
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const _td = new Date()
+  const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
   const { data: abo } = await supabase.from('subscriptions')
     .select('id, sessions_used, sessions_total, end_date')
     .ilike('member_email', next.member_email).eq('is_active', true).gte('end_date', todayStr)
@@ -79,16 +111,20 @@ async function checkAndBookFromWaitlist(classId) {
   const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: next.member_id })
   if (error) { console.error('waitlist auto-book error', error); return }
 
-  await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
-
+  // Sterge intrarea din waitlist doar dupa ce rezervarea + decontarea sedintei
+  // au reusit amandoua - altfel, la un esec al update-ului de sesiuni de mai
+  // jos, membrul ar fi scos definitiv de pe waitlist fara sa fi primit
+  // efectiv locul (rezervarea e anulata mai jos, dar intrarea din waitlist
+  // era deja stearsa, deci membrul pierdea locul in coada fara compensare).
   if (abo.sessions_total != null) {
-    const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abo.id).maybeSingle()
-    const { error: sessErr } = await supabase.from('subscriptions').update({ sessions_used: (freshAbo?.sessions_used || 0) + 1 }).eq('id', abo.id)
-    if (sessErr) {
+    const newUsed = await adjustSessionsUsedAtomic(abo.id, +1, { max: abo.sessions_total })
+    if (newUsed == null) {
       await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', next.member_id)
       return
     }
   }
+
+  await supabase.from('class_waitlist').delete().eq('class_id', classId).eq('member_id', next.member_id)
 
   if (cls?.date && cls?.start_time) {
     const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
@@ -314,44 +350,8 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
-function NavBarDebug() {
-  const [info, setInfo] = useState('')
-  const ref = useRef(null)
-  useEffect(() => {
-    const measure = () => {
-      const probe = document.createElement('div')
-      probe.style.cssText = 'position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;'
-      document.body.appendChild(probe)
-      const safeBottom = getComputedStyle(probe).paddingBottom
-      document.body.removeChild(probe)
-      const nav = ref.current?.previousSibling
-      const navRect = nav?.getBoundingClientRect?.()
-      setInfo(JSON.stringify({
-        innerHeight: window.innerHeight,
-        vv: window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a',
-        vvOffsetTop: window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 'n/a',
-        safeBottom,
-        navBottom: navRect ? Math.round(navRect.bottom) : 'n/a',
-        navTop: navRect ? Math.round(navRect.top) : 'n/a',
-        docH: document.documentElement.clientHeight,
-        standalone: window.navigator.standalone ?? window.matchMedia('(display-mode: standalone)').matches,
-      }, null, 1))
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    window.visualViewport?.addEventListener('resize', measure)
-    return () => { window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure) }
-  }, [])
-  return (
-    <div ref={ref} style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(255,0,0,0.85)', color: '#fff', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre', zIndex: 999, padding: '4px 6px' }}>
-      {info}
-    </div>
-  )
-}
-
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
-    <>
     <div className="app-frame" style={{ position: 'fixed', bottom: 'calc(-1 * env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
@@ -391,8 +391,6 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
-    <NavBarDebug />
-    </>
   )
 }
 
@@ -960,10 +958,17 @@ function Feed({ showToast, user, userProfile }) {
       const cur = prev[postId]?.[emoji] || { count: 0, iMine: false }
       return { ...prev, [postId]: { ...prev[postId], [emoji]: { count: iMine ? cur.count - 1 : cur.count + 1, iMine: !iMine } } }
     })
-    if (iMine) {
-      await supabase.from('feed_reactions').delete().eq('post_id', postId).eq('member_id', user.id).eq('emoji', emoji)
-    } else {
-      await supabase.from('feed_reactions').insert({ post_id: postId, member_id: user.id, emoji })
+    const { error } = iMine
+      ? await supabase.from('feed_reactions').delete().eq('post_id', postId).eq('member_id', user.id).eq('emoji', emoji)
+      : await supabase.from('feed_reactions').insert({ post_id: postId, member_id: user.id, emoji })
+    if (error) {
+      // esec (ex: dublu-tap -> constraint unic, retea etc) - fara realtime event
+      // care sa corecteze automat, revenim manual la starea optimista gresita.
+      console.error('toggleReactie error:', error)
+      setReactions(prev => {
+        const cur = prev[postId]?.[emoji] || { count: 0, iMine: false }
+        return { ...prev, [postId]: { ...prev[postId], [emoji]: { count: iMine ? cur.count + 1 : cur.count - 1, iMine } } }
+      })
     }
   }
 
@@ -1209,7 +1214,7 @@ function Admin({ showToast }) {
 
     const { data: aboActive } = await supabase.from('subscriptions')
       .select('member_email').eq('is_active', true).eq('queued', false)
-      .lte('start_date', azi).gt('end_date', azi)
+      .lte('start_date', azi).gte('end_date', azi)
     const membriActivi = new Set((aboActive || []).map(a => a.member_email?.toLowerCase())).size
 
     const { count: aboVandute } = await supabase.from('subscriptions')
@@ -1331,10 +1336,10 @@ function Admin({ showToast }) {
   }
 
   const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
-    const newTotal = Math.max((currentUsed || 0), (currentTotal || 0) + delta)
-    const { error } = await supabase.from('subscriptions').update({ sessions_total: newTotal }).eq('id', aboId)
+    const newUsed = Math.max(0, Math.min(currentTotal ?? 9999, (currentUsed || 0) + delta))
+    const { error } = await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', aboId)
     if (error) { showToast('❌ Eroare la actualizare!'); return }
-    setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_total: newTotal } : a))
+    setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
     showToast(delta > 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
   }
 
@@ -1522,7 +1527,7 @@ function Admin({ showToast }) {
       .select('id, sessions_used, sessions_total, end_date, start_date')
       .ilike('member_email', emailNorm).eq('is_active', true).eq('queued', false)
       .lte('start_date', azStr)
-      .gt('end_date', azStr)
+      .gte('end_date', azStr)
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
     const hasValidActive = existingActive && (
@@ -2087,13 +2092,14 @@ function Admin({ showToast }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ fontSize: '12px', color: '#888' }}>CLASE ({clase.length})</div>
-            {clase.some(c => c.date < new Date().toISOString().split('T')[0]) && (
+            {clase.some(c => c.date < `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`) && (
               <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>🗑️ Șterge trecute</button>
             )}
           </div>
           {(() => {
             const grouped = clase.reduce((acc, c) => { if (!acc[c.date]) acc[c.date] = []; acc[c.date].push(c); return acc }, {})
-            const azi = new Date().toISOString().split('T')[0]
+            const _azd = new Date()
+            const azi = `${_azd.getFullYear()}-${String(_azd.getMonth()+1).padStart(2,'0')}-${String(_azd.getDate()).padStart(2,'0')}`
             return Object.entries(grouped).map(([date, claseZi]) => {
               const dateObj = new Date(date + 'T00:00:00')
               const eAzi = date === azi
@@ -2614,6 +2620,14 @@ function App() {
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
+  // Citite de handlerele realtime (efect cu deps [user], deci create o
+  // singura data la login) - fara refs, acele closures ar ramane cu
+  // dataAcasa/clasamentDate de la momentul login-ului, suprascriind cu date
+  // vechi ecranul daca userul a navigat between timp la o alta zi.
+  const dataAcasaRef = useRef(dataAcasa)
+  const clasamentDateRef = useRef(clasamentDate)
+  useEffect(() => { dataAcasaRef.current = dataAcasa }, [dataAcasa])
+  useEffect(() => { clasamentDateRef.current = clasamentDate }, [clasamentDate])
   const [userProfile, setUserProfile] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
@@ -2834,10 +2848,10 @@ function App() {
         fetchAbonamentMeu()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wods' }, () => {
-        fetchWodZi()
+        fetchWodZi(dataAcasaRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
-        fetchWodLogs(); fetchClasament()
+        fetchWodLogs(); fetchClasament(clasamentDateRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
         fetchSettings()
@@ -3021,14 +3035,15 @@ function App() {
   const fetchAbonamentMeu = async (isFirstLoad = false) => {
     if (isFirstLoad) setAbonamentLoading(true)
     const fetchActive = async () => {
-      const todayStr = new Date().toISOString().split('T')[0]
+      const _td = new Date()
+      const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
       const { data, error } = await supabase.from('subscriptions')
         .select('*, subscription_plans(name, sessions)')
         .ilike('member_email', user.email.trim())
         .eq('is_active', true)
         .eq('queued', false)
         .lte('start_date', todayStr)
-        .gt('end_date', todayStr)
+        .gte('end_date', todayStr)
         .order('created_at', { ascending: false })
         .limit(1)
       if (error) console.error('fetchAbonamentMeu error:', error)
@@ -3175,7 +3190,8 @@ function App() {
   }
 
   const fetchWodZi = async (data_param) => {
-    const data_str = data_param || dataAcasa || new Date().toISOString().split('T')[0]
+    const _fwd = new Date()
+    const data_str = data_param || dataAcasa || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
     const { data } = await supabase.from('wods').select('*').eq('date', data_str).maybeSingle()
     setWodZiData(data || null)
   }
@@ -3412,10 +3428,8 @@ function App() {
       if (delErr) { showToast('❌ Eroare la anularea rezervării!'); console.error(delErr); return }
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
-        const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abonamentReal.id).maybeSingle()
-        const newUsed = Math.max(0, (freshAbo?.sessions_used || 0) - 1)
-        setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
-        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
+        const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, -1)
+        if (newUsed != null) setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
       supabase.from('class_reminders').delete().eq('class_id', clasaId).eq('member_email', user.email.toLowerCase())
       checkAndBookFromWaitlist(clasaId)
@@ -3425,10 +3439,8 @@ function App() {
       if (insErr) { showToast('❌ Eroare la rezervare!'); console.error(insErr); return }
       setRezervariMele(prev => [...prev, clasaId])
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
-        const { data: freshAbo } = await supabase.from('subscriptions').select('sessions_used').eq('id', abonamentReal.id).maybeSingle()
-        const newUsed = (freshAbo?.sessions_used || 0) + 1
-        await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abonamentReal.id)
-        setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
+        const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, +1, { max: abonamentReal.sessions_total })
+        if (newUsed != null) setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
       const cls = claseDB.find(c => c.id === clasaId)
       if (cls?.date && cls?.start_time) {
@@ -3670,7 +3682,7 @@ function App() {
 
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
-        const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
+        const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''))
         const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
         const sessTotal = abonamentReal?.sessions_total
         const sessUsed = abonamentReal?.sessions_used || 0
@@ -3777,7 +3789,7 @@ function App() {
                             border: rezervat ? '2px solid #1a1a1a' : c.color ? `2px solid ${c.color}` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
+                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time?.slice(0,5)}</span>
                               <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{c.end_time?.slice(0,5)}</span>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -3816,13 +3828,13 @@ function App() {
                                     style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
                                     Anulează rezervarea
                                   </button>
-                                ) : blocat ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
                                 ) : peWaitlist ? (
                                   <button onClick={() => toggleWaitlist(c.id)}
                                     style={{ width: '100%', padding: '9px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                                     ⏳ Pe lista de așteptare · Renunță
                                   </button>
+                                ) : blocat ? (
+                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
                                 ) : plin ? (
                                   <button onClick={() => toggleWaitlist(c.id)}
                                     style={{ width: '100%', padding: '9px', background: '#f5f5f5', color: '#555', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
@@ -4016,9 +4028,9 @@ function App() {
           {(() => {
             const _now = new Date()
             const viitoare = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > _now)
-              .sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time))
+              .sort((a, b) => a.date.localeCompare(b.date) || (a.start_time || '').localeCompare(b.start_time || ''))
             const trecute = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) <= _now)
-              .sort((a, b) => b.date.localeCompare(a.date) || b.start_time.localeCompare(a.start_time))
+              .sort((a, b) => b.date.localeCompare(a.date) || (b.start_time || '').localeCompare(a.start_time || ''))
               .slice(0, 10)
             if (viitoare.length === 0 && trecute.length === 0) return null
             return (
@@ -4173,7 +4185,7 @@ function App() {
                 const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === new Date().toISOString().split('T')[0] ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a', marginBottom: '10px' }}>
                       {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                     </div>
@@ -4617,7 +4629,7 @@ function App() {
             <div style={{ marginBottom: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
               <input type="date" value={profileBirthDate} onChange={e => setProfileBirthDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={todayLocalStr()}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box', background: '#fff' }} />
             </div>
 
@@ -4775,7 +4787,7 @@ function App() {
                 <div style={{ marginBottom: '24px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
                   <input type="date" value={onboardingBirthDate} onChange={e => setOnboardingBirthDate(e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={todayLocalStr()}
                     style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#1a1a1a', boxSizing: 'border-box', background: '#fff' }} />
                 </div>
                 <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast('❌ Completează toate câmpurile obligatorii!'); return }; setOnboardingStep(2) }}
