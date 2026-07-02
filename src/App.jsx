@@ -3824,7 +3824,7 @@ function App() {
             <div style={{ background: '#fff', marginBottom: '10px' }}>
               <div style={{ padding: '14px 20px 10px' }}>
                 {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
-                <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                <div ref={homeCalScrollRef} className="hide-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                   {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
                     const selectat = ds === dataAcasa
                     return (

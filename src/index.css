@@ -8,6 +8,14 @@
   -webkit-touch-callout: none;
 }
 
+/* scrollbarWidth:'none' (inline, in JSX) ascunde scrollbar-ul doar in Firefox -
+   pe iOS/Safari (WebKit) tot apare bara nativa de scroll, vizibila mai ales
+   pe fundaluri inchise (ex: chip-ul de zi selectat, negru) ca o linie alba/gri
+   la marginea de jos a zonei cu scroll orizontal. */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 html {
   touch-action: manipulation;
   -ms-touch-action: manipulation;
