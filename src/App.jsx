@@ -3823,7 +3823,6 @@ function App() {
             {/* ── Clase disponibile ── */}
             <div style={{ background: '#fff', marginBottom: '10px' }}>
               <div style={{ padding: '14px 20px 10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#1a1a1a', letterSpacing: '0.06em', marginBottom: '12px' }}>CLASE DISPONIBILE</div>
                 {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
                 <div ref={homeCalScrollRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                   {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
