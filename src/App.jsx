@@ -3833,11 +3833,13 @@ function App() {
               </div>
               <div style={{ padding: '0 20px 14px' }}>
                 <div onClick={() => setClaseHomeDeschis(v => !v)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', background: '#fafafa' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '12px 14px', borderRadius: '12px', transition: 'background 0.15s, border-color 0.15s',
+                    border: claseHomeDeschis ? '1.5px solid #1a1a1a' : '1.5px solid #e0e0e0',
+                    background: claseHomeDeschis ? '#1a1a1a' : '#fafafa' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: claseHomeDeschis ? '#C8FF00' : '#1a1a1a' }}>
                     {claseZi.length === 0 ? `Nicio clasă ${esteAzi ? 'azi' : 'în această zi'}` : `${claseZi.length} clas${claseZi.length === 1 ? 'ă' : 'e'} disponibil${claseZi.length === 1 ? 'ă' : 'e'}`}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#888', display: 'inline-block', transform: claseHomeDeschis ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▼</span>
+                  <span style={{ fontSize: '11px', color: claseHomeDeschis ? '#C8FF00' : '#888', display: 'inline-block', transform: claseHomeDeschis ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s, color 0.15s' }}>▼</span>
                 </div>
               </div>
               {claseHomeDeschis && (
