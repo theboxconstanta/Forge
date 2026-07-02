@@ -410,7 +410,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
     {showDebug && <NavBarDebug navRef={navRef} />}
     <nav
       ref={navRef}
-      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 items-center justify-around border-t border-gray-200 bg-white pt-2"
+      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 items-start justify-around border-t border-gray-200 bg-white pt-2"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}
     >
       {tabs.map(({ id, label, icon: Icon }) => {
