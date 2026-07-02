@@ -390,20 +390,19 @@ function NavBarDebug({ navRef }) {
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // Pe iOS standalone (icon de pe home screen), NavBar-ul (position:fixed, bottom:0) ramane
-  // uneori cu un gap mic intre el si marginea fizica a ecranului. Am incercat sa extindem
-  // fundalul precis (via env(safe-area-inset-bottom) sau masurat runtime cu screen.height -
-  // innerHeight) dar pe device real orice extindere prea mare a impins iconițele intr-o zona
-  // pe care WebView-ul standalone pur si simplu nu o randeaza - iconițele au disparut complet.
-  // Concluzie: exista un plafon real de randare undeva putin sub marginea fizica, nu doar o
-  // problema de calcul. Ramanem la o extindere modesta (env(safe-area-inset-bottom) + o marja
-  // mica), sigura si testata sa nu ascunda niciodata iconițele, chiar daca lasa un rest mic
-  // de gri vizibil in unele cazuri.
+  // uneori cu un gap mic intre el si marginea fizica a ecranului. NavBar-ul INTERACTIV (cu
+  // iconițele) ramane mereu la bottom:0 - pozitia dovedita sigura (cand a fost impins ~50px
+  // mai jos, iconițele au disparut complet, deci exista undeva un plafon de randare pt
+  // continut INTERACTIV). Filler-ul de mai jos e DOAR decorativ (fara continut, fara tap
+  // targets) - poate sa se extinda mult mai agresiv fara niciun risc, pentru ca in cel mai
+  // rau caz partea care depaseste plafonul de randare pur si simplu nu se vede (nu strica
+  // nimic), dar partea care SE vede tot acopera gap-ul cu alb pana acolo unde poate randa.
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
-    <div style={{ position: 'fixed', bottom: 'calc(-1 * env(safe-area-inset-bottom, 0px) - 20px)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: 'calc(env(safe-area-inset-bottom, 0px) + 30px)', background: '#fff', zIndex: 99 }} />
+    <div style={{ position: 'fixed', bottom: '-150px', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: '200px', background: '#fff', zIndex: 99 }} />
     <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
