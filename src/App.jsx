@@ -410,30 +410,32 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
     {showDebug && <NavBarDebug navRef={navRef} />}
     <nav
       ref={navRef}
-      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 items-center justify-around border-t border-gray-200 bg-white pt-2"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}
+      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 flex-col border-t border-gray-200 bg-white"
     >
-      {tabs.map(({ id, label, icon: Icon }) => {
-        const isActive = screen === id
-        const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
-        return (
-          <button
-            key={id}
-            onClick={() => setScreen(id)}
-            className="relative flex flex-col items-center gap-1 px-2 py-1"
-          >
-            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#1a1a1a' : '#aaa'} />
-            <span className="text-[10px]" style={{ color: isActive ? '#1a1a1a' : '#aaa', fontWeight: isActive ? 600 : 400 }}>
-              {label}
-            </span>
-            {badge != null && (
-              <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-bold text-white">
-                {badge > 99 ? '99+' : badge}
+      <div className="flex items-center justify-around" style={{ paddingTop: '14px', paddingBottom: '14px' }}>
+        {tabs.map(({ id, label, icon: Icon }) => {
+          const isActive = screen === id
+          const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
+          return (
+            <button
+              key={id}
+              onClick={() => setScreen(id)}
+              className="relative flex flex-col items-center gap-1 px-2 py-1"
+            >
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#1a1a1a' : '#aaa'} />
+              <span className="text-[10px]" style={{ color: isActive ? '#1a1a1a' : '#aaa', fontWeight: isActive ? 600 : 400 }}>
+                {label}
               </span>
-            )}
-          </button>
-        )
-      })}
+              {badge != null && (
+                <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-bold text-white">
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
     </nav>
     </>
   )
