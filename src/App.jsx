@@ -355,34 +355,52 @@ function NavBarDebug({ navRef }) {
   const [info, setInfo] = useState(null)
   useEffect(() => {
     const measure = () => {
-      const rect = navRef.current?.getBoundingClientRect()
+      const navRect = navRef.current?.getBoundingClientRect()
+      const rootEl = document.getElementById('root')
+      const rootRect = rootEl?.getBoundingClientRect()
+      const appFrameEl = document.querySelector('.app-frame')
+      const appFrameRect = appFrameEl?.getBoundingClientRect()
       const probe = document.createElement('div')
       probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden'
       document.body.appendChild(probe)
       const safeAreaPx = getComputedStyle(probe).height
       document.body.removeChild(probe)
+      const vv = window.visualViewport
       setInfo({
+        t: new Date().toLocaleTimeString('ro-RO', { hour12: false }),
+        activeEl: document.activeElement?.tagName + (document.activeElement?.type ? `[${document.activeElement.type}]` : ''),
         innerHeight: window.innerHeight,
-        visualViewportHeight: window.visualViewport?.height ?? 'n/a',
+        appVhVar: getComputedStyle(document.documentElement).getPropertyValue('--app-vh'),
+        vvHeight: vv?.height ?? 'n/a',
+        vvOffsetTop: vv?.offsetTop ?? 'n/a',
+        vvScale: vv?.scale ?? 'n/a',
         screenHeight: window.screen?.height ?? 'n/a',
-        standalone: window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone || false,
-        navTop: rect?.top,
-        navBottom: rect?.bottom,
-        gap: rect ? (window.innerHeight - rect.bottom) : 'n/a',
+        rootTop: rootRect?.top,
+        rootBottom: rootRect?.bottom,
+        appFrameTop: appFrameRect?.top,
+        appFrameBottom: appFrameRect?.bottom,
+        navTop: navRect?.top,
+        navBottom: navRect?.bottom,
+        gapVsInnerHeight: navRect ? (window.innerHeight - navRect.bottom) : 'n/a',
+        gapVsVisualViewport: navRect && vv ? ((vv.height + vv.offsetTop) - navRect.bottom) : 'n/a',
         safeAreaPx,
       })
     }
     measure()
+    const interval = setInterval(measure, 250)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('scroll', measure)
     return () => {
+      clearInterval(interval)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('scroll', measure)
     }
   }, [navRef])
   if (!info) return null
   return (
-    <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(0,0,0,0.92)', color: '#0f0', fontFamily: 'monospace', fontSize: '12px', padding: '16px', borderRadius: '10px', zIndex: 999, lineHeight: 1.6, maxWidth: '90vw' }}>
+    <div style={{ position: 'fixed', top: '8px', left: '8px', right: '8px', background: 'rgba(0,0,0,0.92)', color: '#0f0', fontFamily: 'monospace', fontSize: '11px', padding: '12px', borderRadius: '10px', zIndex: 999, lineHeight: 1.5, maxHeight: '45vh', overflowY: 'auto' }}>
       {Object.entries(info).map(([k, v]) => <div key={k}>{k}: {String(v)}</div>)}
       <div onClick={() => { localStorage.removeItem('navDebug'); window.location.reload() }} style={{ marginTop: '10px', color: '#f66', cursor: 'pointer' }}>[inchide]</div>
     </div>
