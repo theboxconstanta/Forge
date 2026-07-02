@@ -350,13 +350,49 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+// TEMPORAR - overlay de debug pt masurat gap-ul real din NavBar pe device. De scos dupa diagnostic.
+function NavBarDebug({ navRef }) {
+  const probeRef = useRef(null)
+  const [txt, setTxt] = useState('masor...')
+  useEffect(() => {
+    const measure = () => {
+      const r = navRef.current?.getBoundingClientRect()
+      const probePad = probeRef.current ? getComputedStyle(probeRef.current).paddingBottom : '?'
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+      setTxt(
+        `innerH:${window.innerHeight} vvH:${Math.round(window.visualViewport?.height)} screenH:${window.screen.height} docClientH:${document.documentElement.clientHeight} standalone:${String(isStandalone)} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} safeAreaPx:${probePad} dpr:${window.devicePixelRatio} ua:${navigator.userAgent}`
+      )
+    }
+    measure()
+    const t = setTimeout(measure, 500)
+    window.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('resize', measure)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('resize', measure)
+    }
+  }, [navRef])
+  return (
+    <>
+      <div ref={probeRef} style={{ position: 'fixed', top: '-9999px', left: 0, paddingBottom: 'env(safe-area-inset-bottom)' }} />
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#E8192C', color: '#fff', fontSize: '9px', lineHeight: 1.4, padding: '4px 6px', zIndex: 99999, wordBreak: 'break-all', fontFamily: 'monospace' }}>
+        {txt}
+      </div>
+    </>
+  )
+}
+
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // innerHeight nu include env(safe-area-inset-bottom) DOAR in standalone/PWA pe iOS -
   // in Safari normal sau intr-un WebView (ex. browser-ul din WhatsApp), bara de jos a
   // browser-ului/WebView-ului ocupa deja acea zona, deci offset-ul negativ nu trebuie aplicat acolo.
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+  const navRef = useRef(null)
   return (
-    <div className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? 'calc(-1 * env(safe-area-inset-bottom, 0px))' : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <>
+    <NavBarDebug navRef={navRef} />
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? 'calc(-1 * env(safe-area-inset-bottom, 0px))' : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -395,6 +431,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
+    </>
   )
 }
 
