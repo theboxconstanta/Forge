@@ -2098,7 +2098,7 @@ function Admin({ showToast }) {
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>Culoare clasă</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              {[null, '#FF3B30', '#FF9500', '#FFD60A', '#ABE73C', '#30D158', '#32ADE6', '#BF5AF2', '#0E0E0E'].map(col => (
+              {[null, '#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8'].map(col => (
                 <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
                   style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
                     background: col || '#e0e0e0',
