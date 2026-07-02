@@ -16,7 +16,7 @@ export default defineConfig({
         description: 'Aplicație CrossFit pentru antrenamente, PR-uri și clase',
         theme_color: '#1a1a1a',
         background_color: '#1a1a1a',
-        display: 'standalone',
+        display: 'fullscreen',
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
