@@ -121,8 +121,14 @@ body {
     width: 100%;
     height: var(--app-vh, 100dvh);
     transform: translateZ(0);
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* overflow:hidden (nu auto) - de cand scroll-ul real s-a mutat pe zona de
+       continut din .app-frame (vezi App.jsx), #root nu mai are nevoie de
+       propriul lui scroll. Lasat pe auto, iOS il considera un ancestor
+       scrolabil valid si il foloseste ca sa "aduca in vizor" un input
+       focusat cand apare tastatura - scroland #root insusi, ceea ce
+       impinge NavBar (copil al #root) in sus odata cu el, independent de
+       orice logica JS/--app-vh. */
+    overflow: hidden;
   }
 }
 
