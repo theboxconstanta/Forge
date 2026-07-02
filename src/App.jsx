@@ -195,6 +195,8 @@ const MISCARI = [
   'Toes to Bar', 'Knees to Elbow', 'Ring Row', 'Push-up', 'Handstand Push-up',
   'Ring Dip', 'Bar Dip', 'Handstand Hold', 'Handstand Walk', 'L-sit Hold',
   'Box Jump', 'Broad Jump', 'Burpee', 'Double Under', 'Single Under',
+  'Pistol Squat', 'Rope Climb', 'GHD Sit-up', 'GHD Back Extension',
+  'Walking Lunge', 'Overhead Lunge', 'Front Rack Lunge',
   ...CARDIO_MISCARI,
   'KB Swing', 'KB Clean', 'KB Snatch', 'KB Goblet Squat', 'Wall Ball',
   // Girls
@@ -258,13 +260,15 @@ const PR_CATEGORII = {
     'Clean & Jerk','Power Clean','Hang Clean','Hang Power Clean','Squat Clean','Clean Pull',
     'Snatch','Power Snatch','Hang Snatch','Hang Power Snatch','Squat Snatch','Snatch Pull','Snatch Balance',
     'Thruster','Farmers Carry','Turkish Get Up','Good Morning','Hip Thrust',
+    'Walking Lunge','Overhead Lunge','Front Rack Lunge',
   ],
   GYMNASTICS: [
-    'Air Squat',
+    'Air Squat','Pistol Squat',
     'Pull-up','Chest to Bar Pull-up','Muscle-up','Ring Muscle-up','Bar Muscle-up',
     'Toes to Bar','Knees to Elbow','Ring Row','Push-up','Handstand Push-up',
     'Ring Dip','Bar Dip','Handstand Hold','Handstand Walk','L-sit Hold',
-    'Box Jump','Broad Jump','Burpee','Double Under','Single Under',
+    'Box Jump','Broad Jump','Burpee','Double Under','Single Under','Rope Climb',
+    'GHD Sit-up','GHD Back Extension',
     'KB Swing','KB Clean','KB Snatch','KB Goblet Squat','Wall Ball',
   ],
   CARDIO: CARDIO_MISCARI,
@@ -3371,7 +3375,7 @@ function App() {
     setPrSaving(true)
     const isBenchmark = miscarePR in heroWodsInfoAll
     const isCardio = CARDIO_MISCARI.includes(miscarePR)
-    const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR)
+    const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { movement: miscarePR, notes: prNote || null }
     if (!editPrId) insertData.member_id = user.id
@@ -3396,7 +3400,7 @@ function App() {
   const startEditPR = (record, movement) => {
     const isBenchmark = movement in heroWodsInfoAll
     const isCardio = CARDIO_MISCARI.includes(movement)
-    const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(movement)
+    const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(movement)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(movement)
     setMiscarePR(movement)
     setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrVarianta('RX')
@@ -4389,7 +4393,7 @@ function App() {
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
                     <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 3:52" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
-                ) : ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump'].includes(miscarePR) ? (
+                ) : ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR) ? (
                   <>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Repetări max</div>
                     <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder="ex: 22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
