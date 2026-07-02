@@ -350,6 +350,44 @@ function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+// TEMPORAR - re-adaugat pt un al doilea diagnostic (gap-ul persista pe device dupa primul fix
+// "masurat runtime"). 5 tap-uri pe "v2" activeaza. De scos dupa diagnostic.
+let _debugTapCount = 0
+let _debugTapTimer = null
+function handleDebugLogoTap() {
+  _debugTapCount++
+  clearTimeout(_debugTapTimer)
+  _debugTapTimer = setTimeout(() => { _debugTapCount = 0 }, 2000)
+  if (_debugTapCount >= 5) {
+    _debugTapCount = 0
+    if (localStorage.getItem('navDebug') === '1') localStorage.removeItem('navDebug')
+    else localStorage.setItem('navDebug', '1')
+    window.location.reload()
+  }
+}
+
+function NavBarDebug({ navRef, bottomGap }) {
+  const [txt, setTxt] = useState('masor...')
+  useEffect(() => {
+    const measure = () => {
+      const r = navRef.current?.getBoundingClientRect()
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+      setTxt(
+        `innerH:${window.innerHeight} screenH:${window.screen.height} standalone:${String(isStandalone)} bottomGap:${bottomGap} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} dpr:${window.devicePixelRatio}`
+      )
+    }
+    measure()
+    const t = setTimeout(measure, 500)
+    window.addEventListener('resize', measure)
+    return () => { clearTimeout(t); window.removeEventListener('resize', measure) }
+  }, [navRef, bottomGap])
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#E8192C', color: '#fff', fontSize: '11px', lineHeight: 1.4, padding: '4px 6px', zIndex: 99999, wordBreak: 'break-all', fontFamily: 'monospace' }}>
+      {txt}
+    </div>
+  )
+}
+
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // innerHeight nu include env(safe-area-inset-bottom) DOAR in standalone/PWA pe iOS -
   // in Safari normal sau intr-un WebView (ex. browser-ul din WhatsApp), bara de jos a
@@ -359,6 +397,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // cu env(safe-area-inset-bottom) (ex. 62px masurat vs 34px raportat de env()) - masuram
   // diferenta reala runtime (screen.height - innerHeight) in loc sa presupunem o valoare fixa.
   const [bottomGap, setBottomGap] = useState(0)
+  const navRef = useRef(null)
   useEffect(() => {
     if (!isStandalone) return
     const masoara = () => setBottomGap(Math.max(0, window.screen.height - window.innerHeight))
@@ -367,8 +406,11 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
     window.addEventListener('orientationchange', masoara)
     return () => { clearTimeout(t); window.removeEventListener('orientationchange', masoara) }
   }, [isStandalone])
+  const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
-    <div className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <>
+    {showDebug && <NavBarDebug navRef={navRef} bottomGap={bottomGap} />}
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
@@ -407,6 +449,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
         </div>
       ))}
     </div>
+    </>
   )
 }
 
@@ -3656,7 +3699,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
-          <span style={{ color: '#444', fontSize: '10px' }}>v2</span>
+          <span onClick={handleDebugLogoTap} style={{ color: '#444', fontSize: '10px', padding: '8px', margin: '-8px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600' }}>
           <span style={{ color: '#fff' }}>CrossFit </span>
