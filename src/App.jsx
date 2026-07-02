@@ -1,6 +1,7 @@
 ﻿// @ts-nocheck
 /* eslint-disable */
 import { useState, useEffect, useRef, useMemo, Component } from 'react'
+import { Home, PenLine, Trophy, Medal, MessageCircle, Settings } from 'lucide-react'
 import { supabase } from './supabase'
 
 class ErrorBoundary extends Component {
@@ -388,57 +389,52 @@ function NavBarDebug({ navRef }) {
   )
 }
 
+const NAV_TABS = [
+  { id: 'home', label: 'Acasă', icon: Home },
+  { id: 'log', label: 'Log', icon: PenLine },
+  { id: 'pr', label: 'PR-uri', icon: Trophy },
+  { id: 'clasament', label: 'Cls.', icon: Medal },
+  { id: 'feed', label: 'Feed', icon: MessageCircle },
+]
+
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
-  // 2026-07-02: revenit la reteta simpla dovedita fara gap (folosita pana pe 30 iunie, inainte
-  // sa inceapa incercarile cu env(safe-area-inset-bottom)/masuratori JS/filler care nu au facut
-  // decat sa introduca un gap vizibil sub NavBar in standalone iOS - vezi [[project-navbar-safe-area]].
-  // Gap-ul a persistat si dupa revenirea la padding simplu, deci am readaugat un overlay de debug
-  // (activabil cu 5 tap-uri pe "v2" din header) ca sa masuram valorile REALE pe device in loc sa
-  // mai ghicim - vezi [[project-navbar-safe-area]].
+  // 2026-07-02: rescris cu Tailwind + lucide-react (iconite reale in loc de emoji), la cererea
+  // userului. Gap-ul standalone iOS a fost masurat real: env(safe-area-inset-bottom) raporteaza
+  // 34px, dar diferenta reala fata de ecranul fizic e 62px - deci bufferul de +8px de mai jos
+  // s-ar putea sa NU inchida gap-ul complet, ramane de verificat pe device - vezi [[project-navbar-safe-area]].
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
+  const tabs = isAdmin ? [...NAV_TABS, { id: 'admin', label: 'Admin', icon: Settings }] : NAV_TABS
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
-    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', padding: '10px 0 16px', zIndex: 100 }}>
-      {[
-        { icon: '🏠', lbl: 'Acasă', sc: 'home' },
-        { icon: '✏️', lbl: 'Log', sc: 'log' },
-        { icon: '🏆', lbl: 'PR-uri', sc: 'pr' },
-        { icon: '🏅', lbl: 'Cls.', sc: 'clasament' },
-        { icon: '💬', lbl: 'Feed', sc: 'feed' },
-        ...(isAdmin ? [{ icon: '⚙️', lbl: 'Admin', sc: 'admin' }] : []),
-      ].map((n, i) => (
-        <div key={i} onClick={() => setScreen(n.sc)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', color: screen === n.sc ? '#1a1a1a' : '#aaa' }}>
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: '20px', lineHeight: 1 }}>{n.icon}</span>
-            {n.sc === 'feed' && feedUnread > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '-5px',
-                right: '-10px',
-                background: '#E8192C',
-                color: '#fff',
-                borderRadius: '999px',
-                minWidth: '18px',
-                height: '18px',
-                fontSize: '11px',
-                fontWeight: '800',
-                lineHeight: '18px',
-                textAlign: 'center',
-                padding: '0 5px',
-                boxSizing: 'border-box',
-                boxShadow: '0 1px 4px rgba(232,25,44,0.5)',
-                border: '1.5px solid #fff',
-              }}>
-                {feedUnread > 99 ? '99+' : feedUnread}
+    <nav
+      ref={navRef}
+      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 items-center justify-around border-t border-gray-200 bg-white pt-2"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}
+    >
+      {tabs.map(({ id, label, icon: Icon }) => {
+        const isActive = screen === id
+        const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
+        return (
+          <button
+            key={id}
+            onClick={() => setScreen(id)}
+            className="relative flex flex-col items-center gap-1 px-2 py-1"
+          >
+            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#1a1a1a' : '#aaa'} />
+            <span className="text-[10px]" style={{ color: isActive ? '#1a1a1a' : '#aaa', fontWeight: isActive ? 600 : 400 }}>
+              {label}
+            </span>
+            {badge != null && (
+              <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-bold text-white">
+                {badge > 99 ? '99+' : badge}
               </span>
             )}
-          </div>
-          <span style={{ fontSize: '10px', fontWeight: screen === n.sc ? '600' : '400' }}>{n.lbl}</span>
-        </div>
-      ))}
-    </div>
+          </button>
+        )
+      })}
+    </nav>
     </>
   )
 }
