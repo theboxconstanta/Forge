@@ -398,10 +398,13 @@ const NAV_TABS = [
 ]
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
-  // 2026-07-02: rescris cu Tailwind + lucide-react (iconite reale in loc de emoji), la cererea
-  // userului. Gap-ul standalone iOS a fost masurat real: env(safe-area-inset-bottom) raporteaza
-  // 34px, dar diferenta reala fata de ecranul fizic e 62px - deci bufferul de +8px de mai jos
-  // s-ar putea sa NU inchida gap-ul complet, ramane de verificat pe device - vezi [[project-navbar-safe-area]].
+  // 2026-07-02, noaptea: renuntat definitiv la position:fixed pt NavBar, dupa o
+  // seara intreaga de incercari esuate de a masura corect inaltimea ecranului
+  // in standalone iOS (vezi [[project-navbar-safe-area]] pt istoricul complet).
+  // NavBar e acum un element normal in flow-ul flex al .app-frame (ultimul
+  // copil, langa zona de continut care scroleaza) - nu mai depinde deloc de
+  // innerHeight/dvh/screen.height, deci nu mai poate "sari"/disparea din cauza
+  // vreunei masuratori gresite de viewport.
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   const tabs = isAdmin ? [...NAV_TABS, { id: 'admin', label: 'Admin', icon: Settings }] : NAV_TABS
@@ -410,7 +413,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
     {showDebug && <NavBarDebug navRef={navRef} />}
     <nav
       ref={navRef}
-      className="app-frame fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[430px] -translate-x-1/2 flex-col border-t border-gray-200 bg-white"
+      className="flex w-full flex-shrink-0 flex-col border-t border-gray-200 bg-white"
     >
       <div className="flex items-center justify-around" style={{ paddingTop: '14px', paddingBottom: '14px' }}>
         {tabs.map(({ id, label, icon: Icon }) => {
@@ -3682,7 +3685,7 @@ function App() {
   )
 
   return (
-    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', height: '100%', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3727,6 +3730,8 @@ function App() {
           </div>
         </div>
       )}
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
 
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
@@ -4740,6 +4745,8 @@ function App() {
           </button>
         </div>
       )}
+
+      </div>
 
       {showCalPicker && (() => {
         const _now2 = new Date(); const todayStr = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`
