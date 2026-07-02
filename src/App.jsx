@@ -366,23 +366,21 @@ function handleDebugLogoTap() {
   }
 }
 
-function NavBarDebug({ navRef, fillerRef, bottomGap }) {
+function NavBarDebug({ navRef }) {
   const [txt, setTxt] = useState('masor...')
   useEffect(() => {
     const measure = () => {
       const r = navRef.current?.getBoundingClientRect()
-      const f = fillerRef.current?.getBoundingClientRect()
-      const fBg = fillerRef.current ? getComputedStyle(fillerRef.current).backgroundColor : '?'
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
       setTxt(
-        `innerH:${window.innerHeight} screenH:${window.screen.height} standalone:${String(isStandalone)} bottomGap:${bottomGap} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} fillerTop:${f ? Math.round(f.top) : 'LIPSA'} fillerBottom:${f ? Math.round(f.bottom) : 'LIPSA'} fillerBg:${fBg} dpr:${window.devicePixelRatio}`
+        `innerH:${window.innerHeight} screenH:${window.screen.height} standalone:${String(isStandalone)} navBottom:${r ? Math.round(r.bottom) : '?'} navTop:${r ? Math.round(r.top) : '?'} dpr:${window.devicePixelRatio}`
       )
     }
     measure()
     const t = setTimeout(measure, 500)
     window.addEventListener('resize', measure)
     return () => { clearTimeout(t); window.removeEventListener('resize', measure) }
-  }, [navRef, fillerRef, bottomGap])
+  }, [navRef])
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#E8192C', color: '#fff', fontSize: '11px', lineHeight: 1.4, padding: '4px 6px', zIndex: 99999, wordBreak: 'break-all', fontFamily: 'monospace' }}>
       {txt}
@@ -391,47 +389,22 @@ function NavBarDebug({ navRef, fillerRef, bottomGap }) {
 }
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
-  // innerHeight nu include env(safe-area-inset-bottom) DOAR in standalone/PWA pe iOS -
-  // in Safari normal sau intr-un WebView (ex. browser-ul din WhatsApp), bara de jos a
-  // browser-ului/WebView-ului ocupa deja acea zona, deci offset-ul negativ nu trebuie aplicat acolo.
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
-  // Masurat pe device real: gap-ul innerHeight vs ecranul fizic in standalone NU e mereu egal
-  // cu env(safe-area-inset-bottom) (ex. 62px masurat vs 34px raportat de env()) - masuram
-  // diferenta reala runtime (screen.height - innerHeight) in loc sa presupunem o valoare fixa.
-  const [bottomGap, setBottomGap] = useState(0)
+  // Pe iOS standalone (icon de pe home screen), NavBar-ul (position:fixed, bottom:0) ramane
+  // uneori cu un gap mic intre el si marginea fizica a ecranului. Am incercat sa extindem
+  // fundalul precis (via env(safe-area-inset-bottom) sau masurat runtime cu screen.height -
+  // innerHeight) dar pe device real orice extindere prea mare a impins iconițele intr-o zona
+  // pe care WebView-ul standalone pur si simplu nu o randeaza - iconițele au disparut complet.
+  // Concluzie: exista un plafon real de randare undeva putin sub marginea fizica, nu doar o
+  // problema de calcul. Ramanem la o extindere modesta (env(safe-area-inset-bottom) + o marja
+  // mica), sigura si testata sa nu ascunda niciodata iconițele, chiar daca lasa un rest mic
+  // de gri vizibil in unele cazuri.
   const navRef = useRef(null)
-  const fillerRef = useRef(null)
-  useEffect(() => {
-    if (!isStandalone) return
-    // La pornire "rece" din icon (nu reload), innerHeight/screen.height nu sunt mereu
-    // stabilizate imediat - o singura masuratoare la 300ms poate prinde valori tranzitorii.
-    // Masuram repetat in prima secunda + la orice resize/orientationchange ulterior.
-    const masoara = () => setBottomGap(Math.min(150, Math.max(0, window.screen.height - window.innerHeight)))
-    masoara()
-    const timeouts = [100, 300, 600, 1000, 2000].map(ms => setTimeout(masoara, ms))
-    window.addEventListener('resize', masoara)
-    window.addEventListener('orientationchange', masoara)
-    window.visualViewport?.addEventListener('resize', masoara)
-    return () => {
-      timeouts.forEach(clearTimeout)
-      window.removeEventListener('resize', masoara)
-      window.removeEventListener('orientationchange', masoara)
-      window.visualViewport?.removeEventListener('resize', masoara)
-    }
-  }, [isStandalone])
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
   return (
     <>
-    {showDebug && <NavBarDebug navRef={navRef} fillerRef={fillerRef} bottomGap={bottomGap} />}
-    {/* Filler decorativ - NU misca NavBar-ul real (care ramane la bottom:0, pozitie sigura/
-        testata), doar acopera vizual orice petic gri ramas dedesubt cu o marja generoasa.
-        Daca se calculeaza gresit, cel mult acopera prea mult sau prea putin dintr-o zona goala -
-        nu poate ascunde iconițele, spre deosebire de a muta NavBar-ul insusi. NECONDITIONAT de
-        bottomGap (foloseste minim 100px) ca sa nu depinda de reusita masuratorii runtime. */}
-    {isStandalone && (
-      <div ref={fillerRef} style={{ position: 'fixed', bottom: `-${Math.max(bottomGap, 40) + 60}px`, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: `${Math.max(bottomGap, 40) + 70}px`, background: '#fff', zIndex: 99 }} />
-    )}
-    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    {showDebug && <NavBarDebug navRef={navRef} />}
+    <div style={{ position: 'fixed', bottom: 'calc(-1 * env(safe-area-inset-bottom, 0px) - 20px)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', height: 'calc(env(safe-area-inset-bottom, 0px) + 30px)', background: '#fff', zIndex: 99 }} />
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
