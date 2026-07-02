@@ -14,7 +14,22 @@ class ErrorBoundary extends Component {
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px' }}>Ceva a mers greșit</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Încearcă să reîmprospătezi pagina.</div>
-          <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={async () => {
+            // Un reload simplu poate reincărca exact același build vechi/stricat
+            // din cache-ul service workerului (mai ales pe PWA instalat pe telefon),
+            // deci ștergem tot înainte de reload ca să fim siguri că luăm build-ul curent.
+            try {
+              if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations()
+                await Promise.all(regs.map(r => r.unregister()))
+              }
+              if ('caches' in window) {
+                const keys = await caches.keys()
+                await Promise.all(keys.map(k => caches.delete(k)))
+              }
+            } catch { /* ignoră - reîncărcăm oricum */ }
+            window.location.reload()
+          }} style={{ padding: '12px 24px', background: '#C8FF00', color: '#111', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
             Reîmprospătează
           </button>
         </div>
@@ -3626,7 +3641,7 @@ function App() {
 
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
-        const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => a.start_time.localeCompare(b.start_time))
+        const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''))
         const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
         const sessTotal = abonamentReal?.sessions_total
         const sessUsed = abonamentReal?.sessions_used || 0
@@ -3733,7 +3748,7 @@ function App() {
                             border: rezervat ? '2px solid #1a1a1a' : c.color ? `2px solid ${c.color}` : deschis ? '2px solid #1a1a1a' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time.slice(0,5)}</span>
+                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#1a1a1a' : '#1a1a1a', letterSpacing: '-0.3px' }}>{c.start_time?.slice(0,5)}</span>
                               <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{c.end_time?.slice(0,5)}</span>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -3972,9 +3987,9 @@ function App() {
           {(() => {
             const _now = new Date()
             const viitoare = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) > _now)
-              .sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time))
+              .sort((a, b) => a.date.localeCompare(b.date) || (a.start_time || '').localeCompare(b.start_time || ''))
             const trecute = claseDB.filter(c => rezervariMele.includes(c.id) && new Date(`${c.date}T${c.end_time}`) <= _now)
-              .sort((a, b) => b.date.localeCompare(a.date) || b.start_time.localeCompare(a.start_time))
+              .sort((a, b) => b.date.localeCompare(a.date) || (b.start_time || '').localeCompare(a.start_time || ''))
               .slice(0, 10)
             if (viitoare.length === 0 && trecute.length === 0) return null
             return (
