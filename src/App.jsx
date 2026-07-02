@@ -351,8 +351,12 @@ function formatWodDurata(durataStr) {
 }
 
 function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
+  // innerHeight nu include env(safe-area-inset-bottom) DOAR in standalone/PWA pe iOS -
+  // in Safari normal sau intr-un WebView (ex. browser-ul din WhatsApp), bara de jos a
+  // browser-ului/WebView-ului ocupa deja acea zona, deci offset-ul negativ nu trebuie aplicat acolo.
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
   return (
-    <div className="app-frame" style={{ position: 'fixed', bottom: 'calc(-1 * env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <div className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? 'calc(-1 * env(safe-area-inset-bottom, 0px))' : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
