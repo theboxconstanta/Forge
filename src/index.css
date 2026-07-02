@@ -55,6 +55,23 @@ body {
   height: 100%;
 }
 
+/* In standalone/PWA (fara bara de adresa), body { position:fixed; inset:0 }
+   se raporteaza la "layout viewport"-ul iOS, care pe unele device-uri nu
+   coincide cu marginea fizica reala a ecranului (gap sub NavBar). In
+   landscape (mai jos) folosim deja 100dvh/100dvw, care raporteaza corect
+   safe-area-ul - aplicam acelasi principiu si in portrait, dar doar in
+   standalone, ca sa nu reaparea flash-ul alb din tab normal (bara de adresa
+   care apare/dispare recalculeaza dvh live). */
+@media (display-mode: standalone) {
+  body {
+    height: 100dvh;
+    bottom: auto;
+  }
+  #root {
+    height: 100dvh;
+  }
+}
+
 /* App.jsx cape la 430px (max-width inline) ca sa arate ca un "telefon" cand
    e deschis pe desktop intr-o fereastra larga. Pe un telefon real acel plafon
    poate fi mai mic decat latimea reala a viewport-ului (in functie de
