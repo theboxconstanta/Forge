@@ -9,7 +9,7 @@ class ErrorBoundary extends Component {
   componentDidCatch(error, info) { console.error('App crash:', error, info) }
   render() {
     if (this.state.hasError) return (
-      <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+      <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
         <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a', marginBottom: '6px' }}>Ceva a mers greșit</div>
@@ -3466,7 +3466,7 @@ function App() {
   )
 
   if (authLoading) return (
-    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏋️</div>
         <div style={{ fontSize: '14px', color: '#888' }}>Se încarcă...</div>
@@ -3584,7 +3584,7 @@ function App() {
   )
 
   return (
-    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100svh', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', minHeight: '100%', background: '#f5f5f5', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
