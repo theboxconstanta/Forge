@@ -420,7 +420,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} bottomGap={bottomGap} />}
-    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
+    <div ref={navRef} className="app-frame" style={{ position: 'fixed', bottom: isStandalone ? `-${bottomGap + 50}px` : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', background: '#fff', borderTop: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-around', paddingTop: '10px', paddingLeft: 0, paddingRight: 0, paddingBottom: isStandalone ? `max(8px, ${bottomGap}px)` : 'max(8px, env(safe-area-inset-bottom))', zIndex: 100, boxShadow: '0 30px 0 0 #fff' }}>
       {[
         { icon: '🏠', lbl: 'Acasă', sc: 'home' },
         { icon: '✏️', lbl: 'Log', sc: 'log' },
