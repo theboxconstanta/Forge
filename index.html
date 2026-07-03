@@ -13,6 +13,15 @@
     <meta name="apple-mobile-web-app-title" content="Forge" />
     <meta name="format-detection" content="telephone=no" />
     <title>Forge</title>
+    <style>
+      /* CSS critic, inline: garanteaza ca #root are o inaltime definita chiar
+         din primul randare, inainte ca index.css (fisier extern) sa apuce sa
+         se incarce - fara asta, la prima instalare PWA, #root se poate
+         randa fara nicio inaltime (shrink la continut) pana se incarca CSS-ul
+         extern, facand NavBar sa para "in mijlocul ecranului" pentru o clipa. */
+      html, body, #root { height: 100%; }
+      body { position: fixed; inset: 0; margin: 0; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
