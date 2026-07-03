@@ -1210,6 +1210,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const [deleteClientConfirm, setDeleteClientConfirm] = useState(null)
   const [deleteClientEmailInput, setDeleteClientEmailInput] = useState('')
   const [deletingClient, setDeletingClient] = useState(false)
+  const [coachesList, setCoachesList] = useState([])
+  const [coachSearch, setCoachSearch] = useState('')
 
   useEffect(() => {
     // fetchClienti ramane si pentru coach (nu doar admin) - desi tab-ul "Clienti" e admin-only,
@@ -1217,7 +1219,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     // adminAdaugaInClasa/adminScoateDinClasa (cautare membru + notificari) din tab-ul Clase,
     // accesibil coach-ului. Fara asta, "Adauga manual" nu gasea pe nimeni pentru un coach.
     fetchClase(); fetchWods(); fetchClienti()
-    if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }
+    if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin(); fetchCoaches() }
   }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
 
@@ -1231,6 +1233,26 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const fetchWods = async () => {
     const { data } = await supabase.from('wods').select('*').order('date', { ascending: false })
     if (data) setWods(data)
+  }
+
+  const fetchCoaches = async () => {
+    const { data } = await supabase.from('coaches').select('id, email').order('email', { ascending: true })
+    if (data) setCoachesList(data)
+  }
+
+  const addCoach = async (memberId, email) => {
+    const { error } = await supabase.from('coaches').insert({ id: memberId, email })
+    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    showToast('✓ Coach adăugat')
+    setCoachSearch('')
+    fetchCoaches()
+  }
+
+  const removeCoach = async (memberId) => {
+    const { error } = await supabase.from('coaches').delete().eq('id', memberId)
+    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    showToast('✓ Coach scos')
+    fetchCoaches()
   }
 
   const fetchClienti = async () => {
@@ -2518,6 +2540,45 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
             {savingSettings ? 'Se salvează...' : '✓ Salvează setările'}
           </button>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Coach-i</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>Acces doar la WOD și Clase, fără Clienți/Abonamente/Planuri/Setări.</div>
+          {coachesList.length > 0 && (
+            <div style={{ marginBottom: '14px' }}>
+              {coachesList.map(co => (
+                <div key={co.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                  <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{co.email}</span>
+                  <button onClick={() => removeCoach(co.id)}
+                    style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
+            placeholder="Caută după nume sau email..."
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          {coachSearch.trim() && (() => {
+            const q = coachSearch.toLowerCase()
+            const rezultate = clienti.filter(cl =>
+              (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
+              !coachesList.some(co => co.id === cl.id)
+            ).slice(0, 5)
+            return rezultate.length > 0 ? (
+              <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
+                {rezultate.map(cl => (
+                  <div key={cl.id} onClick={() => addCoach(cl.id, cl.email)}
+                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '500', color: '#0E0E0E' }}>{cl.full_name || cl.email}</div>
+                      <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>+ Coach</span>
+                  </div>
+                ))}
+              </div>
+            ) : <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>Niciun rezultat</div>
+          })()}
         </div>
         </>
       )}
