@@ -2544,8 +2544,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Coach</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>Acces doar la WOD și Clase, fără Clienți/Abonamente/Planuri/Setări.</div>
+          <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
+            placeholder="Caută după nume sau email..."
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           {coachesList.length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
+            <div style={{ marginTop: '14px' }}>
               {coachesList.map(co => (
                 <div key={co.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{co.email}</span>
@@ -2555,9 +2558,6 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
               ))}
             </div>
           )}
-          <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
-            placeholder="Caută după nume sau email..."
-            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           {coachSearch.trim() && (() => {
             const q = coachSearch.toLowerCase()
             const rezultate = clienti.filter(cl =>
