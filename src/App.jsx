@@ -1152,8 +1152,8 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   )
 }
 
-function Admin({ showToast, onWodChanged }) {
-  const [adminTab, setAdminTab] = useState('clienti')
+function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
+  const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
   const [clienti, setClienti] = useState([])
@@ -1211,7 +1211,10 @@ function Admin({ showToast, onWodChanged }) {
   const [deleteClientEmailInput, setDeleteClientEmailInput] = useState('')
   const [deletingClient, setDeletingClient] = useState(false)
 
-  useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }, [])
+  useEffect(() => {
+    fetchClase(); fetchWods()
+    if (isAdmin) { fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }
+  }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
 
   const fetchClase = async () => {
@@ -1789,11 +1792,11 @@ function Admin({ showToast, onWodChanged }) {
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E' }}>⚙️ Admin</h1>
-        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>COACH</span>
+        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>{isAdmin ? 'ADMIN' : 'COACH'}</span>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', icon: Users, lbl: 'Clienți' }, { id: 'abonamente', icon: Ticket, lbl: 'Abonamente' }, { id: 'clase', icon: Calendar, lbl: 'Clase' }, { id: 'wod', icon: Dumbbell, lbl: 'WOD' }, { id: 'planuri', icon: ClipboardList, lbl: 'Planuri' }, { id: 'setari', icon: Settings, lbl: 'Setări' }].map(t => (
+        {[{ id: 'clienti', icon: Users, lbl: 'Clienți', adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: 'Abonamente', adminOnly: true }, { id: 'clase', icon: Calendar, lbl: 'Clase' }, { id: 'wod', icon: Dumbbell, lbl: 'WOD' }, { id: 'planuri', icon: ClipboardList, lbl: 'Planuri', adminOnly: true }, { id: 'setari', icon: Settings, lbl: 'Setări', adminOnly: true }].filter(t => !t.adminOnly || isAdmin).map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
             style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#0E0E0E' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <t.icon size={13} color={adminTab === t.id ? '#fff' : '#888'} />{adminTab === t.id ? ` ${t.lbl}` : ''}
@@ -1802,7 +1805,7 @@ function Admin({ showToast, onWodChanged }) {
       </div>
 
       {/* CLIENTI */}
-      {adminTab === 'clienti' && (
+      {adminTab === 'clienti' && isAdmin && (
         <>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '16px' }}>🔍</span>
@@ -1994,7 +1997,7 @@ function Admin({ showToast, onWodChanged }) {
       )}
 
       {/* ABONAMENTE */}
-      {adminTab === 'abonamente' && (
+      {adminTab === 'abonamente' && isAdmin && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ Abonament nou</div>
@@ -2431,7 +2434,7 @@ function Admin({ showToast, onWodChanged }) {
       )}
 
       {/* PLANURI */}
-      {adminTab === 'planuri' && (
+      {adminTab === 'planuri' && isAdmin && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ Plan nou</div>
@@ -2469,7 +2472,7 @@ function Admin({ showToast, onWodChanged }) {
       )}
 
       {/* SETĂRI */}
-      {adminTab === 'setari' && (
+      {adminTab === 'setari' && isAdmin && (
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -2750,6 +2753,7 @@ function App() {
   const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isCoach, setIsCoach] = useState(false)
   const [abonamentReal, setAbonamentReal] = useState(null)
   const [abonamentLoading, setAbonamentLoading] = useState(true)
   const [abonamentInitialized, setAbonamentInitialized] = useState(false)
@@ -2924,6 +2928,7 @@ function App() {
       fetchSettings()
       fetchWodZi()
       checkAdmin()
+      checkCoach()
       fetchAbonamentMeu(true)
       fetchClasament()
       registerPushSubscription()
@@ -3218,6 +3223,11 @@ function App() {
   const checkAdmin = async () => {
     const { data } = await supabase.from('admins').select('id').eq('id', user.id)
     setIsAdmin(data && data.length > 0)
+  }
+
+  const checkCoach = async () => {
+    const { data } = await supabase.from('coaches').select('id').eq('id', user.id)
+    setIsCoach(data && data.length > 0)
   }
 
   const fetchAbonamentMeu = async (isFirstLoad = false) => {
@@ -4957,7 +4967,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} />}
-      {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -5246,7 +5256,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} feedUnread={feedUnread} />
+      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin || isCoach} feedUnread={feedUnread} />
     </div>
   )
 }
