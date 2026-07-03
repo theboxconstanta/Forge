@@ -4902,10 +4902,6 @@ function App() {
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>Profilul meu</h1>
           </div>
 
-          <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginBottom: '24px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <span>⏱️</span> Timer
-          </button>
-
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}>
             <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
               style={{ width: '84px', height: '84px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
@@ -4986,6 +4982,10 @@ function App() {
               })}
             </div>
           </div>
+
+          <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginTop: '16px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <span>⏱️</span> Timer
+          </button>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
             <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '16px' }}>Schimbă parola</div>
