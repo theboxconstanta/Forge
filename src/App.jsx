@@ -3941,7 +3941,7 @@ function App() {
                         onClick={() => setDataAcasa(ds)}
                         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
                           background: selectat ? '#ABE73C' : 'transparent',
-                          border: selectat ? 'none' : eAzi ? '2px solid #0E0E0E' : areRez ? '2px solid #0E0E0E' : '1px solid #e8e8e8' }}>
+                          border: selectat ? 'none' : eAzi ? '2px solid #0E0E0E' : '1px solid #e8e8e8' }}>
                         <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#0E0E0E' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
                         <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: '#0E0E0E', lineHeight: 1 }}>{dayNum}</span>
                         <span style={{ fontSize: '10px', color: selectat ? '#0E0E0E' : '#aaa', fontWeight: '500' }}>{luna}</span>
