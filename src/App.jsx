@@ -988,6 +988,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
   const [confirmDeletePost, setConfirmDeletePost] = useState(null)
+  const [confirmDeleteComment, setConfirmDeleteComment] = useState(null)
 
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#0E0E0E', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
@@ -1086,6 +1087,13 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
     showToast('✓ Postare ștearsă')
   }
 
+  const stergeComentariu = async (commentId) => {
+    const { error } = await supabase.from('feed_comments').delete().eq('id', commentId)
+    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    setConfirmDeleteComment(null)
+    showToast('✓ Comentariu șters')
+  }
+
   const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
     const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
@@ -1177,9 +1185,24 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
                   return (
                     <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
                       <AvatarCircle name={cName} avatarUrl={c.profiles?.avatar_url} size={26} />
-                      <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '6px 10px', flex: 1 }}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '2px' }}>{cName}</div>
-                        <div style={{ fontSize: '12px', color: '#555' }}>{c.text}</div>
+                      <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '6px 10px', flex: 1, display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '2px' }}>{cName}</div>
+                          <div style={{ fontSize: '12px', color: '#555' }}>{c.text}</div>
+                        </div>
+                        {isAdmin && (
+                          confirmDeleteComment === c.id ? (
+                            <button onClick={() => stergeComentariu(c.id)}
+                              style={{ fontSize: '10px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', flexShrink: 0, height: 'fit-content' }}>
+                              Șterge?
+                            </button>
+                          ) : (
+                            <button onClick={() => setConfirmDeleteComment(c.id)}
+                              style={{ fontSize: '14px', color: '#bbb', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px', flexShrink: 0, height: 'fit-content' }}>
+                              ×
+                            </button>
+                          )
+                        )}
                       </div>
                     </div>
                   )
