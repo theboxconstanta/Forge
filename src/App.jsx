@@ -357,6 +357,25 @@ function formatWodDurata(durataStr) {
 
 function NavBarDebug({ navRef }) {
   const [info, setInfo] = useState(null)
+  const [loadTrace, setLoadTrace] = useState(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('__loadTrace')
+      if (raw) {
+        const samples = JSON.parse(raw)
+        // condensam: un rand la fiecare ~150ms, ca sa incapa pe ecran
+        const condensed = []
+        let lastT = -999
+        for (const s of samples) {
+          if (s.t - lastT >= 150 || s === samples[samples.length - 1]) {
+            condensed.push(s)
+            lastT = s.t
+          }
+        }
+        setLoadTrace(condensed)
+      }
+    } catch {}
+  }, [])
   useEffect(() => {
     const measure = () => {
       const navRect = navRef.current?.getBoundingClientRect()
@@ -404,8 +423,17 @@ function NavBarDebug({ navRef }) {
   }, [navRef])
   if (!info) return null
   return (
-    <div style={{ position: 'fixed', top: '8px', left: '8px', right: '8px', background: 'rgba(0,0,0,0.92)', color: '#0f0', fontFamily: 'monospace', fontSize: '11px', padding: '12px', borderRadius: '10px', zIndex: 999, lineHeight: 1.5, maxHeight: '45vh', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', top: '8px', left: '8px', right: '8px', background: 'rgba(0,0,0,0.92)', color: '#0f0', fontFamily: 'monospace', fontSize: '11px', padding: '12px', borderRadius: '10px', zIndex: 999, lineHeight: 1.5, maxHeight: '70vh', overflowY: 'auto' }}>
       {Object.entries(info).map(([k, v]) => <div key={k}>{k}: {String(v)}</div>)}
+      {loadTrace && (
+        <>
+          <div style={{ marginTop: '10px', color: '#ff0', fontWeight: 'bold' }}>ISTORIC PRIMELE 4s DUPA INCARCARE:</div>
+          <div style={{ color: '#888' }}>t(ms) innerH root frame navBottom</div>
+          {loadTrace.map((s, i) => (
+            <div key={i}>{String(s.t).padStart(4)}  {String(s.innerH).padStart(4)}  {String(s.rootH).padStart(4)}  {String(s.appFrameH).padStart(4)}  {String(s.navBottom).padStart(4)}</div>
+          ))}
+        </>
+      )}
       <div onClick={() => { localStorage.removeItem('navDebug'); window.location.reload() }} style={{ marginTop: '10px', color: '#f66', cursor: 'pointer' }}>[inchide]</div>
     </div>
   )

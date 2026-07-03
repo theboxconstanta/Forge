@@ -69,6 +69,32 @@ setTimeout(setAppHeight, 1000)
 window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 300))
 window.addEventListener('pageshow', forceViewportRecalc)
 
+// Trace silentios, mereu activ (nu are nevoie de navDebug pornit dinainte),
+// pt bug-ul tranzitoriu "NavBar apare in mijlocul ecranului o clipa, la
+// prima logare/instalare" - dispare prea repede ca sa-l prinzi cu un
+// screenshot cronometrat manual. Salveaza in localStorage un istoric al
+// primelor ~4 secunde dupa incarcare (inaltimile #root/.app-frame/nav),
+// vizibil ulterior in overlay-ul de debug chiar daca intre timp s-a
+// autocorectat - localStorage supravietuieste unui reload (activarea
+// debug-ului), desi nu neaparat unei dezinstalari complete a PWA-ului.
+const __loadTrace = []
+const __traceStart = performance.now()
+const __sampleTrace = () => {
+  const rootEl = document.getElementById('root')
+  const appFrameEl = document.querySelector('.app-frame')
+  const navEl = document.querySelector('nav')
+  __loadTrace.push({
+    t: Math.round(performance.now() - __traceStart),
+    innerH: window.innerHeight,
+    rootH: rootEl ? Math.round(rootEl.getBoundingClientRect().height) : null,
+    appFrameH: appFrameEl ? Math.round(appFrameEl.getBoundingClientRect().height) : null,
+    navBottom: navEl ? Math.round(navEl.getBoundingClientRect().bottom) : null,
+  })
+  try { localStorage.setItem('__loadTrace', JSON.stringify(__loadTrace)) } catch {}
+  if (performance.now() - __traceStart < 4000) requestAnimationFrame(__sampleTrace)
+}
+requestAnimationFrame(__sampleTrace)
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
