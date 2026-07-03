@@ -4302,7 +4302,21 @@ function App() {
             </div>
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIMP</div>
-              <input value={wodTime} onChange={e => setWodTime(e.target.value)} placeholder="ex: 4:22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              {(() => {
+                const [tMin, tSec] = wodTime.split(':')
+                return (
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <input type="number" min="0" value={tMin || ''} onChange={e => setWodTime(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setWodTime(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NOTE</div>
@@ -4361,7 +4375,21 @@ function App() {
                 {miscarePR in heroWodsInfoAll ? (
                   <>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
-                    <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 4:22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    {(() => {
+                      const [tMin, tSec] = prTimp.split(':')
+                      return (
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Variantă</div>
                     <select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }}>
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
