@@ -1174,7 +1174,8 @@ function Admin({ showToast }) {
   const [savingClasa, setSavingClasa] = useState(false)
 
   const [tipWod, setTipWod] = useState('AMRAP')
-  const [durataWod, setDurataWod] = useState('20 minute')
+  const [durataWodMin, setDurataWodMin] = useState('20')
+  const [durataWodSec, setDurataWodSec] = useState('0')
   const [dataWod, setDataWod] = useState('')
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
@@ -1567,6 +1568,7 @@ function Admin({ showToast }) {
     if (!dataWod) { showToast('❌ Alege data!'); return }
     setSavingWod(true)
     const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+    const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
     const { error } = await supabase.from('wods').insert({
       date: dataWod, type: tipWod, duration: durataWod,
       name: numeWod.trim() || null,
@@ -2287,7 +2289,16 @@ function Admin({ showToast }) {
               <option>Chipper</option><option>Ladder</option><option>Partner WOD</option>
             </select>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată</div>
-            <input value={durataWod} onChange={e => setDurataWod(e.target.value)} placeholder="ex: 20 minute" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+              </div>
+            </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume antrenament <span style={{ color: '#bbb' }}>(opțional)</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
