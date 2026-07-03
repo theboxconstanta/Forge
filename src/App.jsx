@@ -2936,6 +2936,11 @@ function App() {
     const isLeap = yr % 4 === 0 && (yr % 100 !== 0 || yr % 400 === 0)
     const totalDays = isLeap ? 366 : 365
     const yearStart = new Date(`${yr}-01-01T00:00:00`)
+    // Litera unica de zi n-are echivalent Intl (nu exista un "format cu o litera"),
+    // scrisa manual pt engleza - coliziuni Duminica/Sambata si Marti/Joi pe aceeasi
+    // litera sunt acceptate, comportament comun in calendarele englezesti.
+    const ziuaLitere = lang === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S']
+    const monthFmt = new Intl.DateTimeFormat(localeFor(lang), { month: 'short' })
     return Array.from({ length: totalDays }, (_, i) => {
       const d = new Date(yearStart)
       d.setDate(d.getDate() + i)
@@ -2943,14 +2948,14 @@ function App() {
       return {
         ds,
         dayNum: d.getDate(),
-        ziuaLitera: ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S'][d.getDay()],
-        luna: ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()],
+        ziuaLitera: ziuaLitere[d.getDay()],
+        luna: monthFmt.format(d),
         eAzi: ds === actualToday,
         areRez: rezervateDates.has(ds),
         areWod: wodLogDates.has(ds),
       }
     })
-  }, [actualToday, claseDB, rezervariMele, wodLogs])
+  }, [actualToday, claseDB, rezervariMele, wodLogs, lang])
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -4031,28 +4036,28 @@ function App() {
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
-              {!abonamentReal ? 'Niciun abonament activ'
-                : !abonamentInceput ? 'Abonament programat'
-                : sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate'
-                : 'Abonamentul a expirat'}
+              {!abonamentReal ? t.paywallNoSubscription
+                : !abonamentInceput ? t.subScheduled
+                : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
+                : t.paywallExpired}
             </div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>
               {!abonamentReal
-                ? 'Nu ai un abonament activ. Contactează coachul pentru a te înscrie.'
+                ? t.paywallNoSubscriptionText
                 : !abonamentInceput
-                  ? `Abonamentul tău începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}. Revino atunci!`
+                  ? t.paywallStartsOnText(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
                   : sedinteLimitate && sedinteRamase === 0
-                    ? 'Ai consumat toate ședințele din abonament. Contactează coachul pentru a achiziționa un abonament nou.'
-                    : 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.'}
+                    ? t.paywallSessionsExhaustedText
+                    : t.paywallExpiredText}
             </div>
             <button onClick={() => fetchAbonamentMeu()} style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
-              Reîncarcă
+              {t.paywallReload}
             </button>
             <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#555', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '10px' }}>
-              Vezi abonamentul →
+              {t.paywallViewSubscription}
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
-              Deconectează-te
+              {t.paywallLogout}
             </button>
           </div>
         </div>
@@ -4082,19 +4087,19 @@ function App() {
                   <div style={{ textAlign: 'left' }}>
                     <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                       style={{ fontSize: '24px', fontWeight: '900', color: '#0E0E0E', letterSpacing: '-0.5px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {selData.getDate()} {selData.toLocaleDateString('ro-RO', { month: 'long' }).toUpperCase()}
+                      {selData.getDate()} {selData.toLocaleDateString(localeFor(lang), { month: 'long' }).toUpperCase()}
                       <span style={{ fontSize: '14px', color: '#bbb' }}>▾</span>
                     </div>
                     {!esteAzi && (
                       <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                        style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>← Înapoi la azi</div>
+                        style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>{t.homeBackToToday}</div>
                     )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '20px', fontWeight: '900', color: '#0E0E0E', lineHeight: 1 }}>{wodLogs.length}</div>
-                    <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>SESIUNI</div>
+                    <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => {
                     setProfileFirstName(userProfile?.first_name || ''); setProfileLastName(userProfile?.last_name || '')
@@ -4112,7 +4117,7 @@ function App() {
                   </div>
                 </div>
               </div>
-              <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>Hey {prenume}, let's get after it today.</p>
+              <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>{t.homeGreeting(prenume)}</p>
 
             </div>
 
@@ -4151,7 +4156,7 @@ function App() {
                     border: claseHomeDeschis ? '1.5px solid #0E0E0E' : '1.5px solid #e0e0e0',
                     background: claseHomeDeschis ? '#0E0E0E' : '#fafafa' }}>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: claseHomeDeschis ? '#ABE73C' : '#0E0E0E' }}>
-                    {claseZi.length === 0 ? `Nicio clasă ${esteAzi ? 'azi' : 'în această zi'}` : `${claseZi.length} clas${claseZi.length === 1 ? 'ă' : 'e'} disponibil${claseZi.length === 1 ? 'ă' : 'e'}`}
+                    {claseZi.length === 0 ? t.homeNoClasses(esteAzi) : t.homeClassesAvailable(claseZi.length)}
                   </span>
                   <span style={{ fontSize: '11px', color: claseHomeDeschis ? '#ABE73C' : '#888', display: 'inline-block', transform: claseHomeDeschis ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s, color 0.15s' }}>▼</span>
                 </div>
@@ -4159,7 +4164,7 @@ function App() {
               {claseHomeDeschis && (
               <div style={{ padding: '0 16px 16px' }}>
                 {claseZi.length === 0
-                  ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>Nicio clasă {esteAzi ? 'azi' : 'în această zi'}</div>
+                  ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>{t.homeNoClasses(esteAzi)}</div>
                   : claseZi.map(c => {
                       const rezervat = rezervariMele.includes(c.id)
                       const nrRez = rezervariPerClasa[c.id]?.count || 0
@@ -4181,15 +4186,15 @@ function App() {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               {rezervat
-                                ? <span style={{ fontSize: '11px', background: '#ABE73C', color: '#0E0E0E', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>✓ Rezervat</span>
+                                ? <span style={{ fontSize: '11px', background: '#ABE73C', color: '#0E0E0E', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
                                 : peWaitlist
-                                ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>⏳ Așteptare</span>
+                                ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                               : plin
-                                ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> Plin</span>
-                                : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
+                                ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
+                                : <span style={{ fontSize: '11px', color: '#888' }}>{t.homeSpotsLeft(nrRez, c.max_spots)}</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: '12px', color: rezervat ? '#0E0E0E' : '#888', marginTop: '3px' }}>{c.name || 'CrossFit WOD'} · {c.coach}</div>
+                          <div style={{ fontSize: '12px', color: rezervat ? '#0E0E0E' : '#888', marginTop: '3px' }}>{c.name || t.homeDefaultClassName} · {c.coach}</div>
                           {deschis && (
                             <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
                               onClick={e => e.stopPropagation()}>
@@ -4198,7 +4203,7 @@ function App() {
                                 const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
                                 return membri.length > 0 ? (
                                   <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>PARTICIPANȚI ({cnt}/{c.max_spots})</div>
+                                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                       {membri.map((name, mi) => (
                                         <span key={mi} style={{ fontSize: '11px', background: rezervat ? '#f0f0f0' : '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>{name}</span>
@@ -4206,35 +4211,35 @@ function App() {
                                     </div>
                                   </div>
                                 ) : cnt > 0 ? (
-                                  <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{cnt} participant{cnt !== 1 ? 'ți' : ''}</div>
+                                  <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{t.homeParticipantsCount(cnt)}</div>
                                 ) : null
                               })()}
                               {!esteInTrecut ? (
                                 rezervat ? (
                                   <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
                                     style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                                    Anulează rezervarea
+                                    {t.homeCancelReservation}
                                   </button>
                                 ) : peWaitlist ? (
                                   <button onClick={() => toggleWaitlist(c.id)}
                                     style={{ width: '100%', padding: '9px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                                    ⏳ Pe lista de așteptare · Renunță
+                                    {t.homeWaitlistCancel}
                                   </button>
                                 ) : blocat ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>Ședințe epuizate</div>
+                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>{t.homeSessionsExhausted}</div>
                                 ) : plin ? (
                                   <button onClick={() => toggleWaitlist(c.id)}
                                     style={{ width: '100%', padding: '9px', background: '#FFFFFF', color: '#555', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                                    Intră pe lista de așteptare
+                                    {t.homeJoinWaitlist}
                                   </button>
                                 ) : (
                                   <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
                                     style={{ width: '100%', padding: '9px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                                    Rezervă locul
+                                    {t.homeBookSpot}
                                   </button>
                                 )
                               ) : (
-                                <div style={{ textAlign: 'center', fontSize: '11px', color: '#bbb', padding: '4px' }}>Clasă trecută</div>
+                                <div style={{ textAlign: 'center', fontSize: '11px', color: '#bbb', padding: '4px' }}>{t.homeClassPast}</div>
                               )}
                             </div>
                           )}
@@ -4250,9 +4255,9 @@ function App() {
             <div style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px' }}>WORKOUT OF THE DAY</div>
+                  <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: '#0E0E0E' }}>
-                    {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : 'Niciun WOD azi'}
+                    {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
                   </div>
                   {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
                   {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
@@ -4273,7 +4278,7 @@ function App() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
                           <LevelDot nivel={v.nivel} />
                           <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: '#0E0E0E', color: '#fff', borderRadius: '20px' }}>Selectat</span>}
+                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: '#0E0E0E', color: '#fff', borderRadius: '20px' }}>{t.homeVariantSelected}</span>}
                         </div>
                         {variantaAleasa === i && miscari.length > 0 && (
                           <>
@@ -4298,13 +4303,13 @@ function App() {
                   })}
                   <button onClick={() => { setEditLogId(null); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                     style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
-                    {variantaAleasa !== null ? `Loghează — ${VARIANTE_CONFIG[variantaAleasa].nivel}` : 'Alege o variantă mai întâi'}
+                    {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
                 </div>
               )}
               {wodDeschis && !wodZiData && (
                 <div style={{ marginTop: '12px', borderTop: '1px solid #f0f0f0', paddingTop: '12px', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
-                  {isAdmin ? '⚙️ Admin → WOD pentru a crea WOD-ul de azi' : 'Coachul nu a programat WOD-ul de azi încă'}
+                  {isAdmin ? t.homeWodAdminHint : t.homeWodMemberHint}
                 </div>
               )}
             </div>
@@ -4314,7 +4319,7 @@ function App() {
               <div onClick={() => setScreen('abonament')} style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || 'Abonament'}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
                     <div style={{ marginTop: '4px' }}><CreditCard size={22} color="#0E0E0E" strokeWidth={1.75} /></div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -4325,9 +4330,9 @@ function App() {
                         <span style={{ color: '#0E0E0E' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700' }}>Nelimitat</div>
+                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700' }}>{t.homeUnlimited}</div>
                     )}
-                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{zileRamase} zile rămase</div>
+                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{t.homeDaysLeft(zileRamase)}</div>
                   </div>
                 </div>
                 {sessTotal && (
@@ -4346,13 +4351,13 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>Abonamentul meu</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.subMyTitle}</h1>
           </div>
           {!abonamentReal ? (
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><ClipboardList size={36} color="#0E0E0E" strokeWidth={1.5} /></div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>Niciun abonament activ</div>
-              <div style={{ fontSize: '12px', color: '#888' }}>Contactează coachul pentru a adăuga un abonament.</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{t.subNoActive}</div>
+              <div style={{ fontSize: '12px', color: '#888' }}>{t.subContactCoachAdd}</div>
             </div>
           ) : !abonamentActiv ? (
             <div style={{ background: !abonamentInceput ? '#f0f0f0' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
@@ -4360,31 +4365,31 @@ function App() {
                 {!abonamentInceput ? <Calendar size={36} color="#0E0E0E" strokeWidth={1.5} /> : sedinteLimitate && sedinteRamase === 0 ? <Flag size={36} color="#0E0E0E" strokeWidth={1.5} /> : <Lock size={36} color="#0E0E0E" strokeWidth={1.5} />}
               </div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
-                {!abonamentInceput ? 'Abonament programat'
-                  : sedinteLimitate && sedinteRamase === 0 ? 'Ședințe epuizate'
-                  : 'Abonament expirat'}
+                {!abonamentInceput ? t.subScheduled
+                  : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
+                  : t.subExpired}
               </div>
               <div style={{ fontSize: '12px', color: !abonamentInceput ? '#0E0E0E' : '#A32D2D' }}>
                 {!abonamentInceput
-                  ? `Începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+                  ? t.subStartsOn(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
                   : sedinteLimitate && sedinteRamase === 0
-                    ? 'Ai consumat toate ședințele. Contactează coachul pentru un abonament nou.'
-                    : 'Contactează coachul pentru reînnoire.'}
+                    ? t.subAllSessionsUsed
+                    : t.subContactCoachRenew}
               </div>
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #0E0E0E' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Plan activ</div>
+                  <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.subActivePlan}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name}</div>
                 </div>
-                <span style={{ background: '#f0f0f0', color: '#0E0E0E', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>✓ Activ</span>
+                <span style={{ background: '#f0f0f0', color: '#0E0E0E', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>{t.subActiveBadge}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', color: '#888', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> Valabil</span>
+                <span style={{ fontSize: '12px', color: '#888', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> {t.subValidLabel}</span>
                 <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
-                  {new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} – {new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}
+                  {new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang))} – {new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString(localeFor(lang))}
                 </span>
               </div>
               {abonamentReal.sessions_total && (
@@ -4393,7 +4398,7 @@ function App() {
                     <div style={{ width: Math.min(100, ((abonamentReal.sessions_used || 0) / abonamentReal.sessions_total) * 100) + '%', height: '6px', borderRadius: '4px', background: '#EF9F27' }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '12px', color: '#888' }}>Ședințe folosite</span>
+                    <span style={{ fontSize: '12px', color: '#888' }}>{t.subSessionsUsedLabel}</span>
                     <span style={{ fontSize: '12px', fontWeight: '600' }}>{abonamentReal.sessions_used || 0} / {abonamentReal.sessions_total}</span>
                   </div>
                 </>
@@ -4401,7 +4406,7 @@ function App() {
             </div>
           )}
           <div style={{ background: '#f0f0f0', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#0E0E0E' }}>Pentru reînnoire sau întrebări contactează coachul.</div>
+            <div style={{ fontSize: '12px', color: '#0E0E0E' }}>{t.subContactCoachFooter}</div>
           </div>
 
           {/* Rezervările mele */}
@@ -4415,23 +4420,23 @@ function App() {
             if (viitoare.length === 0 && trecute.length === 0) return null
             return (
               <div style={{ marginTop: '20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.06em', marginBottom: '12px' }}>REZERVĂRILE MELE</div>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
                 {viitoare.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>URMEAZĂ</div>
+                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
                     {viitoare.map(c => (
                       <div key={c.id} style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #0E0E0E' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || 'CrossFit WOD'}</div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
                             <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
+                              <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
                             <div style={{ fontSize: '11px', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} /> {c.coach}</div>
                           </div>
                           <button onClick={() => toggleRezervare(c.id)}
                             style={{ background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            Anulează
+                            {t.subCancel}
                           </button>
                         </div>
                       </div>
@@ -4440,12 +4445,12 @@ function App() {
                 )}
                 {trecute.length > 0 && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>ISTORIC</div>
+                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
                     {trecute.map(c => (
                       <div key={c.id} style={{ background: '#fafafa', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #e0e0e0' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#aaa' }}>{c.name || 'CrossFit WOD'}</div>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
                         <div style={{ fontSize: '11px', color: '#ccc', marginTop: '3px' }}>
-                          {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · {c.coach}
+                          {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · {c.coach}
                         </div>
                       </div>
                     ))}
@@ -5197,7 +5202,8 @@ function App() {
 
       {showCalPicker && (() => {
         const _now2 = new Date(); const todayStr = `${_now2.getFullYear()}-${String(_now2.getMonth()+1).padStart(2,'0')}-${String(_now2.getDate()).padStart(2,'0')}`
-        const luniRo = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie']
+        const numeLunaCalendar = new Intl.DateTimeFormat(localeFor(lang), { month: 'long' }).format(new Date(calPickerYear, calPickerMonth, 1))
+        const ziuaLitereCalendar = lang === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D']
         const firstDay = new Date(calPickerYear, calPickerMonth, 1)
         const daysInMonth = new Date(calPickerYear, calPickerMonth + 1, 0).getDate()
         const offset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
@@ -5217,14 +5223,14 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <span onClick={prevLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>‹</span>
                 <span style={{ fontSize: '15px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.02em' }}>
-                  {luniRo[calPickerMonth].toUpperCase()} {calPickerYear}
+                  {numeLunaCalendar.toUpperCase()} {calPickerYear}
                 </span>
                 <span onClick={nextLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>›</span>
               </div>
               {/* Zile header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
-                {['L','Ma','Mi','J','V','S','D'].map(z => (
-                  <div key={z} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
+                {ziuaLitereCalendar.map((z, zi) => (
+                  <div key={zi} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
                 ))}
               </div>
               {/* Grid zile */}
@@ -5250,7 +5256,7 @@ function App() {
               {/* Buton azi */}
               <div onClick={() => { setDataAcasa(todayStr); setShowCalPicker(false); scrollChipToDate(todayStr) }}
                 style={{ marginTop: '14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#0E0E0E', cursor: 'pointer', padding: '8px', background: '#f0f0f0', borderRadius: '10px' }}>
-                Mergi la azi
+                {t.calPickerGoToToday}
               </div>
             </div>
           </div>
