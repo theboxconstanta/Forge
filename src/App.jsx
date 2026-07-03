@@ -1305,6 +1305,9 @@ function Admin({ showToast }) {
   const [cancelWindowSetting, setCancelWindowSetting] = useState(2)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
+  const [deleteClientConfirm, setDeleteClientConfirm] = useState(null)
+  const [deleteClientEmailInput, setDeleteClientEmailInput] = useState('')
+  const [deletingClient, setDeletingClient] = useState(false)
 
   useEffect(() => { fetchClase(); fetchWods(); fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
@@ -1517,6 +1520,29 @@ function Admin({ showToast }) {
     if (error) { showToast('❌ Eroare la actualizare!'); return }
     setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
     showToast(delta > 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
+  }
+
+  const adminStergeClient = async (client) => {
+    if (deleteClientEmailInput.trim().toLowerCase() !== client.email?.toLowerCase()) return
+    setDeletingClient(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/admin-delete-client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || 'Eroare la ștergere')
+      setClienti(prev => prev.filter(c => c.id !== client.id))
+      setClientSelectat(null)
+      setDeleteClientConfirm(null)
+      setDeleteClientEmailInput('')
+      showToast('✅ Client șters definitiv')
+    } catch (e) {
+      showToast('❌ ' + e.message)
+    }
+    setDeletingClient(false)
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
@@ -1926,7 +1952,7 @@ function Admin({ showToast }) {
               <div key={c.id} onClick={() => setClientSelectat(isOpen ? null : c.id)}
                 style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', borderLeft: `4px solid ${expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : neInceput ? '#0E0E0E' : abo ? '#0E0E0E' : '#e0e0e0'}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <AvatarCircle name={c.full_name || c.email} size={42} />
+                  <AvatarCircle name={c.full_name || c.email} avatarUrl={c.avatar_url} size={42} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.full_name || 'Fără nume'}</div>
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
@@ -2035,6 +2061,38 @@ function Admin({ showToast }) {
                       style={{ width: '100%', padding: '8px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                       {abo ? (aboQueued ? '➕ Abonament suplimentar' : '🔄 Reînnoiește abonament') : '+ Adaugă abonament'}
                     </button>
+
+                    {/* Zonă periculoasă - ștergere definitivă cont */}
+                    <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #f0c0c0' }} onClick={e => e.stopPropagation()}>
+                      {deleteClientConfirm === c.id ? (
+                        <div style={{ background: '#FCEBEB', borderRadius: '10px', padding: '12px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>⚠️ Ștergere definitivă</div>
+                          <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>
+                            Se șterge complet contul lui <strong>{c.full_name || c.email}</strong>: profil, rezervări, abonamente, PR-uri, postări din Feed. Acțiunea este ireversibilă.
+                            Pentru confirmare, scrie emailul clientului: <strong>{c.email}</strong>
+                          </div>
+                          <input value={deleteClientEmailInput} onChange={e => setDeleteClientEmailInput(e.target.value)}
+                            placeholder={c.email} autoFocus
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #E24B4A', fontSize: '12px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => { setDeleteClientConfirm(null); setDeleteClientEmailInput('') }}
+                              style={{ flex: 1, padding: '8px', background: '#fff', color: '#0E0E0E', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                              Anulează
+                            </button>
+                            <button disabled={deletingClient || deleteClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
+                              onClick={() => adminStergeClient(c)}
+                              style={{ flex: 1, padding: '8px', background: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#E24B4A' : '#f0b8b8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
+                              {deletingClient ? 'Se șterge...' : 'Șterge definitiv'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setDeleteClientConfirm(c.id); setDeleteClientEmailInput('') }}
+                          style={{ width: '100%', padding: '8px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                          🗑️ Șterge clientul definitiv
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
