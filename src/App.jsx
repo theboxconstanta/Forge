@@ -2756,6 +2756,8 @@ function App() {
   const [prValoare, setPrValoare] = useState('')
   const [prReps, setPrReps] = useState('')
   const [prTimp, setPrTimp] = useState('')
+  const [prRoundsCompleted, setPrRoundsCompleted] = useState('')
+  const [prPartialReps, setPrPartialReps] = useState([])
   const [prDistanta, setPrDistanta] = useState('')
   const [prCardioUnit, setPrCardioUnit] = useState('m')
   const [prNote, setPrNote] = useState('')
@@ -2763,7 +2765,9 @@ function App() {
   const [prSaving, setPrSaving] = useState(false)
   const [customHeroWods, setCustomHeroWods] = useState([])
   const [newHeroWodName, setNewHeroWodName] = useState('')
-  const [newHeroWodFormat, setNewHeroWodFormat] = useState('')
+  const [newHeroWodTip, setNewHeroWodTip] = useState('AMRAP')
+  const [newHeroWodDurataMin, setNewHeroWodDurataMin] = useState('')
+  const [newHeroWodDurataSec, setNewHeroWodDurataSec] = useState('0')
   const [newHeroWodMiscari, setNewHeroWodMiscari] = useState([])
   const [newHeroWodMiscareCurenta, setNewHeroWodMiscareCurenta] = useState('')
   const [newHeroWodSaving, setNewHeroWodSaving] = useState(false)
@@ -3260,23 +3264,27 @@ function App() {
     if (data) setCustomHeroWods(data)
   }
 
+  const resetNewHeroWodForm = () => {
+    setNewHeroWodName(''); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0')
+    setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+  }
+
   const saveNewHeroWod = async () => {
     const name = newHeroWodName.trim()
     if (!name) { showToast('❌ Dă un nume WOD-ului!'); return }
-    if (!newHeroWodFormat.trim() && newHeroWodMiscari.length === 0) { showToast('❌ Adaugă formatul sau cel puțin o mișcare!'); return }
     const nameTaken = editHeroWodId
       ? customHeroWods.some(w => w.id !== editHeroWodId && w.name.toLowerCase() === name.toLowerCase())
       : !!heroWodsInfoAll[name]
     if (nameTaken) { showToast('❌ Există deja un Hero WOD cu acest nume!'); return }
     setNewHeroWodSaving(true)
-    const payload = { name, format: newHeroWodFormat.trim() || null, movements: newHeroWodMiscari.join('\n') || null }
+    const payload = { name, format: composeHeroFormat(), movements: newHeroWodMiscari.join('\n') || null }
     if (editHeroWodId) {
       const { data, error } = await supabase.from('custom_hero_wods').update(payload).eq('id', editHeroWodId).select().single()
       if (error) { showToast('❌ Eroare!'); console.error(error) }
       else {
         setCustomHeroWods(prev => prev.map(w => w.id === editHeroWodId ? data : w))
         showToast('✓ Hero WOD actualizat!')
-        setEditHeroWodId(null); setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+        setEditHeroWodId(null); resetNewHeroWodForm()
         setScreen('pr')
       }
     } else {
@@ -3285,8 +3293,8 @@ function App() {
       else {
         setCustomHeroWods(prev => [...prev, data])
         showToast('Hero WOD salvat! 💪')
-        setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
-        setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
+        setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
+        resetNewHeroWodForm()
         setPrevScreen('pr'); setScreen('logPR')
       }
     }
@@ -3482,7 +3490,7 @@ function App() {
 
   const savePR = async () => {
     if (!miscarePR) return
-    const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prDistanta.trim()
+    const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prRoundsCompleted.trim() || prDistanta.trim()
     if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
     setPrSaving(true)
     const isBenchmark = miscarePR in heroWodsInfoAll
@@ -3491,7 +3499,13 @@ function App() {
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { movement: miscarePR, notes: prNote || null }
     if (!editPrId) insertData.member_id = user.id
-    if (isBenchmark) { insertData.value = prTimp ? timeToSec(prTimp) : null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
+    if (isBenchmark && isAmrapHeroPr) {
+      const partialStr = composePartialText(prPartialReps, miscariHeroPr)
+      insertData.value = prRoundsCompleted ? parseInt(prRoundsCompleted) : null
+      insertData.unit = 'runde'
+      insertData.notes = [partialStr ? '+ ' + partialStr : null, prVarianta || null, prNote || null].filter(Boolean).join(' | ')
+    }
+    else if (isBenchmark) { insertData.value = prTimp ? timeToSec(prTimp) : null; insertData.unit = 'timp'; insertData.notes = (prVarianta ? prVarianta + ' | ' : '') + (prNote || '') }
     else if (isCardio) { insertData.value = prDistanta ? parseFloat(prDistanta) : null; insertData.unit = CARDIO_CU_CALORII.includes(miscarePR) ? prCardioUnit : 'm'; insertData.time_result = prTimp.trim() || null }
     else if (isGym) { insertData.reps = prReps ? parseInt(prReps) : null; insertData.unit = 'reps' }
     else if (isHold) { insertData.value = prValoare ? parseFloat(prValoare) : null; insertData.unit = 'sec' }
@@ -3503,7 +3517,7 @@ function App() {
     else {
       showToast(editPrId ? '✓ PR actualizat!' : 'PR salvat! 🏆')
       await fetchPRuri(); setScreen('pr')
-      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
+      setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
       setEditPrId(null); setLogPentruPR(null)
     }
     setPrSaving(false)
@@ -3515,13 +3529,25 @@ function App() {
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(movement)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(movement)
     setMiscarePR(movement)
-    setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrVarianta('RX')
+    setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrVarianta('RX')
     if (isBenchmark) {
-      setPrTimp(record.value != null ? secToTime(parseFloat(record.value)) : '')
+      const heroLinii = (heroWodsInfoAll[movement] || '').split('\n')
+      const isAmrapEdit = heroLinii.length > 0 && heroLinii[0].startsWith('AMRAP')
+      const heroMisc = heroLinii.slice(1)
       const varianteValide = ['RX', 'Intermediate', 'Beginner', 'OnRamp']
-      const [poss, ...rest] = (record.notes || '').split(' | ')
-      if (varianteValide.includes(poss)) { setPrVarianta(poss); setPrNote(rest.join(' | ')) }
-      else { setPrNote(record.notes || '') }
+      if (isAmrapEdit) {
+        setPrRoundsCompleted(record.value != null ? String(record.value) : '')
+        const parts = (record.notes || '').split(' | ')
+        let idx = 0
+        if (parts[0]?.startsWith('+ ')) { setPrPartialReps(parsePartialText(parts[0].slice(2), heroMisc)); idx = 1 }
+        if (varianteValide.includes(parts[idx])) { setPrVarianta(parts[idx]); setPrNote(parts.slice(idx + 1).join(' | ')) }
+        else { setPrNote(parts.slice(idx).join(' | ')) }
+      } else {
+        setPrTimp(record.value != null ? secToTime(parseFloat(record.value)) : '')
+        const [poss, ...rest] = (record.notes || '').split(' | ')
+        if (varianteValide.includes(poss)) { setPrVarianta(poss); setPrNote(rest.join(' | ')) }
+        else { setPrNote(record.notes || '') }
+      }
     } else if (isCardio) {
       setPrDistanta(record.value != null ? String(record.value) : ''); setPrCardioUnit(record.unit === 'cal' ? 'cal' : 'm')
       setPrTimp(record.time_result || ''); setPrNote(record.notes || '')
@@ -3658,8 +3684,22 @@ function App() {
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp' },
   ]
 
-  // Scor AMRAP structurat (runde complete + repetari din runda partiala) in loc de text liber -
-  // compus tot intr-un string simplu pentru coloana `result` existenta (fara migratie de DB),
+  // Scor AMRAP structurat (runde complete + repetari din runda partiala) in loc de text liber.
+  // composePartialText/parsePartialText sunt generice (folosite si pentru PR-uri pe Hero WOD-uri
+  // AMRAP mai jos), nu doar pentru logarea WOD-ului zilei.
+  const composePartialText = (partialArr, movimente) => movimente
+    .map((m, i) => partialArr[i]?.trim() ? `${partialArr[i].trim()} ${m}` : null)
+    .filter(Boolean).join(', ')
+  const parsePartialText = (text, movimente) => {
+    const partialArr = movimente.map(() => '')
+    ;(text || '').split(',').forEach(seg => {
+      const mm = seg.trim().match(/^(\d+)\s+(.+)$/)
+      if (mm) { const idx = movimente.indexOf(mm[2].trim()); if (idx !== -1) partialArr[idx] = mm[1] }
+    })
+    return partialArr
+  }
+
+  // Compus tot intr-un string simplu pentru coloana `result` existenta (fara migratie de DB),
   // cu numarul de runde primul in string ca sa ramana compatibil cu parseScore() din Clasament.
   const isAmrapLog = editLogId
     ? !!(editLogHeader && editLogHeader.startsWith('AMRAP'))
@@ -3669,22 +3709,36 @@ function App() {
     : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
   const composeAmrapResult = () => {
     if (!wodRoundsCompleted.trim()) return ''
-    const partialStr = miscariPentruAmrapLog
-      .map((m, i) => wodPartialReps[i]?.trim() ? `${wodPartialReps[i].trim()} ${m}` : null)
-      .filter(Boolean).join(', ')
+    const partialStr = composePartialText(wodPartialReps, miscariPentruAmrapLog)
     return `${wodRoundsCompleted.trim()} runde${partialStr ? ' + ' + partialStr : ' complete'}`
   }
   const parseAmrapResult = (resultStr, movimente) => {
     const roundsMatch = (resultStr || '').match(/^(\d+)/)
-    const partialArr = movimente.map(() => '')
     const plusIdx = (resultStr || '').indexOf('+')
-    if (plusIdx !== -1) {
-      resultStr.slice(plusIdx + 1).split(',').forEach(seg => {
-        const mm = seg.trim().match(/^(\d+)\s+(.+)$/)
-        if (mm) { const idx = movimente.indexOf(mm[2].trim()); if (idx !== -1) partialArr[idx] = mm[1] }
-      })
-    }
+    const partialArr = plusIdx !== -1 ? parsePartialText(resultStr.slice(plusIdx + 1), movimente) : movimente.map(() => '')
     return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
+  }
+
+  // Acelasi tratament AMRAP (runde + repetari partiale) si pentru Hero WOD-uri, la logarea unui PR.
+  // FORMAT-ul unui Hero WOD (built-in sau custom) e mereu "TIP restul textului" pe prima linie
+  // (vezi HERO_WODS_INFO si compunerea de mai jos) - acelasi tipar folosit peste tot in app pentru
+  // a detecta tipul dintr-un header text (WOD_TYPES.some(t => linie.startsWith(t))).
+  const HERO_WOD_TIPURI = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength']
+  const heroWodLiniiSel = miscarePR && heroWodsInfoAll[miscarePR] ? heroWodsInfoAll[miscarePR].split('\n') : []
+  const isAmrapHeroPr = heroWodLiniiSel.length > 0 && heroWodLiniiSel[0].startsWith('AMRAP')
+  const miscariHeroPr = heroWodLiniiSel.slice(1)
+  const composeHeroFormat = () => {
+    const dur = (newHeroWodDurataMin || newHeroWodDurataSec) ? `${parseInt(newHeroWodDurataMin) || 0}:${String(parseInt(newHeroWodDurataSec) || 0).padStart(2, '0')}` : ''
+    return `${newHeroWodTip}${dur ? ' ' + dur : ''}`
+  }
+  const parseHeroFormat = (formatStr) => {
+    // Fallback "For Time" (nu "AMRAP") pentru text vechi, liber, care nu incepe cu un tip
+    // cunoscut - editarea+salvarea nu trebuie sa forteze din greseala UI-ul de Runde/Partial
+    // peste un Hero WOD care de fapt nu e AMRAP.
+    const tip = HERO_WOD_TIPURI.find(t => (formatStr || '').startsWith(t)) || 'For Time'
+    const rest = (formatStr || '').slice(tip.length).trim()
+    const durMatch = rest.match(/(\d+):(\d+)/)
+    return { tip, min: durMatch ? durMatch[1] : '', sec: durMatch ? durMatch[2] : '0' }
   }
 
   const abonamentInceput = abonamentReal ? new Date(abonamentReal.start_date + 'T00:00:00') <= new Date() : false
@@ -4494,7 +4548,7 @@ function App() {
       {screen === 'newHeroWod' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { setEditHeroWodId(null); setNewHeroWodName(''); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { setEditHeroWodId(null); resetNewHeroWodForm(); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editHeroWodId ? 'Editează Hero WOD' : 'Hero WOD nou'}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
@@ -4502,8 +4556,25 @@ function App() {
             <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder="ex: Forge WOD, The C15..."
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>FORMAT</div>
-            <input value={newHeroWodFormat} onChange={e => setNewHeroWodFormat(e.target.value)} placeholder="ex: For Time, AMRAP 20 min, 5 rounds..."
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+              {HERO_WOD_TIPURI.map(t => (
+                <div key={t} onClick={() => setNewHeroWodTip(t)}
+                  style={{ padding: '6px 12px', borderRadius: '20px', border: newHeroWodTip === t ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: newHeroWodTip === t ? '#f0f0f0' : '#fafafa', color: newHeroWodTip === t ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: newHeroWodTip === t ? '700' : '400', cursor: 'pointer' }}>
+                  {t}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată <span style={{ color: '#bbb' }}>(opțional)</span></div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <input type="number" min="0" value={newHeroWodDurataMin} onChange={e => setNewHeroWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <input type="number" min="0" max="59" value={newHeroWodDurataSec} onChange={e => setNewHeroWodDurataSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+              </div>
+            </div>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
@@ -4535,22 +4606,46 @@ function App() {
               <>
                 {miscarePR in heroWodsInfoAll ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
-                    {(() => {
-                      const [tMin, tSec] = prTimp.split(':')
-                      return (
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-                          <div style={{ flex: 1 }}>
-                            <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                    {isAmrapHeroPr ? (
+                      <>
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Runde complete</div>
+                        <input type="number" min="0" value={prRoundsCompleted} onChange={e => setPrRoundsCompleted(e.target.value)} placeholder="ex: 18" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                        {miscariHeroPr.length > 0 && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>Rundă parțială <span style={{ fontWeight: '400', fontSize: '10px' }}>(câte repetări ai făcut din fiecare mișcare)</span></div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {miscariHeroPr.map((m, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>{m}</div>
+                                  <input type="number" min="0" value={prPartialReps[i] || ''}
+                                    onChange={e => { const v = e.target.value; setPrPartialReps(prev => { const next = [...prev]; next[i] = v; return next }) }}
+                                    placeholder="0" style={{ width: '70px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }} />
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
-                          </div>
-                        </div>
-                      )
-                    })()}
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
+                        {(() => {
+                          const [tMin, tSec] = prTimp.split(':')
+                          return (
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                              <div style={{ flex: 1 }}>
+                                <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </>
+                    )}
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Variantă</div>
                     <select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }}>
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
@@ -4696,7 +4791,9 @@ function App() {
                   {cat === 'HERO_WODS' && customHeroWods.some(w => w.name === movement) && (
                     <button onClick={() => {
                         const cw = customHeroWods.find(w => w.name === movement)
-                        setEditHeroWodId(cw.id); setNewHeroWodName(cw.name); setNewHeroWodFormat(cw.format || ''); setNewHeroWodMiscari(cw.movements ? cw.movements.split('\n') : []); setNewHeroWodMiscareCurenta('')
+                        const { tip, min, sec } = parseHeroFormat(cw.format || '')
+                        setEditHeroWodId(cw.id); setNewHeroWodName(cw.name); setNewHeroWodTip(tip); setNewHeroWodDurataMin(min); setNewHeroWodDurataSec(sec)
+                        setNewHeroWodMiscari(cw.movements ? cw.movements.split('\n') : []); setNewHeroWodMiscareCurenta('')
                         setPrevScreen('pr'); setScreen('newHeroWod')
                       }}
                       style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px' }}>
@@ -4825,12 +4922,12 @@ function App() {
                           <input
                             value={heroWodNouInput}
                             onChange={e => setHeroWodNouInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
+                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0'); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
                             placeholder="ex: Forge WOD, The C15..."
                             style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
                           />
                           <button
-                            onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodFormat(''); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
+                            onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0'); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
                             style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#ABE73C' : '#f0f0f0', color: heroWodNouInput.trim() ? '#0E0E0E' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
                             →
                           </button>
