@@ -14,13 +14,36 @@
     <meta name="format-detection" content="telephone=no" />
     <title>Forge</title>
     <style>
-      /* CSS critic, inline: garanteaza ca #root are o inaltime definita chiar
-         din primul randare, inainte ca index.css (fisier extern) sa apuce sa
-         se incarce - fara asta, la prima instalare PWA, #root se poate
-         randa fara nicio inaltime (shrink la continut) pana se incarca CSS-ul
-         extern, facand NavBar sa para "in mijlocul ecranului" pentru o clipa. */
+      /* CSS critic, inline: garanteaza ca #root are o inaltime + pozitionare
+         definita chiar din primul randare, inainte ca index.css (fisier
+         extern) sa apuce sa se incarce.
+
+         Motiv real (gasit dupa ce bug-ul a reprodus si intr-un tab Safari
+         normal, nu doar PWA standalone): #root primeste transform (in
+         media query-ul de portrait din index.css) ca sa devina containing
+         block pt elementele position:fixed din pagina (inclusiv ecranul de
+         login). Daca acel CSS extern se incarca DUPA primul randare, exista
+         o fereastra in care transform-ul ar putea fi deja aplicat FARA ca
+         height-ul corect sa fie aplicat inca (sau invers) - orice element
+         fixed;inset:0 din pagina s-ar ancora atunci de o cutie #root prea
+         mica, lasand restul ecranului alb in loc de fundalul real al paginii.
+         Duplicam aici regula completa, ca sa nu existe niciodata o stare
+         partiala - odata ce index.css se incarca, regulile sunt identice,
+         nu se suprapun in conflict. */
       html, body, #root { height: 100%; }
       body { position: fixed; inset: 0; margin: 0; }
+      @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
+        body { overflow: hidden; }
+        #root {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100dvh;
+          transform: translateZ(0);
+          overflow: hidden;
+        }
+      }
     </style>
   </head>
   <body>
