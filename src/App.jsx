@@ -952,7 +952,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                         <div style={{ fontSize: podium ? '22px' : '13px', fontWeight: '700', color: '#888', minWidth: '30px', textAlign: 'center' }}>
                           {podium || `#${i + 1}`}
                         </div>
-                        <AvatarCircle name={name} size={36} />
+                        <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
                           <div style={{ fontSize: '11px', color: '#aaa' }}>
@@ -3407,7 +3407,7 @@ function App() {
     const { data: logs } = await q
     if (logs && logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender').in('id', ids)
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender, avatar_url').in('id', ids)
       const map = {}
       if (profiles) profiles.forEach(p => { map[p.id] = p })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
