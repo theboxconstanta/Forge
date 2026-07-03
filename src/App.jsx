@@ -2770,6 +2770,8 @@ function App() {
   const [editHeroWodId, setEditHeroWodId] = useState(null)
   const [editPrId, setEditPrId] = useState(null)
   const [wodResult, setWodResult] = useState('')
+  const [wodRoundsCompleted, setWodRoundsCompleted] = useState('')
+  const [wodPartialReps, setWodPartialReps] = useState([])
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
@@ -3430,9 +3432,10 @@ function App() {
       const liniiPrefix = [...(editLogHeader ? [editLogHeader] : []), ...editLogMiscari]
       const newPrefix = liniiPrefix.join('\n')
       const noteFull = [newPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
+      const rezultatFinal = isAmrapLog ? composeAmrapResult() : wodResult.trim()
       const { error } = await supabase.from('wod_logs').update({
-        result: wodResult.trim() || null,
-        time_result: wodTime.trim() || null,
+        result: rezultatFinal || null,
+        time_result: isAmrapLog ? null : (wodTime.trim() || null),
         notes: noteFull || null,
       }).eq('id', editLogId)
       if (error) { showToast('❌ Eroare!'); console.error(error) }
@@ -3441,12 +3444,12 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
-        setWodResult(''); setWodTime(''); setWodNote('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('')
       }
       setWodSaving(false)
       return
     }
-    const areContiut = wodResult.trim() || wodTime.trim() || wodMiscari.length > 0
+    const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
     if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
     setWodSaving(true)
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
@@ -3459,10 +3462,11 @@ function App() {
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
+    const rezultatFinal = isAmrapLog ? composeAmrapResult() : wodResult
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: wodZiData?.id || null,
       variant_level: tipSalvat,
-      result: wodResult || null, time_result: wodTime || null, notes: noteFull || null,
+      result: rezultatFinal || null, time_result: isAmrapLog ? null : (wodTime || null), notes: noteFull || null,
     })
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
@@ -3470,7 +3474,7 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodTime(''); setWodNote('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('')
       setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
@@ -3653,6 +3657,35 @@ function App() {
     { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', key: 'movements_beginner' },
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp' },
   ]
+
+  // Scor AMRAP structurat (runde complete + repetari din runda partiala) in loc de text liber -
+  // compus tot intr-un string simplu pentru coloana `result` existenta (fara migratie de DB),
+  // cu numarul de runde primul in string ca sa ramana compatibil cu parseScore() din Clasament.
+  const isAmrapLog = editLogId
+    ? !!(editLogHeader && editLogHeader.startsWith('AMRAP'))
+    : (variantaAleasa !== null ? wodZiData?.type === 'AMRAP' : wodTip === 'AMRAP')
+  const miscariPentruAmrapLog = editLogId
+    ? editLogMiscari
+    : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
+  const composeAmrapResult = () => {
+    if (!wodRoundsCompleted.trim()) return ''
+    const partialStr = miscariPentruAmrapLog
+      .map((m, i) => wodPartialReps[i]?.trim() ? `${wodPartialReps[i].trim()} ${m}` : null)
+      .filter(Boolean).join(', ')
+    return `${wodRoundsCompleted.trim()} runde${partialStr ? ' + ' + partialStr : ' complete'}`
+  }
+  const parseAmrapResult = (resultStr, movimente) => {
+    const roundsMatch = (resultStr || '').match(/^(\d+)/)
+    const partialArr = movimente.map(() => '')
+    const plusIdx = (resultStr || '').indexOf('+')
+    if (plusIdx !== -1) {
+      resultStr.slice(plusIdx + 1).split(',').forEach(seg => {
+        const mm = seg.trim().match(/^(\d+)\s+(.+)$/)
+        if (mm) { const idx = movimente.indexOf(mm[2].trim()); if (idx !== -1) partialArr[idx] = mm[1] }
+      })
+    }
+    return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
+  }
 
   const abonamentInceput = abonamentReal ? new Date(abonamentReal.start_date + 'T00:00:00') <= new Date() : false
 
@@ -4284,11 +4317,17 @@ function App() {
               const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
               const linii = prefix.split('\n').filter(Boolean)
               const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
+              const movimenteLog = linii.slice(primaEsteHeader ? 1 : 0)
               setEditLogId(log.id)
               setEditLogHeader(primaEsteHeader ? linii[0] : '')
-              setEditLogMiscari(linii.slice(primaEsteHeader ? 1 : 0))
+              setEditLogMiscari(movimenteLog)
               setEditLogMiscareCurenta('')
-              setWodResult(log.result || '')
+              if (primaEsteHeader && linii[0].startsWith('AMRAP')) {
+                const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
+                setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
+              } else {
+                setWodResult(log.result || ''); setWodRoundsCompleted(''); setWodPartialReps([])
+              }
               setWodTime(log.time_result || '')
               setWodNote(parts.length > 1 ? parts[1] : '')
               setPrevScreen('log')
@@ -4302,7 +4341,7 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
           </div>
 
@@ -4386,28 +4425,54 @@ function App() {
           )}
 
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>REZULTAT / SCOR</div>
-              <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder="ex: 18 runde complete" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIMP</div>
-              {(() => {
-                const [tMin, tSec] = wodTime.split(':')
-                return (
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ flex: 1 }}>
-                      <input type="number" min="0" value={tMin || ''} onChange={e => setWodTime(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setWodTime(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+            {isAmrapLog ? (
+              <>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>RUNDE COMPLETE</div>
+                  <input type="number" min="0" value={wodRoundsCompleted} onChange={e => setWodRoundsCompleted(e.target.value)} placeholder="ex: 18" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                </div>
+                {miscariPentruAmrapLog.length > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>RUNDĂ PARȚIALĂ <span style={{ fontWeight: '400', fontSize: '10px' }}>(câte repetări ai făcut din fiecare mișcare)</span></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {miscariPentruAmrapLog.map((m, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>{m}</div>
+                          <input type="number" min="0" value={wodPartialReps[i] || ''}
+                            onChange={e => { const v = e.target.value; setWodPartialReps(prev => { const next = [...prev]; next[i] = v; return next }) }}
+                            placeholder="0" style={{ width: '70px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }} />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )
-              })()}
-            </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>REZULTAT / SCOR</div>
+                  <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder="ex: 18 runde complete" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIMP</div>
+                  {(() => {
+                    const [tMin, tSec] = wodTime.split(':')
+                    return (
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" value={tMin || ''} onChange={e => setWodTime(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setWodTime(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </>
+            )}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NOTE</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder="Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
