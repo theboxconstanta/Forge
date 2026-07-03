@@ -1250,7 +1250,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   )
 }
 
-function Admin({ showToast }) {
+function Admin({ showToast, onWodChanged }) {
   const [adminTab, setAdminTab] = useState('clienti')
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
@@ -1712,7 +1712,7 @@ function Admin({ showToast }) {
     if (error) { showToast('❌ Eroare!'); console.error(error) }
     else {
       showToast(editWodId ? '✓ WOD actualizat!' : '✓ WOD creat!')
-      await fetchWods(); await fetchWodZi()
+      await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
     }
@@ -1744,7 +1744,7 @@ function Admin({ showToast }) {
   const stergeWod = async (id) => {
     await supabase.from('wods').delete().eq('id', id)
     if (id === editWodId) cancelEditWod()
-    showToast('✓ WOD șters!'); await fetchWods(); await fetchWodZi()
+    showToast('✓ WOD șters!'); await fetchWods(); onWodChanged?.()
   }
 
   const saveAbonament = async () => {
@@ -4900,7 +4900,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} />}
-      {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
+      {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
