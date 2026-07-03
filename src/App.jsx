@@ -4075,20 +4075,20 @@ function App() {
                     const miscari = wodZiData[v.key] || []
                     return (
                       <div key={i} onClick={() => { setVariantaAleasa(variantaAleasa === i ? null : i); setWodMiscariCustom(null) }}
-                        style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
+                        style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? '#fff' : '#fafafa' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
                           <LevelDot nivel={v.nivel} />
                           <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
+                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: '#0E0E0E', color: '#fff', borderRadius: '20px' }}>Selectat</span>}
                         </div>
                         {variantaAleasa === i && miscari.length > 0 && (
                           <>
-                            <div style={{ background: v.culoare + '18', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
+                            <div style={{ background: '#f0f0f0', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: v.culoare }}>{wodZiData.type}</span>
-                                <span style={{ fontSize: '12px', color: v.culoare, opacity: 0.8 }}>{formatWodDurata(wodZiData.duration)}</span>
+                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{wodZiData.type}</span>
+                                <span style={{ fontSize: '12px', color: '#888' }}>{formatWodDurata(wodZiData.duration)}</span>
                               </div>
-                              {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginTop: '2px' }}>"{wodZiData.name}"</div>}
+                              {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>"{wodZiData.name}"</div>}
                             </div>
                             <div>
                               {miscari.map((m, mi) => (
