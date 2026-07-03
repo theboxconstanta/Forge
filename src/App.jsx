@@ -4248,13 +4248,6 @@ function App() {
               </div>
             )}
 
-            {/* ── Timer ── */}
-            <div style={{ background: '#fff', marginBottom: '10px' }}>
-              <button onClick={goTimer} style={{ width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: '14px', fontWeight: '600', color: '#0E0E0E', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span>⏱️</span> Pornește Timer
-              </button>
-            </div>
-
           </div>
         )
       })()}
@@ -4908,6 +4901,10 @@ function App() {
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>Profilul meu</h1>
           </div>
+
+          <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginBottom: '24px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <span>⏱️</span> Timer
+          </button>
 
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}>
             <div onClick={() => !avatarUploading && avatarInputRef.current?.click()}
