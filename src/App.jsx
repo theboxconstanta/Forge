@@ -11,8 +11,10 @@ import { supabase } from './supabase'
 import {
   todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
+  localeFor,
 } from './utils'
 import { AvatarCircle, LevelDot } from './components'
+import { getT } from './translations'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -348,14 +350,14 @@ function NavBarDebug({ navRef }) {
 }
 
 const NAV_TABS = [
-  { id: 'home', label: 'Acasă', icon: Home },
-  { id: 'log', label: 'Log', icon: PenLine },
-  { id: 'pr', label: 'PR-uri', icon: Trophy },
-  { id: 'clasament', label: 'Leaderboard', icon: Medal },
-  { id: 'feed', label: 'Feed', icon: MessageCircle },
+  { id: 'home', labelKey: 'navHome', icon: Home },
+  { id: 'log', labelKey: 'navLog', icon: PenLine },
+  { id: 'pr', labelKey: 'navPr', icon: Trophy },
+  { id: 'clasament', labelKey: 'navLeaderboard', icon: Medal },
+  { id: 'feed', labelKey: 'navFeed', icon: MessageCircle },
 ]
 
-function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread }) {
+function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
   // 2026-07-02, noaptea: renuntat definitiv la position:fixed pt NavBar, dupa o
   // seara intreaga de incercari esuate de a masura corect inaltimea ecranului
   // in standalone iOS (vezi [[project-navbar-safe-area]] pt istoricul complet).
@@ -365,7 +367,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread }) {
   // vreunei masuratori gresite de viewport.
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
-  const tabs = (isAdmin || isCoach) ? [...NAV_TABS, { id: 'admin', label: isAdmin ? 'Admin' : 'Coach', icon: Settings }] : NAV_TABS
+  const tabs = (isAdmin || isCoach) ? [...NAV_TABS, { id: 'admin', labelKey: isAdmin ? 'navAdmin' : 'navCoach', icon: Settings }] : NAV_TABS
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
@@ -374,7 +376,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread }) {
       className="flex w-full flex-shrink-0 flex-col border-t border-gray-200 bg-white"
     >
       <div className="flex items-center justify-around" style={{ paddingTop: '10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}>
-        {tabs.map(({ id, label, icon: Icon }) => {
+        {tabs.map(({ id, labelKey, icon: Icon }) => {
           const isActive = screen === id
           const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
           return (
@@ -385,7 +387,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread }) {
             >
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#afe607' : '#000000'} />
               <span className="text-[10px]" style={{ color: '#000000', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}>
-                {label}
+                {t[labelKey]}
               </span>
               {badge != null && (
                 <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-bold text-white">
@@ -2813,6 +2815,16 @@ function App() {
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [isCoach, setIsCoach] = useState(false)
+  // Inainte de login nu exista userProfile din care sa citim limba - localStorage
+  // (aceeasi convenție ca forge_remember_email) tine limba intre sesiuni pe acest
+  // device; dupa login, se sincronizeaza cu profiles.language (sursa de adevar
+  // pe cont, vezi efectul de mai jos si changeLanguage()).
+  const [lang, setLang] = useState(() => {
+    const stored = localStorage.getItem('forge_lang')
+    if (stored === 'ro' || stored === 'en') return stored
+    return navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'ro'
+  })
+  const t = getT(lang)
   const [abonamentReal, setAbonamentReal] = useState(null)
   const [abonamentLoading, setAbonamentLoading] = useState(true)
   const [abonamentInitialized, setAbonamentInitialized] = useState(false)
@@ -2998,6 +3010,17 @@ function App() {
       }, 150)
     }
   }, [user])
+
+  // profiles.language e sursa de adevar odata logat (persista intre device-uri) -
+  // sincronizeaza limba din profil peste fallback-ul initial din localStorage,
+  // o singura data cand profilul se incarca (nu suprascrie o schimbare facuta
+  // chiar acum din changeLanguage, de-aia verificarea de diferenta).
+  useEffect(() => {
+    if (userProfile?.language && userProfile.language !== lang) {
+      setLang(userProfile.language)
+      localStorage.setItem('forge_lang', userProfile.language)
+    }
+  }, [userProfile?.language])
 
   const registerPushSubscription = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
@@ -3253,6 +3276,15 @@ function App() {
     showToast(`✓ Unitate schimbată în ${unit}`)
   }
 
+  const changeLanguage = async (newLang) => {
+    if (newLang === lang) return
+    setLang(newLang)
+    localStorage.setItem('forge_lang', newLang)
+    setUserProfile(prev => prev ? { ...prev, language: newLang } : prev)
+    const { error } = await supabase.from('profiles').update({ language: newLang }).eq('id', user.id)
+    if (error) { showToast('❌ Eroare la salvare!'); console.error(error) }
+  }
+
   const changeMyPassword = async () => {
     if (profileNewPassword.length < 6) { showToast('❌ Parola trebuie să aibă minim 6 caractere!'); return }
     if (profileNewPassword !== profileNewPasswordConfirm) { showToast('❌ Parolele nu coincid!'); return }
@@ -3466,8 +3498,8 @@ function App() {
   }
 
   const handleSetNewPassword = async () => {
-    if (newPassword !== newPasswordConfirm) { setAuthError('Parolele nu coincid.'); return }
-    if (newPassword.length < 6) { setAuthError('Parola trebuie să aibă minim 6 caractere.'); return }
+    if (newPassword !== newPasswordConfirm) { setAuthError(t.resetPasswordMismatch); return }
+    if (newPassword.length < 6) { setAuthError(t.resetPasswordTooShort); return }
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) setAuthError(error.message)
@@ -3476,11 +3508,11 @@ function App() {
   }
 
   const handleForgotPassword = async () => {
-    if (!authEmail) { setAuthError('Introdu emailul mai întâi.'); return }
+    if (!authEmail) { setAuthError(t.authEnterEmailFirst); return }
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.resetPasswordForEmail(authEmail, { redirectTo: window.location.origin })
     if (error) setAuthError(error.message)
-    else setAuthError('✓ Email de resetare trimis! Verifică inbox-ul.')
+    else setAuthError(t.authResetEmailSent)
     setAuthSubmitting(false)
   }
 
@@ -3488,7 +3520,7 @@ function App() {
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
     if (error) setAuthError(error.message)
-    else setAuthError('✓ Verifică emailul pentru confirmare!')
+    else setAuthError(t.authCheckEmailConfirm)
     setAuthSubmitting(false)
   }
 
@@ -3835,17 +3867,17 @@ function App() {
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
       <div style={{ width: '100%', background: '#0E0E0E', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>Parolă nouă</div>
-          <div style={{ fontSize: '13px', color: '#888' }}>Alege o parolă nouă pentru contul tău</div>
+          <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.resetTitle}</div>
+          <div style={{ fontSize: '13px', color: '#888' }}>{t.resetSubtitle}</div>
         </div>
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Parolă nouă</div>
-          <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder="minimum 6 caractere"
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetNewPasswordLabel}</div>
+          <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.resetNewPasswordPlaceholder}
             style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Confirmă parola</div>
-          <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder="repetă parola"
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetConfirmPasswordLabel}</div>
+          <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder={t.resetConfirmPasswordPlaceholder}
             style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         {authError && (
@@ -3855,7 +3887,7 @@ function App() {
         )}
         <button onClick={handleSetNewPassword} disabled={authSubmitting}
           style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
-          {authSubmitting ? 'Se salvează...' : 'Salvează parola'}
+          {authSubmitting ? t.resetSavingButton : t.resetSaveButton}
         </button>
       </div>
     </div>
@@ -3865,7 +3897,7 @@ function App() {
     <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Dumbbell size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
-        <div style={{ fontSize: '14px', color: '#888' }}>Se încarcă...</div>
+        <div style={{ fontSize: '14px', color: '#888' }}>{t.authLoadingText}</div>
       </div>
     </div>
   )
@@ -3878,16 +3910,16 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
             <img src="/forge.png" alt="Forge" style={{ width: '56px', height: '56px', borderRadius: '12px' }} />
             <div>
-              <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff' }}>Instalează Forge</div>
-              <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>Adaugă pe ecranul principal</div>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff' }}>{t.installTitle}</div>
+              <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{t.installSubtitle}</div>
             </div>
           </div>
           {isIOS ? (<>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               {[
-                { nr: '1', text: 'Apasă butonul', icon: '⎋', sub: 'Share — în bara de jos a Safari' },
-                { nr: '2', text: 'Derulează și alege', icon: '＋', sub: '"Add to Home Screen"' },
-                { nr: '3', text: 'Apasă', icon: '✓', sub: '"Add" în colțul din dreapta sus' },
+                { nr: '1', text: t.installIosStep1Text, icon: '⎋', sub: t.installIosStep1Sub },
+                { nr: '2', text: t.installIosStep2Text, icon: '＋', sub: t.installIosStep2Sub },
+                { nr: '3', text: t.installIosStep3Text, icon: '✓', sub: t.installIosStep3Sub },
               ].map(s => (
                 <div key={s.nr} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
@@ -3900,13 +3932,13 @@ function App() {
             </div>
             <div style={{ background: '#2c2c2e', borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               <span style={{ fontSize: '20px' }}>💡</span>
-              <span style={{ fontSize: '12px', color: '#888', lineHeight: '1.5' }}>Butonul Share (⎋) se află în mijlocul barei de jos din Safari</span>
+              <span style={{ fontSize: '12px', color: '#888', lineHeight: '1.5' }}>{t.installIosHint}</span>
             </div>
           </>) : (<>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               {[
-                { icon: '⋮', text: 'Apasă meniul', sub: 'Cele 3 puncte din colțul browserului' },
-                { icon: '＋', text: 'Alege opțiunea', sub: '"Adaugă pe ecranul principal"' },
+                { icon: '⋮', text: t.installAndroidStep1Text, sub: t.installAndroidStep1Sub },
+                { icon: '＋', text: t.installAndroidStep2Text, sub: t.installAndroidStep2Sub },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#2c2c2e', borderRadius: '14px', padding: '14px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
@@ -3918,7 +3950,7 @@ function App() {
               ))}
             </div>
           </>)}
-          <button onClick={() => setInstallDismissed(false)} style={{ width: '100%', padding: '14px', background: '#2c2c2e', color: '#fff', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Am înțeles</button>
+          <button onClick={() => setInstallDismissed(false)} style={{ width: '100%', padding: '14px', background: '#2c2c2e', color: '#fff', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t.installGotIt}</button>
         </div>
       </div>}
       <img src="/forge.png" alt="Forge" style={{ width: '140px', height: '140px', borderRadius: '28px', marginBottom: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
@@ -3926,37 +3958,37 @@ function App() {
         <div style={{ marginBottom: '20px', textAlign: 'center' }}>
           {installPrompt ? (
             <button onClick={handleInstall} style={{ background: 'none', border: '1px solid #444', borderRadius: '20px', padding: '8px 20px', color: '#aaa', fontSize: '13px', cursor: 'pointer' }}>
-              + Adaugă pe ecranul principal
+              {t.installAddToHomeScreen}
             </button>
           ) : (
             <button onClick={() => setInstallDismissed(true)} style={{ background: 'none', border: '1px solid #444', borderRadius: '20px', padding: '8px 20px', color: '#aaa', fontSize: '13px', cursor: 'pointer' }}>
-              + Adaugă pe ecranul principal
+              {t.installAddToHomeScreen}
             </button>
           )}
         </div>
       )}
       <div style={{ width: '100%', background: '#0E0E0E', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>Forge</h1>
-          <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? 'Bine ai revenit!' : 'Creează cont nou'}</p>
+          <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.authAppName}</h1>
+          <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? t.authWelcomeBack : t.authCreateAccount}</p>
         </div>
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Email</div>
-          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="email@exemplu.com" type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authEmailLabel}</div>
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         <div style={{ marginBottom: authScreen === 'login' ? '12px' : '20px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>Parolă</div>
-          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="minimum 6 caractere" type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authPasswordLabel}</div>
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={t.authPasswordPlaceholder} type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
         </div>
         {authScreen === 'login' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
                 style={{ width: '16px', height: '16px', accentColor: '#0E0E0E', cursor: 'pointer' }} />
-              <span style={{ fontSize: '13px', color: '#aaa' }}>Remember me</span>
+              <span style={{ fontSize: '13px', color: '#aaa' }}>{t.authRememberMe}</span>
             </label>
             <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#ABE73C', cursor: 'pointer', fontWeight: '500' }}>
-              Forgot password?
+              {t.authForgotPassword}
             </span>
           </div>
         )}
@@ -3967,12 +3999,12 @@ function App() {
         )}
         <button onClick={authScreen === 'login' ? handleLogin : handleRegister} disabled={authSubmitting}
           style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
-          {authSubmitting ? 'Se încarcă...' : authScreen === 'login' ? 'Intră în cont' : 'Creează cont'}
+          {authSubmitting ? t.authLoadingButton : authScreen === 'login' ? t.authLoginButton : t.authRegisterButton}
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
-          {authScreen === 'login' ? 'Nu ai cont? ' : 'Ai deja cont? '}
+          {authScreen === 'login' ? t.authNoAccount : t.authHasAccount}
           <span onClick={() => { setAuthScreen(authScreen === 'login' ? 'register' : 'login'); setAuthError('') }} style={{ color: '#ABE73C', fontWeight: '600', cursor: 'pointer' }}>
-            {authScreen === 'login' ? 'Înregistrează-te' : 'Intră în cont'}
+            {authScreen === 'login' ? t.authRegisterLink : t.authLoginLink}
           </span>
         </div>
       </div>
@@ -5116,6 +5148,23 @@ function App() {
             </div>
           </div>
 
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileLanguageTitle}</div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.profileLanguageSubtitle}</div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {[{ val: 'ro', label: 'Română' }, { val: 'en', label: 'English' }].map(l => {
+                const active = lang === l.val
+                return (
+                  <div key={l.val} onClick={() => changeLanguage(l.val)}
+                    style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${active ? '#0E0E0E' : '#e0e0e0'}`, background: active ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{l.val}</div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: active ? '#ABE73C' : '#888', marginTop: '2px' }}>{l.label}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
           <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginTop: '16px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <TimerIcon size={18} color="#ABE73C" strokeWidth={2} /> Timer
           </button>
@@ -5221,31 +5270,31 @@ function App() {
             {/* PASUL 1 — Date personale */}
             {onboardingStep === 1 && (
               <>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>Bun venit! 👋</div>
-                <div style={{ fontSize: '14px', color: '#888', marginBottom: '24px' }}>Completează datele tale pentru înregistrare.</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingWelcome}</div>
+                <div style={{ fontSize: '14px', color: '#888', marginBottom: '24px' }}>{t.onboardingStep1Subtitle}</div>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Prenume *</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingFirstNameLabel}</div>
                     <input value={onboardingFirstName} onChange={e => setOnboardingFirstName(e.target.value)}
-                      placeholder="ex: Andrei"
+                      placeholder={t.onboardingFirstNamePlaceholder}
                       style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Nume *</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingLastNameLabel}</div>
                     <input value={onboardingLastName} onChange={e => setOnboardingLastName(e.target.value)}
-                      placeholder="ex: Popescu"
+                      placeholder={t.onboardingLastNamePlaceholder}
                       style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingBirthDateLabel}</div>
                   <input type="date" value={onboardingBirthDate} onChange={e => setOnboardingBirthDate(e.target.value)}
                     max={todayLocalStr()}
                     style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
                 </div>
-                <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast('❌ Completează toate câmpurile obligatorii!'); return }; setOnboardingStep(2) }}
+                <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast(t.onboardingFillRequired); return }; setOnboardingStep(2) }}
                   style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer' }}>
-                  Continuă →
+                  {t.onboardingContinue}
                 </button>
               </>
             )}
@@ -5253,10 +5302,10 @@ function App() {
             {/* PASUL 2 — Gen */}
             {onboardingStep === 2 && (
               <>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>Selectează genul</div>
-                <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>Folosit pentru clasamentul pe categorii.</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingGenderTitle}</div>
+                <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>{t.onboardingGenderSubtitle}</div>
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
-                  {[{ val: 'masculin', label: '♂', sub: 'Masculin' }, { val: 'feminin', label: '♀', sub: 'Feminin' }].map(g => (
+                  {[{ val: 'masculin', label: '♂', sub: t.onboardingGenderMale }, { val: 'feminin', label: '♀', sub: t.onboardingGenderFemale }].map(g => (
                     <div key={g.val} onClick={() => setOnboardingGender(g.val)}
                       style={{ flex: 1, padding: '20px 14px', borderRadius: '16px', border: `2px solid ${onboardingGender === g.val ? '#0E0E0E' : '#e0e0e0'}`, background: onboardingGender === g.val ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                       <div style={{ fontSize: '28px', marginBottom: '6px', color: onboardingGender === g.val ? '#ABE73C' : '#888' }}>{g.label}</div>
@@ -5266,9 +5315,9 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setOnboardingStep(1)}
-                    style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>← Înapoi</button>
-                  <button onClick={() => { if (!onboardingGender) { showToast('❌ Selectează genul!'); return }; setOnboardingStep(3) }}
-                    style={{ flex: 2, padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>Continuă →</button>
+                    style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>{t.onboardingBack}</button>
+                  <button onClick={() => { if (!onboardingGender) { showToast(t.onboardingSelectGender); return }; setOnboardingStep(3) }}
+                    style={{ flex: 2, padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>{t.onboardingContinue}</button>
                 </div>
               </>
             )}
@@ -5277,30 +5326,30 @@ function App() {
             {onboardingStep === 3 && (
               <>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>
-                  {onboardingFirstName && onboardingGender ? `Reînnoire acord ${new Date().getFullYear()}` : 'Acord de participare'}
+                  {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalTitle(new Date().getFullYear()) : t.onboardingWaiverTitle}
                 </div>
                 <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>
-                  {onboardingFirstName && onboardingGender ? 'Acordul de participare se reînnoiește anual. Citește și acceptă pentru a continua.' : 'Citește și acceptă acordul pentru a continua.'}
+                  {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalSubtitle : t.onboardingWaiverSubtitle}
                 </div>
                 <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>DECLARAȚIE DE CONSIMȚĂMÂNT — CrossFit C15 / Forge</div>
-                  <p style={{ marginBottom: '8px' }}><strong>1. Starea de sănătate</strong><br />Declar că sunt apt/ă din punct de vedere medical pentru activități fizice de intensitate ridicată și nu am contraindicații medicale cunoscute. Am consultat sau mă angajez să consult un medic înainte de începerea programului.</p>
-                  <p style={{ marginBottom: '8px' }}><strong>2. Asumarea riscurilor</strong><br />Înțeleg că CrossFit și activitățile sportive implică riscuri inerente de accidentare. Îmi asum în mod voluntar aceste riscuri și participarea este de bună voie.</p>
-                  <p style={{ marginBottom: '8px' }}><strong>3. Limitarea răspunderii</strong><br />CrossFit C15, Forge și antrenorii nu sunt responsabili pentru accidentări, prejudicii sau pierderi survenite în timpul antrenamentelor, cu excepția cazurilor de neglijență gravă dovedită.</p>
-                  <p style={{ marginBottom: '8px' }}><strong>4. Regulamentul sălii</strong><br />Mă angajez să respect instrucțiunile antrenorilor, regulamentul intern și să utilizez echipamentul în siguranță. Comportamentul neadecvat poate duce la suspendarea accesului.</p>
-                  <p><strong>5. Date personale</strong><br />Datele mele personale sunt utilizate exclusiv pentru gestionarea membriei CrossFit C15 și nu vor fi partajate cu terți fără acordul meu explicit.</p>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading}</div>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver1Title}</strong><br />{t.onboardingWaiver1Text}</p>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver2Title}</strong><br />{t.onboardingWaiver2Text}</p>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text}</p>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver4Title}</strong><br />{t.onboardingWaiver4Text}</p>
+                  <p><strong>{t.onboardingWaiver5Title}</strong><br />{t.onboardingWaiver5Text}</p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={onboardingWaiverAccepted} onChange={e => setOnboardingWaiverAccepted(e.target.checked)}
                     style={{ width: '20px', height: '20px', marginTop: '1px', accentColor: '#0E0E0E', flexShrink: 0, cursor: 'pointer' }} />
-                  <span style={{ fontSize: '13px', color: '#0E0E0E', lineHeight: '1.5' }}>Am citit, înțeles și sunt de acord cu termenii acordului de mai sus.</span>
+                  <span style={{ fontSize: '13px', color: '#0E0E0E', lineHeight: '1.5' }}>{t.onboardingWaiverCheckbox}</span>
                 </label>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setOnboardingStep(2)}
-                    style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>← Înapoi</button>
+                    style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>{t.onboardingBack}</button>
                   <button onClick={saveOnboarding} disabled={!onboardingWaiverAccepted}
                     style={{ flex: 2, padding: '14px', background: onboardingWaiverAccepted ? '#ABE73C' : '#e0e0e0', color: onboardingWaiverAccepted ? '#0E0E0E' : '#aaa', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: onboardingWaiverAccepted ? 'pointer' : 'default' }}>
-                    Confirm și intru ✓
+                    {t.onboardingConfirm}
                   </button>
                 </div>
               </>
@@ -5315,7 +5364,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} />
+      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} t={t} />
     </div>
   )
 }

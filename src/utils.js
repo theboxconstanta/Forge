@@ -1,6 +1,13 @@
 // Funcții pure, fără dependințe de React/Supabase - testabile izolat.
 // Nu importa nimic din App.jsx aici (ar readuce dependința de Supabase).
 
+// Locale pentru toLocaleDateString/Intl.DateTimeFormat, dupa limba aleasa de
+// user (vezi src/translations.js). Nu exista alte limbi in afara de ro/en
+// momentan, deci orice altceva cade pe ro-RO (fallback, nu presupunere).
+export function localeFor(lang) {
+  return lang === 'en' ? 'en-US' : 'ro-RO'
+}
+
 // Data de azi in fusul orar LOCAL, ca string YYYY-MM-DD. NU folosi
 // new Date().toISOString().split('T')[0] pentru asta - e ora UTC, care in
 // Romania (UTC+2/+3) e in urma cu ora locala intre miezul noptii si ~2-3
