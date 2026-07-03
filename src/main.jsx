@@ -1,7 +1,38 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.jsx'
+import { supabase } from './supabase.js'
+
+// Monitorizare erori (Sentry) - pana acum erorile ajungeau doar in console.error,
+// nimeni nu era alertat daca ceva se strica in productie. captureConsoleIntegration
+// prinde automat toate apelurile console.error existente din cod (foarte multe,
+// n-are rost sa fie inlocuite unul cate unul) fara sa trebuiasca schimbat vreun
+// site de apel. supabaseIntegration adauga breadcrumbs cu query-urile Supabase
+// esuate - sendOperationData ramane implicit (false), ca sa nu ajunga in Sentry
+// filtre/body-uri de query care ar putea contine date personale ale membrilor.
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.MODE,
+    integrations: [
+      Sentry.captureConsoleIntegration({ levels: ['error'] }),
+      Sentry.supabaseIntegration({ supabaseClient: supabase }),
+    ],
+  })
+}
+
+const ErrorFallback = () => (
+  <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', background: '#fff' }}>
+    <div style={{ fontSize: '17px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>Ceva nu a mers bine</div>
+    <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>Am fost notificați automat despre eroare.</div>
+    <button onClick={() => window.location.reload()}
+      style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+      Reîncarcă
+    </button>
+  </div>
+)
 
 let swRefreshing = false
 if ('serviceWorker' in navigator) {
@@ -97,6 +128,8 @@ requestAnimationFrame(__sampleTrace)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
+      <App />
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )
