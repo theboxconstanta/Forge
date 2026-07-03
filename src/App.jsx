@@ -347,6 +347,11 @@ function AvatarCircle({ name, avatarUrl, size = 38 }) {
   )
 }
 
+const NIVEL_DOT_COLORS = { RX: '#E8591A', Intermediate: '#F0B429', Beginner: '#2FA84F', OnRamp: '#2F6FED' }
+function LevelDot({ nivel, size = 10 }) {
+  return <span style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: NIVEL_DOT_COLORS[nivel] || '#ccc', flexShrink: 0, verticalAlign: 'middle' }} />
+}
+
 function parseWodMinute(durataStr) {
   if (!durataStr) return null
   const match = durataStr.match(/(\d+)/)
@@ -869,10 +874,10 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   }
 
   const NIVELE = [
-    { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB', emoji: '🔴' },
-    { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡' },
-    { id: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', emoji: '🟢' },
-    { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵' },
+    { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
+    { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
+    { id: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
+    { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
   ]
 
   const getSectionLogs = (nivelId) => {
@@ -933,8 +938,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
                 {/* Header secțiune */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '800', color: nivel.culoare, letterSpacing: '0.04em' }}>
-                    {nivel.emoji} {nivel.id}
+                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '800', color: nivel.culoare, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <LevelDot nivel={nivel.id} /> {nivel.id}
                   </div>
                   <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
                     {sectionLogs.length} {sectionLogs.length === 1 ? (genderTab === 'feminin' ? 'participantă' : 'participant') : (genderTab === 'feminin' ? 'participante' : 'participanți')}
@@ -2508,13 +2513,13 @@ function Admin({ showToast, onWodChanged }) {
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume antrenament <span style={{ color: '#bbb' }}>(opțional)</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
-              { key: 'onramp', label: '🔵 OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
-              { key: 'beginner', label: '🟢 Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
-              { key: 'intermediate', label: '🟡 Intermediate', culoare: '#633806', bg: '#FAEEDA' },
-              { key: 'rx', label: '🔴 RX', culoare: '#791F1F', bg: '#FCEBEB' },
+              { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
+              { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
+              { key: 'intermediate', label: 'Intermediate', nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
+              { key: 'rx', label: 'RX', nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
             ].map(v => (
               <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px' }}>{v.label}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
                 <textarea value={wodVariante[v.key]} onChange={e => setWodVariante(prev => ({ ...prev, [v.key]: e.target.value }))}
                   placeholder={'ex:\n10 Pull-ups\n20 Push-ups\n30 Air Squats'} rows={4}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
@@ -2531,7 +2536,7 @@ function Admin({ showToast, onWodChanged }) {
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
-                  {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px' }}>🔴 {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
+                  {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><LevelDot nivel="RX" size={8} /> {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                   <button onClick={() => startEditWod(w)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>✎</button>
@@ -3761,10 +3766,10 @@ function App() {
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
 
   const VARIANTE_CONFIG = [
-    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', emoji: '🟠', key: 'movements_rx' },
-    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', emoji: '🟡', key: 'movements_intermediate' },
-    { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', emoji: '🟢', key: 'movements_beginner' },
-    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', emoji: '🔵', key: 'movements_onramp' },
+    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', key: 'movements_rx' },
+    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', key: 'movements_intermediate' },
+    { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', key: 'movements_beginner' },
+    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp' },
   ]
 
   const abonamentInceput = abonamentReal ? new Date(abonamentReal.start_date + 'T00:00:00') <= new Date() : false
@@ -4190,7 +4195,7 @@ function App() {
                       <div key={i} onClick={() => { setVariantaAleasa(variantaAleasa === i ? null : i); setWodMiscariCustom(null) }}
                         style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? v.bg : '#fafafa' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
-                          <span>{v.emoji}</span>
+                          <LevelDot nivel={v.nivel} />
                           <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
                           {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: v.culoare, color: '#fff', borderRadius: '20px' }}>Selectat</span>}
                         </div>
@@ -4439,8 +4444,8 @@ function App() {
               {variantaAleasa !== null && (
                 <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare }}>
-                    {VARIANTE_CONFIG[variantaAleasa].emoji} {VARIANTE_CONFIG[variantaAleasa].nivel}
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} /> {VARIANTE_CONFIG[variantaAleasa].nivel}
                     {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
                   </div>
                 </div>
