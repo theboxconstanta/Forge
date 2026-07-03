@@ -1180,6 +1180,7 @@ function Admin({ showToast }) {
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
   const [_numeAbonament, setNumeAbonament] = useState('')
@@ -1569,22 +1570,53 @@ function Admin({ showToast }) {
     setSavingWod(true)
     const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
-    const { error } = await supabase.from('wods').insert({
+    const payload = {
       date: dataWod, type: tipWod, duration: durataWod,
       name: numeWod.trim() || null,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
       movements_rx: parseLinii(wodVariante.rx),
-    })
+    }
+    const { error } = editWodId
+      ? await supabase.from('wods').update(payload).eq('id', editWodId)
+      : await supabase.from('wods').insert(payload)
     if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('✓ WOD creat!'); await fetchWods(); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' }) }
+    else {
+      showToast(editWodId ? '✓ WOD actualizat!' : '✓ WOD creat!')
+      await fetchWods(); await fetchWodZi()
+      setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+      setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
+    }
     setSavingWod(false)
+  }
+
+  const startEditWod = (w) => {
+    setEditWodId(w.id)
+    setDataWod(w.date)
+    setTipWod(w.type || 'AMRAP')
+    const [dMin, dSec] = (w.duration || '20:0').split(':')
+    setDurataWodMin(dMin || '0'); setDurataWodSec(dSec || '0')
+    setNumeWod(w.name || '')
+    setWodVariante({
+      onramp: (w.movements_onramp || []).join('\n'),
+      beginner: (w.movements_beginner || []).join('\n'),
+      intermediate: (w.movements_intermediate || []).join('\n'),
+      rx: (w.movements_rx || []).join('\n'),
+    })
+    setAdminTab('wod')
+    setScreen('admin')
+  }
+
+  const cancelEditWod = () => {
+    setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
   }
 
   const stergeWod = async (id) => {
     await supabase.from('wods').delete().eq('id', id)
-    showToast('✓ WOD șters!'); await fetchWods()
+    if (id === editWodId) cancelEditWod()
+    showToast('✓ WOD șters!'); await fetchWods(); await fetchWodZi()
   }
 
   const saveAbonament = async () => {
@@ -2280,7 +2312,12 @@ function Admin({ showToast }) {
       {adminTab === 'wod' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ WOD nou</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? '✎ Editează WOD' : '+ WOD nou'}</div>
+              {editWodId && (
+                <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>Anulează</div>
+              )}
+            </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data WOD</div>
             <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip WOD</div>
@@ -2315,7 +2352,7 @@ function Admin({ showToast }) {
               </div>
             ))}
             <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
-              {savingWod ? 'Se salvează...' : '+ Creează WOD'}
+              {savingWod ? 'Se salvează...' : editWodId ? 'Salvează modificările' : '+ Creează WOD'}
             </button>
           </div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>WOD-URI ({wods.length})</div>
@@ -2327,7 +2364,10 @@ function Admin({ showToast }) {
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
                   {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px' }}>🔴 {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
-                <button onClick={() => stergeWod(w.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <button onClick={() => startEditWod(w)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>✎</button>
+                  <button onClick={() => stergeWod(w.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                </div>
               </div>
             </div>
           ))}
@@ -3968,8 +4008,16 @@ function App() {
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
                 </div>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
-                  {wodDeschis ? '−' : '+'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {isAdmin && (
+                    <div onClick={(e) => { e.stopPropagation(); wodZiData ? startEditWod(wodZiData) : (cancelEditWod(), setDataWod(dataAcasa), setAdminTab('wod'), setScreen('admin')) }}
+                      style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f0f0f0', color: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', cursor: 'pointer' }}>
+                      ✎
+                    </div>
+                  )}
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                    {wodDeschis ? '−' : '+'}
+                  </div>
                 </div>
               </div>
               {wodDeschis && wodZiData && (
