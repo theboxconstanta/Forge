@@ -359,11 +359,14 @@ function NavBarDebug({ navRef }) {
   const [info, setInfo] = useState(null)
   const [loadTrace, setLoadTrace] = useState(null)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('__loadTrace')
-      if (raw) {
+    // trace-ul se scrie progresiv in localStorage timp de 4s dupa incarcare -
+    // daca citim o singura data la mount (posibil doar la 25ms din acele 4s),
+    // vedem doar un fragment incomplet. Recitim periodic pana se stabilizeaza.
+    const readTrace = () => {
+      try {
+        const raw = localStorage.getItem('__loadTrace')
+        if (!raw) return
         const samples = JSON.parse(raw)
-        // condensam: un rand la fiecare ~150ms, ca sa incapa pe ecran
         const condensed = []
         let lastT = -999
         for (const s of samples) {
@@ -373,8 +376,12 @@ function NavBarDebug({ navRef }) {
           }
         }
         setLoadTrace(condensed)
-      }
-    } catch {}
+      } catch {}
+    }
+    readTrace()
+    const interval = setInterval(readTrace, 500)
+    const timeout = setTimeout(() => clearInterval(interval), 5000)
+    return () => { clearInterval(interval); clearTimeout(timeout) }
   }, [])
   useEffect(() => {
     const measure = () => {
