@@ -355,7 +355,7 @@ const NAV_TABS = [
   { id: 'feed', label: 'Feed', icon: MessageCircle },
 ]
 
-function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
+function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread }) {
   // 2026-07-02, noaptea: renuntat definitiv la position:fixed pt NavBar, dupa o
   // seara intreaga de incercari esuate de a masura corect inaltimea ecranului
   // in standalone iOS (vezi [[project-navbar-safe-area]] pt istoricul complet).
@@ -365,7 +365,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
   // vreunei masuratori gresite de viewport.
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
-  const tabs = isAdmin ? [...NAV_TABS, { id: 'admin', label: 'Admin', icon: Settings }] : NAV_TABS
+  const tabs = (isAdmin || isCoach) ? [...NAV_TABS, { id: 'admin', label: isAdmin ? 'Admin' : 'Coach', icon: Settings }] : NAV_TABS
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
@@ -5254,7 +5254,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin || isCoach} feedUnread={feedUnread} />
+      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} />
     </div>
   )
 }
