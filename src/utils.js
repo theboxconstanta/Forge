@@ -118,3 +118,5 @@ export function formatWodDurata(durataStr) {
   const mins = parseWodMinute(durataStr)
   return mins != null ? `${mins}:00` : durataStr
 }
+
+export const NIVEL_DOT_COLORS = { RX: '#E8591A', Intermediate: '#F0B429', Beginner: '#2FA84F', OnRamp: '#2F6FED' }
