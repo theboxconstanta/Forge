@@ -5,7 +5,7 @@ import {
   Home, PenLine, Trophy, Medal, MessageCircle, Settings,
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
-  RotateCw, Clock, Mars, Venus,
+  RotateCw, Clock, Mars, Venus, User,
 } from 'lucide-react'
 import { supabase } from './supabase'
 
@@ -2400,7 +2400,9 @@ function Admin({ showToast, onWodChanged }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.name}</div>
-                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>🕐 {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · 👤 {c.coach} · {c.max_spots} locuri</div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            <Clock size={11} /> {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · <User size={11} /> {c.coach} · {c.max_spots} locuri
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
@@ -4351,7 +4353,7 @@ function App() {
                             <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#0E0E0E' }}>👤 {c.coach}</div>
+                            <div style={{ fontSize: '11px', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} /> {c.coach}</div>
                           </div>
                           <button onClick={() => toggleRezervare(c.id)}
                             style={{ background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
