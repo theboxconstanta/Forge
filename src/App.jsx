@@ -989,6 +989,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   const [comentariuText, setComentariuText] = useState('')
   const [confirmDeletePost, setConfirmDeletePost] = useState(null)
   const [confirmDeleteComment, setConfirmDeleteComment] = useState(null)
+  const [membriComunitate, setMembriComunitate] = useState([])
 
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#0E0E0E', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
@@ -1042,6 +1043,8 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
 
   useEffect(() => {
     fetchAll(true)
+    supabase.from('profiles').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
+      .then(({ data }) => { if (data) setMembriComunitate(data) })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_reactions' }, () => fetchAll(false))
@@ -1113,6 +1116,21 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>Feed 👥</h1>
+
+      {/* Membrii comunitatii */}
+      {membriComunitate.length > 0 && (
+        <div className="hide-scrollbar" style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '16px' }}>
+          {membriComunitate.map(m => {
+            const mName = m.full_name || m.email?.split('@')[0] || 'Membru'
+            return (
+              <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '58px', flexShrink: 0 }}>
+                <AvatarCircle name={mName} avatarUrl={m.avatar_url} size={50} />
+                <span style={{ fontSize: '10px', color: '#555', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{mName}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Compose */}
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
