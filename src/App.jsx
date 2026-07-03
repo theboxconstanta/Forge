@@ -1949,7 +1949,7 @@ function Admin({ showToast, onWodChanged }) {
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
             const aboQueued = getQueuedAbonamentClient(c.email)
-            const zileRamase = abo ? Math.ceil((new Date(abo.end_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)) : null
+            const zileRamase = abo ? Math.round((new Date(abo.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / (1000 * 60 * 60 * 24)) : null
             const sedinteEpuizate = abo?.sessions_total != null && Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) === 0
             const neInceput = abo ? new Date(abo.start_date + 'T00:00:00') > new Date() : false
             const expirat = (zileRamase !== null && zileRamase < 0) || sedinteEpuizate
@@ -2196,7 +2196,7 @@ function Admin({ showToast, onWodChanged }) {
                   const queued = list.filter(a => a.queued)
                   const membruNume = clienti.find(c => c.email?.toLowerCase() === email)?.full_name
                   const expanded = !!aboExpandat[email]
-                  const zileRamase = activ ? Math.ceil((new Date(activ.end_date + 'T23:59:59') - new Date()) / 86400000) : null
+                  const zileRamase = activ ? Math.round((new Date(activ.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000) : null
                   const epuizat = activ && activ.sessions_total != null && Math.max(0, activ.sessions_total - (activ.sessions_used || 0)) === 0
                   const neinceput = activ && new Date(activ.start_date + 'T00:00:00') > new Date()
                   const expirat = activ && (zileRamase < 0 || epuizat)
@@ -3988,7 +3988,7 @@ function App() {
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''))
-        const zileRamase = abonamentReal ? Math.max(0, Math.ceil((new Date(abonamentReal.end_date + 'T23:59:59') - new Date()) / 86400000)) : 0
+        const zileRamase = abonamentReal ? Math.max(0, Math.round((new Date(abonamentReal.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000)) : 0
         const sessTotal = abonamentReal?.sessions_total
         const sessUsed = abonamentReal?.sessions_used || 0
         const progres = sessTotal ? Math.min(1, sessUsed / sessTotal) : 0
