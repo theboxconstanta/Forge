@@ -1212,8 +1212,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const [deletingClient, setDeletingClient] = useState(false)
 
   useEffect(() => {
-    fetchClase(); fetchWods()
-    if (isAdmin) { fetchClienti(); fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }
+    // fetchClienti ramane si pentru coach (nu doar admin) - desi tab-ul "Clienti" e admin-only,
+    // lista in sine (nume/email, profiles_select_all e deja RLS-open oricui) e folosita si de
+    // adminAdaugaInClasa/adminScoateDinClasa (cautare membru + notificari) din tab-ul Clase,
+    // accesibil coach-ului. Fara asta, "Adauga manual" nu gasea pe nimeni pentru un coach.
+    fetchClase(); fetchWods(); fetchClienti()
+    if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin() }
   }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
 
@@ -1331,17 +1335,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const member = clienti.find(c => c.id === memberId)
     const email = member?.email?.toLowerCase()
     if (!email) return
-    const { data: abo, error } = await supabase.from('subscriptions')
-      .select('id, sessions_used, sessions_total')
-      .ilike('member_email', email)
-      .eq('is_active', true)
-      .not('sessions_total', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(1).maybeSingle()
+    // RPC restransa (nu update direct pe subscriptions) - permite si coach-ului sa
+    // ajusteze doar sessions_used ca efect al adaugarii/scoaterii dintr-o clasa, fara
+    // sa-i dea acces RLS larg la restul tabelului subscriptions (pret, plan, is_active).
+    const { error } = await supabase.rpc('adjust_session_count', { p_member_email: email, p_delta: delta })
     if (error) { console.error('adjustMemberSessions:', error); return }
-    if (!abo) return
-    const newUsed = Math.max(0, Math.min(abo.sessions_total ?? 9999, (abo.sessions_used || 0) + delta))
-    await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', abo.id)
     const bc = supabase.channel('member-sessions-' + memberId)
     bc.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
