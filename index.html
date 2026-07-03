@@ -14,23 +14,23 @@
     <meta name="format-detection" content="telephone=no" />
     <title>Forge</title>
     <style>
-      /* CSS critic, inline: garanteaza ca #root are o inaltime + pozitionare
-         definita chiar din primul randare, inainte ca index.css (fisier
-         extern) sa apuce sa se incarce - plasa de siguranta, identica cu
-         regula din index.css (fara transform - vezi index.css pt motivul
-         complet: transform pe #root facea din el containing block pt orice
-         position:fixed din pagina, inclusiv ecranul de login, care se putea
-         trunchia daca #root avea o inaltime gresita). */
+      /* CSS critic, inline: garanteaza ca #root are o pozitionare definita
+         chiar din primul randare, inainte ca index.css (fisier extern) sa
+         apuce sa se incarce - plasa de siguranta, identica cu regula din
+         index.css. Doua motive, vezi index.css pt detalii complete:
+         (1) fara transform - altfel devine containing block pt orice
+         position:fixed din pagina (ecranul de login etc.), trunchiindu-l
+         daca #root are o inaltime gresita;
+         (2) inset:0 in loc de height:100dvh - dvh poate raporta o valoare
+         inghetata, mai mica decat ecranul real, la cold-start; inset:0 nu
+         calculeaza nicio inaltime, se ancoreaza direct de fereastra reala. */
       html, body, #root { height: 100%; }
       body { position: fixed; inset: 0; margin: 0; }
       @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
         body { overflow: hidden; }
         #root {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100dvh;
+          inset: 0;
           overflow: hidden;
         }
       }

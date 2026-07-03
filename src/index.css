@@ -102,10 +102,7 @@ body {
 
 /* Acelasi tratament ca la landscape (mai sus), aplicat si in portrait -
    fara conditie de standalone/@media (display-mode), care nu s-a dovedit
-   de incredere pe device-ul de test. #root devine el insusi fixed, cu
-   dimensiune proprie explicita in dvh, in loc sa mosteneasca inaltimea
-   prin inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
-   standalone - vezi [[project-navbar-safe-area]]).
+   de incredere pe device-ul de test.
 
    FARA transform pe #root (scos 2026-07-03): NavBar nu mai e position:fixed
    de mult (e element normal in flexbox, in App.jsx) - transform-ul ramasese
@@ -113,21 +110,26 @@ body {
    motiv care nu se mai aplica. Efect secundar REAL, descoperit abia acum:
    orice alt element position:fixed;inset:0 din pagina (ecranul de login,
    modale, toast) se ancora si el, din cauza acestui transform, de cutia
-   #root in loc de fereastra reala - daca #root avea o inaltime gresita
-   (bug de cold-start dvh), acele elemente ramaneau si ele trunchiate,
-   lasand un dreptunghi alb (fundalul implicit body/html) pe restul
-   ecranului. Fara transform, position:fixed;inset:0 se ancoreaza mereu
-   corect de fereastra reala, indiferent de inaltimea lui #root. */
+   #root in loc de fereastra reala.
+
+   height:var(--app-vh,100dvh) INLOCUIT cu inset:0 (2026-07-03, acelasi update):
+   dvh/--app-vh pot raporta o valoare inghetata, mai mica decat ecranul real,
+   la cold-start (vezi [[project-navbar-safe-area]]) - #root (si .app-frame,
+   NavBar prin el) mosteneau acea valoare gresita, aparand "prea sus" cu un
+   gol alb dedesubt la prima incarcare. La fel ca ecranul de login (fixat
+   mai sus prin eliminarea transform-ului), inset:0 nu calculeaza nicio
+   inaltime din dvh - se ancoreaza direct de marginile ferestrei reale,
+   indiferent de bug-ul de cold-start. Compromis acceptat: posibil sa reapara
+   un gol cosmetic de cateva zeci de px in standalone iOS (motivul pt care
+   se folosea dvh initial) - dar acela e invizibil (fundal identic), spre
+   deosebire de bug-ul dramatic aparut acum. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   body {
     overflow: hidden;
   }
   #root {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: var(--app-vh, 100dvh);
+    inset: 0;
     /* overflow:hidden (nu auto) - de cand scroll-ul real s-a mutat pe zona de
        continut din .app-frame (vezi App.jsx), #root nu mai are nevoie de
        propriul lui scroll. Lasat pe auto, iOS il considera un ancestor
