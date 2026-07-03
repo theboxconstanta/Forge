@@ -2542,7 +2542,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Coach-i</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Coach</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>Acces doar la WOD și Clase, fără Clienți/Abonamente/Planuri/Setări.</div>
           {coachesList.length > 0 && (
             <div style={{ marginBottom: '14px' }}>
