@@ -4008,16 +4008,8 @@ function App() {
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                  {isAdmin && (
-                    <div onClick={(e) => { e.stopPropagation(); wodZiData ? startEditWod(wodZiData) : (cancelEditWod(), setDataWod(dataAcasa), setAdminTab('wod'), setScreen('admin')) }}
-                      style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f0f0f0', color: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', cursor: 'pointer' }}>
-                      ✎
-                    </div>
-                  )}
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                    {wodDeschis ? '−' : '+'}
-                  </div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                  {wodDeschis ? '−' : '+'}
                 </div>
               </div>
               {wodDeschis && wodZiData && (
