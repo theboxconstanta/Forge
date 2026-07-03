@@ -8,6 +8,10 @@ import {
   RotateCw, Clock, Mars, Venus, User,
 } from 'lucide-react'
 import { supabase } from './supabase'
+import {
+  todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
+} from './utils'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -32,31 +36,6 @@ class ErrorBoundary extends Component {
 
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-
-// Data de azi in fusul orar LOCAL, ca string YYYY-MM-DD. NU folosi
-// new Date().toISOString().split('T')[0] pentru asta - e ora UTC, care in
-// Romania (UTC+2/+3) e in urma cu ora locala intre miezul noptii si ~2-3
-// dimineata, ducand la comparatii de data gresite exact in acel interval
-// (abonamente/clase tratate ca "de maine" sau "expirate cu o zi in avans").
-function todayLocalStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function levenshtein(a, b) {
-  const m = a.length, n = b.length
-  const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0))
-  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
-    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
-  return dp[m][n]
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const raw = atob(base64)
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
-}
 
 // Ajusteaza sessions_used printr-un citeste-apoi-scrie cu verificare optimista
 // (WHERE sessions_used = valoarea citita) - fara asta, doua booking/anulari
@@ -163,13 +142,8 @@ async function activateQueuedSubscription(memberEmail) {
 
   const duration = queued.subscription_plans?.duration_months || 1
   const startDate = new Date()
-  const pad = n => String(n).padStart(2, '0')
-  const startStr = `${startDate.getFullYear()}-${pad(startDate.getMonth()+1)}-${pad(startDate.getDate())}`
-  const endDate = new Date(startDate)
-  const targetMonth = endDate.getMonth() + duration
-  endDate.setMonth(targetMonth)
-  if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
-  const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+  const startStr = todayLocalStr()
+  const endStr = addMonthsClamped(startDate, duration)
 
   // dezactiveaza abonamentul vechi INAINTE de a activa cel nou
   await supabase.from('subscriptions')
@@ -281,58 +255,6 @@ const PR_CATEGORII = {
 }
 
 
-function fmt(s) {
-  const m = Math.floor(Math.abs(s) / 60)
-  const sec = Math.abs(s) % 60
-  return m + ':' + String(sec).padStart(2, '0')
-}
-
-function secToTime(sec) {
-  const s = Math.round(sec)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const ss = s % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
-  return `${m}:${String(ss).padStart(2, '0')}`
-}
-function timeToSec(str) {
-  if (!str) return null
-  const parts = String(str).trim().split(':').map(Number)
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  if (parts.length === 2) return parts[0] * 60 + parts[1]
-  return parseFloat(str) || null
-}
-const KG_TO_LBS = 2.20462
-function convertWeight(value, fromUnit, toUnit) {
-  if (value == null || fromUnit === toUnit) return value
-  if (fromUnit === 'kg' && toUnit === 'lbs') return Math.round(value * KG_TO_LBS * 2) / 2
-  if (fromUnit === 'lbs' && toUnit === 'kg') return Math.round(value / KG_TO_LBS * 2) / 2
-  return value
-}
-function formatPR(pr, preferredUnit) {
-  if (pr.unit === 'timp') {
-    if (!pr.value && pr.value !== 0) return '—'
-    const v = String(pr.value)
-    // valoare veche stocată ca "4:22" sau nouă ca secunde
-    if (v.includes(':')) return v
-    const sec = parseFloat(v)
-    return isNaN(sec) ? v : secToTime(sec)
-  }
-  const isWeight = pr.unit === 'kg' || pr.unit === 'lbs'
-  const unit = isWeight && preferredUnit ? preferredUnit : pr.unit
-  const value = isWeight && preferredUnit ? convertWeight(pr.value, pr.unit, preferredUnit) : pr.value
-  if (value && (pr.unit === 'm' || pr.unit === 'cal')) return `${value} ${pr.unit}` + (pr.time_result ? ` — ${pr.time_result}` : '')
-  if (value && pr.reps) return `${value} ${unit} × ${pr.reps}rep`
-  if (value) return `${value} ${unit}`
-  if (pr.reps) return `${pr.reps} reps`
-  return '—'
-}
-
-function getInitiale(name) {
-  if (!name) return '??'
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-}
-
 function AvatarCircle({ name, avatarUrl, size = 38 }) {
   const culori = ['#f0f0f0', '#f0f0f0', '#FAEEDA', '#E6F1FB', '#FCE8E8']
   const textCulori = ['#0E0E0E', '#0E0E0E', '#633806', '#0C447C', '#791F1F']
@@ -350,19 +272,6 @@ function AvatarCircle({ name, avatarUrl, size = 38 }) {
 const NIVEL_DOT_COLORS = { RX: '#E8591A', Intermediate: '#F0B429', Beginner: '#2FA84F', OnRamp: '#2F6FED' }
 function LevelDot({ nivel, size = 10 }) {
   return <span style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: NIVEL_DOT_COLORS[nivel] || '#ccc', flexShrink: 0, verticalAlign: 'middle' }} />
-}
-
-function parseWodMinute(durataStr) {
-  if (!durataStr) return null
-  const match = durataStr.match(/(\d+)/)
-  return match ? parseInt(match[1]) : null
-}
-
-function formatWodDurata(durataStr) {
-  if (!durataStr) return ''
-  if (/^\d+:\d+$/.test(durataStr.trim())) return durataStr.trim()
-  const mins = parseWodMinute(durataStr)
-  return mins != null ? `${mins}:00` : durataStr
 }
 
 function NavBarDebug({ navRef }) {
@@ -1557,15 +1466,10 @@ function Admin({ showToast, onWodChanged }) {
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
-    const pad = n => String(n).padStart(2, '0')
     const startDate = new Date()
-    const startStr = `${startDate.getFullYear()}-${pad(startDate.getMonth()+1)}-${pad(startDate.getDate())}`
+    const startStr = todayLocalStr()
     const duration = aboQueued.subscription_plans?.duration_months || 1
-    const endDate = new Date(startDate)
-    const targetMonth = endDate.getMonth() + duration
-    endDate.setMonth(targetMonth)
-    if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
-    const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+    const endStr = addMonthsClamped(startDate, duration)
     await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', memberEmail).eq('is_active', true).neq('id', aboQueued.id)
     const { error } = await supabase.from('subscriptions').update({
       is_active: true, queued: false, start_date: startStr, end_date: endStr, sessions_used: 0,
@@ -1763,9 +1667,7 @@ function Admin({ showToast, onWodChanged }) {
     setSavingAbonament(true)
     const emailNorm = emailAbonament.toLowerCase().trim()
     const plan = planuri.find(p => p.id === planSelectat)
-    const pad = n => String(n).padStart(2, '0')
-    const _az = new Date()
-    const azStr = `${_az.getFullYear()}-${pad(_az.getMonth()+1)}-${pad(_az.getDate())}`
+    const azStr = todayLocalStr()
 
     // verifica daca membrul are deja abonament valid (deja inceput, neexpirat, cu sedinte ramase)
     const { data: existingActive } = await supabase.from('subscriptions')
@@ -1802,11 +1704,7 @@ function Admin({ showToast, onWodChanged }) {
     } else {
       // nu are abonament valid — activeaza imediat
       await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', emailNorm).eq('is_active', true)
-      const endDate = new Date(dataStartAbonament + 'T00:00:00')
-      const targetMonth = endDate.getMonth() + (plan?.duration_months || 1)
-      endDate.setMonth(targetMonth)
-      if (endDate.getMonth() !== targetMonth % 12) endDate.setDate(0)
-      const endDateStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}`
+      const endDateStr = addMonthsClamped(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
       const { error } = await supabase.from('subscriptions').insert({
         member_email: emailNorm,
         plan_id: planSelectat,
@@ -1954,7 +1852,7 @@ function Admin({ showToast, onWodChanged }) {
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
             const aboQueued = getQueuedAbonamentClient(c.email)
-            const zileRamase = abo ? Math.round((new Date(abo.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / (1000 * 60 * 60 * 24)) : null
+            const zileRamase = abo ? daysUntil(abo.end_date) : null
             const sedinteEpuizate = abo?.sessions_total != null && Math.max(0, abo.sessions_total - (abo.sessions_used || 0)) === 0
             const neInceput = abo ? new Date(abo.start_date + 'T00:00:00') > new Date() : false
             const expirat = (zileRamase !== null && zileRamase < 0) || sedinteEpuizate
@@ -2201,7 +2099,7 @@ function Admin({ showToast, onWodChanged }) {
                   const queued = list.filter(a => a.queued)
                   const membruNume = clienti.find(c => c.email?.toLowerCase() === email)?.full_name
                   const expanded = !!aboExpandat[email]
-                  const zileRamase = activ ? Math.round((new Date(activ.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000) : null
+                  const zileRamase = activ ? daysUntil(activ.end_date) : null
                   const epuizat = activ && activ.sessions_total != null && Math.max(0, activ.sessions_total - (activ.sessions_used || 0)) === 0
                   const neinceput = activ && new Date(activ.start_date + 'T00:00:00') > new Date()
                   const expirat = activ && (zileRamase < 0 || epuizat)
@@ -3995,7 +3893,7 @@ function App() {
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
         const claseZi = claseDB.filter(c => c.date === dataAcasa).sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''))
-        const zileRamase = abonamentReal ? Math.max(0, Math.round((new Date(abonamentReal.end_date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000)) : 0
+        const zileRamase = abonamentReal ? Math.max(0, daysUntil(abonamentReal.end_date)) : 0
         const sessTotal = abonamentReal?.sessions_total
         const sessUsed = abonamentReal?.sessions_used || 0
         const progres = sessTotal ? Math.min(1, sessUsed / sessTotal) : 0
