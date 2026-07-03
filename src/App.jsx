@@ -437,7 +437,7 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
       ref={navRef}
       className="flex w-full flex-shrink-0 flex-col border-t border-gray-200 bg-white"
     >
-      <div className="flex items-center justify-around" style={{ paddingTop: '14px', paddingBottom: '14px' }}>
+      <div className="flex items-center justify-around" style={{ paddingTop: '10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}>
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = screen === id
           const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
@@ -460,7 +460,6 @@ function NavBar({ screen, setScreen, isAdmin, feedUnread }) {
           )
         })}
       </div>
-      <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
     </nav>
     </>
   )
