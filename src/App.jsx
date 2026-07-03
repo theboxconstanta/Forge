@@ -1,7 +1,12 @@
 ﻿// @ts-nocheck
 /* eslint-disable */
 import { useState, useEffect, useRef, useMemo, Component } from 'react'
-import { Home, PenLine, Trophy, Medal, MessageCircle, Settings } from 'lucide-react'
+import {
+  Home, PenLine, Trophy, Medal, MessageCircle, Settings,
+  Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
+  Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
+  RotateCw, Clock, Mars, Venus,
+} from 'lucide-react'
 import { supabase } from './supabase'
 
 class ErrorBoundary extends Component {
@@ -12,7 +17,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) return (
       <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
         <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚠️</div>
+          <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AlertTriangle size={40} color="#E24B4A" strokeWidth={1.75} /></div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px' }}>Ceva a mers greșit</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Încearcă să reîmprospătezi pagina.</div>
           <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
@@ -586,10 +591,10 @@ function Timer({ onBack, defaultFortime }) {
   const intervalRef = useRef(null)
   const countdownRef = useRef(null)
   const moduri = [
-    { id: 'fortime', icon: '⏱️', lbl: 'For Time' },
-    { id: 'amrap', icon: '🔄', lbl: 'AMRAP' },
-    { id: 'emom', icon: '⏲️', lbl: 'EMOM' },
-    { id: 'tabata', icon: '🔥', lbl: 'Tabata' },
+    { id: 'fortime', icon: TimerIcon, lbl: 'For Time' },
+    { id: 'amrap', icon: RotateCw, lbl: 'AMRAP' },
+    { id: 'emom', icon: Clock, lbl: 'EMOM' },
+    { id: 'tabata', icon: Flame, lbl: 'Tabata' },
   ]
   const getSec = () => {
     if (mod === 'fortime') return config.fortime * 60
@@ -660,13 +665,13 @@ function Timer({ onBack, defaultFortime }) {
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E' }}>Timer ⏱️</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>Timer <TimerIcon size={20} color="#0E0E0E" strokeWidth={2} /></h1>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
         {moduri.map(m => (
           <div key={m.id} onClick={() => setMod(m.id)}
             style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: mod === m.id ? '#f0f0f0' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-            <div style={{ fontSize: '18px' }}>{m.icon}</div>
+            <m.icon size={18} color={mod === m.id ? '#0E0E0E' : '#888'} strokeWidth={2} />
             <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#0E0E0E' : '#888' }}>{m.lbl}</div>
           </div>
         ))}
@@ -758,8 +763,9 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'tabata' && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>Runda {tabataRunda} / {config.tabataRunde}</div>
-              <div style={{ display: 'inline-block', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
-                {tabataFaza === 'lucru' ? `🔥 LUCRU — ${config.tabataLucru} sec` : `😴 ODIHNĂ — ${config.tabataOdihna} sec`}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
+                {tabataFaza === 'lucru' ? <Flame size={13} color="#791F1F" /> : <span>😴</span>}
+                {tabataFaza === 'lucru' ? `LUCRU — ${config.tabataLucru} sec` : `ODIHNĂ — ${config.tabataOdihna} sec`}
               </div>
             </div>
           )}
@@ -772,7 +778,7 @@ function Timer({ onBack, defaultFortime }) {
             </svg>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
               <div style={{ fontSize: '44px', fontWeight: '700', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
-              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px' }}>GATA! 💪</div>}
+              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>GATA! <Dumbbell size={15} color="#0E0E0E" /></div>}
               {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>în desfășurare</div>}
               {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? 'apasă ▶ start' : 'pauză'}</div>}
             </div>
@@ -881,7 +887,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0E0E0E' }}>Clasament 🏅</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>Clasament <Medal size={20} color="#0E0E0E" strokeWidth={2} /></h1>
         <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#FFFFFF', borderRadius: '12px', padding: '8px 12px' }}>
@@ -897,13 +903,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[
-          { id: 'toti', label: 'Toți', icon: '👥' },
-          { id: 'masculin', label: 'Masculin', icon: '♂️' },
-          { id: 'feminin', label: 'Feminin', icon: '♀️' },
+          { id: 'toti', label: 'Toți', icon: Users },
+          { id: 'masculin', label: 'Masculin', icon: Mars },
+          { id: 'feminin', label: 'Feminin', icon: Venus },
         ].map(g => (
           <div key={g.id} onClick={() => setGenderTab(g.id)}
             style={{ padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#0E0E0E' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#0E0E0E' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {g.icon} {g.label}
+            <g.icon size={13} color={genderTab === g.id ? '#fff' : '#888'} /> {g.label}
           </div>
         ))}
       </div>
@@ -912,7 +918,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
         <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
       ) : totalLogs === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
-          <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏁</div>
+          <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Flag size={36} color="#ccc" strokeWidth={1.5} /></div>
           <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>Niciun rezultat încă</div>
           <div style={{ fontSize: '12px', color: '#aaa' }}>Fii primul care loghează azi!</div>
         </div>
@@ -934,7 +940,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                     {sectionLogs.length} {sectionLogs.length === 1 ? (genderTab === 'feminin' ? 'participantă' : 'participant') : (genderTab === 'feminin' ? 'participante' : 'participanți')}
                   </div>
                   {isForTime && (
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>⏱️ for time</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
                   )}
                   {!isForTime && sectionLogs.some(l => l.result) && (
                     <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>🔄 AMRAP</div>
@@ -943,14 +949,14 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                 {/* Carduri participanți */}
                 {sectionLogs.map((log, i) => {
                   const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || 'Anonim'
-                  const podium = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+                  const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
                   const result = log.time_result || log.result || '—'
                   const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
                   return (
                     <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ fontSize: podium ? '22px' : '13px', fontWeight: '700', color: '#888', minWidth: '30px', textAlign: 'center' }}>
-                          {podium || `#${i + 1}`}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
+                          {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888' }}>#{i + 1}</span>}
                         </div>
                         <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                         <div style={{ flex: 1 }}>
@@ -1115,7 +1121,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>Feed 👥</h1>
+      <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>Feed <MessageCircle size={20} color="#0E0E0E" strokeWidth={2} /></h1>
 
       {/* Membrii comunitatii */}
       {membriComunitate.length > 0 && (
@@ -1151,7 +1157,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
         <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
       ) : posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
-          <div style={{ fontSize: '36px', marginBottom: '10px' }}>👥</div>
+          <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><MessageCircle size={36} color="#ccc" strokeWidth={1.5} /></div>
           <div style={{ fontSize: '14px', color: '#888' }}>Nicio postare încă. Fii primul!</div>
         </div>
       ) : posts.map(post => {
@@ -1902,10 +1908,10 @@ function Admin({ showToast, onWodChanged }) {
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', emoji: '👥', lbl: 'Clienți' }, { id: 'abonamente', emoji: '🎟️', lbl: 'Abonamente' }, { id: 'clase', emoji: '📅', lbl: 'Clase' }, { id: 'wod', emoji: '🏋️', lbl: 'WOD' }, { id: 'planuri', emoji: '📋', lbl: 'Planuri' }, { id: 'setari', emoji: '⚙️', lbl: 'Setări' }].map(t => (
+        {[{ id: 'clienti', icon: Users, lbl: 'Clienți' }, { id: 'abonamente', icon: Ticket, lbl: 'Abonamente' }, { id: 'clase', icon: Calendar, lbl: 'Clase' }, { id: 'wod', icon: Dumbbell, lbl: 'WOD' }, { id: 'planuri', icon: ClipboardList, lbl: 'Planuri' }, { id: 'setari', icon: Settings, lbl: 'Setări' }].map(t => (
           <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#0E0E0E' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-            {t.emoji}{adminTab === t.id ? ` ${t.lbl}` : ''}
+            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#0E0E0E' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            <t.icon size={13} color={adminTab === t.id ? '#fff' : '#888'} />{adminTab === t.id ? ` ${t.lbl}` : ''}
           </div>
         ))}
       </div>
@@ -1922,10 +1928,11 @@ function Admin({ showToast, onWodChanged }) {
             {[
               { id: 'toti', lbl: 'Toți', count: clienti.filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())).length },
               { id: 'activi', lbl: '✓ Activi', count: clienti.filter(c => esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
-              { id: 'inactivi', lbl: '⚠️ Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
+              { id: 'inactivi', lbl: 'Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
             ].map(s => (
               <div key={s.id} onClick={() => setSortClienti(s.id)}
                 style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#0E0E0E' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                {s.id === 'inactivi' && <AlertTriangle size={11} color={sortClienti === s.id ? '#fff' : '#888'} />}
                 {s.lbl}
                 <span style={{ background: sortClienti === s.id ? 'rgba(255,255,255,0.25)' : '#f0f0f0', color: sortClienti === s.id ? '#fff' : '#888', borderRadius: '10px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{s.count}</span>
               </div>
@@ -1936,7 +1943,7 @@ function Admin({ showToast, onWodChanged }) {
           </div>
           {clientiFiltrati.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>👥</div>
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Users size={32} color="#ccc" strokeWidth={1.5} /></div>
               {clienti.length === 0 ? 'Niciun client înregistrat încă' : 'Niciun rezultat găsit'}
             </div>
           ) : clientiFiltrati.map(c => {
@@ -1958,15 +1965,15 @@ function Admin({ showToast, onWodChanged }) {
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#f0f0f0', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#0E0E0E' : '#0E0E0E', fontWeight: '500' }}>
-                          {sedinteEpuizate ? '⚠️ Epuizat' : expirat ? '⚠️ Expirat' : neInceput ? `📅 Din ${new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
+                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#f0f0f0', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#0E0E0E' : '#0E0E0E', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          {sedinteEpuizate ? <><AlertTriangle size={10} /> Epuizat</> : expirat ? <><AlertTriangle size={10} /> Expirat</> : neInceput ? <><Calendar size={10} /> Din {new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}</> : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
                         {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} șed.</span>}
                       </div>
                     )}
                     {!abo && !aboQueued && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Fără abonament</div>}
-                    {!abo && aboQueued && <div style={{ fontSize: '10px', color: '#5B7FCC', marginTop: '2px', fontWeight: '600' }}>📅 Abonament programat</div>}
+                    {!abo && aboQueued && <div style={{ fontSize: '10px', color: '#5B7FCC', marginTop: '2px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}><Calendar size={10} /> Abonament programat</div>}
                   </div>
                 </div>
                 {isOpen && (
@@ -2036,7 +2043,7 @@ function Admin({ showToast, onWodChanged }) {
                     ) : null}
                     {aboQueued && (
                       <div style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', borderLeft: '3px solid #5B7FCC' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px' }}>📅 ABONAMENT PROGRAMAT</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> ABONAMENT PROGRAMAT</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                           <span style={{ color: '#888' }}>Plan</span>
                           <span style={{ fontWeight: '600' }}>{aboQueued.subscription_plans?.name || '—'}</span>
@@ -2052,8 +2059,8 @@ function Admin({ showToast, onWodChanged }) {
                         </div>
                         {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{aboQueued.notes}</div>}
                         <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email) }}
-                          style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                          ⚡ Activează acum
+                          style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                          <Zap size={13} /> Activează acum
                         </button>
                       </div>
                     )}
@@ -2066,7 +2073,7 @@ function Admin({ showToast, onWodChanged }) {
                     <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #f0c0c0' }} onClick={e => e.stopPropagation()}>
                       {deleteClientConfirm === c.id ? (
                         <div style={{ background: '#FCEBEB', borderRadius: '10px', padding: '12px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>⚠️ Ștergere definitivă</div>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Ștergere definitivă</div>
                           <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>
                             Se șterge complet contul lui <strong>{c.full_name || c.email}</strong>: profil, rezervări, abonamente, PR-uri, postări din Feed. Acțiunea este ireversibilă.
                             Pentru confirmare, scrie emailul clientului: <strong>{c.email}</strong>
@@ -2133,8 +2140,9 @@ function Admin({ showToast, onWodChanged }) {
                 return ce && ce !== emailTastat && levenshtein(ce, emailTastat) <= 3
               })
               return similar ? (
-                <div style={{ fontSize: '11px', color: '#BA7517', background: '#FAEEDA', borderRadius: '8px', padding: '6px 10px', marginBottom: '6px' }}>
-                  ⚠️ Email similar cu <strong>{similar.email}</strong> ({similar.full_name}). Verifică dacă e corect.
+                <div style={{ fontSize: '11px', color: '#BA7517', background: '#FAEEDA', borderRadius: '8px', padding: '6px 10px', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                  <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span>Email similar cu <strong>{similar.email}</strong> ({similar.full_name}). Verifică dacă e corect.</span>
                 </div>
               ) : null
             })()}
@@ -2160,8 +2168,9 @@ function Admin({ showToast, onWodChanged }) {
               const diff = parseFloat(pretPlatit) - planStd.price
               if (diff === 0) return <div style={{ fontSize: '11px', color: '#0E0E0E', marginBottom: '10px' }}>✓ Suma corespunde prețului standard</div>
               return (
-                <div style={{ fontSize: '11px', color: diff < 0 ? '#E24B4A' : '#BA7517', marginBottom: '10px' }}>
-                  {diff < 0 ? `⚠️ Cu ${Math.abs(diff)} RON mai puțin decât prețul standard (${planStd.price} RON)` : `ℹ️ Cu ${diff} RON mai mult decât prețul standard (${planStd.price} RON)`}
+                <div style={{ fontSize: '11px', color: diff < 0 ? '#E24B4A' : '#BA7517', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {diff < 0 ? <AlertTriangle size={11} /> : <Info size={11} />}
+                  {diff < 0 ? `Cu ${Math.abs(diff)} RON mai puțin decât prețul standard (${planStd.price} RON)` : `Cu ${diff} RON mai mult decât prețul standard (${planStd.price} RON)`}
                 </div>
               )
             })()}
@@ -2211,8 +2220,8 @@ function Admin({ showToast, onWodChanged }) {
                         <div style={{ borderTop: '1px solid #f0f0f0', padding: '10px 14px 14px' }}>
                           {activ ? (
                             <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#FFFFFF', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px' }}>
-                                {expirat ? '⚠️ EXPIRAT' : neinceput ? '📅 NEÎNCEPUT' : '✓ ACTIV'}
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {expirat ? <><AlertTriangle size={11} /> EXPIRAT</> : neinceput ? <><Calendar size={11} /> NEÎNCEPUT</> : '✓ ACTIV'}
                               </div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{activ.subscription_plans?.name}</div>
                               <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>{fmtData(activ.start_date)} → {fmtData(activ.end_date)}</div>
@@ -2236,13 +2245,13 @@ function Admin({ showToast, onWodChanged }) {
                           )}
                           {queued.map(q => (
                             <div key={q.id} style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginTop: '8px', borderLeft: '3px solid #5B7FCC' }}>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px' }}>📅 PROGRAMAT</div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> PROGRAMAT</div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{q.subscription_plans?.name}</div>
                               {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Ședințe: {q.sessions_total}</div>}
                               {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
                               <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                                 <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email) }}
-                                  style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>⚡ Activează acum</button>
+                                  style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Zap size={12} /> Activează acum</button>
                                 <button onClick={e => { e.stopPropagation(); stergeAbonament(q.id) }}
                                   style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                               </div>
@@ -2390,7 +2399,7 @@ function Admin({ showToast, onWodChanged }) {
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
-                            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer' }}>👥</button>
+                            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Users size={13} color="#0E0E0E" /></button>
                           <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                           <button onClick={() => { if (window.confirm(`Ștergi toate clasele viitoare „${c.name}" ${c.start_time?.slice(0,5)}?`)) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ serie</button>
                         </div>
@@ -2521,7 +2530,7 @@ function Admin({ showToast, onWodChanged }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📅 {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
                   {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px' }}>🔴 {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
@@ -2577,7 +2586,7 @@ function Admin({ showToast, onWodChanged }) {
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E' }}>📊 Rapoarte</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> Rapoarte</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' })}</div>
               <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
@@ -2586,12 +2595,12 @@ function Admin({ showToast, onWodChanged }) {
           {rapoarteData ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               {[
-                { label: 'Membri activi', value: rapoarteData.membriActivi, icon: '👥', color: '#5B7FCC', bg: '#EEF2FF' },
-                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: '🎟️', color: '#0E0E0E', bg: '#f0f0f0' },
-                { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: '💰', color: '#B86E00', bg: '#FFF8EC' },
-              ].map(({ label, value, icon, color, bg }) => (
+                { label: 'Membri activi', value: rapoarteData.membriActivi, icon: Users, color: '#5B7FCC', bg: '#EEF2FF' },
+                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: Ticket, color: '#0E0E0E', bg: '#f0f0f0' },
+                { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: Coins, color: '#B86E00', bg: '#FFF8EC' },
+              ].map(({ label, value, icon: Icon, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '20px', marginBottom: '4px' }}>{icon}</div>
+                  <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Icon size={20} color={color} strokeWidth={1.75} /></div>
                   <div style={{ fontSize: '22px', fontWeight: '800', color, lineHeight: 1 }}>{value}</div>
                   <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', lineHeight: '1.3' }}>{label}</div>
                 </div>
@@ -2780,7 +2789,7 @@ function JurnalList({ logs, onEdit, onDelete }) {
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
               {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
-              {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>⏱ {w.time_result}</span>}
+              {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
               {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
             </div>
             {isOpen && (
@@ -3812,7 +3821,7 @@ function App() {
   if (authLoading) return (
     <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏋️</div>
+        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Dumbbell size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
         <div style={{ fontSize: '14px', color: '#888' }}>Se încarcă...</div>
       </div>
     </div>
@@ -3945,7 +3954,7 @@ function App() {
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
-            <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
+            <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
               {!abonamentReal ? 'Niciun abonament activ'
                 : !abonamentInceput ? 'Abonament programat'
@@ -4095,7 +4104,7 @@ function App() {
                                 : peWaitlist
                                 ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>⏳ Așteptare</span>
                               : plin
-                                ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600' }}>🔒 Plin</span>
+                                ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> Plin</span>
                                 : <span style={{ fontSize: '11px', color: '#888' }}>{nrRez}/{c.max_spots} locuri</span>}
                             </div>
                           </div>
@@ -4225,7 +4234,7 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || 'Abonament'}</div>
-                    <div style={{ fontSize: '22px', marginTop: '4px' }}>💳</div>
+                    <div style={{ marginTop: '4px' }}><CreditCard size={22} color="#0E0E0E" strokeWidth={1.75} /></div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
@@ -4260,14 +4269,14 @@ function App() {
           </div>
           {!abonamentReal ? (
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>📋</div>
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><ClipboardList size={36} color="#0E0E0E" strokeWidth={1.5} /></div>
               <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>Niciun abonament activ</div>
               <div style={{ fontSize: '12px', color: '#888' }}>Contactează coachul pentru a adăuga un abonament.</div>
             </div>
           ) : !abonamentActiv ? (
             <div style={{ background: !abonamentInceput ? '#f0f0f0' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>
-                {!abonamentInceput ? '📅' : sedinteLimitate && sedinteRamase === 0 ? '🏁' : '🔒'}
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+                {!abonamentInceput ? <Calendar size={36} color="#0E0E0E" strokeWidth={1.5} /> : sedinteLimitate && sedinteRamase === 0 ? <Flag size={36} color="#0E0E0E" strokeWidth={1.5} /> : <Lock size={36} color="#0E0E0E" strokeWidth={1.5} />}
               </div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? 'Abonament programat'
@@ -4292,7 +4301,7 @@ function App() {
                 <span style={{ background: '#f0f0f0', color: '#0E0E0E', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>✓ Activ</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', color: '#888' }}>📅 Valabil</span>
+                <span style={{ fontSize: '12px', color: '#888', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> Valabil</span>
                 <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
                   {new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO')} – {new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}
                 </span>
@@ -4334,8 +4343,8 @@ function App() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div>
                             <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || 'CrossFit WOD'}</div>
-                            <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px' }}>
-                              📅 {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
+                            <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
                             <div style={{ fontSize: '11px', color: '#0E0E0E' }}>👤 {c.coach}</div>
                           </div>
@@ -4782,7 +4791,7 @@ function App() {
         return (
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Recorduri 🏆</h1>
+              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>Recorduri <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
               <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                 style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
                 + PR nou
@@ -4790,7 +4799,7 @@ function App() {
             </div>
             {prDate.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
-                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
+                <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Trophy size={36} color="#ccc" strokeWidth={1.5} /></div>
                 <div style={{ fontSize: '14px' }}>Niciun PR salvat încă</div>
               </div>
             )}
@@ -4984,7 +4993,7 @@ function App() {
           </div>
 
           <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginTop: '16px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <span>⏱️</span> Timer
+            <TimerIcon size={18} color="#ABE73C" strokeWidth={2} /> Timer
           </button>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
