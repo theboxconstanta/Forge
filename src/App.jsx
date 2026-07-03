@@ -978,7 +978,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   )
 }
 
-function Feed({ showToast, user, userProfile }) {
+function Feed({ showToast, user, userProfile, isAdmin }) {
   const [posts, setPosts] = useState([])
   const [reactions, setReactions] = useState({})
   const [comments, setComments] = useState({})
@@ -987,6 +987,7 @@ function Feed({ showToast, user, userProfile }) {
   const [posting, setPosting] = useState(false)
   const [comentariuDeschis, setComentariuDeschis] = useState(null)
   const [comentariuText, setComentariuText] = useState('')
+  const [confirmDeletePost, setConfirmDeletePost] = useState(null)
 
   const variantaColor = { 'OnRamp': '#0C447C', 'Beginner': '#0E0E0E', 'Intermediate': '#633806', 'RX': '#791F1F' }
   const variantaBg = { 'OnRamp': '#E6F1FB', 'Beginner': '#f0f0f0', 'Intermediate': '#FAEEDA', 'RX': '#FCEBEB' }
@@ -1078,6 +1079,13 @@ function Feed({ showToast, user, userProfile }) {
     }
   }
 
+  const stergePost = async (postId) => {
+    const { error } = await supabase.from('feed_posts').delete().eq('id', postId)
+    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    setConfirmDeletePost(null)
+    showToast('✓ Postare ștearsă')
+  }
+
   const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
     const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
@@ -1132,6 +1140,19 @@ function Feed({ showToast, user, userProfile }) {
                   )}
                 </div>
               </div>
+              {isAdmin && (
+                confirmDeletePost === post.id ? (
+                  <button onClick={() => stergePost(post.id)}
+                    style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
+                    Șterge?
+                  </button>
+                ) : (
+                  <button onClick={() => setConfirmDeletePost(post.id)}
+                    style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>
+                    ×
+                  </button>
+                )
+              )}
             </div>
             <div style={{ fontSize: '13px', color: '#0E0E0E', lineHeight: '1.5', marginBottom: '12px' }}>{post.text}</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: postComments.length > 0 ? '10px' : '0', flexWrap: 'wrap' }}>
@@ -1150,13 +1171,13 @@ function Feed({ showToast, user, userProfile }) {
               </button>
             </div>
             {postComments.length > 0 && (
-              <div style={{ borderTop: '1px solid #FFFFFF', paddingTop: '8px', marginBottom: '8px' }}>
+              <div style={{ borderTop: '1px solid #f5f5f5', paddingTop: '8px', marginBottom: '8px' }}>
                 {postComments.map((c, i) => {
                   const cName = c.profiles?.full_name || c.profiles?.email?.split('@')[0] || 'Membru'
                   return (
                     <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
                       <AvatarCircle name={cName} avatarUrl={c.profiles?.avatar_url} size={26} />
-                      <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '6px 10px', flex: 1 }}>
+                      <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '6px 10px', flex: 1 }}>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '2px' }}>{cName}</div>
                         <div style={{ fontSize: '12px', color: '#555' }}>{c.text}</div>
                       </div>
@@ -2948,10 +2969,9 @@ function App() {
     }
     if (screen === 'feed' && user) {
       setFeedUnread(0)
-      supabase.from('feed_posts').select('id, member_id').order('created_at', { ascending: false }).limit(200)
-        .then(({ data: posts }) => {
-          const cnt = (posts || []).filter(p => p.member_id !== user.id).length
-          localStorage.setItem('feed_seen_count_' + user.id, String(cnt))
+      supabase.from('feed_posts').select('created_at').order('created_at', { ascending: false }).limit(1)
+        .then(({ data }) => {
+          if (data && data[0]) localStorage.setItem('feed_last_seen_' + user.id, data[0].created_at)
         })
     }
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -2976,11 +2996,13 @@ function App() {
     if (!user) return
     const recalcFeedUnread = async () => {
       const { data: posts, error } = await supabase.from('feed_posts')
-        .select('id, member_id').order('created_at', { ascending: false }).limit(200)
+        .select('id, member_id, created_at').order('created_at', { ascending: false }).limit(200)
       if (error) { console.error('[Feed] query error:', error); return }
-      const othersTotal = (posts || []).filter(p => p.member_id !== user.id).length
-      const seenCount = parseInt(localStorage.getItem('feed_seen_count_' + user.id) || '0')
-      const unread = Math.max(0, othersTotal - seenCount)
+      // comparam dupa timestamp-ul ultimei postari vazute, nu dupa un numar
+      // de postari - un numar se poate strica daca se sterg postari intre
+      // timp (badge-ul de "necitit" reapare gresit), un timestamp nu.
+      const lastSeen = localStorage.getItem('feed_last_seen_' + user.id)
+      const unread = (posts || []).filter(p => p.member_id !== user.id && (!lastSeen || p.created_at > lastSeen)).length
       setFeedUnread(unread)
     }
     recalcFeedUnreadRef.current = recalcFeedUnread
@@ -4772,7 +4794,7 @@ function App() {
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
-      {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} />}
+      {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} />}
       {screen === 'admin' && isAdmin && <Admin showToast={showToast} user={user} />}
 
       {screen === 'profile' && (
