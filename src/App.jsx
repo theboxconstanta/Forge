@@ -1081,15 +1081,21 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   }
 
   const stergePost = async (postId) => {
-    const { error } = await supabase.from('feed_posts').delete().eq('id', postId)
+    // .select() dupa .delete() ca sa vedem CE s-a sters efectiv - fara el,
+    // o stergere blocata silentios de RLS (0 randuri afectate) nu e tratata
+    // ca eroare de Postgres/Supabase, si am arata "succes" fals fara sa
+    // stergem nimic (exact bug-ul gasit: politica RLS nu avea exceptie de admin).
+    const { data, error } = await supabase.from('feed_posts').delete().eq('id', postId).select()
     if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    if (!data || data.length === 0) { showToast('❌ Nu am putut șterge (verifică permisiunile RLS)'); return }
     setConfirmDeletePost(null)
     showToast('✓ Postare ștearsă')
   }
 
   const stergeComentariu = async (commentId) => {
-    const { error } = await supabase.from('feed_comments').delete().eq('id', commentId)
+    const { data, error } = await supabase.from('feed_comments').delete().eq('id', commentId).select()
     if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    if (!data || data.length === 0) { showToast('❌ Nu am putut șterge (verifică permisiunile RLS)'); return }
     setConfirmDeleteComment(null)
     showToast('✓ Comentariu șters')
   }
