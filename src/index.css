@@ -107,17 +107,17 @@ body {
    prin inset:0 -> 100% de la body (asta lasa un gap sub NavBar pe iOS
    standalone - vezi [[project-navbar-safe-area]]).
 
-   IMPORTANT, gasit dupa 4 incercari esuate: NavBar e position:fixed, care
-   se ancoreaza normal de fereastra reala - CU EXCEPTIA cazului in care un
-   parinte are `transform`, caz in care fixed se ancoreaza de parintele
-   transformat. La landscape, #root are `transform: rotate(-90deg)` (pt
-   rotatie) care, ca efect secundar, face NavBar sa se ancoreze de cutia
-   #root (corect dimensionata in dvh) in loc de fereastra reala (cea cu
-   bug-ul de masurare in standalone). Fara rotatie, portrait tot are nevoie
-   de UN transform pe #root (chiar daca vizual neutru) ca sa obtina acelasi
-   efect - simpla schimbare de height/position fara transform nu are niciun
-   efect asupra unde se ancoreaza NavBar, pentru ca fixed ignora inaltimea
-   parintelui daca parintele nu e si el un containing block. */
+   FARA transform pe #root (scos 2026-07-03): NavBar nu mai e position:fixed
+   de mult (e element normal in flexbox, in App.jsx) - transform-ul ramasese
+   aici doar ca sa il faca pe #root containing block pt elemente fixed, un
+   motiv care nu se mai aplica. Efect secundar REAL, descoperit abia acum:
+   orice alt element position:fixed;inset:0 din pagina (ecranul de login,
+   modale, toast) se ancora si el, din cauza acestui transform, de cutia
+   #root in loc de fereastra reala - daca #root avea o inaltime gresita
+   (bug de cold-start dvh), acele elemente ramaneau si ele trunchiate,
+   lasand un dreptunghi alb (fundalul implicit body/html) pe restul
+   ecranului. Fara transform, position:fixed;inset:0 se ancoreaza mereu
+   corect de fereastra reala, indiferent de inaltimea lui #root. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   body {
     overflow: hidden;
@@ -128,7 +128,6 @@ body {
     left: 0;
     width: 100%;
     height: var(--app-vh, 100dvh);
-    transform: translateZ(0);
     /* overflow:hidden (nu auto) - de cand scroll-ul real s-a mutat pe zona de
        continut din .app-frame (vezi App.jsx), #root nu mai are nevoie de
        propriul lui scroll. Lasat pe auto, iOS il considera un ancestor

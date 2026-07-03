@@ -16,20 +16,11 @@
     <style>
       /* CSS critic, inline: garanteaza ca #root are o inaltime + pozitionare
          definita chiar din primul randare, inainte ca index.css (fisier
-         extern) sa apuce sa se incarce.
-
-         Motiv real (gasit dupa ce bug-ul a reprodus si intr-un tab Safari
-         normal, nu doar PWA standalone): #root primeste transform (in
-         media query-ul de portrait din index.css) ca sa devina containing
-         block pt elementele position:fixed din pagina (inclusiv ecranul de
-         login). Daca acel CSS extern se incarca DUPA primul randare, exista
-         o fereastra in care transform-ul ar putea fi deja aplicat FARA ca
-         height-ul corect sa fie aplicat inca (sau invers) - orice element
-         fixed;inset:0 din pagina s-ar ancora atunci de o cutie #root prea
-         mica, lasand restul ecranului alb in loc de fundalul real al paginii.
-         Duplicam aici regula completa, ca sa nu existe niciodata o stare
-         partiala - odata ce index.css se incarca, regulile sunt identice,
-         nu se suprapun in conflict. */
+         extern) sa apuce sa se incarce - plasa de siguranta, identica cu
+         regula din index.css (fara transform - vezi index.css pt motivul
+         complet: transform pe #root facea din el containing block pt orice
+         position:fixed din pagina, inclusiv ecranul de login, care se putea
+         trunchia daca #root avea o inaltime gresita). */
       html, body, #root { height: 100%; }
       body { position: fixed; inset: 0; margin: 0; }
       @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
@@ -40,7 +31,6 @@
           left: 0;
           width: 100%;
           height: 100dvh;
-          transform: translateZ(0);
           overflow: hidden;
         }
       }
