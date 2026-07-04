@@ -3479,13 +3479,20 @@ function App() {
     if (data) setSkillLogs(data)
   }
 
-  const addSkillSet = (movement) => {
-    setSkillLogSets(prev => ({ ...prev, [movement]: [...(prev[movement] || []), ''] }))
+  const normalizeSkillSets = (sets) => {
+    const out = {}
+    Object.entries(sets || {}).forEach(([miscare, seturi]) => {
+      out[miscare] = (seturi || []).map(v => typeof v === 'string' ? { weight: v, reps: '' } : v)
+    })
+    return out
   }
-  const updateSkillSet = (movement, idx, value) => {
+  const addSkillSet = (movement) => {
+    setSkillLogSets(prev => ({ ...prev, [movement]: [...(prev[movement] || []), { weight: '', reps: '' }] }))
+  }
+  const updateSkillSet = (movement, idx, field, value) => {
     setSkillLogSets(prev => {
       const next = [...(prev[movement] || [])]
-      next[idx] = value
+      next[idx] = { ...next[idx], [field]: value }
       return { ...prev, [movement]: next }
     })
   }
@@ -3499,7 +3506,7 @@ function App() {
     // curatam seturile goale (miscari fara niciun set adaugat, sau intrari nescrise)
     const setsCurate = {}
     Object.entries(skillLogSets).forEach(([miscare, seturi]) => {
-      const valide = (seturi || []).filter(v => v.trim() !== '')
+      const valide = (seturi || []).filter(v => (v.weight || '').trim() !== '' || (v.reps || '').trim() !== '')
       if (valide.length > 0) setsCurate[miscare] = valide
     })
     const { error } = await supabase.from('skill_logs')
@@ -4422,13 +4429,20 @@ function App() {
                                 <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</div>
                                 {(logZiSkill?.sets?.[m] || []).length > 0 && (
                                   <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
-                                    {logZiSkill.sets[m].map((g, si) => `${t.skillLogSetLabel(si + 1)}: ${g}${userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}`).join(' · ')}
+                                    {logZiSkill.sets[m].map((set, si) => {
+                                      const unitate = userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'
+                                      const { reps, weight } = typeof set === 'string' ? { reps: '', weight: set } : set
+                                      const parti = []
+                                      if (reps) parti.push(`${reps} reps`)
+                                      if (weight) parti.push(`${weight}${unitate}`)
+                                      return `${t.skillLogSetLabel(si + 1)}: ${parti.join(' @ ')}`
+                                    }).join(' · ')}
                                   </div>
                                 )}
                               </div>
                             ))}
                           </div>
-                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(logZiSkill?.sets || {}); setPrevScreen('home'); setScreen('logSkill') }}
+                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSkillSets(logZiSkill?.sets)); setPrevScreen('home'); setScreen('logSkill') }}
                             style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                             {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
                           </button>
@@ -4832,10 +4846,13 @@ function App() {
             {(wodZiData?.skill || []).map((miscare, mi) => (
               <div key={mi} style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{miscare}</div>
-                {(skillLogSets[miscare] || []).map((greutate, si) => (
+                {(skillLogSets[miscare] || []).map((set, si) => (
                   <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: '#888', minWidth: '42px' }}>{t.skillLogSetLabel(si + 1)}</span>
-                    <input type="number" value={greutate} onChange={e => updateSkillSet(miscare, si, e.target.value)}
+                    <input type="number" value={set.reps || ''} onChange={e => updateSkillSet(miscare, si, 'reps', e.target.value)}
+                      placeholder={t.skillLogRepsPlaceholder}
+                      style={{ width: '70px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    <input type="number" value={set.weight || ''} onChange={e => updateSkillSet(miscare, si, 'weight', e.target.value)}
                       placeholder={userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}
                       style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                     <button onClick={() => removeSkillSet(miscare, si)}
