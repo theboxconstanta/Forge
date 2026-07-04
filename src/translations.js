@@ -301,6 +301,17 @@ export const TRANSLATIONS = {
     toastPrSaved: 'PR salvat! 🏆',
     toastDeleteExerciseError: '❌ Eroare la ștergere!',
     toastExerciseDeleted: '✓ Exercițiu șters',
+    toastHeroWodNameRequired: '❌ Dă un nume WOD-ului!',
+    toastHeroWodNameTaken: '❌ Există deja un Hero WOD cu acest nume!',
+    toastHeroWodUpdateError: '❌ Eroare!',
+    toastHeroWodUpdated: '✓ Hero WOD actualizat!',
+    toastHeroWodInsertError: '❌ Eroare!',
+    toastHeroWodSaved: 'Hero WOD salvat! 💪',
+
+    // Ecran global de eroare (ErrorBoundary - fara acces la starea App())
+    errorBoundaryTitle: 'Ceva a mers greșit',
+    errorBoundarySubtitle: 'Încearcă să reîmprospătezi pagina.',
+    errorBoundaryButton: 'Reîmprospătează',
 
     // Clasament (Leaderboard)
     clasamentTitle: 'Clasament',
@@ -634,6 +645,17 @@ export const TRANSLATIONS = {
     toastPrSaved: 'PR saved! 🏆',
     toastDeleteExerciseError: '❌ Delete failed!',
     toastExerciseDeleted: '✓ Exercise deleted',
+    toastHeroWodNameRequired: '❌ Give the WOD a name!',
+    toastHeroWodNameTaken: '❌ A Hero WOD with this name already exists!',
+    toastHeroWodUpdateError: '❌ Error!',
+    toastHeroWodUpdated: '✓ Hero WOD updated!',
+    toastHeroWodInsertError: '❌ Error!',
+    toastHeroWodSaved: 'Hero WOD saved! 💪',
+
+    // Ecran global de eroare (ErrorBoundary - fara acces la starea App())
+    errorBoundaryTitle: 'Something went wrong',
+    errorBoundarySubtitle: 'Try refreshing the page.',
+    errorBoundaryButton: 'Refresh',
 
     // Clasament (Leaderboard)
     clasamentTitle: 'Leaderboard',

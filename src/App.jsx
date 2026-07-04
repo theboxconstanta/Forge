@@ -21,18 +21,25 @@ class ErrorBoundary extends Component {
   static getDerivedStateFromError(error) { return { hasError: true, error } }
   componentDidCatch(error, info) { console.error('App crash:', error, info) }
   render() {
-    if (this.state.hasError) return (
-      <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
-        <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-          <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AlertTriangle size={40} color="#E24B4A" strokeWidth={1.75} /></div>
-          <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px' }}>Ceva a mers greșit</div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Încearcă să reîmprospătezi pagina.</div>
-          <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-            Reîmprospătează
-          </button>
+    if (this.state.hasError) {
+      // Fara acces la starea App() (crash-ul poate veni din App insusi) -
+      // aceeasi sursa ca fallback-ul pre-auth (vezi App(): useState lang).
+      const storedLang = localStorage.getItem('forge_lang')
+      const lang = (storedLang === 'ro' || storedLang === 'en') ? storedLang : (navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'ro')
+      const t = getT(lang)
+      return (
+        <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AlertTriangle size={40} color="#E24B4A" strokeWidth={1.75} /></div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px' }}>{t.errorBoundaryTitle}</div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>{t.errorBoundarySubtitle}</div>
+            <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              {t.errorBoundaryButton}
+            </button>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
     return this.props.children
   }
 }
@@ -3393,28 +3400,28 @@ function App() {
 
   const saveNewHeroWod = async () => {
     const name = newHeroWodName.trim()
-    if (!name) { showToast('❌ Dă un nume WOD-ului!'); return }
+    if (!name) { showToast(t.toastHeroWodNameRequired); return }
     const nameTaken = editHeroWodId
       ? customHeroWods.some(w => w.id !== editHeroWodId && w.name.toLowerCase() === name.toLowerCase())
       : !!heroWodsInfoAll[name]
-    if (nameTaken) { showToast('❌ Există deja un Hero WOD cu acest nume!'); return }
+    if (nameTaken) { showToast(t.toastHeroWodNameTaken); return }
     setNewHeroWodSaving(true)
     const payload = { name, format: composeHeroFormat(), movements: newHeroWodMiscari.join('\n') || null }
     if (editHeroWodId) {
       const { data, error } = await supabase.from('custom_hero_wods').update(payload).eq('id', editHeroWodId).select().single()
-      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      if (error) { showToast(t.toastHeroWodUpdateError); console.error(error) }
       else {
         setCustomHeroWods(prev => prev.map(w => w.id === editHeroWodId ? data : w))
-        showToast('✓ Hero WOD actualizat!')
+        showToast(t.toastHeroWodUpdated)
         setEditHeroWodId(null); resetNewHeroWodForm()
         setScreen('pr')
       }
     } else {
       const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, ...payload }).select().single()
-      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      if (error) { showToast(t.toastHeroWodInsertError); console.error(error) }
       else {
         setCustomHeroWods(prev => [...prev, data])
-        showToast('Hero WOD salvat! 💪')
+        showToast(t.toastHeroWodSaved)
         setMiscarePR(name); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
         resetNewHeroWodForm()
         setPrevScreen('pr'); setScreen('logPR')
