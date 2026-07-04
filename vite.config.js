@@ -2,8 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig({
+  // sourcemap:true e necesar ca sentryVitePlugin sa aiba ce incarca - fara el,
+  // Sentry primeste doar bundle-ul minificat si stack trace-urile raman ilizibile
+  // (pozitie in fisierul minificat, nu linia reala din App.jsx).
+  build: {
+    sourcemap: true,
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -51,6 +58,24 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         importScripts: ['/push-handler.js'],
+      },
+    }),
+    // Trebuie ultimul plugin din lista (recomandarea Sentry) - are nevoie sa
+    // vada bundle-ul final generat de celelalte plugin-uri ca sa poata
+    // rescrie/incarca source maps-urile corecte. Ruleaza doar cand
+    // SENTRY_AUTH_TOKEN e prezent (setat pe Vercel, nu si local) - fara el,
+    // pluginul se dezactiveaza singur (`disable`), buildul local ramane
+    // neschimbat. sourcemaps.filesToDeleteAfterUpload sterge .map-urile din
+    // dist dupa upload, ca sursa reala sa nu ajunga public-servita alaturi
+    // de bundle.
+    sentryVitePlugin({
+      org: 'forge-zw',
+      project: 'sentry-cyan-harbor',
+      url: 'https://de.sentry.io',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.js.map'],
       },
     }),
   ],
