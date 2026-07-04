@@ -481,7 +481,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder }) {
   )
 }
 
-function Timer({ onBack, defaultFortime }) {
+function Timer({ onBack, defaultFortime, t }) {
   const [mod, setMod] = useState('fortime')
   const [running, setRunning] = useState(false)
   const [secunde, setSecunde] = useState((defaultFortime || 15) * 60)
@@ -585,7 +585,7 @@ function Timer({ onBack, defaultFortime }) {
         <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           {mod === 'fortime' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Time cap</div><div style={{ fontSize: '11px', color: '#888' }}>Timp maxim</div></div>
+              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Time cap</div><div style={{ fontSize: '11px', color: '#888' }}>{t.timerTimeCapSubtitle}</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.max(1, p.fortime - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                 <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.fortime} min</span>
@@ -595,7 +595,7 @@ function Timer({ onBack, defaultFortime }) {
           )}
           {mod === 'amrap' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Durată AMRAP</div><div style={{ fontSize: '11px', color: '#888' }}>As Many Rounds As Possible</div></div>
+              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerAmrapDurationLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>As Many Rounds As Possible</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.max(1, p.amrap - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                 <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.amrap} min</span>
@@ -606,7 +606,7 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'emom' && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Durata totală</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerEmomTotalDurationLabel}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, emom: Math.max(1, p.emom - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.emom} min</span>
@@ -614,7 +614,7 @@ function Timer({ onBack, defaultFortime }) {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Interval</div><div style={{ fontSize: '11px', color: '#888' }}>Secunde per minut</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>{t.timerSecondsPerMinuteSubtitle}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.max(10, p.emomInterval - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.emomInterval}s</span>
@@ -626,7 +626,7 @@ function Timer({ onBack, defaultFortime }) {
           {mod === 'tabata' && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Runde</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 8</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerRoundsLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 8</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.max(1, p.tabataRunde - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '30px', textAlign: 'center' }}>{config.tabataRunde}</span>
@@ -634,7 +634,7 @@ function Timer({ onBack, defaultFortime }) {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Interval lucru</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 20 sec</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerWorkIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 20 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.max(5, p.tabataLucru - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{config.tabataLucru}s</span>
@@ -642,7 +642,7 @@ function Timer({ onBack, defaultFortime }) {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Interval odihnă</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 10 sec</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerRestIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 10 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.max(5, p.tabataOdihna - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{config.tabataOdihna}s</span>
@@ -655,22 +655,22 @@ function Timer({ onBack, defaultFortime }) {
       )}
       {countdown !== null && (
         <div style={{ background: '#0E0E0E', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', color: '#ABE73C', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pregătește-te!</div>
+          <div style={{ fontSize: '13px', color: '#ABE73C', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t.timerGetReady}</div>
           <div style={{ fontSize: '80px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>{countdown}</div>
           <div style={{ fontSize: '14px', color: '#ABE73C', marginTop: '8px' }}>
-            {countdown <= 3 ? ['', '🔴', '🟡', '🟢'][countdown] + ' ' : ''}{countdown === 1 ? 'Gata!' : countdown <= 3 ? countdown : 'secunde...'}
+            {countdown <= 3 ? ['', '🔴', '🟡', '🟢'][countdown] + ' ' : ''}{countdown === 1 ? t.timerCountdownGo : countdown <= 3 ? countdown : t.timerCountdownSeconds}
           </div>
         </div>
       )}
       {countdown === null && (
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-          {mod === 'emom' && <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>Minutul {minutEmom} / {config.emom}</div>}
+          {mod === 'emom' && <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>{t.timerEmomMinuteLabel(minutEmom, config.emom)}</div>}
           {mod === 'tabata' && (
             <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>Runda {tabataRunda} / {config.tabataRunde}</div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>{t.timerTabataRoundLabel(tabataRunda, config.tabataRunde)}</div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
                 {tabataFaza === 'lucru' ? <Flame size={13} color="#791F1F" /> : <span>😴</span>}
-                {tabataFaza === 'lucru' ? `LUCRU — ${config.tabataLucru} sec` : `ODIHNĂ — ${config.tabataOdihna} sec`}
+                {tabataFaza === 'lucru' ? t.timerWorkPhase(config.tabataLucru) : t.timerRestPhase(config.tabataOdihna)}
               </div>
             </div>
           )}
@@ -683,9 +683,9 @@ function Timer({ onBack, defaultFortime }) {
             </svg>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
               <div style={{ fontSize: '44px', fontWeight: '700', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
-              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>GATA! <Dumbbell size={15} color="#0E0E0E" /></div>}
-              {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>în desfășurare</div>}
-              {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? 'apasă ▶ start' : 'pauză'}</div>}
+              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>{t.timerDoneLabel} <Dumbbell size={15} color="#0E0E0E" /></div>}
+              {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t.timerInProgress}</div>}
+              {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? t.timerPressStart : t.timerPaused}</div>}
             </div>
           </div>
           {mod === 'emom' && (
@@ -695,7 +695,7 @@ function Timer({ onBack, defaultFortime }) {
           )}
           {mod === 'amrap' && (
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>RUNDE</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.timerRoundsCounterLabel}</div>
               <div style={{ fontSize: '42px', fontWeight: '700', color: '#0E0E0E' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
                 <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '18px', cursor: 'pointer' }}>−</button>
@@ -717,7 +717,7 @@ function Timer({ onBack, defaultFortime }) {
       )}
       {countdown !== null && (
         <button onClick={reset} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', cursor: 'pointer' }}>
-          Anulează
+          {t.timerCancel}
         </button>
       )}
     </div>
@@ -1177,7 +1177,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
+function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
@@ -1267,16 +1267,16 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
 
   const addCoach = async (memberId, email) => {
     const { error } = await supabase.from('coaches').insert({ id: memberId, email })
-    if (error) { showToast('❌ Eroare!'); console.error(error); return }
-    showToast('✓ Coach adăugat')
+    if (error) { showToast(t.toastGenericError); console.error(error); return }
+    showToast(t.toastCoachAdded)
     setCoachSearch('')
     fetchCoaches()
   }
 
   const removeCoach = async (memberId) => {
     const { error } = await supabase.from('coaches').delete().eq('id', memberId)
-    if (error) { showToast('❌ Eroare!'); console.error(error); return }
-    showToast('✓ Coach scos')
+    if (error) { showToast(t.toastGenericError); console.error(error); return }
+    showToast(t.toastCoachRemoved)
     fetchCoaches()
   }
 
@@ -1374,7 +1374,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const saveSettings = async () => {
     setSavingSettings(true)
     await supabase.from('app_settings').upsert({ key: 'cancel_window_hours', value: String(cancelWindowSetting), updated_at: new Date().toISOString() })
-    showToast('✓ Setări salvate!')
+    showToast(t.toastSettingsSaved)
     setSavingSettings(false)
   }
 
@@ -1411,12 +1411,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
     if (error) {
       await adjustMemberSessions(memberId, +1)
-      showToast('❌ Eroare!'); console.error(error); return
+      showToast(t.toastGenericError); console.error(error); return
     }
     const memberEmail = clienti.find(c => c.id === memberId)?.email?.toLowerCase()
     if (memberEmail) supabase.from('class_reminders').delete().eq('class_id', classId).eq('member_email', memberEmail)
     checkAndBookFromWaitlist(classId)
-    showToast('✓ Scos din clasă')
+    showToast(t.toastRemovedFromClass)
     fetchRezervariClasa(classId)
     fetchClase()
     const member = clienti.find(c => c.id === memberId)
@@ -1428,14 +1428,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
 
   const adminAdaugaInClasa = async (classId, memberId) => {
     const alreadyIn = (rezervariClasa[classId] || []).some(r => r.member_id === memberId)
-    if (alreadyIn) { showToast('❌ Deja rezervat!'); return }
+    if (alreadyIn) { showToast(t.toastAlreadyBooked); return }
     await adjustMemberSessions(memberId, +1)
     const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId })
     if (error) {
       await adjustMemberSessions(memberId, -1)
-      showToast('❌ Eroare!'); console.error(error); return
+      showToast(t.toastGenericError); console.error(error); return
     }
-    showToast('✓ Adăugat la clasă')
+    showToast(t.toastAddedToClass)
     const member = clienti.find(c => c.id === memberId)
     if (member?.email) {
       const memberEmail = member.email.toLowerCase()
@@ -1457,7 +1457,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const { error } = await supabase.from('bookings')
       .update({ checked_in: !currentValue })
       .eq('class_id', classId).eq('member_id', memberId)
-    if (error) { showToast('❌ Eroare!'); console.error(error); return }
+    if (error) { showToast(t.toastGenericError); console.error(error); return }
     setRezervariClasa(prev => ({
       ...prev,
       [classId]: (prev[classId] || []).map(r => r.member_id === memberId ? { ...r, checked_in: !currentValue } : r),
@@ -1467,9 +1467,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
     const newUsed = Math.max(0, Math.min(currentTotal ?? 9999, (currentUsed || 0) + delta))
     const { error } = await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', aboId)
-    if (error) { showToast('❌ Eroare la actualizare!'); return }
+    if (error) { showToast(t.toastUpdateError); return }
     setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
-    showToast(delta > 0 ? '✅ Sesiune adăugată!' : '✅ Sesiune scăzută!')
+    showToast(delta > 0 ? t.toastSessionAdded : t.toastSessionRemoved)
   }
 
   const adminStergeClient = async (client) => {
@@ -1483,12 +1483,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         body: JSON.stringify({ client_id: client.id }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok || json.error) throw new Error(json.error || 'Eroare la ștergere')
+      if (!res.ok || json.error) throw new Error(json.error || t.errorDeletingClient)
       setClienti(prev => prev.filter(c => c.id !== client.id))
       setClientSelectat(null)
       setDeleteClientConfirm(null)
       setDeleteClientEmailInput('')
-      showToast('✅ Client șters definitiv')
+      showToast(t.toastClientDeleted)
     } catch (e) {
       showToast('❌ ' + e.message)
     }
@@ -1504,8 +1504,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const { error } = await supabase.from('subscriptions').update({
       is_active: true, queued: false, start_date: startStr, end_date: endStr, sessions_used: 0,
     }).eq('id', aboQueued.id)
-    if (error) { showToast('❌ Eroare la activare!'); return }
-    showToast('✅ Abonament activat!')
+    if (error) { showToast(t.toastActivateError); return }
+    showToast(t.toastSubscriptionActivated)
     await fetchAbonamente()
   }
 
@@ -1539,18 +1539,18 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   }
 
   const saveClasa = async () => {
-    if (!dataClasa) { showToast('❌ Completează data!'); return }
-    if (repetitiva && zileRepetare.length === 0) { showToast('❌ Alege cel puțin o zi!'); return }
+    if (!dataClasa) { showToast(t.toastFillDate); return }
+    if (repetitiva && zileRepetare.length === 0) { showToast(t.toastPickAtLeastOneDay); return }
     setSavingClasa(true)
     const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null }
     const records = repetitiva
       ? genereazaDateRepetare().map(date => ({ ...baza, date }))
       : [{ ...baza, date: dataClasa }]
-    if (records.length === 0) { showToast('❌ Nicio dată generată!'); setSavingClasa(false); return }
+    if (records.length === 0) { showToast(t.toastNoDateGenerated); setSavingClasa(false); return }
     const { error } = await supabase.from('classes').insert(records)
-    if (error) { showToast('❌ ' + (error.message || 'Eroare!')); console.error(error) }
+    if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.errorWordExclaim)); console.error(error) }
     else {
-      showToast(repetitiva ? `✓ ${records.length} clase create!` : '✓ Clasă creată!')
+      showToast(repetitiva ? t.toastClassesCreated(records.length) : t.toastClassCreated)
       await fetchClase(); setDataClasa(''); setCoachClasa(''); setCuloarClasa(null)
     }
     setSavingClasa(false)
@@ -1600,8 +1600,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const { error } = await supabase.from('classes').delete()
       .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
       .gte('date', aziS)
-    if (error) showToast('❌ ' + error.message)
-    else showToast('✓ Seria ștearsă!')
+    if (error) showToast(t.toastGenericErrorWithFallback(error.message))
+    else showToast(t.toastSeriesDeleted)
     await fetchClase()
   }
 
@@ -1635,11 +1635,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
       }
     }
     await supabase.from('classes').delete().eq('id', id)
-    showToast('✓ Clasă ștearsă!'); await fetchClase()
+    showToast(t.toastClassDeleted); await fetchClase()
   }
 
   const saveWod = async () => {
-    if (!dataWod) { showToast('❌ Alege data!'); return }
+    if (!dataWod) { showToast(t.toastPickDate); return }
     setSavingWod(true)
     const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
@@ -1654,9 +1654,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
     const { error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId)
       : await supabase.from('wods').insert(payload)
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    if (error) { showToast(t.toastGenericError); console.error(error) }
     else {
-      showToast(editWodId ? '✓ WOD actualizat!' : '✓ WOD creat!')
+      showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
@@ -1689,11 +1689,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   const stergeWod = async (id) => {
     await supabase.from('wods').delete().eq('id', id)
     if (id === editWodId) cancelEditWod()
-    showToast('✓ WOD șters!'); await fetchWods(); onWodChanged?.()
+    showToast(t.toastWodDeletedAdmin); await fetchWods(); onWodChanged?.()
   }
 
   const saveAbonament = async () => {
-    if (!emailAbonament || !planSelectat) { showToast('❌ Completează emailul și planul!'); return }
+    if (!emailAbonament || !planSelectat) { showToast(t.toastFillEmailAndPlan); return }
     setSavingAbonament(true)
     const emailNorm = emailAbonament.toLowerCase().trim()
     const plan = planuri.find(p => p.id === planSelectat)
@@ -1725,9 +1725,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         queued: true,
         notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
       })
-      if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
+      if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
       else {
-        showToast('✓ Abonament programat! Va activa automat când cel curent se epuizează.')
+        showToast(t.toastSubscriptionQueued)
         await fetchAbonamente()
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
       }
@@ -1746,9 +1746,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         queued: false,
         notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
       })
-      if (error) { showToast('❌ ' + (error.message || 'Eroare necunoscută')); console.error(error) }
+      if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
       else {
-        showToast('✓ Abonament adăugat!')
+        showToast(t.toastSubscriptionAdded)
         await fetchAbonamente()
         setDataStartAbonament(azStr)
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
@@ -1760,26 +1760,26 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   }
 
   const savePlan = async () => {
-    if (!numePlan) { showToast('❌ Introdu numele!'); return }
+    if (!numePlan) { showToast(t.toastEnterName); return }
     setSavingPlan(true)
     const { error } = await supabase.from('subscription_plans').insert({
       name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : null, duration_months: durataPlan,
     })
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
-    else { showToast('✓ Plan adăugat!'); await fetchPlanuri(); setNumePlan(''); setSedintePlan(''); setPretPlan(''); setDurataPlan(1) }
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else { showToast(t.toastPlanAdded); await fetchPlanuri(); setNumePlan(''); setSedintePlan(''); setPretPlan(''); setDurataPlan(1) }
     setSavingPlan(false)
   }
 
   const stergePlan = async (id) => {
     await supabase.from('subscription_plans').update({ is_active: false }).eq('id', id)
-    showToast('✓ Plan șters!'); await fetchPlanuri()
+    showToast(t.toastPlanDeleted); await fetchPlanuri()
   }
 
   const stergeAbonament = async (id) => {
     const abo = abonamente.find(a => a.id === id)
     if (abo?.queued) {
       await supabase.from('subscriptions').delete().eq('id', id)
-      showToast('✓ Abonament programat șters!')
+      showToast(t.toastQueuedSubscriptionDeleted)
       await fetchAbonamente(); fetchRapoarte()
       return
     }
@@ -1803,7 +1803,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
       }
     }
     await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
-    showToast('✓ Abonament anulat și rezervările viitoare șterse!')
+    showToast(t.toastSubscriptionCancelled)
     setRezervariClasa({})
     await fetchAbonamente(); fetchRapoarte()
     if (abo?.member_email) {
@@ -1836,15 +1836,15 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E' }}>⚙️ Admin</h1>
-        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>{isAdmin ? 'ADMIN' : 'COACH'}</span>
+        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminHeaderTitle}</h1>
+        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>{isAdmin ? t.adminBadgeAdmin : t.adminBadgeCoach}</span>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', icon: Users, lbl: 'Clienți', adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: 'Abonamente', adminOnly: true }, { id: 'clase', icon: Calendar, lbl: 'Clase' }, { id: 'wod', icon: Dumbbell, lbl: 'WOD' }, { id: 'planuri', icon: ClipboardList, lbl: 'Planuri', adminOnly: true }, { id: 'setari', icon: Settings, lbl: 'Setări', adminOnly: true }].filter(t => !t.adminOnly || isAdmin).map(t => (
-          <div key={t.id} onClick={() => setAdminTab(t.id)}
-            style={{ flex: adminTab === t.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === t.id ? '600' : '400', background: adminTab === t.id ? '#0E0E0E' : '#fff', color: adminTab === t.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-            <t.icon size={13} color={adminTab === t.id ? '#fff' : '#888'} />{adminTab === t.id ? ` ${t.lbl}` : ''}
+        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }].filter(tab => !tab.adminOnly || isAdmin).map(tab => (
+          <div key={tab.id} onClick={() => setAdminTab(tab.id)}
+            style={{ flex: adminTab === tab.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === tab.id ? '600' : '400', background: adminTab === tab.id ? '#0E0E0E' : '#fff', color: adminTab === tab.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            <tab.icon size={13} color={adminTab === tab.id ? '#fff' : '#888'} />{adminTab === tab.id ? ` ${tab.lbl}` : ''}
           </div>
         ))}
       </div>
@@ -1854,14 +1854,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         <>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '16px' }}>🔍</span>
-            <input value={searchClienti} onChange={e => setSearchClienti(e.target.value)} placeholder="Caută după nume sau email..."
+            <input value={searchClienti} onChange={e => setSearchClienti(e.target.value)} placeholder={t.adminClientsSearchPlaceholder}
               style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
           </div>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
             {[
-              { id: 'toti', lbl: 'Toți', count: clienti.filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())).length },
-              { id: 'activi', lbl: '✓ Activi', count: clienti.filter(c => esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
-              { id: 'inactivi', lbl: 'Inactivi', count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
+              { id: 'toti', lbl: t.adminClientsFilterAll, count: clienti.filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())).length },
+              { id: 'activi', lbl: t.adminClientsFilterActive, count: clienti.filter(c => esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
+              { id: 'inactivi', lbl: t.adminClientsFilterInactive, count: clienti.filter(c => !esteClientActiv(c.email) && (!searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase()))).length },
             ].map(s => (
               <div key={s.id} onClick={() => setSortClienti(s.id)}
                 style={{ padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: sortClienti === s.id ? '600' : '400', background: sortClienti === s.id ? '#0E0E0E' : '#fff', color: sortClienti === s.id ? '#fff' : '#888', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -1872,12 +1872,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             ))}
           </div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
-            {sortClienti === 'toti' ? 'TOȚI CLIENȚII' : sortClienti === 'activi' ? 'ACTIVI' : 'INACTIVI'} ({clientiFiltrati.length})
+            {sortClienti === 'toti' ? t.adminClientsSectionAll : sortClienti === 'activi' ? t.adminClientsSectionActive : t.adminClientsSectionInactive} ({clientiFiltrati.length})
           </div>
           {clientiFiltrati.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Users size={32} color="#ccc" strokeWidth={1.5} /></div>
-              {clienti.length === 0 ? 'Niciun client înregistrat încă' : 'Niciun rezultat găsit'}
+              {clienti.length === 0 ? t.adminClientsEmptyRegistered : t.adminClientsEmptyFiltered}
             </div>
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
@@ -1894,29 +1894,29 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <AvatarCircle name={c.full_name || c.email} avatarUrl={c.avatar_url} size={42} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.full_name || 'Fără nume'}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.full_name || t.adminClientsNoName}</div>
                     <div style={{ fontSize: '11px', color: '#888' }}>{c.email}</div>
                     {abo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                         <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: expirat ? '#FCEBEB' : expiraCurand ? '#FAEEDA' : neInceput ? '#EEEDFB' : '#f0f0f0', color: expirat ? '#791F1F' : expiraCurand ? '#633806' : neInceput ? '#0E0E0E' : '#0E0E0E', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          {sedinteEpuizate ? <><AlertTriangle size={10} /> Epuizat</> : expirat ? <><AlertTriangle size={10} /> Expirat</> : neInceput ? <><Calendar size={10} /> Din {new Date(abo.start_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}</> : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}`}
+                          {sedinteEpuizate ? <><AlertTriangle size={10} /> {t.adminClientsExhausted}</> : expirat ? <><AlertTriangle size={10} /> {t.adminClientsExpired}</> : neInceput ? <><Calendar size={10} /> {t.adminClientsFromDate(new Date(abo.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit' }))}</> : expiraCurand ? `⏰ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit' })}` : `✓ ${new Date(abo.end_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit' })}`}
                         </span>
                         <span style={{ fontSize: '10px', color: '#888' }}>{abo.subscription_plans?.name}</span>
-                        {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} șed.</span>}
+                        {abo.sessions_total && <span style={{ fontSize: '10px', color: '#888' }}>· {(abo.sessions_used || 0)}/{abo.sessions_total} {t.adminClientsSessionsAbbrev}</span>}
                       </div>
                     )}
-                    {!abo && !aboQueued && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>Fără abonament</div>}
-                    {!abo && aboQueued && <div style={{ fontSize: '10px', color: '#5B7FCC', marginTop: '2px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}><Calendar size={10} /> Abonament programat</div>}
+                    {!abo && !aboQueued && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>{t.adminClientsNoSubscription}</div>}
+                    {!abo && aboQueued && <div style={{ fontSize: '10px', color: '#5B7FCC', marginTop: '2px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}><Calendar size={10} /> {t.adminClientsQueuedSubscription}</div>}
                   </div>
                 </div>
                 {isOpen && (
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                     {/* Profil complet */}
                     <div style={{ background: '#f8f8f8', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>PROFIL</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>{t.adminClientsProfileLabel}</div>
                       {(c.first_name || c.last_name) && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: '#888' }}>Prenume / Nume</span>
+                          <span style={{ color: '#888' }}>{t.adminClientsFirstLastName}</span>
                           <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{[c.first_name, c.last_name].filter(Boolean).join(' ')}</span>
                         </div>
                       )}
@@ -1924,42 +1924,42 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                         const varsta = Math.floor((new Date() - new Date(c.birth_date + 'T00:00:00')) / (365.25 * 24 * 3600 * 1000))
                         return (
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                            <span style={{ color: '#888' }}>Data nașterii</span>
-                            <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{new Date(c.birth_date + 'T00:00:00').toLocaleDateString('ro-RO')} ({varsta} ani)</span>
+                            <span style={{ color: '#888' }}>{t.adminClientsBirthDate}</span>
+                            <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{new Date(c.birth_date + 'T00:00:00').toLocaleDateString(localeFor(lang))} ({t.adminClientsAgeYears(varsta)})</span>
                           </div>
                         )
                       })()}
                       {c.gender && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: '#888' }}>Gen</span>
-                          <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{c.gender === 'masculin' ? '♂ Masculin' : '♀ Feminin'}</span>
+                          <span style={{ color: '#888' }}>{t.adminClientsGenderLabel}</span>
+                          <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{c.gender === 'masculin' ? t.adminClientsGenderMaleFull : t.adminClientsGenderFemaleFull}</span>
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                        <span style={{ color: '#888' }}>Waiver</span>
+                        <span style={{ color: '#888' }}>{t.adminClientsWaiverLabel}</span>
                         {c.waiver_accepted ? (
-                          <span style={{ fontWeight: '600', color: '#0E0E0E' }}>✓ Acceptat {c.waiver_accepted_at ? new Date(c.waiver_accepted_at).toLocaleDateString('ro-RO') : ''}</span>
+                          <span style={{ fontWeight: '600', color: '#0E0E0E' }}>{t.adminClientsWaiverAccepted(c.waiver_accepted_at ? new Date(c.waiver_accepted_at).toLocaleDateString(localeFor(lang)) : '')}</span>
                         ) : (
-                          <span style={{ fontWeight: '600', color: '#E24B4A' }}>✗ Neacceptat</span>
+                          <span style={{ fontWeight: '600', color: '#E24B4A' }}>{t.adminClientsWaiverNotAccepted}</span>
                         )}
                       </div>
                     </div>
                     {abo ? (
                       <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', marginBottom: '6px' }}>
-                          {sedinteEpuizate ? 'ABONAMENT EPUIZAT' : expirat ? 'ABONAMENT EXPIRAT' : neInceput ? 'ABONAMENT PROGRAMAT' : 'ABONAMENT ACTIV'}
+                          {sedinteEpuizate ? t.adminClientsSubExhausted : expirat ? t.adminClientsSubExpired : neInceput ? t.adminClientsSubScheduled : t.adminClientsSubActive}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: '#888' }}>Plan</span>
+                          <span style={{ color: '#888' }}>{t.adminClientsPlanLabel}</span>
                           <span style={{ fontWeight: '600' }}>{abo.subscription_plans?.name}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: '#888' }}>Expiră</span>
-                          <span style={{ fontWeight: '600', color: expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : '#0E0E0E' }}>{new Date(abo.end_date + 'T00:00:00').toLocaleDateString('ro-RO')}</span>
+                          <span style={{ color: '#888' }}>{t.adminClientsExpiresLabel}</span>
+                          <span style={{ fontWeight: '600', color: expirat ? '#E24B4A' : expiraCurand ? '#BA7517' : '#0E0E0E' }}>{new Date(abo.end_date + 'T00:00:00').toLocaleDateString(localeFor(lang))}</span>
                         </div>
                         {abo.sessions_total && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
-                            <span style={{ color: '#888' }}>Ședințe</span>
+                            <span style={{ color: '#888' }}>{t.adminClientsSessionsLabel}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#0E0E0E' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
                               <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
@@ -1976,40 +1976,40 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                     ) : null}
                     {aboQueued && (
                       <div style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', borderLeft: '3px solid #5B7FCC' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> ABONAMENT PROGRAMAT</div>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminClientsSubScheduled}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: '#888' }}>Plan</span>
+                          <span style={{ color: '#888' }}>{t.adminClientsPlanLabel}</span>
                           <span style={{ fontWeight: '600' }}>{aboQueued.subscription_plans?.name || '—'}</span>
                         </div>
                         {aboQueued.sessions_total && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                            <span style={{ color: '#888' }}>Ședințe</span>
+                            <span style={{ color: '#888' }}>{t.adminClientsSessionsLabel}</span>
                             <span style={{ fontWeight: '600' }}>{aboQueued.sessions_total}</span>
                           </div>
                         )}
                         <div style={{ fontSize: '11px', color: '#5B7FCC', marginTop: '4px', marginBottom: '8px' }}>
-                          Activare automată la epuizarea abonamentului curent
+                          {t.adminClientsAutoActivateNote}
                         </div>
                         {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{aboQueued.notes}</div>}
                         <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email) }}
                           style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                          <Zap size={13} /> Activează acum
+                          <Zap size={13} /> {t.adminClientsActivateNow}
                         </button>
                       </div>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); setAdminTab('abonamente'); setEmailAbonament(c.email); setNumeAbonament(c.full_name || '') }}
                       style={{ width: '100%', padding: '8px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                      {abo ? (aboQueued ? '➕ Abonament suplimentar' : '🔄 Reînnoiește abonament') : '+ Adaugă abonament'}
+                      {abo ? (aboQueued ? t.adminClientsAddSupplementary : t.adminClientsRenew) : t.adminClientsAddSubscription}
                     </button>
 
                     {/* Zonă periculoasă - ștergere definitivă cont */}
                     <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #f0c0c0' }} onClick={e => e.stopPropagation()}>
                       {deleteClientConfirm === c.id ? (
                         <div style={{ background: '#FCEBEB', borderRadius: '10px', padding: '12px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> Ștergere definitivă</div>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsDeleteTitle}</div>
                           <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>
-                            Se șterge complet contul lui <strong>{c.full_name || c.email}</strong>: profil, rezervări, abonamente, PR-uri, postări din Feed. Acțiunea este ireversibilă.
-                            Pentru confirmare, scrie emailul clientului: <strong>{c.email}</strong>
+                            {t.adminClientsDeleteWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsDeleteWarnSuffix}
+                            {t.adminClientsDeleteConfirmEmailPrompt} <strong>{c.email}</strong>
                           </div>
                           <input value={deleteClientEmailInput} onChange={e => setDeleteClientEmailInput(e.target.value)}
                             placeholder={c.email} autoFocus
@@ -2017,19 +2017,19 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button onClick={() => { setDeleteClientConfirm(null); setDeleteClientEmailInput('') }}
                               style={{ flex: 1, padding: '8px', background: '#fff', color: '#0E0E0E', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                              Anulează
+                              {t.adminClientsCancel}
                             </button>
                             <button disabled={deletingClient || deleteClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
                               onClick={() => adminStergeClient(c)}
                               style={{ flex: 1, padding: '8px', background: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#E24B4A' : '#f0b8b8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
-                              {deletingClient ? 'Se șterge...' : 'Șterge definitiv'}
+                              {deletingClient ? t.adminClientsDeleting : t.adminClientsDeletePermanently}
                             </button>
                           </div>
                         </div>
                       ) : (
                         <button onClick={() => { setDeleteClientConfirm(c.id); setDeleteClientEmailInput('') }}
                           style={{ width: '100%', padding: '8px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                          🗑️ Șterge clientul definitiv
+                          {t.adminClientsDeleteButtonFull}
                         </button>
                       )}
                     </div>
@@ -2045,19 +2045,19 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
       {adminTab === 'abonamente' && isAdmin && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ Abonament nou</div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Email atlet</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminSubsNewTitle}</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminSubsEmailLabel}</div>
             {(() => {
               const emailVal = emailAbonament.trim()
               const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)
               const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#0E0E0E' : '#E24B4A'
               return (
                 <>
-                  <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder="email@exemplu.com" type="email"
+                  <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder={t.adminSubsEmailPlaceholder} type="email"
                     list="clienti-emails-list"
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1.5px solid ${borderColor}`, fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
                   {emailVal.length > 0 && !emailValid && (
-                    <div style={{ fontSize: '11px', color: '#E24B4A', marginBottom: '4px' }}>Email invalid</div>
+                    <div style={{ fontSize: '11px', color: '#E24B4A', marginBottom: '4px' }}>{t.adminSubsEmailInvalid}</div>
                   )}
                 </>
               )
@@ -2075,12 +2075,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
               return similar ? (
                 <div style={{ fontSize: '11px', color: '#BA7517', background: '#FAEEDA', borderRadius: '8px', padding: '6px 10px', marginBottom: '6px', display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
                   <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <span>Email similar cu <strong>{similar.email}</strong> ({similar.full_name}). Verifică dacă e corect.</span>
+                  <span>{t.adminSubsSimilarEmailPrefix} <strong>{similar.email}</strong>{t.adminSubsSimilarEmailSuffix(similar.full_name)}</span>
                 </div>
               ) : null
             })()}
             <div style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Plan</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminSubsPlanLabel}</div>
             <select value={planSelectat} onChange={e => {
               setPlanSelectat(e.target.value)
               const p = planuri.find(p => p.id === e.target.value)
@@ -2088,31 +2088,31 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
               {planuri.map(p => <option key={p.id} value={p.id}>{p.name}{p.price != null ? ` — ${p.price} RON` : ''}</option>)}
             </select>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data start</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminSubsStartDateLabel}</div>
             <input type="date" value={dataStartAbonament} onChange={e => setDataStartAbonament(e.target.value)}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Sumă plătită (RON)</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminSubsAmountPaidLabel}</div>
             <input type="number" value={pretPlatit} onChange={e => setPretPlatit(e.target.value)}
-              placeholder={planuri.find(p => p.id === planSelectat)?.price != null ? `Standard: ${planuri.find(p => p.id === planSelectat).price} RON` : 'ex: 250'}
+              placeholder={planuri.find(p => p.id === planSelectat)?.price != null ? t.adminSubsStandardPricePlaceholder(planuri.find(p => p.id === planSelectat).price) : t.adminSubsAmountPlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
             {(() => {
               const planStd = planuri.find(p => p.id === planSelectat)
               if (!planStd?.price || !pretPlatit) return <div style={{ marginBottom: '10px' }} />
               const diff = parseFloat(pretPlatit) - planStd.price
-              if (diff === 0) return <div style={{ fontSize: '11px', color: '#0E0E0E', marginBottom: '10px' }}>✓ Suma corespunde prețului standard</div>
+              if (diff === 0) return <div style={{ fontSize: '11px', color: '#0E0E0E', marginBottom: '10px' }}>{t.adminSubsAmountMatches}</div>
               return (
                 <div style={{ fontSize: '11px', color: diff < 0 ? '#E24B4A' : '#BA7517', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {diff < 0 ? <AlertTriangle size={11} /> : <Info size={11} />}
-                  {diff < 0 ? `Cu ${Math.abs(diff)} RON mai puțin decât prețul standard (${planStd.price} RON)` : `Cu ${diff} RON mai mult decât prețul standard (${planStd.price} RON)`}
+                  {diff < 0 ? t.adminSubsAmountLess(Math.abs(diff), planStd.price) : t.adminSubsAmountMore(diff, planStd.price)}
                 </div>
               )
             })()}
             <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
-              {savingAbonament ? 'Se salvează...' : '+ Adaugă abonament'}
+              {savingAbonament ? t.adminSubsSaving : t.adminSubsAddButton}
             </button>
           </div>
           {(() => {
-            const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })
             const grouped = {}
             abonamente.forEach(a => {
               const key = a.member_email?.toLowerCase()
@@ -2122,7 +2122,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             const emails = Object.keys(grouped)
             return (
               <>
-                <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>ABONAMENTE — {emails.length} membri, {abonamente.length} total</div>
+                <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminSubsListHeader(emails.length, abonamente.length)}</div>
                 {emails.map(email => {
                   const list = grouped[email]
                   const activ = list.find(a => a.is_active && !a.queued)
@@ -2134,7 +2134,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                   const neinceput = activ && new Date(activ.start_date + 'T00:00:00') > new Date()
                   const expirat = activ && (zileRamase < 0 || epuizat)
                   const statusColor = !activ ? '#aaa' : expirat ? '#E24B4A' : neinceput ? '#BA7517' : '#0E0E0E'
-                  const statusLabel = !activ ? 'Fără abonament' : expirat ? 'Expirat' : neinceput ? 'Neînceput' : 'Activ'
+                  const statusLabel = !activ ? t.adminSubsStatusNone : expirat ? t.adminSubsStatusExpired : neinceput ? t.adminSubsStatusNotStarted : t.adminSubsStatusActive
                   return (
                     <div key={email} style={{ background: '#fff', borderRadius: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                       <div onClick={() => setAboExpandat(prev => ({ ...prev, [email]: !prev[email] }))}
@@ -2144,7 +2144,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                           <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{email}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px', flexShrink: 0 }}>
-                          {queued.length > 0 && <span style={{ fontSize: '10px', background: '#E8EEFF', color: '#5B7FCC', borderRadius: '6px', padding: '2px 6px', fontWeight: '600' }}>+{queued.length} programat</span>}
+                          {queued.length > 0 && <span style={{ fontSize: '10px', background: '#E8EEFF', color: '#5B7FCC', borderRadius: '6px', padding: '2px 6px', fontWeight: '600' }}>{t.adminSubsQueuedBadge(queued.length)}</span>}
                           <span style={{ fontSize: '11px', fontWeight: '600', color: statusColor }}>{statusLabel}</span>
                           <span style={{ fontSize: '14px', color: '#aaa', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
                         </div>
@@ -2154,13 +2154,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                           {activ ? (
                             <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#FFFFFF', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
                               <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {expirat ? <><AlertTriangle size={11} /> EXPIRAT</> : neinceput ? <><Calendar size={11} /> NEÎNCEPUT</> : '✓ ACTIV'}
+                                {expirat ? <><AlertTriangle size={11} /> {t.adminSubsExpiredBadge}</> : neinceput ? <><Calendar size={11} /> {t.adminSubsNotStartedBadge}</> : t.adminSubsActiveBadge}
                               </div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{activ.subscription_plans?.name}</div>
                               <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>{fmtData(activ.start_date)} → {fmtData(activ.end_date)}</div>
                               {activ.sessions_total != null && (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                                  <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>Ședințe: {activ.sessions_used || 0}/{activ.sessions_total}</span>
+                                  <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>{t.adminSubsSessionsLabel(activ.sessions_used || 0, activ.sessions_total)}</span>
                                   <div style={{ display: 'flex', gap: '4px' }}>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, +1) }}
                                       style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
@@ -2171,20 +2171,20 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                               )}
                               {activ.notes && <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px' }}>{activ.notes}</div>}
                               <button onClick={e => { e.stopPropagation(); stergeAbonament(activ.id) }}
-                                style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️ Șterge</button>
+                                style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>{t.adminSubsDeleteButton}</button>
                             </div>
                           ) : (
-                            <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '8px 0' }}>Niciun abonament activ</div>
+                            <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '8px 0' }}>{t.adminSubsNoActiveSubscription}</div>
                           )}
                           {queued.map(q => (
                             <div key={q.id} style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginTop: '8px', borderLeft: '3px solid #5B7FCC' }}>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> PROGRAMAT</div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminSubsScheduledBadge}</div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{q.subscription_plans?.name}</div>
-                              {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>Ședințe: {q.sessions_total}</div>}
+                              {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.adminSubsSessionsTotal(q.sessions_total)}</div>}
                               {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
                               <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                                 <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email) }}
-                                  style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Zap size={12} /> Activează acum</button>
+                                  style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Zap size={12} /> {t.adminSubsActivateNow}</button>
                                 <button onClick={e => { e.stopPropagation(); stergeAbonament(q.id) }}
                                   style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                               </div>
@@ -2205,34 +2205,34 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
       {adminTab === 'clase' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ Clasă nouă</div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip clasă</div>
-            <input list="nume-clase-list" value={numeClasa} onChange={e => setNumeClasa(e.target.value)} placeholder="Nume clasă" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminClassNewTitle}</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassTypeLabel}</div>
+            <input list="nume-clase-list" value={numeClasa} onChange={e => setNumeClasa(e.target.value)} placeholder={t.adminClassNamePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <datalist id="nume-clase-list">
               <option value="CrossFit WOD" /><option value="Weightlifting" /><option value="Gymnastics" />
               <option value="Powerlifting" /><option value="Open Gym" /><option value="Kids CrossFit" /><option value="Foundations" />
             </datalist>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassDateLabel}</div>
             <input type="date" value={dataClasa} onChange={e => setDataClasa(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Ora început</div>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassStartTimeLabel}</div>
                 <input type="time" value={oraInceput} onChange={e => setOraInceput(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Ora sfârșit</div>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassEndTimeLabel}</div>
                 <input type="time" value={oraSfarsit} onChange={e => setOraSfarsit(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
               </div>
             </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Coach</div>
-            <input value={coachClasa} onChange={e => setCoachClasa(e.target.value)} placeholder="ex: Andrei M." style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Locuri</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassCoachLabel}</div>
+            <input value={coachClasa} onChange={e => setCoachClasa(e.target.value)} placeholder={t.adminClassCoachPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassSpotsLabel}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <button onClick={() => setLocuriClasa(l => Math.max(1, l - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
               <span style={{ fontSize: '18px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{locuriClasa}</span>
               <button onClick={() => setLocuriClasa(l => Math.min(50, l + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
             </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>Culoare clasă</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{t.adminClassColorLabel}</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
               {[null, '#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8'].map(col => (
                 <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
@@ -2245,8 +2245,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             <div onClick={() => { setRepetitiva(!repetitiva); setZileRepetare([]); setLaInfinit(false) }}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: repetitiva ? '#f0f0f0' : '#FFFFFF', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: repetitiva ? '1.5px solid #0E0E0E' : '1.5px solid transparent' }}>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: '#0E0E0E' }}>Repetă săptămânal</div>
-                <div style={{ fontSize: '11px', color: '#888' }}>Creează automat pe zilele alese</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: '#0E0E0E' }}>{t.adminClassRepeatWeeklyLabel}</div>
+                <div style={{ fontSize: '11px', color: '#888' }}>{t.adminClassRepeatWeeklySubtitle}</div>
               </div>
               <div style={{ width: '44px', height: '26px', borderRadius: '13px', background: repetitiva ? '#0E0E0E' : '#ccc', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: '3px', left: repetitiva ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
@@ -2254,9 +2254,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
             </div>
             {repetitiva && (
               <div style={{ background: '#f0f0f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600', marginBottom: '8px' }}>ZILELE SĂPTĂMÂNII</div>
+                <div style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600', marginBottom: '8px' }}>{t.adminClassWeekDaysLabel}</div>
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
-                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((z, i) => (
+                  {t.adminClassWeekDayLetters.map((z, i) => (
                     <div key={i} onClick={() => toggleZiRepetare(i)}
                       style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#0E0E0E' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #0E0E0E' : '1px solid #C5C2F5' }}>
                       {z}
@@ -2264,7 +2264,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                  {[{ id: false, lbl: 'Nr. săptămâni' }, { id: true, lbl: 'Până opresc eu' }].map(opt => (
+                  {[{ id: false, lbl: t.adminClassWeeksCountOption }, { id: true, lbl: t.adminClassUntilIStopOption }].map(opt => (
                     <div key={String(opt.id)} onClick={() => setLaInfinit(opt.id)}
                       style={{ flex: 1, padding: '7px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: laInfinit === opt.id ? '600' : '400', background: laInfinit === opt.id ? '#0E0E0E' : '#fff', color: laInfinit === opt.id ? '#fff' : '#888', border: laInfinit === opt.id ? '2px solid #0E0E0E' : '1px solid #C5C2F5' }}>
                       {opt.lbl}
@@ -2274,12 +2274,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                 {!laInfinit && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', minWidth: '80px', textAlign: 'center' }}>{saptamaniRepetare} săpt.</span>
+                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', minWidth: '80px', textAlign: 'center' }}>{t.adminClassWeeksAbbrev(saptamaniRepetare)}</span>
                     <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
                   </div>
                 )}
                 {laInfinit && (
-                  <div style={{ fontSize: '11px', color: '#0E0E0E', marginBottom: '8px' }}>Se generează 1 an de clase (~52 săpt.). Șterge clasele viitoare când vrei să oprești.</div>
+                  <div style={{ fontSize: '11px', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminClassInfiniteNote}</div>
                 )}
                 {dataClasa && zileRepetare.length > 0 && (() => {
                   const dates = genereazaDateRepetare()
@@ -2287,21 +2287,21 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                   const last = new Date(dates[dates.length - 1] + 'T00:00:00')
                   return (
                     <div style={{ fontSize: '11px', color: '#0E0E0E', lineHeight: '1.6' }}>
-                      {dates.length} clase · până în {last.toLocaleDateString('ro-RO')}
+                      {t.adminClassGeneratedCount(dates.length, last.toLocaleDateString(localeFor(lang)))}
                     </div>
                   )
                 })()}
-                {zileRepetare.length === 0 && <div style={{ fontSize: '11px', color: '#888' }}>Alege cel puțin o zi</div>}
+                {zileRepetare.length === 0 && <div style={{ fontSize: '11px', color: '#888' }}>{t.adminClassPickAtLeastOneDay}</div>}
               </div>
             )}
             <button onClick={saveClasa} disabled={savingClasa} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingClasa ? 'not-allowed' : 'pointer', opacity: savingClasa ? 0.7 : 1 }}>
-              {savingClasa ? 'Se salvează...' : repetitiva && zileRepetare.length > 0 && dataClasa ? `+ Creează ${genereazaDateRepetare().length} clase` : '+ Creează clasa'}
+              {savingClasa ? t.adminClassSaving : repetitiva && zileRepetare.length > 0 && dataClasa ? t.adminClassCreateMultiple(genereazaDateRepetare().length) : t.adminClassCreateSingle}
             </button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ fontSize: '12px', color: '#888' }}>CLASE ({clase.length})</div>
+            <div style={{ fontSize: '12px', color: '#888' }}>{t.adminClassListHeader(clase.length)}</div>
             {clase.some(c => c.date < `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`) && (
-              <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>🗑️ Șterge trecute</button>
+              <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>{t.adminClassDeletePast}</button>
             )}
           </div>
           {(() => {
@@ -2312,13 +2312,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
               const dateObj = new Date(date + 'T00:00:00')
               const eAzi = date === azi
               const eTrecut = date < azi
-              const ziLabel = dateObj.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })
+              const ziLabel = dateObj.toLocaleDateString(localeFor(lang), { weekday: 'long', day: 'numeric', month: 'long' })
               return (
                 <div key={date} style={{ marginBottom: '18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#0E0E0E' : eTrecut ? '#f0f0f0' : '#0E0E0E', borderRadius: '20px', padding: '5px 14px' }}>
-                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '800', letterSpacing: '0.08em' }}>AZI</span>}
+                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '800', letterSpacing: '0.08em' }}>{t.adminClassTodayBadge}</span>}
                       <span style={{ fontSize: '13px', fontWeight: '700', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
                     </div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
@@ -2329,14 +2329,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.name}</div>
                           <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                            <Clock size={11} /> {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · <User size={11} /> {c.coach} · {c.max_spots} locuri
+                            <Clock size={11} /> {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · <User size={11} /> {c.coach} · {t.adminClassSpotsCount(c.max_spots)}
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
                             style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Users size={13} color="#0E0E0E" /></button>
                           <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
-                          <button onClick={() => { if (window.confirm(`Ștergi toate clasele viitoare „${c.name}" ${c.start_time?.slice(0,5)}?`)) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ serie</button>
+                          <button onClick={() => { if (window.confirm(t.adminClassDeleteSeriesConfirm(c.name, c.start_time?.slice(0,5)))) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.adminClassDeleteSeriesButton}</button>
                         </div>
                       </div>
                       {clasaDeschisa === c.id && (
@@ -2347,18 +2347,18 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                             const nrTotal = rez?.length || 0
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>REZERVĂRI ({nrTotal}/{c.max_spots})</div>
-                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#0E0E0E' : '#aaa', background: nrCheckin > 0 ? '#f0f0f0' : '#FFFFFF', padding: '2px 8px', borderRadius: '20px' }}>✓ {nrCheckin}/{nrTotal} prezenți</div>}
+                                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>{t.adminClassBookingsHeader(nrTotal, c.max_spots)}</div>
+                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#0E0E0E' : '#aaa', background: nrCheckin > 0 ? '#f0f0f0' : '#FFFFFF', padding: '2px 8px', borderRadius: '20px' }}>{t.adminClassPresentCount(nrCheckin, nrTotal)}</div>}
                               </div>
                             )
                           })()}
-                          {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>Se încarcă...</div>
-                            : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>Nicio rezervare</div>
+                          {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>{t.adminClassLoading}</div>
+                            : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>{t.adminClassNoBooking}</div>
                             : rezervariClasa[c.id].map((r, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #FFFFFF' : 'none' }}>
                               <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '12px', fontWeight: '500', color: '#0E0E0E' }}>{r.full_name || 'Utilizator'}</div>
+                                <div style={{ fontSize: '12px', fontWeight: '500', color: '#0E0E0E' }}>{r.full_name || t.adminClassUserFallback}</div>
                                 <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
                               </div>
                               {(() => {
@@ -2366,7 +2366,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                                 return (
                                   <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
                                     style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #0E0E0E' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#FFFFFF', color: r.checked_in ? '#0E0E0E' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
-                                    {r.checked_in ? '✓ Prezent' : clasaInceput ? '○ Absent' : '○ Marchează'}
+                                    {r.checked_in ? t.adminClassPresentLabel : clasaInceput ? t.adminClassAbsentLabel : t.adminClassMarkLabel}
                                   </button>
                                 )
                               })()}
@@ -2375,9 +2375,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                             </div>
                           ))}
                           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #FFFFFF' }}>
-                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>ADAUGĂ MANUAL</div>
+                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
                             <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              placeholder="Caută după nume sau email..."
+                              placeholder={t.adminClassSearchMemberPlaceholder}
                               style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
                             {adaugaMembruSearch[c.id]?.trim() && (() => {
                               const q = adaugaMembruSearch[c.id].toLowerCase()
@@ -2394,11 +2394,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                                         <div style={{ fontWeight: '500', color: '#0E0E0E' }}>{cl.full_name || cl.email}</div>
                                         <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
                                       </div>
-                                      <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>+ Adaugă</span>
+                                      <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>{t.adminClassAddButton}</span>
                                     </div>
                                   ))}
                                 </div>
-                              ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>Niciun rezultat</div>
+                              ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>{t.adminClassNoResult}</div>
                             })()}
                           </div>
                         </div>
@@ -2417,30 +2417,30 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? '✎ Editează WOD' : '+ WOD nou'}</div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? t.adminWodEditTitle : t.adminWodNewTitle}</div>
               {editWodId && (
-                <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>Anulează</div>
+                <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
               )}
             </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Data WOD</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
             <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Tip WOD</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodTypeLabel}</div>
             <select value={tipWod} onChange={e => setTipWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
               <option>AMRAP</option><option>For Time</option><option>EMOM</option><option>Tabata</option>
               <option>Chipper</option><option>Ladder</option><option>Partner WOD</option>
             </select>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
               <div style={{ flex: 1 }}>
                 <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
               </div>
               <div style={{ flex: 1 }}>
                 <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
               </div>
             </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume antrenament <span style={{ color: '#bbb' }}>(opțional)</span></div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
               { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
@@ -2456,16 +2456,16 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
               </div>
             ))}
             <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
-              {savingWod ? 'Se salvează...' : editWodId ? 'Salvează modificările' : '+ Creează WOD'}
+              {savingWod ? t.adminWodSaving : editWodId ? t.adminWodSaveEdit : t.adminWodCreateButton}
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>WOD-URI ({wods.length})</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminWodListHeader(wods.length)}</div>
           {wods.map(w => (
             <div key={w.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString('ro-RO')}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString(localeFor(lang))}</div>
                   {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><LevelDot nivel="RX" size={8} /> {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
@@ -2482,31 +2482,31 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
       {adminTab === 'planuri' && isAdmin && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>+ Plan nou</div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Nume plan</div>
-            <input value={numePlan} onChange={e => setNumePlan(e.target.value)} placeholder="ex: 12 ședințe"
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminPlansNewTitle}</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansNameLabel}</div>
+            <input value={numePlan} onChange={e => setNumePlan(e.target.value)} placeholder={t.adminPlansNamePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Număr ședințe (gol = nelimitat)</div>
-            <input type="number" value={sedintePlan} onChange={e => setSedintePlan(e.target.value)} placeholder="ex: 12"
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansSessionsLabel}</div>
+            <input type="number" value={sedintePlan} onChange={e => setSedintePlan(e.target.value)} placeholder={t.adminPlansSessionsPlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Preț (RON)</div>
-            <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder="ex: 250"
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansPriceLabel}</div>
+            <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder={t.adminPlansPricePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Valabilitate (luni)</div>
-            <input type="number" min="1" value={durataPlan} onChange={e => setDurataPlan(Math.max(1, parseInt(e.target.value) || 1))} placeholder="ex: 1"
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansDurationLabel}</div>
+            <input type="number" min="1" value={durataPlan} onChange={e => setDurataPlan(Math.max(1, parseInt(e.target.value) || 1))} placeholder={t.adminPlansDurationPlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
-              {savingPlan ? 'Se salvează...' : '+ Adaugă plan'}
+              {savingPlan ? t.adminPlansSaving : t.adminPlansAddButton}
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>PLANURI ({planuri.length})</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminPlansListHeader(planuri.length)}</div>
           {planuri.map(p => (
             <div key={p.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{p.name}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                    {p.sessions ? `${p.sessions} ședințe` : 'Nelimitat'} · {p.price != null ? `${p.price} RON` : 'Preț nesetat'} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? 'lună' : 'luni'}
+                    {p.sessions ? t.adminPlansSessionsCount(p.sessions) : t.adminPlansUnlimited} · {p.price != null ? t.adminPlansPriceSet(p.price) : t.adminPlansPriceUnset} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? t.adminPlansMonthSingular : t.adminPlansMonthPlural}
                   </div>
                 </div>
                 <button onClick={() => stergePlan(p.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
@@ -2521,18 +2521,18 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> Rapoarte</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> {t.adminSettingsReportsTitle}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' })}</div>
+              <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString(localeFor(lang), { month: 'long', year: 'numeric' })}</div>
               <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
             </div>
           </div>
           {rapoarteData ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               {[
-                { label: 'Membri activi', value: rapoarteData.membriActivi, icon: Users, color: '#5B7FCC', bg: '#EEF2FF' },
-                { label: 'Abonamente luna', value: rapoarteData.aboVandute, icon: Ticket, color: '#0E0E0E', bg: '#f0f0f0' },
-                { label: 'Venituri RON', value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: Coins, color: '#B86E00', bg: '#FFF8EC' },
+                { label: t.adminSettingsActiveMembers, value: rapoarteData.membriActivi, icon: Users, color: '#5B7FCC', bg: '#EEF2FF' },
+                { label: t.adminSettingsSubsThisMonth, value: rapoarteData.aboVandute, icon: Ticket, color: '#0E0E0E', bg: '#f0f0f0' },
+                { label: t.adminSettingsRevenueRon, value: rapoarteData.venituriLuna % 1 === 0 ? rapoarteData.venituriLuna : rapoarteData.venituriLuna.toFixed(0), icon: Coins, color: '#B86E00', bg: '#FFF8EC' },
               ].map(({ label, value, icon: Icon, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
                   <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Icon size={20} color={color} strokeWidth={1.75} /></div>
@@ -2542,35 +2542,35 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
               ))}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', color: '#aaa', fontSize: '13px', padding: '20px 0' }}>Se încarcă...</div>
+            <div style={{ textAlign: 'center', color: '#aaa', fontSize: '13px', padding: '20px 0' }}>{t.adminSettingsLoading}</div>
           )}
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Fereastră de anulare clase</div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>Membrii nu pot anula cu mai puțin de X ore înainte de start. Admin-ul poate anula oricând.</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCancelWindowTitle}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>{t.adminSettingsCancelWindowSubtitle}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <button onClick={() => setCancelWindowSetting(prev => Math.max(0, prev - 0.5))}
               style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: '#0E0E0E', lineHeight: 1 }}>{cancelWindowSetting}</div>
-              <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>ore</div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{t.adminSettingsHoursLabel}</div>
             </div>
             <button onClick={() => setCancelWindowSetting(prev => prev + 0.5)}
               style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
           </div>
           {cancelWindowSetting === 0 && (
-            <div style={{ fontSize: '11px', color: '#0E0E0E', background: '#f0f0f0', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>Membrii pot anula oricând (fără restricții).</div>
+            <div style={{ fontSize: '11px', color: '#0E0E0E', background: '#f0f0f0', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>{t.adminSettingsNoRestriction}</div>
           )}
           <button onClick={saveSettings} disabled={savingSettings}
             style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
-            {savingSettings ? 'Se salvează...' : '✓ Salvează setările'}
+            {savingSettings ? t.adminSettingsSaving : t.adminSettingsSaveButton}
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Coach</div>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>Acces doar la WOD și Clase, fără Clienți/Abonamente/Planuri/Setări.</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCoachTitle}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminSettingsCoachSubtitle}</div>
           <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
-            placeholder="Caută după nume sau email..."
+            placeholder={t.adminSettingsCoachSearchPlaceholder}
             style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           {coachesList.length > 0 && (
             <div style={{ marginTop: '14px' }}>
@@ -2598,11 +2598,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged }) {
                       <div style={{ fontWeight: '500', color: '#0E0E0E' }}>{cl.full_name || cl.email}</div>
                       <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
                     </div>
-                    <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>+ Coach</span>
+                    <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>{t.adminSettingsAddCoachButton}</span>
                   </div>
                 ))}
               </div>
-            ) : <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>Niciun rezultat</div>
+            ) : <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>{t.adminSettingsNoResult}</div>
           })()}
         </div>
         </>
@@ -3282,7 +3282,7 @@ function App() {
   const saveMyProfile = async () => {
     const firstName = profileFirstName.trim()
     const lastName = profileLastName.trim()
-    if (!firstName || !lastName || !profileBirthDate) { showToast('❌ Completează toate câmpurile obligatorii!'); return }
+    if (!firstName || !lastName || !profileBirthDate) { showToast(t.toastFillRequiredFields); return }
     const fullName = [firstName, lastName].filter(Boolean).join(' ') || null
     setProfileSaving(true)
     const { error } = await supabase.from('profiles').update({
@@ -3290,9 +3290,9 @@ function App() {
       gender: profileGender || null, birth_date: profileBirthDate || null,
     }).eq('id', user.id)
     setProfileSaving(false)
-    if (error) { showToast('❌ Eroare la salvare!'); console.error(error); return }
+    if (error) { showToast(t.toastProfileSaveError); console.error(error); return }
     setUserProfile(prev => ({ ...prev, first_name: firstName, last_name: lastName, full_name: fullName, gender: profileGender, birth_date: profileBirthDate }))
-    showToast('✓ Profil actualizat!')
+    showToast(t.toastProfileUpdated)
     setScreen(prevScreen || 'home')
   }
 
@@ -3300,8 +3300,8 @@ function App() {
     if (unit === userProfile?.weight_unit) return
     setUserProfile(prev => ({ ...prev, weight_unit: unit }))
     const { error } = await supabase.from('profiles').update({ weight_unit: unit }).eq('id', user.id)
-    if (error) { showToast('❌ Eroare la salvare!'); console.error(error); return }
-    showToast(`✓ Unitate schimbată în ${unit}`)
+    if (error) { showToast(t.toastProfileSaveError); console.error(error); return }
+    showToast(t.toastWeightUnitChanged(unit))
   }
 
   const changeLanguage = async (newLang) => {
@@ -3310,18 +3310,18 @@ function App() {
     localStorage.setItem('forge_lang', newLang)
     setUserProfile(prev => prev ? { ...prev, language: newLang } : prev)
     const { error } = await supabase.from('profiles').update({ language: newLang }).eq('id', user.id)
-    if (error) { showToast('❌ Eroare la salvare!'); console.error(error) }
+    if (error) { showToast(t.toastLanguageSaveError); console.error(error) }
   }
 
   const changeMyPassword = async () => {
-    if (profileNewPassword.length < 6) { showToast('❌ Parola trebuie să aibă minim 6 caractere!'); return }
-    if (profileNewPassword !== profileNewPasswordConfirm) { showToast('❌ Parolele nu coincid!'); return }
+    if (profileNewPassword.length < 6) { showToast(t.toastPasswordTooShort); return }
+    if (profileNewPassword !== profileNewPasswordConfirm) { showToast(t.toastPasswordMismatch); return }
     setPasswordSaving(true)
     const { error } = await supabase.auth.updateUser({ password: profileNewPassword })
     setPasswordSaving(false)
-    if (error) { showToast('❌ Eroare la schimbarea parolei!'); console.error(error); return }
+    if (error) { showToast(t.toastPasswordChangeError); console.error(error); return }
     setProfileNewPassword(''); setProfileNewPasswordConfirm('')
-    showToast('✓ Parolă schimbată!')
+    showToast(t.toastPasswordChanged)
   }
 
   const uploadAvatar = async (file) => {
@@ -3330,12 +3330,12 @@ function App() {
     const ext = file.name.split('.').pop().toLowerCase() || 'jpg'
     const path = `${user.id}/avatar.${ext}`
     const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
-    if (upErr) { showToast('❌ Eroare la upload!'); console.error(upErr); setAvatarUploading(false); return }
+    if (upErr) { showToast(t.toastAvatarUploadError); console.error(upErr); setAvatarUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
     const urlFinal = `${publicUrl}?t=${Date.now()}`
     await supabase.from('profiles').upsert({ id: user.id, email: user.email, avatar_url: urlFinal }, { onConflict: 'id' })
     setUserProfile(prev => ({ ...prev, avatar_url: urlFinal }))
-    showToast('✓ Poză de profil actualizată!')
+    showToast(t.toastAvatarUpdated)
     setAvatarUploading(false)
   }
 
@@ -3705,15 +3705,15 @@ function App() {
     if (peWaitlist) {
       await supabase.from('class_waitlist').delete().eq('class_id', clasaId).eq('member_id', user.id)
       setWaitlistMea(prev => prev.filter(id => id !== clasaId))
-      showToast('✓ Ai ieșit din lista de așteptare')
+      showToast(t.toastWaitlistLeft)
     } else {
       const { error } = await supabase.from('class_waitlist').insert({ class_id: clasaId, member_id: user.id, member_email: user.email.toLowerCase() })
       if (error) {
-        if (error.code === '23505') { setWaitlistMea(prev => prev.includes(clasaId) ? prev : [...prev, clasaId]); showToast('✓ Ești deja pe lista de așteptare!'); return }
-        showToast('❌ ' + (error.message || error.code || 'Eroare')); console.error(error); return
+        if (error.code === '23505') { setWaitlistMea(prev => prev.includes(clasaId) ? prev : [...prev, clasaId]); showToast(t.toastWaitlistAlready); return }
+        showToast(t.toastWaitlistError(error.message || error.code || t.toastErrorFallbackGeneric)); console.error(error); return
       }
       setWaitlistMea(prev => [...prev, clasaId])
-      showToast('✓ Ești pe lista de așteptare!')
+      showToast(t.toastWaitlistJoined)
     }
   }
 
@@ -3725,23 +3725,23 @@ function App() {
     if (!esteRezervat && !isAdmin) {
       const clasaPtRez = claseDB.find(c => c.id === clasaId)
       if (!clasaPtRez || new Date(`${clasaPtRez.date}T${clasaPtRez.start_time}`) <= new Date()) {
-        showToast('❌ Clasa a început deja!')
+        showToast(t.toastClassAlreadyStarted)
         return
       }
       if (!abonamentReal) {
-        showToast('❌ Nu ai un abonament activ!')
+        showToast(t.toastNoActiveSubscription)
         return
       }
       if (new Date(abonamentReal.start_date + 'T00:00:00') > new Date()) {
-        showToast(`❌ Abonamentul tău începe pe ${new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString('ro-RO')}!`)
+        showToast(t.toastSubscriptionStartsOn(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang))))
         return
       }
       if (new Date(abonamentReal.end_date + 'T23:59:59') < new Date()) {
-        showToast('❌ Abonamentul tău a expirat!')
+        showToast(t.toastSubscriptionExpired)
         return
       }
       if (sedinteLimitate && sedinteRamase <= 0) {
-        showToast('❌ Ai epuizat toate ședințele din abonament!')
+        showToast(t.toastSessionsExhausted)
         return
       }
     }
@@ -3756,25 +3756,25 @@ function App() {
     if (esteRezervat && !isAdmin) {
       const clasa = claseDB.find(c => c.id === clasaId)
       if (!clasa) {
-        showToast('❌ Nu poți anula această clasă!')
+        showToast(t.toastCannotCancelClass)
         return
       }
       const clasaEnd = new Date(`${clasa.date}T${clasa.end_time}`)
       if (clasaEnd <= new Date()) {
-        showToast('❌ Clasa s-a terminat, nu mai poți anula!')
+        showToast(t.toastClassEndedCannotCancel)
         return
       }
       const clasaStart = new Date(`${clasa.date}T${clasa.start_time}`)
       const hoursUntil = (clasaStart - new Date()) / 3600000
       if (hoursUntil < cancelWindowHours) {
-        const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} minute`
-        showToast(`❌ Nu poți anula cu mai puțin de ${h} înainte de clasă!`)
+        const h = cancelWindowHours % 1 === 0 ? `${cancelWindowHours}h` : `${cancelWindowHours * 60} ${t.unitMinutesShort}`
+        showToast(t.toastCannotCancelWithin(h))
         return
       }
     }
     if (esteRezervat) {
       const { error: delErr } = await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
-      if (delErr) { showToast('❌ Eroare la anularea rezervării!'); console.error(delErr); return }
+      if (delErr) { showToast(t.toastCancelBookingError); console.error(delErr); return }
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, -1)
@@ -3782,10 +3782,10 @@ function App() {
       }
       supabase.from('class_reminders').delete().eq('class_id', clasaId).eq('member_email', user.email.toLowerCase())
       checkAndBookFromWaitlist(clasaId)
-      showToast('✓ Rezervare anulată')
+      showToast(t.toastBookingCancelled)
     } else {
       const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
-      if (insErr) { showToast('❌ Eroare la rezervare!'); console.error(insErr); return }
+      if (insErr) { showToast(t.toastBookingError); console.error(insErr); return }
       setRezervariMele(prev => [...prev, clasaId])
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, +1, { max: abonamentReal.sessions_total })
@@ -3797,7 +3797,7 @@ function App() {
         if (remindAt > new Date())
           supabase.from('class_reminders').upsert({ class_id: clasaId, member_email: user.email.toLowerCase(), remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
       }
-      showToast('✓ Loc rezervat! Te așteptăm!')
+      showToast(t.toastBookingConfirmed)
     }
     await fetchClaseDB()
     await fetchAbonamentMeu()
@@ -5096,16 +5096,16 @@ function App() {
       })()}
 
 
-      {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
+      {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} t={t} lang={lang} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>Profilul meu</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.profileTitle}</h1>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}>
@@ -5133,30 +5133,30 @@ function App() {
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Prenume *</div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileFirstNameLabel}</div>
                 <input value={profileFirstName} onChange={e => setProfileFirstName(e.target.value)}
-                  placeholder="ex: Andrei"
+                  placeholder={t.profileFirstNamePlaceholder}
                   style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Nume *</div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileLastNameLabel}</div>
                 <input value={profileLastName} onChange={e => setProfileLastName(e.target.value)}
-                  placeholder="ex: Popescu"
+                  placeholder={t.profileLastNamePlaceholder}
                   style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
               </div>
             </div>
 
             <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Data nașterii *</div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileBirthDateLabel}</div>
               <input type="date" value={profileBirthDate} onChange={e => setProfileBirthDate(e.target.value)}
                 max={todayLocalStr()}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Gen</div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileGenderLabel}</div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                {[{ val: 'masculin', label: '♂', sub: 'Masculin' }, { val: 'feminin', label: '♀', sub: 'Feminin' }].map(g => (
+                {[{ val: 'masculin', label: '♂', sub: t.profileGenderMale }, { val: 'feminin', label: '♀', sub: t.profileGenderFemale }].map(g => (
                   <div key={g.val} onClick={() => setProfileGender(g.val)}
                     style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${profileGender === g.val ? '#0E0E0E' : '#e0e0e0'}`, background: profileGender === g.val ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                     <div style={{ fontSize: '22px', marginBottom: '4px', color: profileGender === g.val ? '#ABE73C' : '#888' }}>{g.label}</div>
@@ -5168,15 +5168,15 @@ function App() {
 
             <button onClick={saveMyProfile} disabled={profileSaving}
               style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
-              {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
+              {profileSaving ? t.profileSaving : t.profileSaveButton}
             </button>
           </div>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>Unitate de măsură</div>
-            <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>Folosită pentru greutățile din Recorduri.</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileWeightUnitTitle}</div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.profileWeightUnitSubtitle}</div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              {[{ val: 'kg', label: 'Kilograme' }, { val: 'lbs', label: 'Lbs' }].map(u => {
+              {[{ val: 'kg', label: t.profileWeightUnitKg }, { val: 'lbs', label: t.profileWeightUnitLbs }].map(u => {
                 const active = (userProfile?.weight_unit || 'kg') === u.val
                 return (
                   <div key={u.val} onClick={() => changeWeightUnit(u.val)}
@@ -5211,25 +5211,25 @@ function App() {
           </button>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '16px' }}>Schimbă parola</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '16px' }}>{t.profileChangePasswordTitle}</div>
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Parolă nouă</div>
-              <input value={profileNewPassword} onChange={e => setProfileNewPassword(e.target.value)} type="password" placeholder="minimum 6 caractere"
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileNewPasswordLabel}</div>
+              <input value={profileNewPassword} onChange={e => setProfileNewPassword(e.target.value)} type="password" placeholder={t.profileNewPasswordPlaceholder}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Confirmă parola</div>
-              <input value={profileNewPasswordConfirm} onChange={e => setProfileNewPasswordConfirm(e.target.value)} type="password" placeholder="repetă parola"
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileConfirmPasswordLabel}</div>
+              <input value={profileNewPasswordConfirm} onChange={e => setProfileNewPasswordConfirm(e.target.value)} type="password" placeholder={t.profileConfirmPasswordPlaceholder}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <button onClick={changeMyPassword} disabled={passwordSaving}
               style={{ width: '100%', padding: '16px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.6 : 1 }}>
-              {passwordSaving ? 'Se salvează...' : 'Schimbă parola'}
+              {passwordSaving ? t.profileSaving : t.profileChangePasswordButton}
             </button>
           </div>
 
           <button onClick={handleLogout} style={{ width: '100%', padding: '14px', marginTop: '16px', background: 'none', border: 'none', fontSize: '13px', color: '#aaa', cursor: 'pointer', textAlign: 'center' }}>
-            Deconectează-te
+            {t.profileLogout}
           </button>
         </div>
       )}
