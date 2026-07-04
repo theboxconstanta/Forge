@@ -5,7 +5,7 @@ import {
   Home, PenLine, Trophy, Medal, MessageCircle, Settings,
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
-  RotateCw, Clock, Mars, Venus, User,
+  RotateCw, Clock, Mars, Venus, User, CheckCircle2,
 } from 'lucide-react'
 import { supabase } from './supabase'
 import {
@@ -4076,7 +4076,7 @@ function App() {
         const numeFull = user?.user_metadata?.full_name || user?.email || ''
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
-        const amLogatWodZi = !!(wodZiData && wodLogs.some(l => l.wod_id === wodZiData.id))
+        const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id) : null
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
 
@@ -4261,10 +4261,16 @@ function App() {
                     {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
                   </div>
                   {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
-                  {amLogatWodZi && (
-                    <div style={{ fontSize: '12px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: '#ABE73C' }}>✓</span>
-                      <span style={{ color: '#0E0E0E' }}>{t.homeWodLoggedToday}</span>
+                  {logZiWod && (
+                    <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
+                      <span style={{ color: '#0E0E0E' }}>{t.homeWorkoutDone}</span>
+                      {logZiWod.variant_level && (
+                        <>
+                          <span style={{ color: '#ddd', fontWeight: '400' }}>|</span>
+                          <span style={{ color: '#0E0E0E' }}>{logZiWod.variant_level}</span>
+                        </>
+                      )}
                     </div>
                   )}
                   {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
