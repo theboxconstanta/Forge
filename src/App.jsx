@@ -15,6 +15,8 @@ import {
 } from './utils'
 import { AvatarCircle, LevelDot } from './components'
 import { getT } from './translations'
+import FormatConfigEditor from './FormatConfigEditor'
+import { estimateTotalDurationSec, composeFormatHeader } from './workoutFormats'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -2993,8 +2995,7 @@ function App() {
   const [customHeroWods, setCustomHeroWods] = useState([])
   const [newHeroWodName, setNewHeroWodName] = useState('')
   const [newHeroWodTip, setNewHeroWodTip] = useState('AMRAP')
-  const [newHeroWodDurataMin, setNewHeroWodDurataMin] = useState('')
-  const [newHeroWodDurataSec, setNewHeroWodDurataSec] = useState('0')
+  const [newHeroWodFormatConfig, setNewHeroWodFormatConfig] = useState({})
   const [newHeroWodMiscari, setNewHeroWodMiscari] = useState([])
   const [newHeroWodMiscareCurenta, setNewHeroWodMiscareCurenta] = useState('')
   const [newHeroWodSaving, setNewHeroWodSaving] = useState(false)
@@ -3544,7 +3545,7 @@ function App() {
   }
 
   const resetNewHeroWodForm = () => {
-    setNewHeroWodName(''); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0')
+    setNewHeroWodName(''); setNewHeroWodTip('AMRAP'); setNewHeroWodFormatConfig({})
     setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta('')
   }
 
@@ -3556,7 +3557,10 @@ function App() {
       : !!heroWodsInfoAll[name]
     if (nameTaken) { showToast(t.toastHeroWodNameTaken); return }
     setNewHeroWodSaving(true)
-    const payload = { name, format: composeHeroFormat(), movements: newHeroWodMiscari.join('\n') || null }
+    const payload = {
+      name, format: composeHeroFormat(), movements: newHeroWodMiscari.join('\n') || null,
+      format_type: newHeroWodTip, format_config: Object.keys(newHeroWodFormatConfig).length > 0 ? newHeroWodFormatConfig : null,
+    }
     if (editHeroWodId) {
       const { data, error } = await supabase.from('custom_hero_wods').update(payload).eq('id', editHeroWodId).select().single()
       if (error) { showToast(t.toastHeroWodUpdateError); console.error(error) }
@@ -4104,8 +4108,10 @@ function App() {
   const isAmrapHeroPr = heroWodLiniiSel.length > 0 && heroWodLiniiSel[0].startsWith('AMRAP')
   const miscariHeroPr = heroWodLiniiSel.slice(1)
   const composeHeroFormat = () => {
-    const dur = (newHeroWodDurataMin || newHeroWodDurataSec) ? `${parseInt(newHeroWodDurataMin) || 0}:${String(parseInt(newHeroWodDurataSec) || 0).padStart(2, '0')}` : ''
-    return `${newHeroWodTip}${dur ? ' ' + dur : ''}`
+    const totalSec = estimateTotalDurationSec(newHeroWodTip, newHeroWodFormatConfig)
+    if (!totalSec) return newHeroWodTip
+    const [min, sec] = secToTime(totalSec).split(':')
+    return composeFormatHeader(newHeroWodTip, min, sec)
   }
   const parseHeroFormat = (formatStr) => {
     // Fallback "For Time" (nu "AMRAP") pentru text vechi, liber, care nu incepe cu un tip
@@ -5089,26 +5095,8 @@ function App() {
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodNameLabel}</div>
             <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder={t.heroWodNamePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodFormatLabel}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-              {HERO_WOD_TIPURI.map(tip => (
-                <div key={tip} onClick={() => setNewHeroWodTip(tip)}
-                  style={{ padding: '6px 12px', borderRadius: '20px', border: newHeroWodTip === tip ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: newHeroWodTip === tip ? '#f0f0f0' : '#fafafa', color: newHeroWodTip === tip ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: newHeroWodTip === tip ? '700' : '400', cursor: 'pointer' }}>
-                  {tip}
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.heroWodDurationLabel} <span style={{ color: '#bbb' }}>{t.heroWodDurationOptional}</span></div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <input type="number" min="0" value={newHeroWodDurataMin} onChange={e => setNewHeroWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.heroWodMinutesLabel}</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <input type="number" min="0" max="59" value={newHeroWodDurataSec} onChange={e => setNewHeroWodDurataSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.heroWodSecondsLabel}</div>
-              </div>
-            </div>
+            <FormatConfigEditor formatId={newHeroWodTip} onFormatChange={setNewHeroWodTip}
+              config={newHeroWodFormatConfig} onConfigChange={setNewHeroWodFormatConfig} t={t} />
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.heroWodReorderHint}</span></div>
@@ -5343,8 +5331,8 @@ function App() {
                   {cat === 'HERO_WODS' && customHeroWods.some(w => w.name === movement) && (
                     <button onClick={() => {
                         const cw = customHeroWods.find(w => w.name === movement)
-                        const { tip, min, sec } = parseHeroFormat(cw.format || '')
-                        setEditHeroWodId(cw.id); setNewHeroWodName(cw.name); setNewHeroWodTip(tip); setNewHeroWodDurataMin(min); setNewHeroWodDurataSec(sec)
+                        const tip = cw.format_type || parseHeroFormat(cw.format || '').tip
+                        setEditHeroWodId(cw.id); setNewHeroWodName(cw.name); setNewHeroWodTip(tip); setNewHeroWodFormatConfig(cw.format_config || {})
                         setNewHeroWodMiscari(cw.movements ? cw.movements.split('\n') : []); setNewHeroWodMiscareCurenta('')
                         setPrevScreen('pr'); setScreen('newHeroWod')
                       }}
@@ -5491,12 +5479,12 @@ function App() {
                           <input
                             value={heroWodNouInput}
                             onChange={e => setHeroWodNouInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0'); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
+                            onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodFormatConfig({}); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
                             placeholder={t.prHeroNewPlaceholder}
                             style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
                           />
                           <button
-                            onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0'); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
+                            onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodFormatConfig({}); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
                             style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#ABE73C' : '#f0f0f0', color: heroWodNouInput.trim() ? '#0E0E0E' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
                             →
                           </button>
