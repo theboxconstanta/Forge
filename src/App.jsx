@@ -2008,7 +2008,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
                         <div style={{ background: '#FCEBEB', borderRadius: '10px', padding: '12px' }}>
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsDeleteTitle}</div>
                           <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>
-                            {t.adminClientsDeleteWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsDeleteWarnSuffix}
+                            {t.adminClientsDeleteWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsDeleteWarnSuffix}{' '}
                             {t.adminClientsDeleteConfirmEmailPrompt} <strong>{c.email}</strong>
                           </div>
                           <input value={deleteClientEmailInput} onChange={e => setDeleteClientEmailInput(e.target.value)}
