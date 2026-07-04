@@ -45,6 +45,9 @@ export const TRANSLATIONS = {
     homeWodWarmupTitle: 'WARM-UP',
     homeWodSkillTitle: 'SKILL',
     homeWorkoutDone: 'WORKOUT DONE',
+    homeSkillWorkDone: 'SKILL WORK DONE',
+    homeLogSkillButton: 'Loghează Skill Work',
+    homeEditSkillButton: '✎ Editează Skill Work',
     homeVariantSelected: 'Selectat',
     homeChooseVariantFirst: 'Alege o variantă mai întâi',
     homeLogWithLevel: (nivel) => `Loghează — ${nivel}`,
@@ -218,6 +221,14 @@ export const TRANSLATIONS = {
     logWodSaveEdit: 'Salvează modificările',
     logWodSaveNew: 'Salvează WOD',
 
+    // Log Skill Work
+    skillLogNewTitle: 'Log Skill Work',
+    skillLogEditTitle: 'Editează Skill Work',
+    skillLogNoteLabel: 'NOTE',
+    skillLogNotePlaceholder: 'Cum a mers?',
+    skillLogSaving: 'Se salvează...',
+    skillLogSaveButton: 'Salvează',
+
     // Hero WOD nou/editare
     heroWodEditTitle: 'Editează Hero WOD',
     heroWodNewTitle: 'Hero WOD nou',
@@ -296,6 +307,7 @@ export const TRANSLATIONS = {
     toastWodUpdated: '✓ WOD actualizat!',
     toastLogWodInsertError: '❌ Eroare!',
     toastWodSaved: 'WOD salvat! 🎉',
+    toastSkillLogSaved: '✓ Skill work salvat!',
     toastFillResultOrTime: '❌ Completează cel puțin rezultatul, timpul sau o mișcare!',
     toastFillPrValue: '❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!',
     toastPrSaveError: '❌ Eroare!',
@@ -622,6 +634,7 @@ export const TRANSLATIONS = {
     adminWodWarmupLabel: 'WARM-UP',
     adminWodWarmupPlaceholder: 'ex:\n400m Run\n10 Air Squats\n10 PVC Pass Throughs',
     adminWodSkillLabel: 'SKILL',
+    adminWodSkillNamePlaceholder: 'Nume Skill (opțional), ex: "Snatch Technique"',
     adminWodSkillPlaceholder: 'ex:\n5x3 Back Squat @ 70%\nHandstand Push-up practice',
     adminWodSaving: 'Se salvează...',
     adminWodSaveEdit: 'Salvează modificările',
@@ -700,6 +713,9 @@ export const TRANSLATIONS = {
     homeWodWarmupTitle: 'WARM-UP',
     homeWodSkillTitle: 'SKILL',
     homeWorkoutDone: 'WORKOUT DONE',
+    homeSkillWorkDone: 'SKILL WORK DONE',
+    homeLogSkillButton: 'Log Skill Work',
+    homeEditSkillButton: '✎ Edit Skill Log',
     homeVariantSelected: 'Selected',
     homeChooseVariantFirst: 'Choose a variant first',
     homeLogWithLevel: (nivel) => `Log — ${nivel}`,
@@ -873,6 +889,14 @@ export const TRANSLATIONS = {
     logWodSaveEdit: 'Save changes',
     logWodSaveNew: 'Save WOD',
 
+    // Log Skill Work
+    skillLogNewTitle: 'Log Skill Work',
+    skillLogEditTitle: 'Edit Skill Log',
+    skillLogNoteLabel: 'NOTES',
+    skillLogNotePlaceholder: 'How did it go?',
+    skillLogSaving: 'Saving...',
+    skillLogSaveButton: 'Save',
+
     // Hero WOD nou/editare
     heroWodEditTitle: 'Edit Hero WOD',
     heroWodNewTitle: 'New Hero WOD',
@@ -951,6 +975,7 @@ export const TRANSLATIONS = {
     toastWodUpdated: '✓ WOD updated!',
     toastLogWodInsertError: '❌ Error!',
     toastWodSaved: 'WOD saved! 🎉',
+    toastSkillLogSaved: '✓ Skill work saved!',
     toastFillResultOrTime: '❌ Fill in at least the result, time, or a movement!',
     toastFillPrValue: '❌ Fill in at least one value (weight, reps, time, or distance)!',
     toastPrSaveError: '❌ Error!',
@@ -1274,6 +1299,7 @@ export const TRANSLATIONS = {
     adminWodWarmupLabel: 'WARM-UP',
     adminWodWarmupPlaceholder: 'e.g.:\n400m Run\n10 Air Squats\n10 PVC Pass Throughs',
     adminWodSkillLabel: 'SKILL',
+    adminWodSkillNamePlaceholder: 'Skill name (optional), e.g. "Snatch Technique"',
     adminWodSkillPlaceholder: 'e.g.:\n5x3 Back Squat @ 70%\nHandstand Push-up practice',
     adminWodSaving: 'Saving...',
     adminWodSaveEdit: 'Save changes',

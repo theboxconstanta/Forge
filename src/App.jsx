@@ -1211,6 +1211,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [warmupWod, setWarmupWod] = useState('')
   const [skillWod, setSkillWod] = useState('')
+  const [skillNameWod, setSkillNameWod] = useState('')
   const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
@@ -1655,6 +1656,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       name: numeWod.trim() || null,
       warmup: parseLinii(warmupWod),
       skill: parseLinii(skillWod),
+      skill_name: skillNameWod.trim() || null,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
@@ -1668,7 +1670,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-      setWarmupWod(''); setSkillWod('')
+      setWarmupWod(''); setSkillWod(''); setSkillNameWod('')
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
     }
     setSavingWod(false)
@@ -1683,6 +1685,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     setNumeWod(w.name || '')
     setWarmupWod((w.warmup || []).join('\n'))
     setSkillWod((w.skill || []).join('\n'))
+    setSkillNameWod(w.skill_name || '')
     setWodVariante({
       onramp: (w.movements_onramp || []).join('\n'),
       beginner: (w.movements_beginner || []).join('\n'),
@@ -1695,7 +1698,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setSkillWod('')
+    setWarmupWod(''); setSkillWod(''); setSkillNameWod('')
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
   }
 
@@ -2463,6 +2466,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
+              <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
               <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
                 placeholder={t.adminWodSkillPlaceholder} rows={3}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
@@ -2847,6 +2852,9 @@ function App() {
   const [heroWodNouInput, setHeroWodNouInput] = useState('')
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
+  const [skillLogs, setSkillLogs] = useState([])
+  const [skillLogNote, setSkillLogNote] = useState('')
+  const [skillLogSaving, setSkillLogSaving] = useState(false)
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
@@ -3046,6 +3054,7 @@ function App() {
       fetchPRuri()
       fetchCustomHeroWods()
       fetchWodLogs()
+      fetchSkillLogs()
       fetchRezervari()
       fetchWaitlistMea()
       fetchClaseDB()
@@ -3180,6 +3189,9 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
         fetchWodLogs(); fetchClasament(clasamentDateRef.current)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_logs' }, () => {
+        fetchSkillLogs()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
         fetchSettings()
@@ -3458,6 +3470,25 @@ function App() {
   const fetchWodLogs = async () => {
     const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration)').eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
+  }
+
+  const fetchSkillLogs = async () => {
+    const { data } = await supabase.from('skill_logs').select('*').eq('member_id', user.id)
+    if (data) setSkillLogs(data)
+  }
+
+  const saveSkillLog = async () => {
+    if (!wodZiData) return
+    setSkillLogSaving(true)
+    const { error } = await supabase.from('skill_logs')
+      .upsert({ member_id: user.id, wod_id: wodZiData.id, notes: skillLogNote.trim() || null, logged_at: new Date().toISOString() }, { onConflict: 'member_id,wod_id' })
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else {
+      showToast(t.toastSkillLogSaved)
+      await fetchSkillLogs()
+      setScreen(prevScreen || 'home')
+    }
+    setSkillLogSaving(false)
   }
 
   const fetchClaseDB = async () => {
@@ -4125,6 +4156,7 @@ function App() {
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
         const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id) : null
+        const logZiSkill = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id) : null
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
 
@@ -4341,10 +4373,29 @@ function App() {
                   )}
                   {(wodZiData.skill || []).length > 0 && (
                     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodSkillTitle}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>{t.homeWodSkillTitle}</div>
+                        {wodZiData.skill_name && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{wodZiData.skill_name}</div>}
+                      </div>
                       {wodZiData.skill.map((m, mi) => (
                         <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
                       ))}
+                      {logZiSkill && (
+                        <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
+                          <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
+                          {wodZiData.skill_name && (
+                            <>
+                              <span style={{ color: '#ddd', fontWeight: '400' }}>|</span>
+                              <span style={{ color: '#0E0E0E' }}>{wodZiData.skill_name}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setPrevScreen('home'); setScreen('logSkill') }}
+                        style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                        {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
+                      </button>
                     </div>
                   )}
                   {VARIANTE_CONFIG.map((v, i) => {
@@ -4723,6 +4774,30 @@ function App() {
             <button onClick={saveWodLog} disabled={wodSaving}
               style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
               {wodSaving ? t.logWodSaving : editLogId ? t.logWodSaveEdit : t.logWodSaveNew}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {screen === 'logSkill' && (
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>
+              {wodZiData && skillLogs.find(l => l.wod_id === wodZiData.id) ? t.skillLogEditTitle : t.skillLogNewTitle}
+            </h1>
+          </div>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            {wodZiData?.skill_name && (
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{wodZiData.skill_name}</div>
+            )}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.skillLogNoteLabel}</div>
+              <input value={skillLogNote} onChange={e => setSkillLogNote(e.target.value)} placeholder={t.skillLogNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            </div>
+            <button onClick={saveSkillLog} disabled={skillLogSaving}
+              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: skillLogSaving ? 'not-allowed' : 'pointer', opacity: skillLogSaving ? 0.7 : 1 }}>
+              {skillLogSaving ? t.skillLogSaving : t.skillLogSaveButton}
             </button>
           </div>
         </div>
