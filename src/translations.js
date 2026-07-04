@@ -1316,6 +1316,11 @@ const wrapDev = (dict) => {
   return new Proxy(dict, {
     get(target, key) {
       if (key in target) return target[key]
+      // React/browser introspecteaza obiectul cu Symbol-uri (Symbol.toStringTag etc.)
+      // si chei speciale ca $$typeof/then (verificare de thenable) - nu sunt chei de
+      // traducere lipsa, doar reflectie normala. Fara filtrul asta, fiecare randare
+      // arunca eroare falsa in Sentry (gasit live, issue "cheie lipsa: Symbol(...)").
+      if (typeof key === 'symbol' || key === '$$typeof' || key === 'then') return undefined
       console.error(`[i18n] cheie lipsa: "${String(key)}"`)
       return `⚠️MISSING:${String(key)}⚠️`
     },

@@ -1304,8 +1304,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     const azi = new Date(); const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
     const { data: claseViit } = await supabase.from('classes').select('id').gte('date', aziStr)
     if (claseViit && claseViit.length > 0) {
-      const { data: bookings } = await supabase.from('bookings').select('member_id').in('class_id', claseViit.map(c => c.id))
-      if (bookings) setMemberIdsCuRezervariViitoare(new Set(bookings.map(b => b.member_id).filter(Boolean)))
+      // NU .in('class_id', claseViit.map(...)) - cu clase recurente pe un an intreg (~1000 randuri),
+      // URL-ul rezultat (sute de UUID-uri concatenate) depaseste limita serverului si pica cu 400
+      // Bad Request (gasit in Sentry). bookings are mult mai putine randuri decat classes, deci le
+      // luam pe toate si filtram in JS dupa setul de clase viitoare, fara sa mai construim un URL urias.
+      const claseViitIds = new Set(claseViit.map(c => c.id))
+      const { data: bookings } = await supabase.from('bookings').select('member_id, class_id')
+      if (bookings) setMemberIdsCuRezervariViitoare(new Set(bookings.filter(b => claseViitIds.has(b.class_id)).map(b => b.member_id).filter(Boolean)))
     }
   }
 
@@ -1386,7 +1391,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     // ajusteze doar sessions_used ca efect al adaugarii/scoaterii dintr-o clasa, fara
     // sa-i dea acces RLS larg la restul tabelului subscriptions (pret, plan, is_active).
     const { error } = await supabase.rpc('adjust_session_count', { p_member_email: email, p_delta: delta })
-    if (error) { console.error('adjustMemberSessions:', error); return }
+    if (error) { console.error('adjustMemberSessions:', error.message || error); return }
     const bc = supabase.channel('member-sessions-' + memberId)
     bc.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
