@@ -4586,7 +4586,7 @@ function App() {
                       ))}
                     </div>
                   )}
-                  {(wodZiData.skill || []).length > 0 && (
+                  {((wodZiData.skill || []).length > 0 || wodZiData.skill_name || wodZiData.skill_format_config) && (
                     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
                       <div onClick={() => setSkillDeschis(!skillDeschis)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                         <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>{t.homeWodSkillTitle}</div>
