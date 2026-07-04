@@ -4076,6 +4076,7 @@ function App() {
         const numeFull = user?.user_metadata?.full_name || user?.email || ''
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
+        const amLogatWodZi = !!(wodZiData && wodLogs.some(l => l.wod_id === wodZiData.id))
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
 
@@ -4260,6 +4261,12 @@ function App() {
                     {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
                   </div>
                   {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
+                  {amLogatWodZi && (
+                    <div style={{ fontSize: '12px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: '#ABE73C' }}>✓</span>
+                      <span style={{ color: '#0E0E0E' }}>{t.homeWodLoggedToday}</span>
+                    </div>
+                  )}
                   {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
