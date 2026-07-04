@@ -2774,7 +2774,6 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
       <div style={{ fontSize: '14px' }}>{t.jurnalEmpty}</div>
     </div>
   )
-  const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
   return (
     <>
       {entries.map((entry, i) => {
@@ -2791,10 +2790,19 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const logKey = w.id
               const isOpen = deschis === logKey
               const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
-              const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
+              const primaEsteHeader = linii.length > 0 && !!legacyHeaderTypeOf(linii[0])
               const wodHeader = primaEsteHeader ? linii[0] : null
               const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
-              const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
+              const wHasSets = w.sets && Object.keys(w.sets).length > 0
+              const wSetsParti = wHasSets ? Object.entries(w.sets).map(([cheie, seturi]) => ({
+                cheie, seturiTxt: (seturi || []).map((set, si) => {
+                  const bucati = []
+                  if (set.reps) bucati.push(`${set.reps} reps`)
+                  if (set.weight) bucati.push(`${set.weight}`)
+                  return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
+                }).join(' · '),
+              })) : []
+              const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -2820,7 +2828,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                     {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
                     {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
-                    {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
+                    {wHasSets && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{wSetsParti.length} seturi</span>}
+                    {w.log_meta?.completed && <span style={{ fontSize: '12px', background: '#F5FBEA', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>✓</span>}
+                    {!w.result && !w.time_result && !wHasSets && !w.log_meta?.completed && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
                   </div>
                   {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
@@ -2828,9 +2838,19 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
                       )}
                       {miscariAfisate.length > 0 && (
-                        <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                        <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
                             <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                          ))}
+                        </div>
+                      )}
+                      {wHasSets && (
+                        <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                          {wSetsParti.map((p, j) => (
+                            <div key={j} style={{ marginBottom: '6px' }}>
+                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
+                              <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
+                            </div>
                           ))}
                         </div>
                       )}
