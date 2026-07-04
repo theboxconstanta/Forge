@@ -1209,6 +1209,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  const [warmupWod, setWarmupWod] = useState('')
+  const [skillWod, setSkillWod] = useState('')
   const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
@@ -1651,6 +1653,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     const payload = {
       date: dataWod, type: tipWod, duration: durataWod,
       name: numeWod.trim() || null,
+      warmup: parseLinii(warmupWod),
+      skill: parseLinii(skillWod),
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
@@ -1664,6 +1668,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+      setWarmupWod(''); setSkillWod('')
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
     }
     setSavingWod(false)
@@ -1676,6 +1681,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     const [dMin, dSec] = (w.duration || '20:0').split(':')
     setDurataWodMin(dMin || '0'); setDurataWodSec(dSec || '0')
     setNumeWod(w.name || '')
+    setWarmupWod((w.warmup || []).join('\n'))
+    setSkillWod((w.skill || []).join('\n'))
     setWodVariante({
       onramp: (w.movements_onramp || []).join('\n'),
       beginner: (w.movements_beginner || []).join('\n'),
@@ -1688,6 +1695,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    setWarmupWod(''); setSkillWod('')
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
   }
 
@@ -2447,6 +2455,18 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodWarmupLabel}</div>
+              <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
+                placeholder={t.adminWodWarmupPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
+              <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
+                placeholder={t.adminWodSkillPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
             {[
               { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
               { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
@@ -4311,6 +4331,22 @@ function App() {
               </div>
               {wodDeschis && wodZiData && (
                 <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
+                  {(wodZiData.warmup || []).length > 0 && (
+                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
+                      {wodZiData.warmup.map((m, mi) => (
+                        <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                      ))}
+                    </div>
+                  )}
+                  {(wodZiData.skill || []).length > 0 && (
+                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodSkillTitle}</div>
+                      {wodZiData.skill.map((m, mi) => (
+                        <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                      ))}
+                    </div>
+                  )}
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
                     return (
