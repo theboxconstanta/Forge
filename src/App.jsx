@@ -773,8 +773,24 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
     { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
   ]
 
+  // Un membru poate avea mai multe log-uri pentru acelasi WOD (relogat din
+  // greseala, sau a incercat alta varianta) - fara dedup GLOBAL (pe toate
+  // nivelele), ar aparea cate o data in fiecare sectiune in care are un log
+  // (ex: si la Intermediate, si la RX). Pastram doar cel mai recent log al
+  // fiecarui membru pentru acest WOD, indiferent de nivel - nivelul acelui
+  // log e cel care decide in ce sectiune apare.
+  const dedupLogsGlobal = (arr) => {
+    const byMember = {}
+    arr.forEach(log => {
+      const curr = byMember[log.member_id]
+      if (!curr || new Date(log.logged_at) > new Date(curr.logged_at)) byMember[log.member_id] = log
+    })
+    return Object.values(byMember)
+  }
+  const logsUnicePerMembru = dedupLogsGlobal(logs)
+
   const getSectionLogs = (nivelId) => {
-    const sorted = sortLogs(logs.filter(l => l.variant_level === nivelId))
+    const sorted = sortLogs(logsUnicePerMembru.filter(l => l.variant_level === nivelId))
     if (genderTab === 'masculin') return sorted.filter(l => l.profile?.gender === 'masculin')
     if (genderTab === 'feminin') return sorted.filter(l => l.profile?.gender === 'feminin')
     return sorted
