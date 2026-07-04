@@ -410,7 +410,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
   )
 }
 
-function CautareMiscare({ onAleage, preFill, t }) {
+function CautareMiscare({ onAleage, preFill, t, label }) {
   const [query, setQuery] = useState(preFill || '')
   const [sugestii, setSugestii] = useState([])
   const [aleasa, setAleasa] = useState(preFill || '')
@@ -426,7 +426,7 @@ function CautareMiscare({ onAleage, preFill, t }) {
   }
   return (
     <div style={{ position: 'relative', marginBottom: '12px' }}>
-      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.cautareMiscareLabel}</div>
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{label || t.cautareMiscareLabel}</div>
       <input value={query} onChange={e => cauta(e.target.value)} placeholder={t.cautareMiscarePlaceholder}
         style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #0E0E0E' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
       {sugestii.length > 0 && (
@@ -1212,6 +1212,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
   const [warmupWod, setWarmupWod] = useState('')
   const [skillWod, setSkillWod] = useState('')
   const [skillNameWod, setSkillNameWod] = useState('')
+  const [skillTypeWod, setSkillTypeWod] = useState('Weightlifting')
   const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
@@ -1657,6 +1658,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       warmup: parseLinii(warmupWod),
       skill: parseLinii(skillWod),
       skill_name: skillNameWod.trim() || null,
+      skill_type: skillTypeWod,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
@@ -1670,7 +1672,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-      setWarmupWod(''); setSkillWod(''); setSkillNameWod('')
+      setWarmupWod(''); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
     }
     setSavingWod(false)
@@ -1686,6 +1688,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     setWarmupWod((w.warmup || []).join('\n'))
     setSkillWod((w.skill || []).join('\n'))
     setSkillNameWod(w.skill_name || '')
+    setSkillTypeWod(w.skill_type || 'Weightlifting')
     setWodVariante({
       onramp: (w.movements_onramp || []).join('\n'),
       beginner: (w.movements_beginner || []).join('\n'),
@@ -1698,7 +1701,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setSkillWod(''); setSkillNameWod('')
+    setWarmupWod(''); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
   }
 
@@ -2466,8 +2469,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
-              <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              <select value={skillTypeWod} onChange={e => setSkillTypeWod(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }}>
+                <option>Weightlifting</option><option>EMOM</option><option>Tabata</option>
+                <option>Cardio</option><option>Other</option>
+              </select>
+              {skillTypeWod === 'Weightlifting' ? (
+                <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
+              ) : (
+                <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              )}
               <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
                 placeholder={t.adminWodSkillPlaceholder} rows={3}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
@@ -2743,10 +2755,12 @@ function SortableList({ items, onReorder, onRemove }) {
   )
 }
 
-function JurnalList({ logs, onEdit, onDelete, t, lang }) {
+function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, t, lang }) {
   const [deschis, setDeschis] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  if (logs.length === 0) return (
+  const [deschisSkill, setDeschisSkill] = useState(null)
+  const [confirmDeleteSkill, setConfirmDeleteSkill] = useState(null)
+  if (entries.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
       <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
       <div style={{ fontSize: '14px' }}>{t.jurnalEmpty}</div>
@@ -2755,77 +2769,155 @@ function JurnalList({ logs, onEdit, onDelete, t, lang }) {
   const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
   return (
     <>
-      {logs.map((w, i) => {
-        const parts = (w.notes || '').split('\n---\n')
-        const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
-        const noteLog = parts.length > 1 ? parts[1] : null
-        const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
-        const logKey = w.id || i
-        const isOpen = deschis === logKey
-        const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
-        const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
-        const wodHeader = primaEsteHeader ? linii[0] : null
-        const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
-        const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
+      {entries.map((entry, i) => {
+        const w = entry.wodLog
+        const sl = entry.skillLog
+        const dataAfisata = entry.date ? new Date(entry.date).toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
         return (
-          <div key={logKey}>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{data}</div>
-          <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
-            style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{w.variant_level || 'WOD'}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {onDelete && (
-                  confirmDelete === logKey ? (
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(w.id); setConfirmDelete(null) }}
-                      style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
-                      {t.jurnalDeleteConfirm}
-                    </button>
-                  ) : (
-                    <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(logKey) }}
-                      style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
-                      ×
-                    </button>
-                  )
-                )}
-                <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-              {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
-              {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
-              {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
-            </div>
-            {isOpen && (
-              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                {wodHeader && (
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
-                )}
-                {miscariAfisate.length > 0 && (
-                  <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
-                    {miscariAfisate.map((m, j) => (
-                      <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
-                    ))}
+          <div key={entry.key}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{dataAfisata}</div>
+            {w && (() => {
+              const parts = (w.notes || '').split('\n---\n')
+              const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
+              const noteLog = parts.length > 1 ? parts[1] : null
+              const logKey = w.id
+              const isOpen = deschis === logKey
+              const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
+              const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
+              const wodHeader = primaEsteHeader ? linii[0] : null
+              const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
+              const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim())
+              return (
+                <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
+                  style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{w.variant_level || 'WOD'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {onDeleteWod && (
+                        confirmDelete === logKey ? (
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteWod(w.id); setConfirmDelete(null) }}
+                            style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                            {t.jurnalDeleteConfirm}
+                          </button>
+                        ) : (
+                          <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(logKey) }}
+                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+                            ×
+                          </button>
+                        )
+                      )}
+                      <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+                    </div>
                   </div>
-                )}
-                {noteLog && noteLog.trim() && (
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                    <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
+                    {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
+                    {!w.result && !w.time_result && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
                   </div>
-                )}
-                {!areDetalii && (
-                  <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
-                )}
-                {onEdit && (
-                  <button onClick={(e) => { e.stopPropagation(); onEdit(w) }}
-                    style={{ marginTop: '12px', padding: '7px 16px', background: '#f0f0f0', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-                    {t.jurnalEdit}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                  {isOpen && (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                      {wodHeader && (
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
+                      )}
+                      {miscariAfisate.length > 0 && (
+                        <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                          {miscariAfisate.map((m, j) => (
+                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                          ))}
+                        </div>
+                      )}
+                      {noteLog && noteLog.trim() && (
+                        <div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                          <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                        </div>
+                      )}
+                      {!areDetalii && (
+                        <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
+                      )}
+                      {onEditWod && (
+                        <button onClick={(e) => { e.stopPropagation(); onEditWod(w) }}
+                          style={{ marginTop: '12px', padding: '7px 16px', background: '#f0f0f0', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                          {t.jurnalEdit}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+            {sl && (() => {
+              const hasSets = sl.sets && Object.keys(sl.sets).length > 0
+              const skillKey = sl.id
+              const skillOpen = deschisSkill === skillKey
+              const parti = []
+              if (hasSets) {
+                Object.entries(sl.sets).forEach(([miscare, seturi]) => {
+                  const seturiTxt = (seturi || []).map((set, si) => {
+                    if (typeof set === 'string') return `${t.skillLogSetLabel(si + 1)}: ${set}`
+                    const bucati = []
+                    if (set.reps) bucati.push(`${set.reps} reps`)
+                    if (set.weight) bucati.push(`${set.weight}`)
+                    return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
+                  }).join(' · ')
+                  parti.push({ miscare, seturiTxt })
+                })
+              }
+              return (
+                <div onClick={() => { setDeschisSkill(skillOpen ? null : skillKey); setConfirmDeleteSkill(null) }}
+                  style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{t.jurnalSkillTitle}{sl.wods?.skill_name ? ` · ${sl.wods.skill_name}` : ''}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {onDeleteSkill && (
+                        confirmDeleteSkill === skillKey ? (
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteSkill(sl.id); setConfirmDeleteSkill(null) }}
+                            style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                            {t.jurnalDeleteConfirm}
+                          </button>
+                        ) : (
+                          <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteSkill(skillKey) }}
+                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+                            ×
+                          </button>
+                        )
+                      )}
+                      <span style={{ fontSize: '14px', color: '#aaa' }}>{skillOpen ? '▲' : '▼'}</span>
+                    </div>
+                  </div>
+                  {skillOpen && (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                      {hasSets ? (
+                        <div style={{ marginBottom: sl.notes ? '10px' : 0 }}>
+                          {parti.map((p, j) => (
+                            <div key={j} style={{ marginBottom: '6px' }}>
+                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.miscare}</div>
+                              <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : sl.result ? (
+                        <div style={{ fontSize: '13px', color: '#0E0E0E', marginBottom: sl.notes ? '10px' : 0 }}>{sl.result}</div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalSkillNoResult}</div>
+                      )}
+                      {sl.notes && (
+                        <div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                          <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{sl.notes}</div>
+                        </div>
+                      )}
+                      {onEditSkill && (
+                        <button onClick={(e) => { e.stopPropagation(); onEditSkill(sl) }}
+                          style={{ marginTop: '12px', padding: '7px 16px', background: '#f0f0f0', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                          {t.jurnalEdit}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )
       })}
@@ -2856,7 +2948,9 @@ function App() {
   const [skillLogs, setSkillLogs] = useState([])
   const [skillLogNote, setSkillLogNote] = useState('')
   const [skillLogSets, setSkillLogSets] = useState({})
+  const [skillLogResult, setSkillLogResult] = useState('')
   const [skillLogSaving, setSkillLogSaving] = useState(false)
+  const [skillPrCandidates, setSkillPrCandidates] = useState(null)
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
   const [claseDB, setClaseDB] = useState([])
@@ -3014,6 +3108,23 @@ function App() {
       }
     })
   }, [actualToday, claseDB, rezervariMele, wodLogs, lang])
+
+  // Jurnalul imbina wod_logs si skill_logs dupa wod_id, ca un Skill Work
+  // logat fara WOD in acea zi (sau invers) sa apara oricum, fiecare in
+  // cardul lui, sub aceeasi data.
+  const jurnalEntries = useMemo(() => {
+    const map = new Map()
+    wodLogs.forEach(l => {
+      const key = l.wod_id || `wodlog-${l.id}`
+      map.set(key, { ...(map.get(key) || {}), key, date: (l.logged_at || '').slice(0, 10), wodLog: l })
+    })
+    skillLogs.forEach(l => {
+      const key = l.wod_id || `skilllog-${l.id}`
+      const existing = map.get(key) || { key, date: (l.logged_at || '').slice(0, 10) }
+      map.set(key, { ...existing, skillLog: l })
+    })
+    return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  }, [wodLogs, skillLogs])
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -3475,7 +3586,7 @@ function App() {
   }
 
   const fetchSkillLogs = async () => {
-    const { data } = await supabase.from('skill_logs').select('*').eq('member_id', user.id)
+    const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill)').eq('member_id', user.id)
     if (data) setSkillLogs(data)
   }
 
@@ -3500,23 +3611,68 @@ function App() {
     setSkillLogSets(prev => ({ ...prev, [movement]: (prev[movement] || []).filter((_, i) => i !== idx) }))
   }
 
+  // Pentru fiecare numar de reps logat la Skill Work, ia cea mai mare greutate
+  // introdusa si o compara cu cel mai mare PR existent la aceeasi miscare +
+  // acelasi numar exact de reps (PR-urile se tin separat pe numar de reps -
+  // un 15RM nu concureaza cu un 1RM). Returneaza doar cele care bat recordul.
+  const computeSkillPrCandidates = (movement, setsByLine, weightUnit) => {
+    if (!movement) return []
+    const bestByReps = {}
+    Object.values(setsByLine || {}).forEach(seturi => (seturi || []).forEach(s => {
+      const reps = parseInt(s.reps), weight = parseFloat(s.weight)
+      if (!reps || !weight) return
+      if (!bestByReps[reps] || weight > bestByReps[reps]) bestByReps[reps] = weight
+    }))
+    return Object.entries(bestByReps).map(([repsStr, weight]) => {
+      const reps = parseInt(repsStr)
+      const existingKg = prDate
+        .filter(r => r.movement === movement && (r.reps || 1) === reps && (r.unit === 'kg' || r.unit === 'lbs'))
+        .map(r => convertWeight(parseFloat(r.value), r.unit, weightUnit))
+      const bestExisting = existingKg.length ? Math.max(...existingKg) : null
+      return { movement, reps, weight, unit: weightUnit, isNewPr: bestExisting == null || weight > bestExisting }
+    }).filter(c => c.isNewPr).sort((a, b) => a.reps - b.reps)
+  }
+
+  const confirmSkillPR = async (candidate) => {
+    const { error } = await supabase.from('personal_records').insert({
+      member_id: user.id, movement: candidate.movement, value: candidate.weight,
+      unit: candidate.unit, reps: candidate.reps, notes: t.prFromSkillWorkNote,
+    })
+    if (error) { showToast(t.toastGenericError); console.error(error); return }
+    showToast(t.toastSkillPrSaved)
+    await fetchPRuri()
+    setSkillPrCandidates(prev => (prev || []).filter(c => c.reps !== candidate.reps))
+  }
+
   const saveSkillLog = async () => {
     if (!wodZiData) return
     setSkillLogSaving(true)
+    const isWeightlifting = (wodZiData.skill_type || 'Weightlifting') === 'Weightlifting'
     // curatam seturile goale (miscari fara niciun set adaugat, sau intrari nescrise)
     const setsCurate = {}
-    Object.entries(skillLogSets).forEach(([miscare, seturi]) => {
-      const valide = (seturi || []).filter(v => (v.weight || '').trim() !== '' || (v.reps || '').trim() !== '')
-      if (valide.length > 0) setsCurate[miscare] = valide
-    })
-    const { error } = await supabase.from('skill_logs')
-      .upsert({ member_id: user.id, wod_id: wodZiData.id, notes: skillLogNote.trim() || null, sets: Object.keys(setsCurate).length > 0 ? setsCurate : null, logged_at: new Date().toISOString() }, { onConflict: 'member_id,wod_id' })
-    if (error) { showToast(t.toastGenericError); console.error(error) }
-    else {
-      showToast(t.toastSkillLogSaved)
-      await fetchSkillLogs()
-      setScreen(prevScreen || 'home')
+    if (isWeightlifting) {
+      Object.entries(skillLogSets).forEach(([miscare, seturi]) => {
+        const valide = (seturi || []).filter(v => (v.weight || '').trim() !== '' || (v.reps || '').trim() !== '')
+        if (valide.length > 0) setsCurate[miscare] = valide
+      })
     }
+    const { error } = await supabase.from('skill_logs').upsert({
+      member_id: user.id, wod_id: wodZiData.id,
+      notes: skillLogNote.trim() || null,
+      sets: isWeightlifting && Object.keys(setsCurate).length > 0 ? setsCurate : null,
+      result: !isWeightlifting ? (skillLogResult.trim() || null) : null,
+      logged_at: new Date().toISOString(),
+    }, { onConflict: 'member_id,wod_id' })
+    if (error) { showToast(t.toastGenericError); console.error(error); setSkillLogSaving(false); return }
+    showToast(t.toastSkillLogSaved)
+    await fetchSkillLogs()
+    if (isWeightlifting && wodZiData.skill_name) {
+      await fetchPRuri()
+      const candidates = computeSkillPrCandidates(wodZiData.skill_name, setsCurate, userProfile?.weight_unit || 'kg')
+      if (candidates.length > 0) { setSkillPrCandidates(candidates); setSkillLogSaving(false); return }
+    }
+    setSkillPrCandidates(null)
+    setScreen(prevScreen || 'home')
     setSkillLogSaving(false)
   }
 
@@ -3646,6 +3802,12 @@ function App() {
     const { error } = await supabase.from('wod_logs').delete().eq('id', id)
     if (error) { showToast(t.toastDeleteWorkoutError); console.error(error) }
     else { showToast(t.toastWorkoutDeleted); await fetchWodLogs() }
+  }
+
+  const stergeSkillLog = async (id) => {
+    const { error } = await supabase.from('skill_logs').delete().eq('id', id)
+    if (error) { showToast(t.toastDeleteWorkoutError); console.error(error) }
+    else { showToast(t.toastWorkoutDeleted); await fetchSkillLogs() }
   }
 
   const saveWodLog = async () => {
@@ -4442,7 +4604,7 @@ function App() {
                               </div>
                             ))}
                           </div>
-                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSkillSets(logZiSkill?.sets)); setPrevScreen('home'); setScreen('logSkill') }}
+                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSkillSets(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
                             style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                             {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
                           </button>
@@ -4657,28 +4819,35 @@ function App() {
           </div>
 
           {logTab === 'jurnal' && (
-            <JurnalList logs={wodLogs} onDelete={stergeWodLog} t={t} lang={lang} onEdit={(log) => {
-              const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
-              const parts = (log.notes || '').split('\n---\n')
-              const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
-              const linii = prefix.split('\n').filter(Boolean)
-              const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
-              const movimenteLog = linii.slice(primaEsteHeader ? 1 : 0)
-              setEditLogId(log.id)
-              setEditLogHeader(primaEsteHeader ? linii[0] : '')
-              setEditLogMiscari(movimenteLog)
-              setEditLogMiscareCurenta('')
-              if (primaEsteHeader && linii[0].startsWith('AMRAP')) {
-                const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
-                setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
-              } else {
-                setWodResult(log.result || ''); setWodRoundsCompleted(''); setWodPartialReps([])
-              }
-              setWodTime(log.time_result || '')
-              setWodNote(parts.length > 1 ? parts[1] : '')
-              setPrevScreen('log')
-              setScreen('logWOD')
-            }} />
+            <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} t={t} lang={lang}
+              onEditWod={(log) => {
+                const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
+                const parts = (log.notes || '').split('\n---\n')
+                const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
+                const linii = prefix.split('\n').filter(Boolean)
+                const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
+                const movimenteLog = linii.slice(primaEsteHeader ? 1 : 0)
+                setEditLogId(log.id)
+                setEditLogHeader(primaEsteHeader ? linii[0] : '')
+                setEditLogMiscari(movimenteLog)
+                setEditLogMiscareCurenta('')
+                if (primaEsteHeader && linii[0].startsWith('AMRAP')) {
+                  const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
+                  setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
+                } else {
+                  setWodResult(log.result || ''); setWodRoundsCompleted(''); setWodPartialReps([])
+                }
+                setWodTime(log.time_result || '')
+                setWodNote(parts.length > 1 ? parts[1] : '')
+                setPrevScreen('log')
+                setScreen('logWOD')
+              }}
+              onEditSkill={(sl) => {
+                setSkillLogNote(sl.notes || ''); setSkillLogSets(normalizeSkillSets(sl.sets)); setSkillLogResult(sl.result || ''); setSkillPrCandidates(null)
+                if (sl.wods?.date) setDataAcasa(sl.wods.date)
+                setPrevScreen('log')
+                setScreen('logSkill')
+              }} />
           )}
 
         </div>
@@ -4843,28 +5012,41 @@ function App() {
             {wodZiData?.skill_name && (
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{wodZiData.skill_name}</div>
             )}
-            {(wodZiData?.skill || []).map((miscare, mi) => (
-              <div key={mi} style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{miscare}</div>
-                {(skillLogSets[miscare] || []).map((set, si) => (
-                  <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '11px', color: '#888', minWidth: '42px' }}>{t.skillLogSetLabel(si + 1)}</span>
-                    <input type="number" value={set.reps || ''} onChange={e => updateSkillSet(miscare, si, 'reps', e.target.value)}
-                      placeholder={t.skillLogRepsPlaceholder}
-                      style={{ width: '70px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                    <input type="number" value={set.weight || ''} onChange={e => updateSkillSet(miscare, si, 'weight', e.target.value)}
-                      placeholder={userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}
-                      style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                    <button onClick={() => removeSkillSet(miscare, si)}
-                      style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer', lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>×</button>
-                  </div>
+            {(wodZiData?.skill_type || 'Weightlifting') === 'Weightlifting' ? (
+              (wodZiData?.skill || []).map((miscare, mi) => (
+                <div key={mi} style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{miscare}</div>
+                  {(skillLogSets[miscare] || []).map((set, si) => (
+                    <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '11px', color: '#888', minWidth: '42px' }}>{t.skillLogSetLabel(si + 1)}</span>
+                      <input type="number" value={set.reps || ''} onChange={e => updateSkillSet(miscare, si, 'reps', e.target.value)}
+                        placeholder={t.skillLogRepsPlaceholder}
+                        style={{ width: '70px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      <input type="number" value={set.weight || ''} onChange={e => updateSkillSet(miscare, si, 'weight', e.target.value)}
+                        placeholder={userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      <button onClick={() => removeSkillSet(miscare, si)}
+                        style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer', lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => addSkillSet(miscare)}
+                    style={{ padding: '6px 12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                    {t.skillLogAddSet}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <>
+                {(wodZiData?.skill || []).map((m, mi) => (
+                  <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
                 ))}
-                <button onClick={() => addSkillSet(miscare)}
-                  style={{ padding: '6px 12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                  {t.skillLogAddSet}
-                </button>
-              </div>
-            ))}
+                <div style={{ marginTop: '10px', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.skillLogResultLabel}</div>
+                  <input value={skillLogResult} onChange={e => setSkillLogResult(e.target.value)} placeholder={t.skillLogResultPlaceholder}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                </div>
+              </>
+            )}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.skillLogNoteLabel}</div>
               <input value={skillLogNote} onChange={e => setSkillLogNote(e.target.value)} placeholder={t.skillLogNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
@@ -4874,6 +5056,26 @@ function App() {
               {skillLogSaving ? t.skillLogSaving : t.skillLogSaveButton}
             </button>
           </div>
+          {skillPrCandidates && skillPrCandidates.length > 0 && (
+            <div style={{ marginTop: '14px', background: '#F5FBEA', border: '1px solid #ABE73C', borderRadius: '12px', padding: '14px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{t.skillPrConfirmTitle}</div>
+              {skillPrCandidates.map(c => (
+                <div key={c.reps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #ddeec4' }}>
+                  <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{t.prRepCountLabel(c.reps)} — {c.weight}{c.unit}</span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => setSkillPrCandidates(prev => prev.filter(x => x.reps !== c.reps))}
+                      style={{ fontSize: '11px', padding: '5px 10px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer' }}>{t.skillPrConfirmDismissButton}</button>
+                    <button onClick={() => confirmSkillPR(c)}
+                      style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', background: '#ABE73C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t.skillPrConfirmSaveButton}</button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => { setSkillPrCandidates(null); setScreen(prevScreen || 'home') }}
+                style={{ marginTop: '10px', width: '100%', padding: '9px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                {t.skillPrConfirmDoneButton}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -5065,12 +5267,30 @@ function App() {
         const toateMiscariCategorii = [...PR_CATEGORII.WEIGHTLIFTING, ...PR_CATEGORII.GYMNASTICS, ...PR_CATEGORII.CARDIO, ...heroWodsListAll]
         const miscariFaraCat = Object.keys(prGroups).filter(m => !toateMiscariCategorii.includes(m))
         const preferredUnit = userProfile?.weight_unit || 'kg'
+        // Pentru WEIGHTLIFTING, PR-urile se tin separat pe fiecare numar de repetari
+        // (1RM, 3RM, 5RM, 15RM etc.) - un 15RM greu nu concureaza cu un 1RM, sunt
+        // recorduri independente la aceeasi miscare. Randurile vechi fara reps
+        // completat sunt tratate ca 1RM (consistent cu hint-ul din formularul PR).
+        const repGroupsFor = (records) => {
+          const buckets = {}
+          ;(records || []).forEach(r => {
+            if (r.unit !== 'kg' && r.unit !== 'lbs') return
+            if (r.value == null) return
+            const reps = r.reps || 1
+            const valKg = convertWeight(parseFloat(r.value), r.unit, preferredUnit)
+            if (!buckets[reps] || valKg > buckets[reps].valKg) buckets[reps] = { reps, valKg, record: r }
+          })
+          return Object.values(buckets).sort((a, b) => a.reps - b.reps)
+        }
         const renderMiscare = (movement, idx, total, cat) => {
           const records = prGroups[movement]
           const best = bestPR(records)
           const isOpen = prSelectat === movement
+          const repRows = cat === 'WEIGHTLIFTING' ? repGroupsFor(records) : null
+          const oneRm = repRows?.find(r => r.reps === 1)
+          const collapsedRecord = oneRm ? oneRm.record : best
           const isWeightBest = cat === 'WEIGHTLIFTING' && (best?.unit === 'kg' || best?.unit === 'lbs') && best?.value
-          const bestKg = isWeightBest ? convertWeight(parseFloat(best.value), best.unit, preferredUnit) : null
+          const bestKg = oneRm ? oneRm.valKg : (isWeightBest ? convertWeight(parseFloat(best.value), best.unit, preferredUnit) : null)
           const wodInfo = heroWodsInfoAll[movement]
           const isConfirmingDelete = prConfirmDelete === movement
           return (
@@ -5079,7 +5299,7 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: best ? '#0E0E0E' : '#ccc' }}>{best ? formatPR(best, preferredUnit) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: collapsedRecord ? '#0E0E0E' : '#ccc' }}>{collapsedRecord ? formatPR(collapsedRecord, preferredUnit) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                   {isConfirmingDelete ? (
                     <button onClick={(e) => { e.stopPropagation(); deleteMiscarePR(movement) }}
@@ -5094,12 +5314,12 @@ function App() {
                   )}
                 </div>
               </div>
-              {best && !isOpen && (
+              {collapsedRecord && !isOpen && (
                 <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>
-                  {new Date(best.recorded_at).toLocaleDateString(localeFor(lang))}{best.notes ? ' · ' + best.notes : ''}
+                  {new Date(collapsedRecord.recorded_at).toLocaleDateString(localeFor(lang))}{collapsedRecord.notes ? ' · ' + collapsedRecord.notes : ''}
                 </div>
               )}
-              {!best && !isOpen && wodInfo && (
+              {!collapsedRecord && !isOpen && wodInfo && (
                 <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
               )}
               {isOpen && (
@@ -5148,7 +5368,24 @@ function App() {
                       </div>
                     </div>
                   )}
-                  {records && records.length > 0 && (
+                  {cat === 'WEIGHTLIFTING' && repRows && repRows.length > 0 ? (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      {repRows.map(({ reps, record }) => (
+                        <div key={reps}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid #FFFFFF' }}>
+                          <span style={{ fontSize: '11px', color: '#aaa' }}>{t.prRepCountLabel(reps)} · {new Date(record.recorded_at).toLocaleDateString(localeFor(lang))}{record.notes ? ' · ' + record.notes : ''}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(record, preferredUnit)}</span>
+                            <button onClick={() => startEditPR(record, movement)}
+                              style={{ background: '#f0f0f0', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              ✎
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
                       <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {records.slice(0, 5).map((r, j) => (
