@@ -1211,6 +1211,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
   const [tipWod, setTipWod] = useState('AMRAP')
   const [durataWodMin, setDurataWodMin] = useState('20')
   const [durataWodSec, setDurataWodSec] = useState('0')
+  const [formatConfigWod, setFormatConfigWod] = useState({})
   const [dataWod, setDataWod] = useState('')
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
@@ -1661,6 +1662,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
     const payload = {
       date: dataWod, type: tipWod, duration: durataWod,
+      format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
       warmup: parseLinii(warmupWod),
       skill: parseLinii(skillWod),
@@ -1681,7 +1683,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
       setWarmupWod(''); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({})
-      setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
+      setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
     }
     setSavingWod(false)
   }
@@ -1692,6 +1694,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     setTipWod(w.type || 'AMRAP')
     const [dMin, dSec] = (w.duration || '20:0').split(':')
     setDurataWodMin(dMin || '0'); setDurataWodSec(dSec || '0')
+    setFormatConfigWod(w.format_config || {})
     setNumeWod(w.name || '')
     setWarmupWod((w.warmup || []).join('\n'))
     setSkillWod((w.skill || []).join('\n'))
@@ -2452,11 +2455,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
             <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodTypeLabel}</div>
-            <select value={tipWod} onChange={e => setTipWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
-              <option>AMRAP</option><option>For Time</option><option>EMOM</option><option>Tabata</option>
-              <option>Chipper</option><option>Ladder</option><option>Partner WOD</option>
-            </select>
+            <FormatConfigEditor formatId={tipWod} onFormatChange={setTipWod}
+              config={formatConfigWod} onConfigChange={setFormatConfigWod}
+              excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
               <div style={{ flex: 1 }}>

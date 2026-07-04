@@ -97,11 +97,12 @@ function IntervalListField({ label, value, onChange }) {
   return <MovementListField label={label} value={value} onChange={onChange} />
 }
 
-export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, t }) {
+export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, t }) {
   const options = formatOptions || FORMAT_IDS
   const format = getFormat(formatId)
   const cfg = config || {}
   const setField = (key, value) => onConfigChange({ ...cfg, [key]: value })
+  const excluded = excludeConfigKeys || []
 
   return (
     <div>
@@ -111,7 +112,7 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           {options.map(id => <option key={id} value={id}>{id}</option>)}
         </select>
       </div>
-      {Object.entries(format.config || {}).map(([key, field]) => {
+      {Object.entries(format.config || {}).filter(([key]) => !excluded.includes(key)).map(([key, field]) => {
         if (field.type === 'duration') return (
           <DurationField key={key} label={field.label} seconds={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
         )
