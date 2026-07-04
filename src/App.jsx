@@ -4261,6 +4261,9 @@ function App() {
                     {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
                   </div>
                   {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
+                  {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
+                  )}
                   {logZiWod && (
                     <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
@@ -4272,9 +4275,6 @@ function App() {
                         </>
                       )}
                     </div>
-                  )}
-                  {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
-                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
                 </div>
                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
