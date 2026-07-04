@@ -87,6 +87,13 @@ export const WORKOUT_FORMATS = {
       restSec: { type: 'duration', required: true, label: 'Odihnă' },
     },
   },
+  // Id istoric (skill_type implicit dinainte de acest catalog) - pastrat ca
+  // atare (nu redenumit 'Strength Sets') ca sa ramana compatibil cu toate
+  // WOD-urile existente. Seturi libere, fara nr. de seturi prescris.
+  'Weightlifting': {
+    family: 'sets', rowMode: 'movement', prEligible: true,
+    config: {},
+  },
   'Strength Sets': {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {
@@ -198,6 +205,20 @@ export function parseFormatHeader(headerStr) {
   return { tip, min: durMatch ? durMatch[1] : '', sec: durMatch ? durMatch[2] : '0' }
 }
 
+// Durata totala estimata (secunde) dintr-un config structurat, folosita doar
+// pentru afisare/compatibilitate cu header-ul text vechi "TIP mm:ss" - nu
+// toate formatele au o durata clara (ex. Death By e open-ended), caz in care
+// intoarce null si header-ul ramane fara durata (optionala oricum).
+export function estimateTotalDurationSec(formatId, config) {
+  const cfg = config || {}
+  if (formatId === 'AMRAP') return cfg.durationSec || null
+  if (['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD'].includes(formatId)) return cfg.timeCapSec || cfg.durationSec || null
+  if (formatId === 'EMOM') return (parseInt(cfg.totalRounds) || 0) * (cfg.intervalSec || 60) || null
+  if (formatId === 'Tabata' || formatId === 'Intervals') return (parseInt(cfg.rounds) || 8) * ((cfg.workSec || 20) + (cfg.restSec || 10)) || null
+  if (formatId === 'Buy-In/Cash-Out') return cfg.mainDurationSec || null
+  return null
+}
+
 // --- family: 'sets' -----------------------------------------------------
 
 // Accepta atat formatul vechi ({ miscare: ["40","50"] }, doar greutate ca
@@ -261,11 +282,14 @@ export function defaultRowsForFormat(formatId, config, movements) {
     for (let i = 1; i <= n; i++) out[`Rundă ${i}`] = [emptyRow()]
     return out
   }
-  // Strength Sets / Superset / Build to Heavy/1RM: randuri per miscare.
-  const targetSets = parseInt(config?.targetSets) || 1
+  // Weightlifting / Strength Sets / Superset / Build to Heavy/1RM: randuri per
+  // miscare. Fara targetSets prescris (Weightlifting, Build to Heavy) pornim
+  // de la 0 randuri - membrul adauga manual cate seturi a facut, ca la
+  // Skill Work Weightlifting azi (nu presupunem un numar).
+  const targetSets = parseInt(config?.targetSets) || 0
   const movs = (movements && movements.length > 0) ? movements : ['']
   const out = {}
-  movs.forEach(m => { out[m] = rowsOf(targetSets) })
+  movs.forEach(m => { out[m] = targetSets ? rowsOf(targetSets) : [] })
   return out
 }
 

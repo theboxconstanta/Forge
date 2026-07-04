@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   WORKOUT_FORMATS, FORMAT_IDS, getFormat, legacyHeaderTypeOf,
   composePartialText, parsePartialText, composeAmrapResult, parseAmrapResult,
-  composeFormatHeader, parseFormatHeader,
+  composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates,
 } from './workoutFormats'
@@ -70,6 +70,21 @@ describe('composeFormatHeader / parseFormatHeader', () => {
   })
 })
 
+describe('estimateTotalDurationSec', () => {
+  it('AMRAP ia direct durationSec', () => {
+    expect(estimateTotalDurationSec('AMRAP', { durationSec: 720 })).toBe(720)
+  })
+  it('EMOM înmulțește intervalul cu numărul de runde', () => {
+    expect(estimateTotalDurationSec('EMOM', { totalRounds: 10, intervalSec: 60 })).toBe(600)
+  })
+  it('Tabata înmulțește rundele cu lucru+odihnă', () => {
+    expect(estimateTotalDurationSec('Tabata', { rounds: 8, workSec: 20, restSec: 10 })).toBe(240)
+  })
+  it('Death By nu are durată estimabilă (open-ended)', () => {
+    expect(estimateTotalDurationSec('Death By', {})).toBe(null)
+  })
+})
+
 describe('normalizeSetsRows', () => {
   it('migrează formatul vechi (array de string-uri = doar greutate)', () => {
     expect(normalizeSetsRows({ Squat: ['40', '50'] })).toEqual({
@@ -110,6 +125,10 @@ describe('defaultRowsForFormat', () => {
   it('Strength Sets generează N seturi per mișcare', () => {
     const rows = defaultRowsForFormat('Strength Sets', { targetSets: 3 }, ['Back Squat'])
     expect(rows['Back Squat']).toHaveLength(3)
+  })
+  it('Weightlifting fără targetSets prescris pornește cu 0 rânduri (adăugate manual)', () => {
+    const rows = defaultRowsForFormat('Weightlifting', {}, ['Back Squat'])
+    expect(rows['Back Squat']).toHaveLength(0)
   })
   it('formatele scored nu au rânduri', () => {
     expect(defaultRowsForFormat('AMRAP', {}, [])).toEqual({})

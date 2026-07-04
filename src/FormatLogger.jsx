@@ -114,7 +114,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
     <>
       {Object.entries(rowsByKey).map(([key, rows]) => (
         <SetsRows key={key} rowKey={key} rows={rows}
-          onChange={patch => onChange({ ...rowsByKey, ...patch })}
+          onChange={nextRows => onChange({ ...rowsByKey, [key]: nextRows })}
           weightUnit={weightUnit} t={t} />
       ))}
     </>
@@ -141,7 +141,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>Buy-In</div>
         {Object.entries(buyInRows).map(([key, rows]) => (
           <SetsRows key={key} rowKey={key} rows={rows}
-            onChange={patchRows => patch({ sets: { ...v.sets, __buyIn: patchRows[key] } })}
+            onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })}
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>Main Work</div>
@@ -149,7 +149,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>Cash-Out</div>
         {Object.entries(cashOutRows).map(([key, rows]) => (
           <SetsRows key={key} rowKey={key} rows={rows}
-            onChange={patchRows => patch({ sets: { ...v.sets, __cashOut: patchRows[key] } })}
+            onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
             weightUnit={weightUnit} t={t} />
         ))}
       </>
