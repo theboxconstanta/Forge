@@ -4378,6 +4378,18 @@ function App() {
                       )}
                     </div>
                   )}
+                  {logZiSkill && (
+                    <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
+                      <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
+                      {wodZiData.skill_name && (
+                        <>
+                          <span style={{ color: '#ddd', fontWeight: '400' }}>|</span>
+                          <span style={{ color: '#0E0E0E' }}>{wodZiData.skill_name}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                   {wodDeschis ? '−' : '+'}
@@ -4409,18 +4421,6 @@ function App() {
                               <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
                             ))}
                           </div>
-                          {logZiSkill && (
-                            <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
-                              <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
-                              {wodZiData.skill_name && (
-                                <>
-                                  <span style={{ color: '#ddd', fontWeight: '400' }}>|</span>
-                                  <span style={{ color: '#0E0E0E' }}>{wodZiData.skill_name}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
                           <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(logZiSkill?.sets || {}); setPrevScreen('home'); setScreen('logSkill') }}
                             style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                             {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
