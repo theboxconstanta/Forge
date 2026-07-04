@@ -403,7 +403,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
   )
 }
 
-function CautareMiscare({ onAleage, preFill }) {
+function CautareMiscare({ onAleage, preFill, t }) {
   const [query, setQuery] = useState(preFill || '')
   const [sugestii, setSugestii] = useState([])
   const [aleasa, setAleasa] = useState(preFill || '')
@@ -419,8 +419,8 @@ function CautareMiscare({ onAleage, preFill }) {
   }
   return (
     <div style={{ position: 'relative', marginBottom: '12px' }}>
-      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Exercițiu / Mișcare</div>
-      <input value={query} onChange={e => cauta(e.target.value)} placeholder="Scrie pentru a căuta..."
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.cautareMiscareLabel}</div>
+      <input value={query} onChange={e => cauta(e.target.value)} placeholder={t.cautareMiscarePlaceholder}
         style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #0E0E0E' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
       {sugestii.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
@@ -428,7 +428,7 @@ function CautareMiscare({ onAleage, preFill }) {
             <div key={i} onClick={() => alege(s)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #FFFFFF' : 'none' }}>{s}</div>
           ))}
           <div onClick={() => alege(query)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '12px', color: '#0E0E0E', fontWeight: '500', background: '#f0f0f0' }}>
-            + Adaugă "{query}" ca mișcare nouă
+            {t.cautareMiscareAddNew(query)}
           </div>
         </div>
       )}
@@ -717,7 +717,7 @@ function Timer({ onBack, defaultFortime }) {
   )
 }
 
-function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateChange }) {
+function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
   const isToday = selectedDate === todayStr
@@ -801,25 +801,25 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>Clasament <Medal size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.clasamentTitle} <Medal size={20} color="#0E0E0E" strokeWidth={2} /></h1>
         <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#FFFFFF', borderRadius: '12px', padding: '8px 12px' }}>
         <button onClick={() => goDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>
-            {isToday ? 'Azi' : new Date(selectedDate + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })}
+            {isToday ? t.clasamentToday : new Date(selectedDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })}
           </div>
-          {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>Niciun WOD</div>}
+          {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>{t.clasamentNoWod}</div>}
         </div>
         <button onClick={() => goDay(+1)} disabled={isToday} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: isToday ? '#e0e0e0' : '#0E0E0E', color: isToday ? '#bbb' : '#fff', fontSize: '16px', cursor: isToday ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         {[
-          { id: 'toti', label: 'Toți', icon: Users },
-          { id: 'masculin', label: 'Masculin', icon: Mars },
-          { id: 'feminin', label: 'Feminin', icon: Venus },
+          { id: 'toti', label: t.clasamentFilterAll, icon: Users },
+          { id: 'masculin', label: t.clasamentFilterMale, icon: Mars },
+          { id: 'feminin', label: t.clasamentFilterFemale, icon: Venus },
         ].map(g => (
           <div key={g.id} onClick={() => setGenderTab(g.id)}
             style={{ padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#0E0E0E' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#0E0E0E' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -829,12 +829,12 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>{t.clasamentLoading}</div>
       ) : totalLogs === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
           <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Flag size={36} color="#ccc" strokeWidth={1.5} /></div>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>Niciun rezultat încă</div>
-          <div style={{ fontSize: '12px', color: '#aaa' }}>Fii primul care loghează azi!</div>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>{t.clasamentEmptyTitle}</div>
+          <div style={{ fontSize: '12px', color: '#aaa' }}>{t.clasamentEmptySubtitle}</div>
         </div>
       ) : (
         <div>
@@ -851,7 +851,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                     <LevelDot nivel={nivel.id} /> {nivel.id}
                   </div>
                   <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
-                    {sectionLogs.length} {sectionLogs.length === 1 ? (genderTab === 'feminin' ? 'participantă' : 'participant') : (genderTab === 'feminin' ? 'participante' : 'participanți')}
+                    {sectionLogs.length} {t.clasamentParticipantWord(sectionLogs.length, genderTab)}
                   </div>
                   {isForTime && (
                     <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
@@ -862,7 +862,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                 </div>
                 {/* Carduri participanți */}
                 {sectionLogs.map((log, i) => {
-                  const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || 'Anonim'
+                  const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
                   const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
                   const result = log.time_result || log.result || '—'
                   const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
@@ -876,7 +876,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
                           <div style={{ fontSize: '11px', color: '#aaa' }}>
-                            {new Date(log.logged_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -898,7 +898,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   )
 }
 
-function Feed({ showToast, user, userProfile, isAdmin }) {
+function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   const [posts, setPosts] = useState([])
   const [reactions, setReactions] = useState({})
   const [comments, setComments] = useState({})
@@ -917,11 +917,11 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
   const relativeTime = (ts) => {
     const diff = Date.now() - new Date(ts).getTime()
     const min = Math.floor(diff / 60000)
-    if (min < 1) return 'acum'
+    if (min < 1) return t.feedJustNow
     if (min < 60) return `${min} min`
     const h = Math.floor(min / 60)
     if (h < 24) return `${h}h`
-    return `${Math.floor(h / 24)}z`
+    return t.feedDaysAgo(Math.floor(h / 24))
   }
 
   const fetchAll = async (showLoader = false) => {
@@ -977,8 +977,8 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
     if (!postText.trim() || posting) return
     setPosting(true)
     const { error } = await supabase.from('feed_posts').insert({ member_id: user.id, text: postText.trim() })
-    if (error) { showToast('❌ Eroare la postare!'); console.error(error) }
-    else { setPostText(''); showToast('Postat! 🎉') }
+    if (error) { showToast(t.feedToastPostError); console.error(error) }
+    else { setPostText(''); showToast(t.feedToastPostSuccess) }
     setPosting(false)
   }
 
@@ -1009,39 +1009,39 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
     // ca eroare de Postgres/Supabase, si am arata "succes" fals fara sa
     // stergem nimic (exact bug-ul gasit: politica RLS nu avea exceptie de admin).
     const { data, error } = await supabase.from('feed_posts').delete().eq('id', postId).select()
-    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
-    if (!data || data.length === 0) { showToast('❌ Nu am putut șterge (verifică permisiunile RLS)'); return }
+    if (error) { showToast(t.feedToastDeletePostError); console.error(error); return }
+    if (!data || data.length === 0) { showToast(t.feedToastDeletePostRlsError); return }
     setConfirmDeletePost(null)
-    showToast('✓ Postare ștearsă')
+    showToast(t.feedToastDeletePostSuccess)
   }
 
   const stergeComentariu = async (commentId) => {
     const { data, error } = await supabase.from('feed_comments').delete().eq('id', commentId).select()
-    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
-    if (!data || data.length === 0) { showToast('❌ Nu am putut șterge (verifică permisiunile RLS)'); return }
+    if (error) { showToast(t.feedToastDeleteCommentError); console.error(error); return }
+    if (!data || data.length === 0) { showToast(t.feedToastDeleteCommentRlsError); return }
     setConfirmDeleteComment(null)
-    showToast('✓ Comentariu șters')
+    showToast(t.feedToastDeleteCommentSuccess)
   }
 
   const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
     const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
-    if (error) { showToast('❌ Eroare la comentariu!'); console.error(error) }
-    else { setComentariuText(''); setComentariuDeschis(null); showToast('Comentariu adăugat!') }
+    if (error) { showToast(t.feedToastCommentError); console.error(error) }
+    else { setComentariuText(''); setComentariuDeschis(null); showToast(t.feedToastCommentAdded) }
   }
 
-  const myName = userProfile?.full_name || user?.email?.split('@')[0] || 'Tu'
+  const myName = userProfile?.full_name || user?.email?.split('@')[0] || t.feedMyNameFallback
   const myAvatar = userProfile?.avatar_url
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>Feed <MessageCircle size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+      <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.feedTitle} <MessageCircle size={20} color="#0E0E0E" strokeWidth={2} /></h1>
 
       {/* Membrii comunitatii */}
       {membriComunitate.length > 0 && (
         <div className="hide-scrollbar" style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '16px' }}>
           {membriComunitate.map(m => {
-            const mName = m.full_name || m.email?.split('@')[0] || 'Membru'
+            const mName = m.full_name || m.email?.split('@')[0] || t.feedMemberFallback
             return (
               <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '58px', flexShrink: 0 }}>
                 <AvatarCircle name={mName} avatarUrl={m.avatar_url} size={50} />
@@ -1056,26 +1056,26 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
       <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <AvatarCircle name={myName} avatarUrl={myAvatar} size={36} />
-          <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder="Cum a fost antrenamentul azi?"
+          <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder={t.feedComposePlaceholder}
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#0E0E0E', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'system-ui' }} />
         </div>
         {postText.trim() && (
           <button onClick={posteaza} disabled={posting}
             style={{ width: '100%', marginTop: '10px', padding: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', opacity: posting ? 0.7 : 1 }}>
-            {posting ? 'Se postează...' : 'Postează'}
+            {posting ? t.feedPosting : t.feedPostButton}
           </button>
         )}
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>Se încarcă...</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>{t.feedLoading}</div>
       ) : posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
           <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><MessageCircle size={36} color="#ccc" strokeWidth={1.5} /></div>
-          <div style={{ fontSize: '14px', color: '#888' }}>Nicio postare încă. Fii primul!</div>
+          <div style={{ fontSize: '14px', color: '#888' }}>{t.feedEmpty}</div>
         </div>
       ) : posts.map(post => {
-        const name = post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Membru'
+        const name = post.profiles?.full_name || post.profiles?.email?.split('@')[0] || t.feedMemberFallback
         const avatarUrl = post.profiles?.avatar_url
         const postReactions = reactions[post.id] || {}
         const postComments = comments[post.id] || []
@@ -1096,7 +1096,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
                 confirmDeletePost === post.id ? (
                   <button onClick={() => stergePost(post.id)}
                     style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
-                    Șterge?
+                    {t.feedDeletePostConfirm}
                   </button>
                 ) : (
                   <button onClick={() => setConfirmDeletePost(post.id)}
@@ -1125,7 +1125,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
             {postComments.length > 0 && (
               <div style={{ borderTop: '1px solid #f5f5f5', paddingTop: '8px', marginBottom: '8px' }}>
                 {postComments.map((c, i) => {
-                  const cName = c.profiles?.full_name || c.profiles?.email?.split('@')[0] || 'Membru'
+                  const cName = c.profiles?.full_name || c.profiles?.email?.split('@')[0] || t.feedMemberFallback
                   return (
                     <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
                       <AvatarCircle name={cName} avatarUrl={c.profiles?.avatar_url} size={26} />
@@ -1138,7 +1138,7 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
                           confirmDeleteComment === c.id ? (
                             <button onClick={() => stergeComentariu(c.id)}
                               style={{ fontSize: '10px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', flexShrink: 0, height: 'fit-content' }}>
-                              Șterge?
+                              {t.feedDeleteCommentConfirm}
                             </button>
                           ) : (
                             <button onClick={() => setConfirmDeleteComment(c.id)}
@@ -1157,10 +1157,10 @@ function Feed({ showToast, user, userProfile, isAdmin }) {
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input value={comentariuText} onChange={e => setComentariuText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && adaugaComentariu(post.id)}
-                  placeholder="Scrie un comentariu..."
+                  placeholder={t.feedCommentPlaceholder}
                   style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa' }} />
                 <button onClick={() => adaugaComentariu(post.id)}
-                  style={{ padding: '8px 14px', borderRadius: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>Trimite</button>
+                  style={{ padding: '8px 14px', borderRadius: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>{t.feedCommentSend}</button>
               </div>
             )}
           </div>
@@ -2706,13 +2706,13 @@ function SortableList({ items, onReorder, onRemove }) {
   )
 }
 
-function JurnalList({ logs, onEdit, onDelete }) {
+function JurnalList({ logs, onEdit, onDelete, t, lang }) {
   const [deschis, setDeschis] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   if (logs.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
       <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
-      <div style={{ fontSize: '14px' }}>Niciun antrenament logat încă</div>
+      <div style={{ fontSize: '14px' }}>{t.jurnalEmpty}</div>
     </div>
   )
   const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
@@ -2722,7 +2722,7 @@ function JurnalList({ logs, onEdit, onDelete }) {
         const parts = (w.notes || '').split('\n---\n')
         const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
         const noteLog = parts.length > 1 ? parts[1] : null
-        const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+        const data = w.logged_at ? new Date(w.logged_at).toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
         const logKey = w.id || i
         const isOpen = deschis === logKey
         const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
@@ -2742,7 +2742,7 @@ function JurnalList({ logs, onEdit, onDelete }) {
                   confirmDelete === logKey ? (
                     <button onClick={(e) => { e.stopPropagation(); onDelete(w.id); setConfirmDelete(null) }}
                       style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
-                      Șterge?
+                      {t.jurnalDeleteConfirm}
                     </button>
                   ) : (
                     <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(logKey) }}
@@ -2773,17 +2773,17 @@ function JurnalList({ logs, onEdit, onDelete }) {
                 )}
                 {noteLog && noteLog.trim() && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>NOTE</div>
+                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
                     <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                   </div>
                 )}
                 {!areDetalii && (
-                  <div style={{ fontSize: '12px', color: '#aaa' }}>Nicio detaliere suplimentară.</div>
+                  <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
                 )}
                 {onEdit && (
                   <button onClick={(e) => { e.stopPropagation(); onEdit(w) }}
                     style={{ marginTop: '12px', padding: '7px 16px', background: '#f0f0f0', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-                    ✎ Editează
+                    {t.jurnalEdit}
                   </button>
                 )}
               </div>
@@ -3552,8 +3552,8 @@ function App() {
 
   const stergeWodLog = async (id) => {
     const { error } = await supabase.from('wod_logs').delete().eq('id', id)
-    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error) }
-    else { showToast('✓ Antrenament șters!'); await fetchWodLogs() }
+    if (error) { showToast(t.toastDeleteWorkoutError); console.error(error) }
+    else { showToast(t.toastWorkoutDeleted); await fetchWodLogs() }
   }
 
   const saveWodLog = async () => {
@@ -3568,9 +3568,9 @@ function App() {
         time_result: isAmrapLog ? null : (wodTime.trim() || null),
         notes: noteFull || null,
       }).eq('id', editLogId)
-      if (error) { showToast('❌ Eroare!'); console.error(error) }
+      if (error) { showToast(t.toastLogWodUpdateError); console.error(error) }
       else {
-        showToast('✓ WOD actualizat!')
+        showToast(t.toastWodUpdated)
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
@@ -3580,7 +3580,7 @@ function App() {
       return
     }
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
-    if (!areContiut) { showToast('❌ Completează cel puțin rezultatul, timpul sau o mișcare!'); return }
+    if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
     const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? (wodMiscariCustom ?? wodZiData[cheieVarianta]) : []
@@ -3598,9 +3598,9 @@ function App() {
       variant_level: tipSalvat,
       result: rezultatFinal || null, time_result: isAmrapLog ? null : (wodTime || null), notes: noteFull || null,
     })
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
-      showToast('WOD salvat! 🎉'); await fetchWodLogs(); fetchClasament()
+      showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
@@ -3613,7 +3613,7 @@ function App() {
   const savePR = async () => {
     if (!miscarePR) return
     const areValoare = prValoare.trim() || prReps.trim() || prTimp.trim() || prRoundsCompleted.trim() || prDistanta.trim()
-    if (!areValoare) { showToast('❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!'); return }
+    if (!areValoare) { showToast(t.toastFillPrValue); return }
     setPrSaving(true)
     const isBenchmark = miscarePR in heroWodsInfoAll
     const isCardio = CARDIO_MISCARI.includes(miscarePR)
@@ -3635,9 +3635,9 @@ function App() {
     const { error } = editPrId
       ? await supabase.from('personal_records').update(insertData).eq('id', editPrId)
       : await supabase.from('personal_records').insert(insertData)
-    if (error) { showToast('❌ Eroare!'); console.error(error) }
+    if (error) { showToast(t.toastPrSaveError); console.error(error) }
     else {
-      showToast(editPrId ? '✓ PR actualizat!' : 'PR salvat! 🏆')
+      showToast(editPrId ? t.toastPrUpdated : t.toastPrSaved)
       await fetchPRuri(); setScreen('pr')
       setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX')
       setEditPrId(null); setLogPentruPR(null)
@@ -3687,10 +3687,10 @@ function App() {
 
   const deleteMiscarePR = async (movement) => {
     const { error } = await supabase.from('personal_records').delete().eq('member_id', user.id).eq('movement', movement)
-    if (error) { showToast('❌ Eroare la ștergere!'); console.error(error); return }
+    if (error) { showToast(t.toastDeleteExerciseError); console.error(error); return }
     setPrDate(prev => prev.filter(r => r.movement !== movement))
     if (prSelectat === movement) setPrSelectat(null)
-    showToast('✓ Exercițiu șters')
+    showToast(t.toastExerciseDeleted)
   }
 
   const toggleWaitlist = async (clasaId) => {
@@ -4497,16 +4497,16 @@ function App() {
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
             <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setPrevScreen('log'); setScreen('logWOD') }}
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
-              + Logare nouă
+              {t.logNewEntry}
             </div>
             <div onClick={() => setLogTab('jurnal')}
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: '#fff', color: '#0E0E0E', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: 'all 0.15s' }}>
-              📓 Jurnal
+              {t.logJournalTab}
             </div>
           </div>
 
           {logTab === 'jurnal' && (
-            <JurnalList logs={wodLogs} onDelete={stergeWodLog} onEdit={(log) => {
+            <JurnalList logs={wodLogs} onDelete={stergeWodLog} t={t} lang={lang} onEdit={(log) => {
               const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
               const parts = (log.notes || '').split('\n---\n')
               const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
@@ -4537,7 +4537,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? 'Editează WOD' : 'Log WOD'}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
           </div>
 
           {editLogId ? (
@@ -4545,7 +4545,7 @@ function App() {
               {editLogHeader ? (
                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
               ) : null}
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
               <SortableList
                 items={editLogMiscari}
                 onReorder={setEditLogMiscari}
@@ -4553,13 +4553,13 @@ function App() {
               />
               <MiscareQuickAdd value={editLogMiscareCurenta} onChange={setEditLogMiscareCurenta}
                 onAdd={(v) => { setEditLogMiscari(prev => [...prev, v]); setEditLogMiscareCurenta('') }}
-                placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
+                placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)} />
             </div>
           ) : (
             <>
               {variantaAleasa !== null && (
                 <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Varianta aleasă</div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>{t.logWodVariantChosen}</div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} /> {VARIANTE_CONFIG[variantaAleasa].nivel}
                     {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
@@ -4569,17 +4569,17 @@ function App() {
 
               {variantaAleasa === null && (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIP ANTRENAMENT</div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodTypeLabel}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-                    {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(t => (
-                      <div key={t} onClick={() => setWodTip(t)}
-                        style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === t ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: wodTip === t ? '#f0f0f0' : '#fafafa', color: wodTip === t ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: wodTip === t ? '700' : '400', cursor: 'pointer' }}>
-                        {t}
+                    {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(tip => (
+                      <div key={tip} onClick={() => setWodTip(tip)}
+                        style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === tip ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: wodTip === tip ? '#f0f0f0' : '#fafafa', color: wodTip === tip ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: wodTip === tip ? '700' : '400', cursor: 'pointer' }}>
+                        {tip}
                       </div>
                     ))}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>DURATĂ / RUNDE</div>
-                  <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder="ex: 20 minute, 5 runde" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
+                  <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder={t.logWodDurationPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 </div>
               )}
 
@@ -4589,7 +4589,7 @@ function App() {
                 const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? 'ANTRENAMENTUL DE AZI' : `WOD — ${new Date(dataAcasa + 'T00:00:00').toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`}</div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(dataAcasa + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>
                       {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                     </div>
@@ -4599,13 +4599,13 @@ function App() {
                         onReorder={setWodMiscariCustom}
                       />
                     ) : (
-                      <div style={{ fontSize: '13px', color: '#aaa' }}>Nicio mișcare definită pentru această variantă.</div>
+                      <div style={{ fontSize: '13px', color: '#aaa' }}>{t.logWodNoMovementForVariant}</div>
                     )}
                   </div>
                 )
               })() : (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
                   <SortableList
                     items={wodMiscari}
                     onReorder={setWodMiscari}
@@ -4613,7 +4613,7 @@ function App() {
                   />
                   <MiscareQuickAdd value={wodMiscareCurenta} onChange={setWodMiscareCurenta}
                     onAdd={(v) => { setWodMiscari(prev => [...prev, v]); setWodMiscareCurenta('') }}
-                    placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
+                    placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)} />
                 </div>
               )}
             </>
@@ -4623,12 +4623,12 @@ function App() {
             {isAmrapLog ? (
               <>
                 <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>RUNDE COMPLETE</div>
-                  <input type="number" min="0" value={wodRoundsCompleted} onChange={e => setWodRoundsCompleted(e.target.value)} placeholder="ex: 18" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodRoundsCompletedLabel}</div>
+                  <input type="number" min="0" value={wodRoundsCompleted} onChange={e => setWodRoundsCompleted(e.target.value)} placeholder={t.logWodRoundsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 </div>
                 {miscariPentruAmrapLog.length > 0 && (
                   <div style={{ marginBottom: '14px' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>RUNDĂ PARȚIALĂ <span style={{ fontWeight: '400', fontSize: '10px' }}>(câte repetări ai făcut din fiecare mișcare)</span></div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>{t.logWodPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodPartialRoundHint}</span></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {miscariPentruAmrapLog.map((m, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4645,22 +4645,22 @@ function App() {
             ) : (
               <>
                 <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>REZULTAT / SCOR</div>
-                  <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder="ex: 18 runde complete" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodResultLabel}</div>
+                  <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder={t.logWodResultPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>TIMP</div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodTimeLabel}</div>
                   {(() => {
                     const [tMin, tSec] = wodTime.split(':')
                     return (
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <div style={{ flex: 1 }}>
                           <input type="number" min="0" value={tMin || ''} onChange={e => setWodTime(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.logWodMinutesLabel}</div>
                         </div>
                         <div style={{ flex: 1 }}>
                           <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setWodTime(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.logWodSecondsLabel}</div>
                         </div>
                       </div>
                     )
@@ -4669,12 +4669,12 @@ function App() {
               </>
             )}
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NOTE</div>
-              <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder="Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
+              <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
               style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
-              {wodSaving ? 'Se salvează...' : editLogId ? 'Salvează modificările' : 'Salvează WOD'}
+              {wodSaving ? t.logWodSaving : editLogId ? t.logWodSaveEdit : t.logWodSaveNew}
             </button>
           </div>
         </div>
@@ -4684,35 +4684,35 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => { setEditHeroWodId(null); resetNewHeroWodForm(); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editHeroWodId ? 'Editează Hero WOD' : 'Hero WOD nou'}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editHeroWodId ? t.heroWodEditTitle : t.heroWodNewTitle}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>NUME WOD</div>
-            <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder="ex: Forge WOD, The C15..."
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodNameLabel}</div>
+            <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder={t.heroWodNamePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>FORMAT</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodFormatLabel}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-              {HERO_WOD_TIPURI.map(t => (
-                <div key={t} onClick={() => setNewHeroWodTip(t)}
-                  style={{ padding: '6px 12px', borderRadius: '20px', border: newHeroWodTip === t ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: newHeroWodTip === t ? '#f0f0f0' : '#fafafa', color: newHeroWodTip === t ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: newHeroWodTip === t ? '700' : '400', cursor: 'pointer' }}>
-                  {t}
+              {HERO_WOD_TIPURI.map(tip => (
+                <div key={tip} onClick={() => setNewHeroWodTip(tip)}
+                  style={{ padding: '6px 12px', borderRadius: '20px', border: newHeroWodTip === tip ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: newHeroWodTip === tip ? '#f0f0f0' : '#fafafa', color: newHeroWodTip === tip ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: newHeroWodTip === tip ? '700' : '400', cursor: 'pointer' }}>
+                  {tip}
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Durată <span style={{ color: '#bbb' }}>(opțional)</span></div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.heroWodDurationLabel} <span style={{ color: '#bbb' }}>{t.heroWodDurationOptional}</span></div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1 }}>
                 <input type="number" min="0" value={newHeroWodDurataMin} onChange={e => setNewHeroWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.heroWodMinutesLabel}</div>
               </div>
               <div style={{ flex: 1 }}>
                 <input type="number" min="0" max="59" value={newHeroWodDurataSec} onChange={e => setNewHeroWodDurataSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.heroWodSecondsLabel}</div>
               </div>
             </div>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>MIȘCĂRI <span style={{ fontWeight: '400', fontSize: '10px' }}>(trage ☰ pentru reordonare)</span></div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.heroWodReorderHint}</span></div>
             <SortableList
               items={newHeroWodMiscari}
               onReorder={setNewHeroWodMiscari}
@@ -4720,11 +4720,11 @@ function App() {
             />
             <MiscareQuickAdd value={newHeroWodMiscareCurenta} onChange={setNewHeroWodMiscareCurenta}
               onAdd={(v) => { setNewHeroWodMiscari(prev => [...prev, v]); setNewHeroWodMiscareCurenta('') }}
-              placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 21 Thrusters @ 95lbs' : 'ex: 21 Thrusters @ 43kg'} />
+              placeholder={t.heroWodMovementPlaceholder(userProfile?.weight_unit)} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
             style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
-            {newHeroWodSaving ? 'Se salvează...' : editHeroWodId ? 'Salvează modificările' : 'Salvează Hero WOD'}
+            {newHeroWodSaving ? t.heroWodSaving : editHeroWodId ? t.heroWodSaveEdit : t.heroWodSaveNew}
           </button>
         </div>
       )}
@@ -4733,21 +4733,21 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => { setEditPrId(null); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editPrId ? `Editează — ${miscarePR}` : logPentruPR ? `Log — ${logPentruPR.movement}` : 'Log PR nou'}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editPrId ? t.prLogEditTitle(miscarePR) : logPentruPR ? t.prLogWithMovementTitle(logPentruPR.movement) : t.prLogNewTitle}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} />
+            <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} t={t} />
             {miscarePR && (
               <>
                 {miscarePR in heroWodsInfoAll ? (
                   <>
                     {isAmrapHeroPr ? (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Runde complete</div>
-                        <input type="number" min="0" value={prRoundsCompleted} onChange={e => setPrRoundsCompleted(e.target.value)} placeholder="ex: 18" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prRoundsCompletedLabel}</div>
+                        <input type="number" min="0" value={prRoundsCompleted} onChange={e => setPrRoundsCompleted(e.target.value)} placeholder={t.prRoundsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                         {miscariHeroPr.length > 0 && (
                           <div style={{ marginBottom: '12px' }}>
-                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>Rundă parțială <span style={{ fontWeight: '400', fontSize: '10px' }}>(câte repetări ai făcut din fiecare mișcare)</span></div>
+                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>{t.prPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.prPartialRoundHint}</span></div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               {miscariHeroPr.map((m, i) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4763,25 +4763,25 @@ function App() {
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
                         {(() => {
                           const [tMin, tSec] = prTimp.split(':')
                           return (
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>minute</div>
+                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prMinutesLabel}</div>
                               </div>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>secunde</div>
+                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prSecondsLabel}</div>
                               </div>
                             </div>
                           )
                         })()}
                       </>
                     )}
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Variantă</div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prVariantLabel}</div>
                     <select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }}>
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
                     </select>
@@ -4790,9 +4790,9 @@ function App() {
                   <>
                     {CARDIO_CU_CALORII.includes(miscarePR) && (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Scor în</div>
+                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prScoreInLabel}</div>
                         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                          {[{ val: 'm', label: 'Metri' }, { val: 'cal', label: 'Calorii' }].map(o => (
+                          {[{ val: 'm', label: t.prUnitMeters }, { val: 'cal', label: t.prUnitCalories }].map(o => (
                             <div key={o.val} onClick={() => setPrCardioUnit(o.val)}
                               style={{ flex: 1, padding: '9px', textAlign: 'center', borderRadius: '10px', border: prCardioUnit === o.val ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: prCardioUnit === o.val ? '#f0f0f0' : '#fafafa', color: prCardioUnit === o.val ? '#0E0E0E' : '#888', fontSize: '13px', fontWeight: prCardioUnit === o.val ? '700' : '400', cursor: 'pointer' }}>
                               {o.label}
@@ -4801,34 +4801,34 @@ function App() {
                         </div>
                       </>
                     )}
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{prCardioUnit === 'cal' ? 'Calorii' : 'Distanță (m)'}</div>
-                    <input type="number" value={prDistanta} onChange={e => setPrDistanta(e.target.value)} placeholder={prCardioUnit === 'cal' ? 'ex: 50' : 'ex: 1000'} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp</div>
-                    <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder="ex: 3:52" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prDistanceCaloriesLabel(prCardioUnit)}</div>
+                    <input type="number" value={prDistanta} onChange={e => setPrDistanta(e.target.value)} placeholder={t.prDistancePlaceholder(prCardioUnit)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
+                    <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder={t.prTimePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR) ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Repetări max</div>
-                    <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder="ex: 22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prMaxRepsLabel}</div>
+                    <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder={t.prRepsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : ['Handstand Hold','L-sit Hold'].includes(miscarePR) ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Timp hold (secunde)</div>
-                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder="ex: 45" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prHoldTimeLabel}</div>
+                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={t.prHoldPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Greutate ({userProfile?.weight_unit || 'kg'})</div>
-                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={userProfile?.weight_unit === 'lbs' ? 'ex: 265' : 'ex: 120'} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Repetări</div>
-                    <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder="ex: 1 (pentru 1RM)" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prWeightLabel(userProfile?.weight_unit || 'kg')}</div>
+                    <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={t.prWeightPlaceholder(userProfile?.weight_unit)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prRepsLabel}</div>
+                    <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder={t.prRepsFor1rmPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 )}
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Note</div>
-                <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder="Belt? Knee sleeves? Cum te-ai simțit?" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prNoteLabel}</div>
+                <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder={t.prNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                 <button onClick={savePR} disabled={prSaving}
                   style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
-                  {prSaving ? 'Se salvează...' : editPrId ? 'Salvează modificările' : 'Salvează PR'}
+                  {prSaving ? t.prSaving : editPrId ? t.prSaveEdit : t.prSaveNew}
                 </button>
               </>
             )}
@@ -4887,7 +4887,7 @@ function App() {
                   {isConfirmingDelete ? (
                     <button onClick={(e) => { e.stopPropagation(); deleteMiscarePR(movement) }}
                       style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
-                      Șterge?
+                      {t.prDeleteConfirm}
                     </button>
                   ) : (
                     <button onClick={(e) => { e.stopPropagation(); setPrConfirmDelete(movement) }}
@@ -4899,7 +4899,7 @@ function App() {
               </div>
               {best && !isOpen && (
                 <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>
-                  {new Date(best.recorded_at).toLocaleDateString('ro-RO')}{best.notes ? ' · ' + best.notes : ''}
+                  {new Date(best.recorded_at).toLocaleDateString(localeFor(lang))}{best.notes ? ' · ' + best.notes : ''}
                 </div>
               )}
               {!best && !isOpen && wodInfo && (
@@ -4932,12 +4932,12 @@ function App() {
                         setPrevScreen('pr'); setScreen('newHeroWod')
                       }}
                       style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px' }}>
-                      ✎ Editează Hero WOD-ul
+                      {t.prEditHeroWodButton}
                     </button>
                   )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>% DIN 1RM — {bestKg} {preferredUnit}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
                         {PCT_BARA.map(pct => {
                           const w = Math.round(bestKg * pct / 100 * 2) / 2
@@ -4953,11 +4953,11 @@ function App() {
                   )}
                   {records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>ISTORIC</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {records.slice(0, 5).map((r, j) => (
                         <div key={j}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #FFFFFF' : 'none' }}>
-                          <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString('ro-RO')}{r.notes ? ' · ' + r.notes : ''}</span>
+                          <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString(localeFor(lang))}{r.notes ? ' · ' + r.notes : ''}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
                             <button onClick={() => startEditPR(r, movement)}
@@ -4971,7 +4971,7 @@ function App() {
                   )}
                   <button onClick={() => { setEditPrId(null); setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
                     style={{ width: '100%', padding: '8px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                    + Adaugă rezultat nou
+                    {t.prAddNewResult}
                   </button>
                 </div>
               )}
@@ -4981,16 +4981,16 @@ function App() {
         return (
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>Recorduri <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.prScreenTitle} <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
               <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                 style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
-                + PR nou
+                {t.prNewButton}
               </button>
             </div>
             {prDate.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
                 <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Trophy size={36} color="#ccc" strokeWidth={1.5} /></div>
-                <div style={{ fontSize: '14px' }}>Niciun PR salvat încă</div>
+                <div style={{ fontSize: '14px' }}>{t.prEmpty}</div>
               </div>
             )}
             {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO'].map(cat => {
@@ -5006,7 +5006,7 @@ function App() {
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{miscariCat.length} exerciții</div>
+                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#0E0E0E' ? '#ABE73C' : '#fff', flexShrink: 0 }}>
                       {esteOpen ? '▲' : '▼'}
                     </div>
@@ -5017,12 +5017,12 @@ function App() {
                         <input
                           value={catSearch[cat] || ''}
                           onChange={e => setCatSearch(prev => ({ ...prev, [cat]: e.target.value }))}
-                          placeholder={`Caută în ${cfg.label}...`}
+                          placeholder={t.prSearchPlaceholder(cfg.label)}
                           style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box', outline: 'none' }}
                         />
                       </div>
                       {miscariAfisate.length === 0
-                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#aaa' }}>Niciun exercițiu găsit</div>
+                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#aaa' }}>{t.prNoExerciseFound}</div>
                         : miscariAfisate.map((m, idx) => renderMiscare(m, idx, miscariAfisate.length, cat))
                       }
                     </div>
@@ -5042,7 +5042,7 @@ function App() {
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{cuPR}/{toateHero.length} completate</div>
+                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
                       {heroWodsDeschis ? '▲' : '▼'}
                     </div>
@@ -5052,13 +5052,13 @@ function App() {
                       {toateHero.map((m, idx) => renderMiscare(m, idx, toateHero.length + 1, 'HERO_WODS'))}
                       {/* Linie separator + formular WOD nou */}
                       <div style={{ borderTop: '2px dashed #f0f0f0', padding: '14px' }}>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>HERO WOD PERSONALIZAT</div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
                             value={heroWodNouInput}
                             onChange={e => setHeroWodNouInput(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && heroWodNouInput.trim()) { setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodDurataMin(''); setNewHeroWodDurataSec('0'); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}}
-                            placeholder="ex: Forge WOD, The C15..."
+                            placeholder={t.prHeroNewPlaceholder}
                             style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }}
                           />
                           <button
@@ -5076,7 +5076,7 @@ function App() {
             {miscariFaraCat.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#888', letterSpacing: '1.5px' }}>ALTELE</div>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
                   <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                 </div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -5090,8 +5090,8 @@ function App() {
 
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} />}
-      {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
+      {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} />}
 
       {screen === 'profile' && (
