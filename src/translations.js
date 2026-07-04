@@ -224,6 +224,8 @@ export const TRANSLATIONS = {
     // Log Skill Work
     skillLogNewTitle: 'Log Skill Work',
     skillLogEditTitle: 'Editează Skill Work',
+    skillLogSetLabel: (n) => `Set ${n}`,
+    skillLogAddSet: '+ Adaugă set',
     skillLogNoteLabel: 'NOTE',
     skillLogNotePlaceholder: 'Cum a mers?',
     skillLogSaving: 'Se salvează...',
@@ -892,6 +894,8 @@ export const TRANSLATIONS = {
     // Log Skill Work
     skillLogNewTitle: 'Log Skill Work',
     skillLogEditTitle: 'Edit Skill Log',
+    skillLogSetLabel: (n) => `Set ${n}`,
+    skillLogAddSet: '+ Add set',
     skillLogNoteLabel: 'NOTES',
     skillLogNotePlaceholder: 'How did it go?',
     skillLogSaving: 'Saving...',

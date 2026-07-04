@@ -2855,6 +2855,7 @@ function App() {
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
   const [skillLogNote, setSkillLogNote] = useState('')
+  const [skillLogSets, setSkillLogSets] = useState({})
   const [skillLogSaving, setSkillLogSaving] = useState(false)
   const [miscarePR, setMiscarePR] = useState('')
   const [logPentruPR, setLogPentruPR] = useState(null)
@@ -3478,11 +3479,31 @@ function App() {
     if (data) setSkillLogs(data)
   }
 
+  const addSkillSet = (movement) => {
+    setSkillLogSets(prev => ({ ...prev, [movement]: [...(prev[movement] || []), ''] }))
+  }
+  const updateSkillSet = (movement, idx, value) => {
+    setSkillLogSets(prev => {
+      const next = [...(prev[movement] || [])]
+      next[idx] = value
+      return { ...prev, [movement]: next }
+    })
+  }
+  const removeSkillSet = (movement, idx) => {
+    setSkillLogSets(prev => ({ ...prev, [movement]: (prev[movement] || []).filter((_, i) => i !== idx) }))
+  }
+
   const saveSkillLog = async () => {
     if (!wodZiData) return
     setSkillLogSaving(true)
+    // curatam seturile goale (miscari fara niciun set adaugat, sau intrari nescrise)
+    const setsCurate = {}
+    Object.entries(skillLogSets).forEach(([miscare, seturi]) => {
+      const valide = (seturi || []).filter(v => v.trim() !== '')
+      if (valide.length > 0) setsCurate[miscare] = valide
+    })
     const { error } = await supabase.from('skill_logs')
-      .upsert({ member_id: user.id, wod_id: wodZiData.id, notes: skillLogNote.trim() || null, logged_at: new Date().toISOString() }, { onConflict: 'member_id,wod_id' })
+      .upsert({ member_id: user.id, wod_id: wodZiData.id, notes: skillLogNote.trim() || null, sets: Object.keys(setsCurate).length > 0 ? setsCurate : null, logged_at: new Date().toISOString() }, { onConflict: 'member_id,wod_id' })
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else {
       showToast(t.toastSkillLogSaved)
@@ -4400,7 +4421,7 @@ function App() {
                               )}
                             </div>
                           )}
-                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setPrevScreen('home'); setScreen('logSkill') }}
+                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(logZiSkill?.sets || {}); setPrevScreen('home'); setScreen('logSkill') }}
                             style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                             {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
                           </button>
@@ -4801,6 +4822,25 @@ function App() {
             {wodZiData?.skill_name && (
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{wodZiData.skill_name}</div>
             )}
+            {(wodZiData?.skill || []).map((miscare, mi) => (
+              <div key={mi} style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{miscare}</div>
+                {(skillLogSets[miscare] || []).map((greutate, si) => (
+                  <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#888', minWidth: '42px' }}>{t.skillLogSetLabel(si + 1)}</span>
+                    <input type="number" value={greutate} onChange={e => updateSkillSet(miscare, si, e.target.value)}
+                      placeholder={userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    <button onClick={() => removeSkillSet(miscare, si)}
+                      style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer', lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={() => addSkillSet(miscare)}
+                  style={{ padding: '6px 12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                  {t.skillLogAddSet}
+                </button>
+              </div>
+            ))}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.skillLogNoteLabel}</div>
               <input value={skillLogNote} onChange={e => setSkillLogNote(e.target.value)} placeholder={t.skillLogNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
