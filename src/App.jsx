@@ -18,8 +18,9 @@ import { getT } from './translations'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
-  getFormat, estimateTotalDurationSec, composeFormatHeader,
-  composeAmrapResult as composeAmrapResultGeneric, normalizeSetsRows, computeSetsPrCandidates,
+  getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
+  composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
+  normalizeSetsRows, computeSetsPrCandidates,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -3017,12 +3018,17 @@ function App() {
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
   const [wodTip, setWodTip] = useState('AMRAP')
+  const [wodFormatConfig, setWodFormatConfig] = useState({})
+  const [wodSets, setWodSets] = useState({})
+  const [wodCompleted, setWodCompleted] = useState(false)
   const [wodDurata, setWodDurata] = useState('')
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
   const [editLogId, setEditLogId] = useState(null)
   const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
   const [editLogHeader, setEditLogHeader] = useState('')
+  const [editLogFormatId, setEditLogFormatId] = useState(null)
+  const [editLogFormatConfig, setEditLogFormatConfig] = useState(null)
   const [editLogMiscari, setEditLogMiscari] = useState([])
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
@@ -3594,7 +3600,7 @@ function App() {
   }
 
   const fetchWodLogs = async () => {
-    const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration)').eq('member_id', user.id).order('logged_at', { ascending: false })
+    const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration, format_config)').eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -3632,7 +3638,7 @@ function App() {
       logMeta = { completed: skillLogCompleted }
     } else {
       resultCurat = format.scoreMode === 'amrap'
-        ? composeAmrapResultGeneric(skillLogRoundsCompleted, skillLogPartialReps, wodZiData.skill || [])
+        ? composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, wodZiData.skill || [])
         : [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
       resultCurat = resultCurat.trim() || null
     }
@@ -3789,16 +3795,41 @@ function App() {
     else { showToast(t.toastWorkoutDeleted); await fetchSkillLogs() }
   }
 
+  // Compune result/time_result/sets/log_meta pt wod_logs pe baza familiei
+  // formatului activ (scored/sets/mixed/nft) - generalizarea vechiului
+  // `isAmrapLog ? composeAmrapResult() : wodResult`.
+  const composeWodLogFields = () => {
+    const format = getFormat(activeLogFormatId)
+    const setsCurate = () => {
+      const cleaned = {}
+      Object.entries(wodSets).forEach(([cheie, rows]) => {
+        const valide = (rows || []).filter(v => (v.weight || '').toString().trim() !== '' || (v.reps || '').toString().trim() !== '')
+        if (valide.length > 0) cleaned[cheie] = valide
+      })
+      return Object.keys(cleaned).length > 0 ? cleaned : null
+    }
+    if (format.family === 'sets') {
+      return { result: null, time_result: null, sets: setsCurate(), log_meta: null }
+    }
+    if (format.family === 'nft') {
+      return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted } }
+    }
+    const isAmrapScore = format.scoreMode === 'amrap' || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
+    const rezultatFinal = isAmrapScore ? composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog) : wodResult.trim()
+    return {
+      result: rezultatFinal || null, time_result: isAmrapScore ? null : (wodTime.trim() || null),
+      sets: format.family === 'mixed' ? setsCurate() : null, log_meta: null,
+    }
+  }
+
   const saveWodLog = async () => {
     if (editLogId) {
       setWodSaving(true)
       const liniiPrefix = [...(editLogHeader ? [editLogHeader] : []), ...editLogMiscari]
       const newPrefix = liniiPrefix.join('\n')
       const noteFull = [newPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
-      const rezultatFinal = isAmrapLog ? composeAmrapResult() : wodResult.trim()
       const { error } = await supabase.from('wod_logs').update({
-        result: rezultatFinal || null,
-        time_result: isAmrapLog ? null : (wodTime.trim() || null),
+        ...composeWodLogFields(),
         notes: noteFull || null,
       }).eq('id', editLogId)
       if (error) { showToast(t.toastLogWodUpdateError); console.error(error) }
@@ -3806,13 +3837,14 @@ function App() {
         showToast(t.toastWodUpdated)
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
-        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('')
+        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('')
       }
       setWodSaving(false)
       return
     }
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
+      || Object.keys(wodSets).length > 0 || wodCompleted
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
@@ -3825,11 +3857,12 @@ function App() {
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
-    const rezultatFinal = isAmrapLog ? composeAmrapResult() : wodResult
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: wodZiData?.id || null,
       variant_level: tipSalvat,
-      result: rezultatFinal || null, time_result: isAmrapLog ? null : (wodTime || null), notes: noteFull || null,
+      format_type: variantaAleasa === null ? wodTip : null,
+      notes: noteFull || null,
+      ...composeWodLogFields(),
     })
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
@@ -3837,8 +3870,8 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('')
-      setWodTip('AMRAP'); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('')
+      setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
   }
@@ -4039,40 +4072,18 @@ function App() {
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp' },
   ]
 
-  // Scor AMRAP structurat (runde complete + repetari din runda partiala) in loc de text liber.
-  // composePartialText/parsePartialText sunt generice (folosite si pentru PR-uri pe Hero WOD-uri
-  // AMRAP mai jos), nu doar pentru logarea WOD-ului zilei.
-  const composePartialText = (partialArr, movimente) => movimente
-    .map((m, i) => partialArr[i]?.trim() ? `${partialArr[i].trim()} ${m}` : null)
-    .filter(Boolean).join(', ')
-  const parsePartialText = (text, movimente) => {
-    const partialArr = movimente.map(() => '')
-    ;(text || '').split(',').forEach(seg => {
-      const mm = seg.trim().match(/^(\d+)\s+(.+)$/)
-      if (mm) { const idx = movimente.indexOf(mm[2].trim()); if (idx !== -1) partialArr[idx] = mm[1] }
-    })
-    return partialArr
-  }
-
-  // Compus tot intr-un string simplu pentru coloana `result` existenta (fara migratie de DB),
-  // cu numarul de runde primul in string ca sa ramana compatibil cu parseScore() din Clasament.
-  const isAmrapLog = editLogId
-    ? !!(editLogHeader && editLogHeader.startsWith('AMRAP'))
-    : (variantaAleasa !== null ? wodZiData?.type === 'AMRAP' : wodTip === 'AMRAP')
-  const miscariPentruAmrapLog = editLogId
+  // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
+  // ales liber de membru) - inlocuieste vechiul isAmrapLog/miscariPentruAmrapLog,
+  // acum generalizat prin catalogul din workoutFormats.js (FormatLogger).
+  const activeLogFormatId = editLogId
+    ? (editLogFormatId || 'For Time')
+    : (variantaAleasa !== null ? (wodZiData?.type || 'For Time') : wodTip)
+  const activeLogFormatConfig = editLogId
+    ? editLogFormatConfig
+    : (variantaAleasa !== null ? wodZiData?.format_config : wodFormatConfig)
+  const miscariPentruLog = editLogId
     ? editLogMiscari
     : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
-  const composeAmrapResult = () => {
-    if (!wodRoundsCompleted.trim()) return ''
-    const partialStr = composePartialText(wodPartialReps, miscariPentruAmrapLog)
-    return `${wodRoundsCompleted.trim()} runde${partialStr ? ' + ' + partialStr : ' complete'}`
-  }
-  const parseAmrapResult = (resultStr, movimente) => {
-    const roundsMatch = (resultStr || '').match(/^(\d+)/)
-    const plusIdx = (resultStr || '').indexOf('+')
-    const partialArr = plusIdx !== -1 ? parsePartialText(resultStr.slice(plusIdx + 1), movimente) : movimente.map(() => '')
-    return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
-  }
 
   // Acelasi tratament AMRAP (runde + repetari partiale) si pentru Hero WOD-uri, la logarea unui PR.
   // FORMAT-ul unui Hero WOD (built-in sau custom) e mereu "TIP restul textului" pe prima linie
@@ -4821,23 +4832,28 @@ function App() {
           {logTab === 'jurnal' && (
             <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} t={t} lang={lang}
               onEditWod={(log) => {
-                const WOD_TYPES = ['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Strength','Partner WOD']
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
                 const linii = prefix.split('\n').filter(Boolean)
-                const primaEsteHeader = linii.length > 0 && WOD_TYPES.some(t => linii[0].startsWith(t))
-                const movimenteLog = linii.slice(primaEsteHeader ? 1 : 0)
+                const headerTip = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
+                const movimenteLog = linii.slice(headerTip ? 1 : 0)
+                const formatId = log.wods?.type || log.format_type || headerTip || 'For Time'
+                const format = getFormat(formatId)
                 setEditLogId(log.id)
-                setEditLogHeader(primaEsteHeader ? linii[0] : '')
+                setEditLogHeader(headerTip ? linii[0] : '')
+                setEditLogFormatId(formatId)
+                setEditLogFormatConfig(log.wods?.format_config || null)
                 setEditLogMiscari(movimenteLog)
                 setEditLogMiscareCurenta('')
-                if (primaEsteHeader && linii[0].startsWith('AMRAP')) {
+                if (format.scoreMode === 'amrap') {
                   const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
                   setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
                 } else {
                   setWodResult(log.result || ''); setWodRoundsCompleted(''); setWodPartialReps([])
                 }
                 setWodTime(log.time_result || '')
+                setWodSets(normalizeSetsRows(log.sets))
+                setWodCompleted(!!log.log_meta?.completed)
                 setWodNote(parts.length > 1 ? parts[1] : '')
                 setPrevScreen('log')
                 setScreen('logWOD')
@@ -4856,7 +4872,7 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
           </div>
 
@@ -4889,15 +4905,9 @@ function App() {
 
               {variantaAleasa === null && (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodTypeLabel}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-                    {['AMRAP','For Time','EMOM','Tabata','Chipper','Ladder','Partner WOD','Strength'].map(tip => (
-                      <div key={tip} onClick={() => setWodTip(tip)}
-                        style={{ padding: '6px 12px', borderRadius: '20px', border: wodTip === tip ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: wodTip === tip ? '#f0f0f0' : '#fafafa', color: wodTip === tip ? '#0E0E0E' : '#555', fontSize: '12px', fontWeight: wodTip === tip ? '700' : '400', cursor: 'pointer' }}>
-                        {tip}
-                      </div>
-                    ))}
-                  </div>
+                  <FormatConfigEditor formatId={wodTip} onFormatChange={setWodTip}
+                    config={wodFormatConfig} onConfigChange={setWodFormatConfig}
+                    excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
                   <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
                   <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder={t.logWodDurationPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                 </div>
@@ -4940,54 +4950,23 @@ function App() {
           )}
 
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            {isAmrapLog ? (
-              <>
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodRoundsCompletedLabel}</div>
-                  <input type="number" min="0" value={wodRoundsCompleted} onChange={e => setWodRoundsCompleted(e.target.value)} placeholder={t.logWodRoundsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                </div>
-                {miscariPentruAmrapLog.length > 0 && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>{t.logWodPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodPartialRoundHint}</span></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {miscariPentruAmrapLog.map((m, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>{m}</div>
-                          <input type="number" min="0" value={wodPartialReps[i] || ''}
-                            onChange={e => { const v = e.target.value; setWodPartialReps(prev => { const next = [...prev]; next[i] = v; return next }) }}
-                            placeholder="0" style={{ width: '70px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodResultLabel}</div>
-                  <input value={wodResult} onChange={e => setWodResult(e.target.value)} placeholder={t.logWodResultPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                </div>
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodTimeLabel}</div>
-                  {(() => {
-                    const [tMin, tSec] = wodTime.split(':')
-                    return (
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <div style={{ flex: 1 }}>
-                          <input type="number" min="0" value={tMin || ''} onChange={e => setWodTime(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.logWodMinutesLabel}</div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setWodTime(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.logWodSecondsLabel}</div>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-              </>
-            )}
+            <FormatLogger
+              formatId={activeLogFormatId}
+              config={activeLogFormatConfig}
+              movements={miscariPentruLog}
+              value={{
+                result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
+                partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
+              }}
+              onChange={(patch) => {
+                if ('result' in patch) setWodResult(patch.result)
+                if ('time' in patch) setWodTime(patch.time)
+                if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
+                if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
+                if ('sets' in patch) setWodSets(patch.sets)
+                if ('completed' in patch) setWodCompleted(patch.completed)
+              }}
+              weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
