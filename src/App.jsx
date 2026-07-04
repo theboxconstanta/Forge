@@ -4418,7 +4418,14 @@ function App() {
                         <>
                           <div style={{ marginTop: '10px' }}>
                             {wodZiData.skill.map((m, mi) => (
-                              <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                              <div key={mi} style={{ padding: '3px 0' }}>
+                                <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</div>
+                                {(logZiSkill?.sets?.[m] || []).length > 0 && (
+                                  <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
+                                    {logZiSkill.sets[m].map((g, si) => `${t.skillLogSetLabel(si + 1)}: ${g}${userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}`).join(' · ')}
+                                  </div>
+                                )}
+                              </div>
                             ))}
                           </div>
                           <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(logZiSkill?.sets || {}); setPrevScreen('home'); setScreen('logSkill') }}
