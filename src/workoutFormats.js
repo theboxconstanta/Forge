@@ -57,7 +57,10 @@ export const WORKOUT_FORMATS = {
     config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'Ladder': {
-    family: 'scored', scoreMode: 'fortime',
+    // Ca la RFT: daca nu termini schema (21-15-9 etc) in time cap, trebuie sa
+    // poti loga runde complete + reps partiale in loc de timp - fara asta nu
+    // exista nicio cale sa notezi progresul unei ladder neterminate.
+    family: 'scored', scoreMode: 'fortime_or_amrap',
     config: {
       // quickOptions: scheme clasice reutilizate des (21-15-9 etc), afisate ca
       // chip-uri peste inputul de text liber - vezi FormatConfigEditor.
@@ -118,8 +121,12 @@ export const WORKOUT_FORMATS = {
       scoringMode: { type: 'select', options: ['Lowest Reps', 'Total Reps'], required: true, default: 'Lowest Reps', labelKey: 'fmtIntervalScoring' },
     },
   },
+  // Aceeasi structura ca Tabata (runde de lucru/odihna, scor = reps) - acelasi
+  // motiv pentru simpleReps: o runda e un singur numar de reps, nu un set
+  // repetabil cu greutate.
   'Intervals': {
     family: 'sets', rowMode: 'interval',
+    simpleReps: true,
     config: {
       rounds: { type: 'number', required: true, labelKey: 'fmtRounds' },
       workSec: { type: 'duration', required: true, labelKey: 'fmtWork' },

@@ -16,6 +16,12 @@ describe('getFormat', () => {
   it('cade pe For Time pentru un id necunoscut (nu crapă niciodată)', () => {
     expect(getFormat('Ceva Inexistent')).toBe(WORKOUT_FORMATS['For Time'])
   })
+  it('Ladder are scoreMode fortime_or_amrap, ca RFT - poate loga progres parțial dacă nu termină', () => {
+    expect(getFormat('Ladder').scoreMode).toBe('fortime_or_amrap')
+  })
+  it('Intervals are simpleReps ca Tabata - o rundă e un singur număr de reps', () => {
+    expect(getFormat('Intervals').simpleReps).toBe(true)
+  })
 })
 
 describe('legacyHeaderTypeOf', () => {

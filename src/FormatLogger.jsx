@@ -161,11 +161,14 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     const buyInRows = (v.sets || {})['__buyIn'] ? { [buyIn.join(' + ')]: v.sets['__buyIn'] } : { [buyIn.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
     const cashOutRows = (v.sets || {})['__cashOut'] ? { [cashOut.join(' + ')]: v.sets['__cashOut'] } : { [cashOut.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
     const mainScoreMode = format.scoreMode || (config?.mainFormat === 'AMRAP' ? 'amrap' : 'fortime')
+    // Buy-In/Cash-Out sunt sarcini facute o singura data (ex. "50 Cal Row"),
+    // nu seturi repetabile cu greutati diferite - acelasi motiv ca la Tabata:
+    // un singur input de reps, fara greutate, fara "+ Adauga set".
     return (
       <>
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
         {Object.entries(buyInRows).map(([key, rows]) => (
-          <SetsRows key={key} rowKey={key} rows={rows}
+          <SimpleRepsRow key={key} rowKey={key} rows={rows}
             onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })}
             weightUnit={weightUnit} t={t} />
         ))}
@@ -175,7 +178,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
           <>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
             {Object.entries(cashOutRows).map(([key, rows]) => (
-              <SetsRows key={key} rowKey={key} rows={rows}
+              <SimpleRepsRow key={key} rowKey={key} rows={rows}
                 onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
                 weightUnit={weightUnit} t={t} />
             ))}
@@ -194,7 +197,15 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     )
   }
 
-  return <ScoredFields scoreMode={format.scoreMode} movements={movements || []} value={v} onChange={patch} t={t} />
+  // Partner WOD: scoreMode-ul din catalog e doar un fallback generic
+  // ('fortime_or_amrap') - alegerea reala de baseFormat (AMRAP/For Time) a
+  // antrenorului trebuie sa schimbe UI-ul de logare, altfel un Partner WOD
+  // configurat ca AMRAP tot arata campurile de Timp si hint-ul "daca nu ai
+  // terminat", care n-au sens pentru AMRAP (nu exista time cap/finish acolo).
+  const scoreMode = formatId === 'Partner WOD' && config?.baseFormat
+    ? (config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap')
+    : format.scoreMode
+  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

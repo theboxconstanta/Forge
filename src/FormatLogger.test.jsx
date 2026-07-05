@@ -102,6 +102,53 @@ describe('FormatLogger - family mixed (Buy-In/Cash-Out)', () => {
     expect(patch.sets.__buyIn[0].reps).toBe('20')
     expect(patch.sets.__cashOut).toBeUndefined()
   })
+  it('Buy-In/Cash-Out nu au câmp de greutate și nu au buton de adăugat set (sarcini o singură dată)', () => {
+    render(
+      <FormatLogger formatId="Buy-In/Cash-Out" config={{ buyIn: ['Row'], cashOut: ['Burpees'] }} movements={[]}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.queryByPlaceholderText('kg')).not.toBeInTheDocument()
+    expect(screen.queryByText('+ set')).not.toBeInTheDocument()
+  })
+})
+
+describe('FormatLogger - Partner WOD respectă baseFormat', () => {
+  it('baseFormat AMRAP randeaza doar runde + reps partiale, fara campuri de timp', () => {
+    render(
+      <FormatLogger formatId="Partner WOD" config={{ baseFormat: 'AMRAP' }} movements={['Wall Balls']}
+        value={{}} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+    expect(screen.queryByText('Timp')).not.toBeInTheDocument()
+  })
+  it('baseFormat For Time randeaza timp + optiunea de runde partiale (nu a terminat)', () => {
+    render(
+      <FormatLogger formatId="Partner WOD" config={{ baseFormat: 'For Time' }} movements={['Wall Balls']}
+        value={{}} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+  })
+  it('fara baseFormat setat, cade pe fortime_or_amrap (comportament vechi)', () => {
+    render(
+      <FormatLogger formatId="Partner WOD" config={{}} movements={['Wall Balls']}
+        value={{}} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+  })
+})
+
+describe('FormatLogger - Intervals (simpleReps ca Tabata)', () => {
+  it('nu are câmp de greutate și nu are buton de adăugat set', () => {
+    render(
+      <FormatLogger formatId="Intervals" config={{ rounds: 3 }} movements={[]}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getAllByPlaceholderText('reps')).toHaveLength(3)
+    expect(screen.queryByPlaceholderText('kg')).not.toBeInTheDocument()
+    expect(screen.queryByText('+ set')).not.toBeInTheDocument()
+  })
 })
 
 describe('FormatLogger - family mixed (AMRAP with Buy-In, fără Cash-Out)', () => {
