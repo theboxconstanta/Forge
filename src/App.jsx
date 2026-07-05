@@ -2761,7 +2761,16 @@ function SortableList({ items, onReorder, onRemove }) {
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
                   {miscareSugestii(editVal).map((s, si) => (
                     <div key={si} onMouseDown={e => e.preventDefault()}
-                      onClick={() => { const parts = editVal.split(/\s+/); parts[parts.length - 1] = s; setEditVal(parts.join(' ') + ' ') }}
+                      onClick={() => {
+                        // Click pe sugestie salveaza direct editarea (nu doar completeaza
+                        // textul) - acelasi fix ca la MiscareQuickAdd: altfel utilizatorul
+                        // credea ca a salvat mutarea, dar ramanea doar scrisa in input pana
+                        // la un blur/Enter separat.
+                        const parts = editVal.split(/\s+/); parts[parts.length - 1] = s
+                        const finalVal = parts.join(' ').trim()
+                        if (finalVal) { const next = [...items]; next[i] = finalVal; onReorder(next) }
+                        setEditIdx(null); setEditVal('')
+                      }}
                       style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#0E0E0E' }}>{s}</div>
                   ))}
                 </div>
