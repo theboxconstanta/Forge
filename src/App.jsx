@@ -1284,6 +1284,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [skillName2Wod, setSkillName2Wod] = useState('')
   const [skillType2Wod, setSkillType2Wod] = useState('Weightlifting')
   const [skillFormatConfig2Wod, setSkillFormatConfig2Wod] = useState({})
+  // WARM-UP/SKILL/SKILL 2/formularul principal sunt dropdown-uri in Admin -
+  // implicit inchise, arata doar titlul, ca formularul sa nu fie tot pe un
+  // singur scroll lung.
+  const [adminWarmupOpen, setAdminWarmupOpen] = useState(false)
+  const [adminSkillOpen, setAdminSkillOpen] = useState(false)
+  const [adminSkill2Open, setAdminSkill2Open] = useState(false)
+  const [adminWodFormOpen, setAdminWodFormOpen] = useState(false)
   const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
@@ -1753,6 +1760,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({})
       setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
+      setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
     }
     setSavingWod(false)
   }
@@ -1781,6 +1789,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       intermediate: (w.movements_intermediate || []).join('\n'),
       rx: (w.movements_rx || []).join('\n'),
     })
+    // La editare deschidem dropdown-urile automat (altfel adminul nu vede ce
+    // e completat deja fara sa dea click pe fiecare titlu pe rand).
+    setAdminWarmupOpen(true); setAdminSkillOpen(true); setAdminSkill2Open(true); setAdminWodFormOpen(true)
     setAdminTab('wod')
     // Admin e deja randat doar cand screen === 'admin' (vezi App()), nu are
     // propriul lui setScreen - fara reset explicit aici, editarea unui WOD mai
@@ -1795,6 +1806,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
     setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
+    setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
   }
 
   const stergeWod = async (id) => {
@@ -2534,90 +2546,121 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                 <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: warmupSkillVisibleWod ? '21px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
               </div>
             </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodWarmupLabel}</div>
-              <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
-                placeholder={t.adminWodWarmupPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/+WOD NOU */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
+              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
-              <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
-                config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
-              {skillTypeWod === 'Weightlifting' ? (
-                <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
-              ) : (
-                <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupLabel}</div>
+                <span style={{ fontSize: '11px', color: '#888' }}>{adminWarmupOpen ? '▲' : '▼'}</span>
+              </div>
+              {adminWarmupOpen && (
+                <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
+                  placeholder={t.adminWodWarmupPlaceholder} rows={3}
+                  style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
               )}
-              <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
-                placeholder={t.adminWodSkillPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+              <div onClick={() => setAdminSkillOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkillLabel}</div>
+                <span style={{ fontSize: '11px', color: '#888' }}>{adminSkillOpen ? '▲' : '▼'}</span>
+              </div>
+              {adminSkillOpen && (
+                <div style={{ marginTop: '8px' }}>
+                  <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
+                    config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
+                  {skillTypeWod === 'Weightlifting' ? (
+                    <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
+                  ) : (
+                    <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+                  )}
+                  <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
+                    placeholder={t.adminWodSkillPlaceholder} rows={3}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                </div>
+              )}
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkill2Label}</div>
-              <FormatConfigEditor formatId={skillType2Wod} onFormatChange={setSkillType2Wod}
-                config={skillFormatConfig2Wod} onConfigChange={setSkillFormatConfig2Wod} t={t} />
-              {skillType2Wod === 'Weightlifting' ? (
-                <CautareMiscare key={(editWodId || 'new') + '-skill2'} preFill={skillName2Wod} onAleage={m => setSkillName2Wod(m)} t={t} label={t.adminWodSkillMovementLabel} />
-              ) : (
-                <input value={skillName2Wod} onChange={e => setSkillName2Wod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              <div onClick={() => setAdminSkill2Open(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkill2Label}</div>
+                <span style={{ fontSize: '11px', color: '#888' }}>{adminSkill2Open ? '▲' : '▼'}</span>
+              </div>
+              {adminSkill2Open && (
+                <div style={{ marginTop: '8px' }}>
+                  <FormatConfigEditor formatId={skillType2Wod} onFormatChange={setSkillType2Wod}
+                    config={skillFormatConfig2Wod} onConfigChange={setSkillFormatConfig2Wod} t={t} />
+                  {skillType2Wod === 'Weightlifting' ? (
+                    <CautareMiscare key={(editWodId || 'new') + '-skill2'} preFill={skillName2Wod} onAleage={m => setSkillName2Wod(m)} t={t} label={t.adminWodSkillMovementLabel} />
+                  ) : (
+                    <input value={skillName2Wod} onChange={e => setSkillName2Wod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+                  )}
+                  <textarea value={skill2Wod} onChange={e => setSkill2Wod(e.target.value)}
+                    placeholder={t.adminWodSkillPlaceholder} rows={3}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                </div>
               )}
-              <textarea value={skill2Wod} onChange={e => setSkill2Wod(e.target.value)}
-                placeholder={t.adminWodSkillPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? t.adminWodEditTitle : t.adminWodNewTitle}</div>
-              {editWodId && (
-                <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
-              )}
-            </div>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
-            <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-            <FormatConfigEditor formatId={tipWod} onFormatChange={setTipWod}
-              config={formatConfigWod} onConfigChange={setFormatConfigWod}
-              excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
-            {AUTO_DURATION_FORMAT_IDS.includes(tipWod) ? (
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-                <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
-                  {estimateTotalDurationSec(tipWod, formatConfigWod) != null
-                    ? <>{secToTime(estimateTotalDurationSec(tipWod, formatConfigWod))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
-                    : t.adminWodDurationPending}
+            <div style={{ marginBottom: '12px' }}>
+              <div onClick={() => setAdminWodFormOpen(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? t.adminWodEditTitle : t.adminWodNewTitle}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {editWodId && (
+                    <div onClick={(e) => { e.stopPropagation(); cancelEditWod() }} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
+                  )}
+                  <span style={{ fontSize: '11px', color: '#888' }}>{adminWodFormOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
-            ) : (
-              <>
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                  <div style={{ flex: 1 }}>
-                    <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
-                  </div>
+              {adminWodFormOpen && (
+                <div style={{ marginTop: '12px' }}>
+                  <FormatConfigEditor formatId={tipWod} onFormatChange={setTipWod}
+                    config={formatConfigWod} onConfigChange={setFormatConfigWod}
+                    excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
+                  {AUTO_DURATION_FORMAT_IDS.includes(tipWod) ? (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+                      <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
+                        {estimateTotalDurationSec(tipWod, formatConfigWod) != null
+                          ? <>{secToTime(estimateTotalDurationSec(tipWod, formatConfigWod))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
+                          : t.adminWodDurationPending}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+                  <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+                  {[
+                    { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
+                    { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
+                    { key: 'intermediate', label: 'Intermediate', nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
+                    { key: 'rx', label: 'RX', nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
+                  ].map(v => (
+                    <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
+                      <textarea value={wodVariante[v.key]} onChange={e => setWodVariante(prev => ({ ...prev, [v.key]: e.target.value }))}
+                        placeholder={'ex:\n10 Pull-ups\n20 Push-ups\n30 Air Squats'} rows={4}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                    </div>
+                  ))}
                 </div>
-              </>
-            )}
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-            <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-            {[
-              { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
-              { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
-              { key: 'intermediate', label: 'Intermediate', nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
-              { key: 'rx', label: 'RX', nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
-            ].map(v => (
-              <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-                <textarea value={wodVariante[v.key]} onChange={e => setWodVariante(prev => ({ ...prev, [v.key]: e.target.value }))}
-                  placeholder={'ex:\n10 Pull-ups\n20 Push-ups\n30 Air Squats'} rows={4}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-              </div>
-            ))}
+              )}
+            </div>
             <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
               {savingWod ? t.adminWodSaving : editWodId ? t.adminWodSaveEdit : t.adminWodCreateButton}
             </button>
