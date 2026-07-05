@@ -177,7 +177,7 @@ async function activateQueuedSubscription(memberEmail) {
   return queued.id
 }
 
-const CARDIO_MISCARI = ['Row', 'Run', 'Bike Erg', 'Assault Bike', 'Air Bike', 'Ski Erg']
+const CARDIO_MISCARI = ['Row', 'Run', 'Bike Erg', 'Assault Bike', 'Air Bike', 'Ski Erg', 'Echo Bike', 'Assault Runner']
 const CARDIO_CU_CALORII = CARDIO_MISCARI.filter(c => c !== 'Run')
 
 const MISCARI = [
@@ -469,14 +469,27 @@ function miscareSugestii(text) {
 function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t }) {
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
+  const [metri, setMetri] = useState('')
+  const [cal, setCal] = useState('')
   const [justSelected, setJustSelected] = useState(false)
   const repsRef = useRef(null)
+  const metriRef = useRef(null)
+  // Miscari cardio (Run/Row/Bike/Ski Erg...) - reps+greutate n-au sens acolo,
+  // se logheaza in metri si/sau calorii. Detectat pe numele exact (dupa ce a
+  // fost ales complet, nu in timp ce se tasteaza partial).
+  const isCardio = CARDIO_MISCARI.some(c => c.toLowerCase() === value.trim().toLowerCase())
   // Dupa ce alegi o sugestie, nu o mai arata din nou ca sugestie (altfel
   // ramane vizibila peste casutele de reps/greutate) - dispare de indata ce
   // userul mai scrie ceva in campul de miscare.
   const sugestii = justSelected ? [] : miscareSugestii(value)
   const compose = (movementName) => {
     const parts = []
+    if (isCardio) {
+      if (metri.trim()) parts.push(`${metri.trim()}m`)
+      if (cal.trim()) parts.push(`${cal.trim()} Cal`)
+      parts.push(movementName.trim())
+      return parts.join(' ')
+    }
     if (reps.trim()) parts.push(reps.trim())
     parts.push(movementName.trim())
     let text = parts.join(' ')
@@ -486,16 +499,17 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
   const add = () => {
     if (!value.trim()) return
     onAdd(compose(value))
-    onChange(''); setReps(''); setWeight(''); setJustSelected(false)
+    onChange(''); setReps(''); setWeight(''); setMetri(''); setCal(''); setJustSelected(false)
   }
   // Click pe o sugestie completeaza doar numele miscarii si muta focusul pe
-  // "reps" - nu adauga inca (userul vrea sa completeze reps/greutate imediat
-  // dupa ce alege miscarea, nu sa sara direct la urmatoarea). useEffect (nu
-  // requestAnimationFrame) ca sa ruleze sigur dupa ce React a randat inputul
-  // de reps (care nu exista in DOM pana valoarea nu e completata).
+  // "reps" (sau "metri" la cardio) - nu adauga inca (userul vrea sa
+  // completeze imediat dupa ce alege miscarea, nu sa sara direct la
+  // urmatoarea). useEffect (nu requestAnimationFrame) ca sa ruleze sigur dupa
+  // ce React a randat inputul (care nu exista in DOM pana valoarea nu e
+  // completata).
   useEffect(() => {
-    if (justSelected) repsRef.current?.focus()
-  }, [justSelected])
+    if (justSelected) (isCardio ? metriRef : repsRef).current?.focus()
+  }, [justSelected, isCardio])
   const alege = (m) => {
     onChange(m)
     setJustSelected(true)
@@ -507,7 +521,18 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
         <input value={value} onChange={e => { onChange(e.target.value); setJustSelected(false) }}
           onKeyDown={onEnterCommit}
           placeholder={placeholder} style={{ flex: value.trim() ? 2 : 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-        {value.trim() && (
+        {value.trim() && (isCardio ? (
+          <>
+            <input ref={metriRef} type="number" value={metri} onChange={e => setMetri(e.target.value)}
+              onKeyDown={onEnterCommit}
+              placeholder="metri"
+              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            <input type="number" value={cal} onChange={e => setCal(e.target.value)}
+              onKeyDown={onEnterCommit}
+              placeholder="cal"
+              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          </>
+        ) : (
           <>
             <input ref={repsRef} type="number" value={reps} onChange={e => setReps(e.target.value)}
               onKeyDown={onEnterCommit}
@@ -518,7 +543,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
               placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
               style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           </>
-        )}
+        ))}
         <button onClick={add}
           style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>+</button>
       </div>
