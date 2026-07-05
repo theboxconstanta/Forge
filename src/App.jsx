@@ -1713,8 +1713,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     // setScreen('admin') nu declanseaza reset-ul de scroll din useEffect-ul de
     // schimbare ecran (ramanem deja pe 'admin') - fara asta, editarea unui WOD
     // mai jos in lista lasa formularul de editare (sus) invizibil, in afara
-    // ecranului.
-    document.body.scrollTop = 0
+    // ecranului. Containerul care scroleaza de fapt e div-ul flex:1 de mai jos
+    // (mainScrollRef), nu document.body.
+    if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
   }
 
   const cancelEditWod = () => {
@@ -2453,6 +2454,26 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       {adminTab === 'wod' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodWarmupLabel}</div>
+              <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
+                placeholder={t.adminWodWarmupPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
+              <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
+                config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
+              {skillTypeWod === 'Weightlifting' ? (
+                <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
+              ) : (
+                <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              )}
+              <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
+                placeholder={t.adminWodSkillPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? t.adminWodEditTitle : t.adminWodNewTitle}</div>
               {editWodId && (
@@ -2477,26 +2498,6 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodWarmupLabel}</div>
-              <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
-                placeholder={t.adminWodWarmupPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-            </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
-              <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
-                config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
-              {skillTypeWod === 'Weightlifting' ? (
-                <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
-              ) : (
-                <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
-              )}
-              <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
-                placeholder={t.adminWodSkillPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-            </div>
             {[
               { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
               { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
@@ -2963,6 +2964,7 @@ function App() {
   const [prevScreen, setPrevScreen] = useState('home')
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
+  const mainScrollRef = useRef(null)
   const debugTapRef = useRef(0)
   const [wodDeschis, setWodDeschis] = useState(false)
   const [skillDeschis, setSkillDeschis] = useState(false)
@@ -3261,12 +3263,13 @@ function App() {
 
   useEffect(() => {
     screenRef.current = screen
-    // body e singurul container de scroll (vezi index.css) - fara reset aici,
-    // la schimbarea ecranului ramane cu offset-ul de scroll de pe ecranul
+    // div-ul flex:1/overflow-y:auto de mai jos (mainScrollRef) e containerul
+    // care scroleaza de fapt (nu document.body) - fara reset aici, la
+    // schimbarea ecranului ramane cu offset-ul de scroll de pe ecranul
     // anterior, ceea ce face ca NavBar-ul (sticky) sa para ca "sare"/se
     // deplaseaza fata de continutul nou, mai ales intre ecrane cu inaltimi
     // foarte diferite.
-    document.body.scrollTop = 0
+    if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
     if (screen === 'clasament' && user) fetchClasament()
     if (screen === 'home') {
       const d = new Date()
@@ -4350,7 +4353,7 @@ function App() {
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+      <div ref={mainScrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
 
       {screen === 'home' && (() => {
         const selData = new Date(dataAcasa + 'T00:00:00')
