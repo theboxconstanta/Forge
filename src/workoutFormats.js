@@ -28,6 +28,11 @@ export const REP_SCHEME_QUICK_OPTIONS = [
   '10-8-6-4-2', '5-4-3-2-1', '1-2-3-4-5-6-7-8-9-10',
 ]
 
+// Formate unde durata totala e 100% determinata de config (runde x
+// interval) - a cere si o durata manuala separata e redundant si poate sa
+// nu se potriveasca cu ce rezulta din config. Vezi estimateTotalDurationSec.
+export const AUTO_DURATION_FORMAT_IDS = ['EMOM', 'Tabata', 'Intervals']
+
 // Fiecare camp de config are `labelKey`, o cheie din translations.js (nu text
 // literal) - catalogul e partajat intre UI romana/engleza, vezi
 // FormatConfigEditor care rezolva `t[labelKey]`.

@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -240,5 +240,19 @@ describe('computeSetsPrCandidates', () => {
   it('ignoră rânduri incomplete (fără reps sau fără greutate)', () => {
     const rows = { 'Min 1': [{ reps: '', weight: '60' }, { reps: '5', weight: '' }] }
     expect(computeSetsPrCandidates('Back Squat', rows, 'kg', [])).toEqual([])
+  })
+})
+
+describe('AUTO_DURATION_FORMAT_IDS', () => {
+  it('conține EMOM, Tabata, Intervals - formate a căror durată totală e determinată de config', () => {
+    expect(AUTO_DURATION_FORMAT_IDS).toEqual(['EMOM', 'Tabata', 'Intervals'])
+  })
+  it('Tabata/Intervals au valori implicite, deci se poate calcula durata chiar cu config gol', () => {
+    expect(estimateTotalDurationSec('Tabata', {})).not.toBe(null)
+    expect(estimateTotalDurationSec('Intervals', {})).not.toBe(null)
+  })
+  it('EMOM nu are un nr. implicit de intervale - fără totalRounds setat, durata nu poate fi calculată', () => {
+    expect(estimateTotalDurationSec('EMOM', {})).toBe(null)
+    expect(estimateTotalDurationSec('EMOM', { totalRounds: 12, intervalSec: 60 })).toBe(720)
   })
 })

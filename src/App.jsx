@@ -20,7 +20,7 @@ import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -1220,6 +1220,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [durataWodSec, setDurataWodSec] = useState('0')
   const [formatConfigWod, setFormatConfigWod] = useState({})
   const [dataWod, setDataWod] = useState('')
+  // La EMOM/Tabata/Intervals durata totala e deja 100% determinata de config
+  // (runde x interval) - o durata manuala separata ar putea sa nu se
+  // potriveasca, deci o calculam si o sincronizam automat (vezi si JSX-ul
+  // care ascunde inputul manual pentru aceste formate).
+  useEffect(() => {
+    if (!AUTO_DURATION_FORMAT_IDS.includes(tipWod)) return
+    const totalSec = estimateTotalDurationSec(tipWod, formatConfigWod)
+    if (totalSec == null) return
+    setDurataWodMin(String(Math.floor(totalSec / 60)))
+    setDurataWodSec(String(totalSec % 60))
+  }, [tipWod, formatConfigWod])
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
@@ -2490,17 +2501,30 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             <FormatConfigEditor formatId={tipWod} onFormatChange={setTipWod}
               config={formatConfigWod} onConfigChange={setFormatConfigWod}
               excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+            {AUTO_DURATION_FORMAT_IDS.includes(tipWod) ? (
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+                <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
+                  {estimateTotalDurationSec(tipWod, formatConfigWod) != null
+                    ? <>{secToTime(estimateTotalDurationSec(tipWod, formatConfigWod))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
+                    : t.adminWodDurationPending}
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <div style={{ flex: 1 }}>
+                    <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+                  </div>
+                </div>
+              </>
+            )}
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
             <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
             {[
@@ -3066,6 +3090,14 @@ function App() {
   const [wodSets, setWodSets] = useState({})
   const [wodCompleted, setWodCompleted] = useState(false)
   const [wodDurata, setWodDurata] = useState('')
+  // La EMOM/Tabata/Intervals durata e deja determinata de config (vezi
+  // acelasi tratament in Admin) - o sincronizam automat in loc sa cerem
+  // membrului sa o scrie manual a doua oara.
+  useEffect(() => {
+    if (!AUTO_DURATION_FORMAT_IDS.includes(wodTip)) return
+    const totalSec = estimateTotalDurationSec(wodTip, wodFormatConfig)
+    if (totalSec != null) setWodDurata(secToTime(totalSec))
+  }, [wodTip, wodFormatConfig])
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
   const [editLogId, setEditLogId] = useState(null)
@@ -4967,8 +4999,21 @@ function App() {
                   <FormatConfigEditor formatId={wodTip} onFormatChange={setWodTip}
                     config={wodFormatConfig} onConfigChange={setWodFormatConfig}
                     excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
-                  <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder={t.logWodDurationPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  {AUTO_DURATION_FORMAT_IDS.includes(wodTip) ? (
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
+                      <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
+                        {estimateTotalDurationSec(wodTip, wodFormatConfig) != null
+                          ? <>{secToTime(estimateTotalDurationSec(wodTip, wodFormatConfig))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
+                          : t.adminWodDurationPending}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
+                      <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder={t.logWodDurationPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                    </>
+                  )}
                 </div>
               )}
 
