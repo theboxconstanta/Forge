@@ -260,6 +260,8 @@ export const TRANSLATIONS = {
     logWodSaving: 'Se salvează...',
     logWodSaveEdit: 'Salvează modificările',
     logWodSaveNew: 'Salvează WOD',
+    logWodContinueToScoreButton: 'Continuă → Log Score',
+    logWodBackToComposeLink: 'Înapoi la antrenament',
 
     // Log Skill Work
     skillLogNewTitle: 'Log Skill Work',
@@ -983,6 +985,8 @@ export const TRANSLATIONS = {
     logWodSaving: 'Saving...',
     logWodSaveEdit: 'Save changes',
     logWodSaveNew: 'Save WOD',
+    logWodContinueToScoreButton: 'Continue → Log Score',
+    logWodBackToComposeLink: 'Back to workout',
 
     // Log Skill Work
     skillLogNewTitle: 'Log Skill Work',

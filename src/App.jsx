@@ -3143,6 +3143,12 @@ function App() {
   }, [wodTip, wodFormatConfig])
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
+  // Ecranul de logare era un singur scroll lung (format+config+durata+miscari
+  // apoi scor+note+salveaza) - impartit in 2 pasi ca sa nu mai fie nevoie de
+  // scroll: intai "compune" antrenamentul, apoi "LOG SCORE" separat. Doar
+  // pentru editLogId (editare log existent) ramane un singur ecran, fara pasi
+  // - acolo formatul e deja fixat, nu mai e nimic de "compus".
+  const [logWodStep, setLogWodStep] = useState('compose')
   const [editLogId, setEditLogId] = useState(null)
   const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
   const [editLogHeader, setEditLogHeader] = useState('')
@@ -4788,7 +4794,7 @@ function App() {
                       </div>
                     )
                   })}
-                  <button onClick={() => { setEditLogId(null); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
+                  <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                     style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
@@ -4953,7 +4959,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
-            <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setPrevScreen('log'); setScreen('logWOD') }}
+            <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('log'); setScreen('logWOD') }}
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
               {t.logNewEntry}
             </div>
@@ -5006,7 +5012,11 @@ function App() {
       {screen === 'logWOD' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => { if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('') } setScreen(prevScreen || 'home') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <button onClick={() => {
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setScreen(prevScreen || 'home') }
+              else if (logWodStep === 'score') { setLogWodStep('compose') }
+              else { setScreen(prevScreen || 'home') }
+            }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
           </div>
 
@@ -5026,7 +5036,7 @@ function App() {
                 placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
                 weightUnit={userProfile?.weight_unit} t={t} />
             </div>
-          ) : (
+          ) : logWodStep === 'compose' ? (
             <>
               {variantaAleasa !== null && (
                 <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
@@ -5107,10 +5117,20 @@ function App() {
                     weightUnit={userProfile?.weight_unit} t={t} />
                 </div>
               )}
+              <button onClick={() => setLogWodStep('score')}
+                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                {t.logWodContinueToScoreButton}
+              </button>
             </>
-          )}
+          ) : null}
 
+          {(editLogId || logWodStep === 'score') && (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            {!editLogId && (
+              <div onClick={() => setLogWodStep('compose')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#888', cursor: 'pointer', marginBottom: '14px' }}>
+                ← {t.logWodBackToComposeLink}
+              </div>
+            )}
             <FormatLogger
               formatId={activeLogFormatId}
               config={activeLogFormatConfig}
@@ -5137,6 +5157,7 @@ function App() {
               {wodSaving ? t.logWodSaving : editLogId ? t.logWodSaveEdit : t.logWodSaveNew}
             </button>
           </div>
+          )}
         </div>
       )}
 
