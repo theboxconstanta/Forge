@@ -5,8 +5,9 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig,
 } from './workoutFormats'
+import { getT } from './translations'
 
 describe('getFormat', () => {
   it('întoarce definiția pentru un id cunoscut', () => {
@@ -163,6 +164,64 @@ describe('REP_SCHEME_QUICK_OPTIONS', () => {
   it('include schemele clasice și e atașat câmpului repsScheme al Ladder', () => {
     expect(REP_SCHEME_QUICK_OPTIONS).toContain('21-15-9')
     expect(WORKOUT_FORMATS['Ladder'].config.repsScheme.quickOptions).toBe(REP_SCHEME_QUICK_OPTIONS)
+  })
+})
+
+describe('describeFormatConfig', () => {
+  const tRo = getT('ro')
+
+  it('RFT: rundele setate de admin apar în descriere (bug raportat - nu se vedeau nicăieri)', () => {
+    expect(describeFormatConfig('RFT', { rounds: 5, timeCapSec: 1200 }, tRo)).toBe('Număr runde: 5 · Time cap (opțional): 20:00')
+  })
+  it('Ladder: tipul de ladder și schema de reps apar în descriere', () => {
+    expect(describeFormatConfig('Ladder', { ladderType: 'Ascending', repsScheme: '21-15-9' }, tRo)).toContain('Ascending')
+    expect(describeFormatConfig('Ladder', { ladderType: 'Ascending', repsScheme: '21-15-9' }, tRo)).toContain('21-15-9')
+  })
+  it('Partner WOD: split și format de bază apar', () => {
+    const desc = describeFormatConfig('Partner WOD', { splitType: 'You go/I go', baseFormat: 'AMRAP' }, tRo)
+    expect(desc).toContain('You go/I go')
+    expect(desc).toContain('AMRAP')
+  })
+  it('EMOM: numărul de intervale, durata și exercițiile rotative apar', () => {
+    const desc = describeFormatConfig('EMOM', { totalRounds: 12, intervalSec: 105, intervals: ['Row', 'Wall Ball'] }, tRo)
+    expect(desc).toContain('12')
+    expect(desc).toContain('1:45')
+    expect(desc).toContain('Row, Wall Ball')
+  })
+  it('Tabata: rundele, lucru/odihnă și scoringMode apar', () => {
+    const desc = describeFormatConfig('Tabata', { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Total Reps' }, tRo)
+    expect(desc).toContain('8')
+    expect(desc).toContain('Total Reps')
+  })
+  it('Death By Weight: greutatea de start și incrementul apar', () => {
+    const desc = describeFormatConfig('Death By Weight', { startWeight: 40, incrementWeight: 5, intervalSec: 60 }, tRo)
+    expect(desc).toContain('40')
+    expect(desc).toContain('5')
+  })
+  it('Strength Sets: schema per set apare ca listă unită', () => {
+    expect(describeFormatConfig('Strength Sets', { setsScheme: [5, 3, 1] }, tRo)).toContain('5-3-1')
+  })
+  it('Complex: mișcările și numărul de runde apar', () => {
+    const desc = describeFormatConfig('Complex', { complexMovements: ['Clean', 'Front Squat', 'Jerk'], rounds: 3 }, tRo)
+    expect(desc).toContain('Clean, Front Squat, Jerk')
+    expect(desc).toContain('3')
+  })
+  it('Buy-In/Cash-Out: mișcările buy-in și cash-out apar', () => {
+    const desc = describeFormatConfig('Buy-In/Cash-Out', { buyIn: ['Run 400m'], cashOut: ['Burpees'], mainFormat: 'AMRAP' }, tRo)
+    expect(desc).toContain('Run 400m')
+    expect(desc).toContain('Burpees')
+  })
+  it('AMRAP with Buy-In: durata totală și mișcările buy-in apar', () => {
+    const desc = describeFormatConfig('AMRAP with Buy-In', { totalDurationSec: 1200, buyIn: ['Row 500m'] }, tRo)
+    expect(desc).toContain('20:00')
+    expect(desc).toContain('Row 500m')
+  })
+  it('câmpurile goale/nesetate sunt omise, nu apar ca "undefined"', () => {
+    expect(describeFormatConfig('RFT', { rounds: 5 }, tRo)).toBe('Număr runde: 5')
+    expect(describeFormatConfig('For Time', {}, tRo)).toBe('')
+  })
+  it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
+    FORMAT_IDS.forEach(id => expect(() => describeFormatConfig(id, {}, tRo)).not.toThrow())
   })
 })
 

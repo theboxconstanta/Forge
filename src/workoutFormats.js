@@ -17,7 +17,7 @@
 // - 'mixed'   - Buy-In/Cash-Out: sets + scored + sets
 // - 'nft'     - Not For Time: doar completat + nota, fara scor
 
-import { convertWeight } from './utils'
+import { convertWeight, secToTime } from './utils'
 
 // Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
 // FormatConfigEditor peste campul de text liber - nu limiteaza ce se poate
@@ -260,6 +260,33 @@ export function estimateTotalDurationSec(formatId, config) {
   if (formatId === 'Buy-In/Cash-Out') return cfg.mainDurationSec || null
   if (formatId === 'AMRAP with Buy-In') return cfg.totalDurationSec || null
   return null
+}
+
+// Rezuma configul intr-un text scurt "Label: valoare · Label: valoare" pentru
+// afisare pe ecranul de acasa/jurnal/logare - fara asta, campurile setate de
+// admin (ex. RFT cu 5 runde, Ladder Ascending, EMOM cu exercitiu rotativ) erau
+// salvate corect dar nu se vedeau nicaieri in afara formularului de editare
+// (bug raportat: "la RFT ... nu imi ia rundele" - de fapt rundele erau
+// salvate, doar nu erau afisate nicaieri membrului). Genereaza automat pentru
+// orice format din catalog, plecand de la aceleasi field-uri ca
+// FormatConfigEditor - nu hardcodeaza per format, deci acopera si formate noi
+// adaugate ulterior in WORKOUT_FORMATS fara nicio modificare aici.
+export function describeFormatConfig(formatId, config, t) {
+  const fmt = getFormat(formatId)
+  const cfg = config || {}
+  const parts = []
+  Object.entries(fmt.config || {}).forEach(([key, field]) => {
+    const value = cfg[key]
+    if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return
+    const label = t?.[field.labelKey] || field.labelKey
+    let displayValue
+    if (field.type === 'duration') displayValue = secToTime(value)
+    else if (field.type === 'movementList' || field.type === 'intervalList') displayValue = value.join(', ')
+    else if (field.type === 'repsSchemeList') displayValue = value.join('-')
+    else displayValue = String(value)
+    parts.push(`${label}: ${displayValue}`)
+  })
+  return parts.join(' · ')
 }
 
 // --- family: 'sets' -----------------------------------------------------

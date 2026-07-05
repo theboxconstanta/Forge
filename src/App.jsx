@@ -20,7 +20,7 @@ import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -2520,6 +2520,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
+                  {describeFormatConfig(w.type, w.format_config, t) && (
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(w.type, w.format_config, t)}</div>
+                  )}
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString(localeFor(lang))}</div>
                   {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><LevelDot nivel="RX" size={8} /> {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
                 </div>
@@ -4551,6 +4554,9 @@ function App() {
                     {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
                   </div>
                   {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
+                  {wodZiData && describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                  )}
                   {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
                   )}
@@ -4604,6 +4610,9 @@ function App() {
                       </div>
                       {skillDeschis && (
                         <>
+                          {describeFormatConfig(wodZiData.skill_type, wodZiData.skill_format_config, t) && (
+                            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{wodZiData.skill_type} — {describeFormatConfig(wodZiData.skill_type, wodZiData.skill_format_config, t)}</div>
+                          )}
                           <div style={{ marginTop: '10px' }}>
                             {(() => {
                               const unitate = userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'
@@ -4668,6 +4677,9 @@ function App() {
                                 <span style={{ fontSize: '12px', color: '#888' }}>{formatWodDurata(wodZiData.duration)}</span>
                               </div>
                               {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>"{wodZiData.name}"</div>}
+                              {describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
+                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                              )}
                             </div>
                             <div>
                               {miscari.map((m, mi) => (
@@ -4947,9 +4959,12 @@ function App() {
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(dataAcasa + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: describeFormatConfig(wodZiData.type, wodZiData.format_config, t) ? '2px' : '10px' }}>
                       {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                     </div>
+                    {describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                    )}
                     {miscariAfisate.length > 0 ? (
                       <SortableList
                         items={miscariAfisate}
