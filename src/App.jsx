@@ -3127,14 +3127,19 @@ function App() {
   const [wodFormatConfig, setWodFormatConfig] = useState({})
   const [wodSets, setWodSets] = useState({})
   const [wodCompleted, setWodCompleted] = useState(false)
-  const [wodDurata, setWodDurata] = useState('')
+  // Doua casute (minute/secunde), ca la Admin - nu text liber, evita
+  // ambiguitati ("20 minute" vs "20:00") si se compune direct in acelasi
+  // format "mm:ss" folosit peste tot in app.
+  const [wodDurataMin, setWodDurataMin] = useState('')
+  const [wodDurataSec, setWodDurataSec] = useState('')
+  const wodDurata = (wodDurataMin || wodDurataSec) ? `${parseInt(wodDurataMin) || 0}:${String(parseInt(wodDurataSec) || 0).padStart(2, '0')}` : ''
   // La EMOM/Tabata/Intervals durata e deja determinata de config (vezi
   // acelasi tratament in Admin) - o sincronizam automat in loc sa cerem
   // membrului sa o scrie manual a doua oara.
   useEffect(() => {
     if (!AUTO_DURATION_FORMAT_IDS.includes(wodTip)) return
     const totalSec = estimateTotalDurationSec(wodTip, wodFormatConfig)
-    if (totalSec != null) setWodDurata(secToTime(totalSec))
+    if (totalSec != null) { setWodDurataMin(String(Math.floor(totalSec / 60))); setWodDurataSec(String(totalSec % 60)) }
   }, [wodTip, wodFormatConfig])
   const [wodMiscari, setWodMiscari] = useState([])
   const [wodMiscareCurenta, setWodMiscareCurenta] = useState('')
@@ -3991,7 +3996,7 @@ function App() {
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
       setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('')
-      setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurata(''); setWodMiscari([]); setWodMiscareCurenta('')
+      setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
   }
@@ -5050,7 +5055,16 @@ function App() {
                   ) : (
                     <>
                       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
-                      <input value={wodDurata} onChange={e => setWodDurata(e.target.value)} placeholder={t.logWodDurationPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" value={wodDurataMin} onChange={e => setWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" min="0" max="59" value={wodDurataSec} onChange={e => setWodDurataSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
