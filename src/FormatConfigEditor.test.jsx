@@ -42,4 +42,25 @@ describe('FormatConfigEditor', () => {
     fireEvent.change(numberInputs[0], { target: { value: '10' } })
     expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ totalRounds: 10 }))
   })
+
+  it('Ladder afișează chip-uri quick-select pentru scheme de reps și le poate alege', () => {
+    const onConfigChange = vi.fn()
+    render(<FormatConfigEditor formatId="Ladder" onFormatChange={() => {}} config={{}} onConfigChange={onConfigChange} t={tRo} />)
+    fireEvent.click(screen.getByText('21-15-9'))
+    expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ repsScheme: '21-15-9' }))
+  })
+
+  it('Strength Sets: adăugarea unei ținte de reps construiește schema per set', () => {
+    const onConfigChange = vi.fn()
+    render(<FormatConfigEditor formatId="Strength Sets" onFormatChange={() => {}} config={{}} onConfigChange={onConfigChange} t={tRo} />)
+    const input = screen.getByPlaceholderText('ex: 5')
+    fireEvent.change(input, { target: { value: '5' } })
+    fireEvent.click(screen.getByText('+'))
+    expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ setsScheme: [5] }))
+  })
+
+  it('Tabata expune scoringMode ca select cu Lowest Reps implicit', () => {
+    render(<FormatConfigEditor formatId="Tabata" onFormatChange={() => {}} config={{}} onConfigChange={() => {}} t={tRo} />)
+    expect(screen.getByText('Scor pe interval')).toBeInTheDocument()
+  })
 })

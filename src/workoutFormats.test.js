@@ -4,7 +4,8 @@ import {
   composePartialText, parsePartialText, composeAmrapResult, parseAmrapResult,
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
-  defaultRowsForFormat, computeSetsPrCandidates,
+  defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
+  REP_SCHEME_QUICK_OPTIONS,
 } from './workoutFormats'
 
 describe('getFormat', () => {
@@ -83,6 +84,9 @@ describe('estimateTotalDurationSec', () => {
   it('Death By nu are durată estimabilă (open-ended)', () => {
     expect(estimateTotalDurationSec('Death By', {})).toBe(null)
   })
+  it('AMRAP with Buy-In ia durata totala (buy-in-ul consuma din ea)', () => {
+    expect(estimateTotalDurationSec('AMRAP with Buy-In', { totalDurationSec: 1200 })).toBe(1200)
+  })
 })
 
 describe('normalizeSetsRows', () => {
@@ -122,16 +126,43 @@ describe('defaultRowsForFormat', () => {
     const rows = defaultRowsForFormat('Tabata', {}, [])
     expect(Object.keys(rows)).toHaveLength(8)
   })
-  it('Strength Sets generează N seturi per mișcare', () => {
-    const rows = defaultRowsForFormat('Strength Sets', { targetSets: 3 }, ['Back Squat'])
+  it('Strength Sets generează un rând per intrare din setsScheme, cu targetReps purtat pe rând', () => {
+    const rows = defaultRowsForFormat('Strength Sets', { setsScheme: [5, 3, 1] }, ['Back Squat'])
     expect(rows['Back Squat']).toHaveLength(3)
+    expect(rows['Back Squat'].map(r => r.targetReps)).toEqual([5, 3, 1])
   })
   it('Weightlifting fără targetSets prescris pornește cu 0 rânduri (adăugate manual)', () => {
     const rows = defaultRowsForFormat('Weightlifting', {}, ['Back Squat'])
     expect(rows['Back Squat']).toHaveLength(0)
   })
+  it('Death By Weight pornește cu 1 rând, ca Death By', () => {
+    const rows = defaultRowsForFormat('Death By Weight', {}, [])
+    expect(Object.keys(rows)).toEqual(['Min 1'])
+  })
   it('formatele scored nu au rânduri', () => {
     expect(defaultRowsForFormat('AMRAP', {}, [])).toEqual({})
+  })
+})
+
+describe('computeSetsScore', () => {
+  it('Total Reps însumează toate rândurile', () => {
+    const rows = { 'Rundă 1': [{ reps: '10' }], 'Rundă 2': [{ reps: '8' }], 'Rundă 3': [{ reps: '12' }] }
+    expect(computeSetsScore('Tabata', { scoringMode: 'Total Reps' }, rows)).toBe(30)
+  })
+  it('Lowest Reps ia minimul dintre rânduri', () => {
+    const rows = { 'Rundă 1': [{ reps: '10' }], 'Rundă 2': [{ reps: '8' }], 'Rundă 3': [{ reps: '12' }] }
+    expect(computeSetsScore('Tabata', { scoringMode: 'Lowest Reps' }, rows)).toBe(8)
+  })
+  it('întoarce null fără scoringMode sau fără rânduri completate', () => {
+    expect(computeSetsScore('EMOM', {}, { 'Min 1': [{ reps: '5' }] })).toBe(null)
+    expect(computeSetsScore('Tabata', { scoringMode: 'Total Reps' }, {})).toBe(null)
+  })
+})
+
+describe('REP_SCHEME_QUICK_OPTIONS', () => {
+  it('include schemele clasice și e atașat câmpului repsScheme al Ladder', () => {
+    expect(REP_SCHEME_QUICK_OPTIONS).toContain('21-15-9')
+    expect(WORKOUT_FORMATS['Ladder'].config.repsScheme.quickOptions).toBe(REP_SCHEME_QUICK_OPTIONS)
   })
 })
 

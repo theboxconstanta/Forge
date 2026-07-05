@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore } from './workoutFormats'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }
@@ -93,6 +93,7 @@ function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
           <input type="number" value={row.reps || ''} onChange={e => onChange(updateSetRow({ [rowKey]: rows }, rowKey, si, 'reps', e.target.value)[rowKey])}
             placeholder={t?.skillLogRepsPlaceholder || 'reps'}
             style={{ width: '70px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          {row.targetReps != null && <span style={{ fontSize: '11px', color: '#aaa', whiteSpace: 'nowrap' }}>/ {row.targetReps}</span>}
           <input type="number" value={row.weight || ''} onChange={e => onChange(updateSetRow({ [rowKey]: rows }, rowKey, si, 'weight', e.target.value)[rowKey])}
             placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
             style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
@@ -110,6 +111,7 @@ function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
 
 function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t }) {
   const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
+  const score = computeSetsScore(formatId, config, rowsByKey)
   return (
     <>
       {Object.entries(rowsByKey).map(([key, rows]) => (
@@ -117,6 +119,11 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           onChange={nextRows => onChange({ ...rowsByKey, [key]: nextRows })}
           weightUnit={weightUnit} t={t} />
       ))}
+      {score != null && (
+        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+          {config?.scoringMode === 'Total Reps' ? (t?.fmtTotalRepsScoreLabel || 'Total reps') : (t?.fmtLowestRepsScoreLabel || 'Cea mai slabă rundă')}: {score}
+        </div>
+      )}
     </>
   )
 }
@@ -133,9 +140,11 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
 
   if (format.family === 'mixed') {
     const buyIn = (config?.buyIn && config.buyIn.length > 0) ? config.buyIn : ['Buy-In']
+    const hasCashOut = Array.isArray(config?.cashOut)
     const cashOut = (config?.cashOut && config.cashOut.length > 0) ? config.cashOut : ['Cash-Out']
     const buyInRows = (v.sets || {})['__buyIn'] ? { [buyIn.join(' + ')]: v.sets['__buyIn'] } : { [buyIn.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
     const cashOutRows = (v.sets || {})['__cashOut'] ? { [cashOut.join(' + ')]: v.sets['__cashOut'] } : { [cashOut.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
+    const mainScoreMode = format.scoreMode || (config?.mainFormat === 'AMRAP' ? 'amrap' : 'fortime')
     return (
       <>
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
@@ -145,13 +154,17 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
-        <ScoredFields scoreMode={config?.mainFormat === 'AMRAP' ? 'amrap' : 'fortime'} movements={movements || []} value={v} onChange={patch} t={t} />
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
-        {Object.entries(cashOutRows).map(([key, rows]) => (
-          <SetsRows key={key} rowKey={key} rows={rows}
-            onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
-            weightUnit={weightUnit} t={t} />
-        ))}
+        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} />
+        {hasCashOut && (
+          <>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
+            {Object.entries(cashOutRows).map(([key, rows]) => (
+              <SetsRows key={key} rowKey={key} rows={rows}
+                onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
+                weightUnit={weightUnit} t={t} />
+            ))}
+          </>
+        )}
       </>
     )
   }

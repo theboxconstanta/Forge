@@ -19,6 +19,15 @@
 
 import { convertWeight } from './utils'
 
+// Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
+// FormatConfigEditor peste campul de text liber - nu limiteaza ce se poate
+// scrie manual, doar accelereaza cazurile comune.
+export const REP_SCHEME_QUICK_OPTIONS = [
+  '21-15-9', '21-18-15-12-9-6-3', '15-12-9-6-3', '12-9-6-3', '9-7-5',
+  '50-40-30-20-10', '30-20-10', '25-20-15-10-5', '10-9-8-7-6-5-4-3-2-1',
+  '10-8-6-4-2', '5-4-3-2-1', '1-2-3-4-5-6-7-8-9-10',
+]
+
 // Fiecare camp de config are `labelKey`, o cheie din translations.js (nu text
 // literal) - catalogul e partajat intre UI romana/engleza, vezi
 // FormatConfigEditor care rezolva `t[labelKey]`.
@@ -45,6 +54,9 @@ export const WORKOUT_FORMATS = {
   'Ladder': {
     family: 'scored', scoreMode: 'fortime',
     config: {
+      // quickOptions: scheme clasice reutilizate des (21-15-9 etc), afisate ca
+      // chip-uri peste inputul de text liber - vezi FormatConfigEditor.
+      repsScheme: { type: 'text', required: false, labelKey: 'fmtRepsScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
       ladderType: { type: 'select', options: ['Ascending', 'Descending', 'Asc-Desc'], required: true, labelKey: 'fmtLadderType' },
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
@@ -66,6 +78,17 @@ export const WORKOUT_FORMATS = {
       intervalSec: { type: 'duration', required: true, default: 60, labelKey: 'fmtIntervalDuration' },
     },
   },
+  // Varianta cu greutate crescanda in loc de reps (ex: +5kg in fiecare minut
+  // pana nu mai poti termina in interval) - acelasi principiu ca Death By,
+  // dar tinta e o singura miscare cu incarcatura in crestere.
+  'Death By Weight': {
+    family: 'sets', rowMode: 'interval', prEligible: true,
+    config: {
+      startWeight: { type: 'number', required: true, labelKey: 'fmtStartWeight' },
+      incrementWeight: { type: 'number', required: true, default: 5, labelKey: 'fmtIncrementWeight' },
+      intervalSec: { type: 'duration', required: true, default: 60, labelKey: 'fmtIntervalDuration' },
+    },
+  },
   'EMOM': {
     family: 'sets', rowMode: 'interval',
     config: {
@@ -80,6 +103,9 @@ export const WORKOUT_FORMATS = {
       rounds: { type: 'number', required: true, default: 8, labelKey: 'fmtRounds' },
       workSec: { type: 'duration', required: true, default: 20, labelKey: 'fmtWork' },
       restSec: { type: 'duration', required: true, default: 10, labelKey: 'fmtRest' },
+      // scorul clasic Tabata e "cea mai slaba runda" (Lowest Reps), dar unii
+      // coach vor suma totala - lasam alegerea, in loc sa hardcodam.
+      scoringMode: { type: 'select', options: ['Lowest Reps', 'Total Reps'], required: true, default: 'Lowest Reps', labelKey: 'fmtIntervalScoring' },
     },
   },
   'Intervals': {
@@ -88,6 +114,7 @@ export const WORKOUT_FORMATS = {
       rounds: { type: 'number', required: true, labelKey: 'fmtRounds' },
       workSec: { type: 'duration', required: true, labelKey: 'fmtWork' },
       restSec: { type: 'duration', required: true, labelKey: 'fmtRest' },
+      scoringMode: { type: 'select', options: ['Lowest Reps', 'Total Reps'], required: true, default: 'Total Reps', labelKey: 'fmtIntervalScoring' },
     },
   },
   // Id istoric (skill_type implicit dinainte de acest catalog) - pastrat ca
@@ -97,11 +124,13 @@ export const WORKOUT_FORMATS = {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {},
   },
+  // setsScheme: lista de tinte de reps, un numar per set (ex [5,5,5,5,5] sau
+  // [5,3,3,1,1]) - fiecare set poate avea o tinta diferita de reps, nu doar o
+  // schema uniforma de tip "5x5". Numarul de seturi = lungimea listei.
   'Strength Sets': {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {
-      targetSets: { type: 'number', required: true, labelKey: 'fmtSetsCount' },
-      repsScheme: { type: 'text', required: false, labelKey: 'fmtRepsScheme' },
+      setsScheme: { type: 'repsSchemeList', required: true, labelKey: 'fmtSetsScheme' },
     },
   },
   'Build to Heavy/1RM': {
@@ -129,6 +158,16 @@ export const WORKOUT_FORMATS = {
       cashOut: { type: 'movementList', required: true, labelKey: 'fmtCashOutMovements' },
       mainFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, labelKey: 'fmtMainWorkFormat' },
       mainDurationSec: { type: 'duration', required: false, labelKey: 'fmtMainWorkDuration' },
+    },
+  },
+  // Diferit de Buy-In/Cash-Out: aici e o SINGURA durata totala (clock unic);
+  // buy-in-ul consuma din ea, iar AMRAP-ul foloseste timpul ramas - nu doua
+  // durate separate (buy-in + main work).
+  'AMRAP with Buy-In': {
+    family: 'mixed', scoreMode: 'amrap',
+    config: {
+      totalDurationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' },
+      buyIn: { type: 'movementList', required: true, labelKey: 'fmtBuyInMovements' },
     },
   },
   'Not For Time': {
@@ -219,6 +258,7 @@ export function estimateTotalDurationSec(formatId, config) {
   if (formatId === 'EMOM') return (parseInt(cfg.totalRounds) || 0) * (cfg.intervalSec || 60) || null
   if (formatId === 'Tabata' || formatId === 'Intervals') return (parseInt(cfg.rounds) || 8) * ((cfg.workSec || 20) + (cfg.restSec || 10)) || null
   if (formatId === 'Buy-In/Cash-Out') return cfg.mainDurationSec || null
+  if (formatId === 'AMRAP with Buy-In') return cfg.totalDurationSec || null
   return null
 }
 
@@ -276,7 +316,7 @@ export function defaultRowsForFormat(formatId, config, movements) {
     for (let i = 1; i <= n; i++) out[`Rundă ${i}`] = [emptyRow()]
     return out
   }
-  if (formatId === 'Death By') {
+  if (formatId === 'Death By' || formatId === 'Death By Weight') {
     return { 'Min 1': [emptyRow()] }
   }
   if (formatId === 'Complex') {
@@ -285,15 +325,41 @@ export function defaultRowsForFormat(formatId, config, movements) {
     for (let i = 1; i <= n; i++) out[`Rundă ${i}`] = [emptyRow()]
     return out
   }
-  // Weightlifting / Strength Sets / Superset / Build to Heavy/1RM: randuri per
-  // miscare. Fara targetSets prescris (Weightlifting, Build to Heavy) pornim
-  // de la 0 randuri - membrul adauga manual cate seturi a facut, ca la
-  // Skill Work Weightlifting azi (nu presupunem un numar).
+  // Strength Sets: un rand per intrare din setsScheme (tinta de reps a acelui
+  // set), purtata pe rand ca `targetReps` - FormatLogger o afiseaza ca hint
+  // ("/ N reps"), nu forteaza valoarea logata.
+  if (formatId === 'Strength Sets') {
+    const scheme = Array.isArray(config?.setsScheme) && config.setsScheme.length > 0 ? config.setsScheme : [null]
+    const movs = (movements && movements.length > 0) ? movements : ['']
+    const out = {}
+    movs.forEach(m => { out[m] = scheme.map(targetReps => ({ ...emptyRow(), targetReps: targetReps ?? null })) })
+    return out
+  }
+  // Weightlifting / Superset / Build to Heavy/1RM: randuri per miscare. Fara
+  // targetSets prescris (Weightlifting, Build to Heavy) pornim de la 0
+  // randuri - membrul adauga manual cate seturi a facut, ca la Skill Work
+  // Weightlifting azi (nu presupunem un numar).
   const targetSets = parseInt(config?.targetSets) || 0
   const movs = (movements && movements.length > 0) ? movements : ['']
   const out = {}
   movs.forEach(m => { out[m] = targetSets ? rowsOf(targetSets) : [] })
   return out
+}
+
+// Calculeaza scorul unui format family:'sets' cu scoringMode configurabil
+// (Tabata/Intervals: Total Reps = suma tuturor randurilor, Lowest Reps = cea
+// mai mica valoare dintre randuri cu reps completat). Intoarce null daca nu
+// exista randuri cu reps valide sau formatul nu are scoringMode.
+export function computeSetsScore(formatId, config, rowsByKey) {
+  const scoringMode = config?.scoringMode
+  if (!scoringMode) return null
+  const repsValues = Object.values(rowsByKey || {})
+    .flat()
+    .map(r => parseInt(r?.reps))
+    .filter(n => !isNaN(n))
+  if (repsValues.length === 0) return null
+  if (scoringMode === 'Total Reps') return repsValues.reduce((a, b) => a + b, 0)
+  return Math.min(...repsValues)
 }
 
 // Pentru fiecare numar de reps logat, ia cea mai mare greutate introdusa si o

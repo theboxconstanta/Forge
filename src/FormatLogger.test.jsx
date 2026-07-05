@@ -37,6 +37,27 @@ describe('FormatLogger - family sets (EMOM)', () => {
   })
 })
 
+describe('FormatLogger - family sets cu targetReps și scoringMode', () => {
+  it('Strength Sets afișează ținta de reps ca hint lângă input', () => {
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5, 3, 1] }} movements={['Back Squat']}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getByText('/ 5')).toBeInTheDocument()
+    expect(screen.getByText('/ 3')).toBeInTheDocument()
+    expect(screen.getByText('/ 1')).toBeInTheDocument()
+  })
+
+  it('Tabata cu scoringMode afișează scorul calculat din rândurile logate', () => {
+    const value = { sets: { 'Rundă 1': [{ reps: '10' }], 'Rundă 2': [{ reps: '8' }] } }
+    render(
+      <FormatLogger formatId="Tabata" config={{ rounds: 2, scoringMode: 'Lowest Reps' }} movements={[]}
+        value={value} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getByText(/Cea mai slabă rundă: 8/)).toBeInTheDocument()
+  })
+})
+
 describe('FormatLogger - family scored (AMRAP)', () => {
   it('afișează runde + reps parțiale pentru mișcările date', () => {
     render(<FormatLogger formatId="AMRAP" config={{}} movements={['Pull-ups']} value={{}} onChange={() => {}} t={{}} />)
@@ -56,6 +77,20 @@ describe('FormatLogger - family mixed (Buy-In/Cash-Out)', () => {
     const patch = onChange.mock.calls[0][0]
     expect(patch.sets.__buyIn[0].reps).toBe('20')
     expect(patch.sets.__cashOut).toBeUndefined()
+  })
+})
+
+describe('FormatLogger - family mixed (AMRAP with Buy-In, fără Cash-Out)', () => {
+  it('nu randeaza sectiunea Cash-Out cand config nu are cashOut', () => {
+    render(
+      <FormatLogger formatId="AMRAP with Buy-In" config={{ totalDurationSec: 1200, buyIn: ['Row 1000m'] }} movements={['Burpees']}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.queryByText('Cash-Out')).not.toBeInTheDocument()
+    expect(screen.getByText('Buy-In')).toBeInTheDocument()
+    expect(screen.getByText('Main Work')).toBeInTheDocument()
+    // family 'mixed' cu scoreMode 'amrap' de la format -> ScoredFields randeaza runde complete
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
   })
 })
 

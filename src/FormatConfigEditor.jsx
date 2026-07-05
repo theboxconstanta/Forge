@@ -44,11 +44,49 @@ function NumberField({ label, value, onChange }) {
   )
 }
 
-function TextField({ label, value, onChange, placeholder }) {
+function TextField({ label, value, onChange, placeholder, quickOptions }) {
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
+      {quickOptions && quickOptions.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+          {quickOptions.map(opt => (
+            <div key={opt} onClick={() => onChange(opt)}
+              style={{ padding: '5px 10px', borderRadius: '20px', border: value === opt ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: value === opt ? '#f0f0f0' : '#fafafa', color: value === opt ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: value === opt ? '700' : '400', cursor: 'pointer' }}>
+              {opt}
+            </div>
+          ))}
+        </div>
+      )}
       <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
+    </div>
+  )
+}
+
+// Schema de reps per set (ex: [5,3,1]) - un rand per set, fiecare cu propria
+// tinta de reps; numarul de seturi = lungimea listei (nu un camp separat).
+function RepsSchemeListField({ label, value, onChange }) {
+  const [draft, setDraft] = useState('')
+  const items = value || []
+  const add = () => {
+    const n = parseInt(draft)
+    if (!isNaN(n) && n > 0) { onChange([...items, n]); setDraft('') }
+  }
+  return (
+    <div style={fieldWrapStyle}>
+      <div style={labelStyle}>{label}</div>
+      {items.map((reps, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>Set {i + 1}: {reps} reps</div>
+          <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))}
+            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input type="number" min="1" value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="ex: 5" style={{ ...inputStyle, flex: 1 }} />
+        <button type="button" onClick={add} style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+      </div>
     </div>
   )
 }
@@ -124,13 +162,16 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <SelectField key={key} label={label} value={cfg[key]} options={field.options} onChange={v => setField(key, v)} />
         )
         if (field.type === 'text') return (
-          <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
+          <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />
         )
         if (field.type === 'movementList') return (
           <MovementListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
         )
         if (field.type === 'intervalList') return (
           <IntervalListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
+        )
+        if (field.type === 'repsSchemeList') return (
+          <RepsSchemeListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} />
         )
         return null
       })}
