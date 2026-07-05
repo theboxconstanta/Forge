@@ -2887,7 +2887,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
                 }).join(' · '),
               })) : []
-              const areDetalii = wodHeader || miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets
+              // Rezultatul (timp/scor/seturi/completat) - afisat o singura data, in
+              // sectiunea REZULTAT de mai jos (nu si ca chip-uri in randul de sus,
+              // care ar duplica aceeasi informatie ca titlul + REZULTAT).
+              const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
+              const areRezultat = rezultatBucati.length > 0
+              const areDetalii = miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets || areRezultat
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -2910,26 +2915,11 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                    {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
-                    {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
-                    {wHasSets && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{t.jurnalSetsCountLabel(wSetsParti.length)}</span>}
-                    {w.log_meta?.completed && <span style={{ fontSize: '12px', background: '#F5FBEA', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>✓</span>}
-                    {!w.result && !w.time_result && !wHasSets && !w.log_meta?.completed && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
-                  </div>
-                  {isOpen && (() => {
-                    // Rezultatul (timp/scor/seturi/completat) era vizibil doar ca
-                    // chip-uri mici in randul de mai sus - in vederea extinsa nu se
-                    // repeta nicaieri, etichetat clar. Adaugat aici, separat printr-o
-                    // linie proprie de restul detaliilor, ca in aplicatiile de
-                    // referinta (nume+miscari sus, apoi REZULTAT clar dedesubt).
-                    const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
-                    const areRezultat = rezultatBucati.length > 0
-                    return (
+                  {!isOpen && !areRezultat && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#aaa' }}>—</div>
+                  )}
+                  {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                      {wodHeader && (
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
-                      )}
                       {miscariAfisate.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
@@ -2969,8 +2959,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         </button>
                       )}
                     </div>
-                    )
-                  })()}
+                  )}
                 </div>
               )
             })()}
