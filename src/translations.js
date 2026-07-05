@@ -679,8 +679,7 @@ export const TRANSLATIONS = {
     adminClassNoResult: 'Niciun rezultat',
 
     // Admin - tab WOD
-    adminWodEditTitle: '✎ Editează WOD',
-    adminWodNewTitle: '+ WOD nou',
+    adminWodFormTitle: 'Workout of the Day',
     adminWodCancel: 'Anulează',
     adminWodDateLabel: 'Data WOD',
     adminWodTypeLabel: 'Tip WOD',
@@ -1406,8 +1405,7 @@ export const TRANSLATIONS = {
     adminClassNoResult: 'No results',
 
     // Admin - tab WOD
-    adminWodEditTitle: '✎ Edit WOD',
-    adminWodNewTitle: '+ New WOD',
+    adminWodFormTitle: 'Workout of the Day',
     adminWodCancel: 'Cancel',
     adminWodDateLabel: 'WOD date',
     adminWodTypeLabel: 'WOD type',

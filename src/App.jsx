@@ -2559,10 +2559,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       {adminTab === 'wod' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/+WOD NOU */}
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
-              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/Workout of the Day, aceeasi incadrare ca ele */}
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodDateLabel}</div>
+              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
@@ -2626,9 +2626,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                 </div>
               )}
             </div>
-            <div style={{ marginBottom: '12px' }}>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
               <div onClick={() => setAdminWodFormOpen(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{editWodId ? t.adminWodEditTitle : t.adminWodNewTitle}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodFormTitle}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {editWodId && (
                     <div onClick={(e) => { e.stopPropagation(); cancelEditWod() }} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
