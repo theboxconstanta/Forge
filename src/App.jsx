@@ -1273,10 +1273,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [warmupWod, setWarmupWod] = useState('')
+  // Switch admin: ascunde/arata WARM-UP + SKILL impreuna pe Acasa la membri.
+  const [warmupSkillVisibleWod, setWarmupSkillVisibleWod] = useState(true)
   const [skillWod, setSkillWod] = useState('')
   const [skillNameWod, setSkillNameWod] = useState('')
   const [skillTypeWod, setSkillTypeWod] = useState('Weightlifting')
   const [skillFormatConfigWod, setSkillFormatConfigWod] = useState({})
+  // SKILL 2: oglinda completa a SKILL, independent (format/miscari proprii).
+  const [skill2Wod, setSkill2Wod] = useState('')
+  const [skillName2Wod, setSkillName2Wod] = useState('')
+  const [skillType2Wod, setSkillType2Wod] = useState('Weightlifting')
+  const [skillFormatConfig2Wod, setSkillFormatConfig2Wod] = useState({})
   const [editWodId, setEditWodId] = useState(null)
 
   const [emailAbonament, setEmailAbonament] = useState('')
@@ -1721,10 +1728,15 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
       warmup: parseLinii(warmupWod),
+      warmup_skill_visible: warmupSkillVisibleWod,
       skill: parseLinii(skillWod),
       skill_name: skillNameWod.trim() || null,
       skill_type: skillTypeWod,
       skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null,
+      skill2: parseLinii(skill2Wod),
+      skill2_name: skillName2Wod.trim() || null,
+      skill2_type: skillType2Wod,
+      skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
@@ -1738,7 +1750,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-      setWarmupWod(''); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({})
+      setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({})
+      setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
     }
     setSavingWod(false)
@@ -1753,10 +1766,15 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setFormatConfigWod(w.format_config || {})
     setNumeWod(w.name || '')
     setWarmupWod((w.warmup || []).join('\n'))
+    setWarmupSkillVisibleWod(w.warmup_skill_visible !== false)
     setSkillWod((w.skill || []).join('\n'))
     setSkillNameWod(w.skill_name || '')
     setSkillTypeWod(w.skill_type || 'Weightlifting')
     setSkillFormatConfigWod(w.skill_format_config || {})
+    setSkill2Wod((w.skill2 || []).join('\n'))
+    setSkillName2Wod(w.skill2_name || '')
+    setSkillType2Wod(w.skill2_type || 'Weightlifting')
+    setSkillFormatConfig2Wod(w.skill2_format_config || {})
     setWodVariante({
       onramp: (w.movements_onramp || []).join('\n'),
       beginner: (w.movements_beginner || []).join('\n'),
@@ -1774,7 +1792,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
+    setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
+    setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
   }
 
@@ -2508,13 +2527,20 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       {adminTab === 'wod' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupSkillVisibleLabel}</div>
+              <div onClick={() => setWarmupSkillVisibleWod(v => !v)} role="switch" aria-checked={warmupSkillVisibleWod}
+                style={{ width: '42px', height: '24px', borderRadius: '12px', background: warmupSkillVisibleWod ? '#ABE73C' : '#e0e0e0', position: 'relative', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}>
+                <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: warmupSkillVisibleWod ? '21px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </div>
+            </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodWarmupLabel}</div>
               <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
                 placeholder={t.adminWodWarmupPlaceholder} rows={3}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
             </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkillLabel}</div>
               <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
                 config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
@@ -2525,6 +2551,20 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
               )}
               <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
+                placeholder={t.adminWodSkillPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodSkill2Label}</div>
+              <FormatConfigEditor formatId={skillType2Wod} onFormatChange={setSkillType2Wod}
+                config={skillFormatConfig2Wod} onConfigChange={setSkillFormatConfig2Wod} t={t} />
+              {skillType2Wod === 'Weightlifting' ? (
+                <CautareMiscare key={(editWodId || 'new') + '-skill2'} preFill={skillName2Wod} onAleage={m => setSkillName2Wod(m)} t={t} label={t.adminWodSkillMovementLabel} />
+              ) : (
+                <input value={skillName2Wod} onChange={e => setSkillName2Wod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              )}
+              <textarea value={skill2Wod} onChange={e => setSkill2Wod(e.target.value)}
                 placeholder={t.adminWodSkillPlaceholder} rows={3}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
             </div>
@@ -2863,7 +2903,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
     <>
       {entries.map((entry, i) => {
         const w = entry.wodLog
-        const sl = entry.skillLog
+        const skillLogsArr = entry.skillLogsArr || []
         const dataAfisata = entry.date ? new Date(entry.date).toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
         return (
           <div key={entry.key}>
@@ -2963,10 +3003,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 </div>
               )
             })()}
-            {sl && (() => {
+            {skillLogsArr.map(sl => (() => {
               const hasSets = sl.sets && Object.keys(sl.sets).length > 0
               const skillKey = sl.id
               const skillOpen = deschisSkill === skillKey
+              const esteSlot2 = sl.slot === 2
+              const skillTitleName = esteSlot2 ? sl.wods?.skill2_name : sl.wods?.skill_name
               const parti = []
               if (hasSets) {
                 Object.entries(sl.sets).forEach(([miscare, seturi]) => {
@@ -2981,10 +3023,10 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 })
               }
               return (
-                <div onClick={() => { setDeschisSkill(skillOpen ? null : skillKey); setConfirmDeleteSkill(null) }}
+                <div key={sl.id} onClick={() => { setDeschisSkill(skillOpen ? null : skillKey); setConfirmDeleteSkill(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{t.jurnalSkillTitle}{sl.wods?.skill_name ? ` · ${sl.wods.skill_name}` : ''}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteSkill && (
                         confirmDeleteSkill === skillKey ? (
@@ -3034,11 +3076,79 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   )}
                 </div>
               )
-            })()}
+            })())}
           </div>
         )
       })}
     </>
+  )
+}
+
+// Sectiune Skill Work pe Acasa (SKILL sau SKILL 2 - aceeasi randare, doar
+// alte date) - extrasa ca sa nu duplicam ~50 de linii JSX identice pentru
+// cele 2 sloturi.
+function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, skillFormatConfig, logZiSkill, isOpen, onToggle, onLogClick, userProfile, t }) {
+  const areDate = (skillMovements || []).length > 0 || skillName || skillFormatConfig
+  if (!areDate) return null
+  return (
+    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>{titleLabel}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {skillName && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{skillName}</div>}
+          <span style={{ fontSize: '10px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      {isOpen && (
+        <>
+          {describeFormatConfig(skillType, skillFormatConfig, t) && (
+            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{skillType} — {describeFormatConfig(skillType, skillFormatConfig, t)}</div>
+          )}
+          <div style={{ marginTop: '10px' }}>
+            {(() => {
+              const unitate = userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'
+              const seturiTextPentru = (rows) => (rows || []).map((set, si) => {
+                const { reps, weight } = typeof set === 'string' ? { reps: '', weight: set } : set
+                const parti = []
+                if (reps) parti.push(`${reps} reps`)
+                if (weight) parti.push(`${weight}${unitate}`)
+                return `${t.skillLogSetLabel(si + 1)}: ${parti.join(' @ ')}`
+              }).join(' · ')
+              // Weightlifting/Strength Sets/Superset: seturile sunt cheiate pe numele
+              // miscarii (afisate langa fiecare). EMOM/Tabata/Death By/Complex: cheiate
+              // pe interval/runda, aratam direct randurile logate (nu au corespondent
+              // 1:1 in skillMovements).
+              if (getFormat(skillType || 'Weightlifting').rowMode === 'movement' || !logZiSkill?.sets) {
+                return (skillMovements || []).map((m, mi) => (
+                  <div key={mi} style={{ padding: '3px 0' }}>
+                    <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</div>
+                    {(logZiSkill?.sets?.[m] || []).length > 0 && (
+                      <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
+                        {seturiTextPentru(logZiSkill.sets[m])}
+                      </div>
+                    )}
+                  </div>
+                ))
+              }
+              return Object.entries(logZiSkill.sets).map(([cheie, rows]) => (
+                <div key={cheie} style={{ padding: '3px 0' }}>
+                  <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {cheie}</div>
+                  {rows.length > 0 && (
+                    <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
+                      {seturiTextPentru(rows)}
+                    </div>
+                  )}
+                </div>
+              ))
+            })()}
+          </div>
+          <button onClick={onLogClick}
+            style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+            {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -3051,6 +3161,7 @@ function App() {
   const debugTapRef = useRef(0)
   const [wodDeschis, setWodDeschis] = useState(false)
   const [skillDeschis, setSkillDeschis] = useState(false)
+  const [skillDeschis2, setSkillDeschis2] = useState(false)
   const [claseHomeDeschis, setClaseHomeDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
@@ -3064,6 +3175,8 @@ function App() {
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
+  // Care slot de Skill Work e editat pe ecranul logSkill (1 = SKILL, 2 = SKILL 2).
+  const [skillLogSlot, setSkillLogSlot] = useState(1)
   const [skillLogNote, setSkillLogNote] = useState('')
   const [skillLogSets, setSkillLogSets] = useState({})
   const [skillLogResult, setSkillLogResult] = useState('')
@@ -3256,7 +3369,9 @@ function App() {
 
   // Jurnalul imbina wod_logs si skill_logs dupa wod_id, ca un Skill Work
   // logat fara WOD in acea zi (sau invers) sa apara oricum, fiecare in
-  // cardul lui, sub aceeasi data.
+  // cardul lui, sub aceeasi data. skillLogsArr e array (nu un singur log) -
+  // cu SKILL 2 pot exista 2 skill_logs pentru acelasi wod_id (slot 1 si 2),
+  // care altfel s-ar suprascrie unul pe altul in map.
   const jurnalEntries = useMemo(() => {
     const map = new Map()
     wodLogs.forEach(l => {
@@ -3266,7 +3381,7 @@ function App() {
     skillLogs.forEach(l => {
       const key = l.wod_id || `skilllog-${l.id}`
       const existing = map.get(key) || { key, date: (l.logged_at || '').slice(0, 10) }
-      map.set(key, { ...existing, skillLog: l })
+      map.set(key, { ...existing, skillLogsArr: [...(existing.skillLogsArr || []), l] })
     })
     return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
   }, [wodLogs, skillLogs])
@@ -3735,7 +3850,7 @@ function App() {
   }
 
   const fetchSkillLogs = async () => {
-    const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill)').eq('member_id', user.id)
+    const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill, skill2_name, skill2_type, skill2)').eq('member_id', user.id)
     if (data) setSkillLogs(data)
   }
 
@@ -3753,7 +3868,10 @@ function App() {
   const saveSkillLog = async () => {
     if (!wodZiData) return
     setSkillLogSaving(true)
-    const skillType = wodZiData.skill_type || 'Weightlifting'
+    const esteSlot2 = skillLogSlot === 2
+    const skillType = (esteSlot2 ? wodZiData.skill2_type : wodZiData.skill_type) || 'Weightlifting'
+    const skillMiscari = (esteSlot2 ? wodZiData.skill2 : wodZiData.skill) || []
+    const skillNameCurent = esteSlot2 ? wodZiData.skill2_name : wodZiData.skill_name
     const format = getFormat(skillType)
     let setsCurate = null, resultCurat = null, logMeta = null
     if (format.family === 'sets' || format.family === 'mixed') {
@@ -3768,22 +3886,22 @@ function App() {
       logMeta = { completed: skillLogCompleted }
     } else {
       resultCurat = format.scoreMode === 'amrap'
-        ? composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, wodZiData.skill || [])
+        ? composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscari)
         : [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
       resultCurat = resultCurat.trim() || null
     }
     const { error } = await supabase.from('skill_logs').upsert({
-      member_id: user.id, wod_id: wodZiData.id,
+      member_id: user.id, wod_id: wodZiData.id, slot: skillLogSlot,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
       logged_at: new Date().toISOString(),
-    }, { onConflict: 'member_id,wod_id' })
+    }, { onConflict: 'member_id,wod_id,slot' })
     if (error) { showToast(t.toastGenericError); console.error(error); setSkillLogSaving(false); return }
     showToast(t.toastSkillLogSaved)
     await fetchSkillLogs()
-    if (format.prEligible && wodZiData.skill_name && setsCurate) {
+    if (format.prEligible && skillNameCurent && setsCurate) {
       await fetchPRuri()
-      const candidates = computeSetsPrCandidates(wodZiData.skill_name, setsCurate, userProfile?.weight_unit || 'kg', prDate)
+      const candidates = computeSetsPrCandidates(skillNameCurent, setsCurate, userProfile?.weight_unit || 'kg', prDate)
       if (candidates.length > 0) { setSkillPrCandidates(candidates); setSkillLogSaving(false); return }
     }
     setSkillPrCandidates(null)
@@ -4474,7 +4592,8 @@ function App() {
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
         const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id) : null
-        const logZiSkill = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id) : null
+        const logZiSkill = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === 1) : null
+        const logZiSkill2 = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && l.slot === 2) : null
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
 
@@ -4696,73 +4815,31 @@ function App() {
               </div>
               {wodDeschis && wodZiData && (
                 <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                  {(wodZiData.warmup || []).length > 0 && (
-                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
-                      {wodZiData.warmup.map((m, mi) => (
-                        <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
-                      ))}
-                    </div>
-                  )}
-                  {((wodZiData.skill || []).length > 0 || wodZiData.skill_name || wodZiData.skill_format_config) && (
-                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                      <div onClick={() => setSkillDeschis(!skillDeschis)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>{t.homeWodSkillTitle}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {wodZiData.skill_name && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{wodZiData.skill_name}</div>}
-                          <span style={{ fontSize: '10px', color: '#aaa' }}>{skillDeschis ? '▲' : '▼'}</span>
+                  {wodZiData.warmup_skill_visible !== false && (
+                    <>
+                      {(wodZiData.warmup || []).length > 0 && (
+                        <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
+                          {wodZiData.warmup.map((m, mi) => (
+                            <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                          ))}
                         </div>
-                      </div>
-                      {skillDeschis && (
-                        <>
-                          {describeFormatConfig(wodZiData.skill_type, wodZiData.skill_format_config, t) && (
-                            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{wodZiData.skill_type} — {describeFormatConfig(wodZiData.skill_type, wodZiData.skill_format_config, t)}</div>
-                          )}
-                          <div style={{ marginTop: '10px' }}>
-                            {(() => {
-                              const unitate = userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'
-                              const seturiTextPentru = (rows) => (rows || []).map((set, si) => {
-                                const { reps, weight } = typeof set === 'string' ? { reps: '', weight: set } : set
-                                const parti = []
-                                if (reps) parti.push(`${reps} reps`)
-                                if (weight) parti.push(`${weight}${unitate}`)
-                                return `${t.skillLogSetLabel(si + 1)}: ${parti.join(' @ ')}`
-                              }).join(' · ')
-                              // Weightlifting/Strength Sets/Superset: seturile sunt cheiate pe numele
-                              // miscarii (afisate langa fiecare). EMOM/Tabata/Death By/Complex: cheiate
-                              // pe interval/runda, aratam direct randurile logate (nu au corespondent
-                              // 1:1 in wodZiData.skill).
-                              if (getFormat(wodZiData.skill_type || 'Weightlifting').rowMode === 'movement' || !logZiSkill?.sets) {
-                                return wodZiData.skill.map((m, mi) => (
-                                  <div key={mi} style={{ padding: '3px 0' }}>
-                                    <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</div>
-                                    {(logZiSkill?.sets?.[m] || []).length > 0 && (
-                                      <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
-                                        {seturiTextPentru(logZiSkill.sets[m])}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))
-                              }
-                              return Object.entries(logZiSkill.sets).map(([cheie, rows]) => (
-                                <div key={cheie} style={{ padding: '3px 0' }}>
-                                  <div style={{ fontSize: '13px', color: '#0E0E0E' }}>• {cheie}</div>
-                                  {rows.length > 0 && (
-                                    <div style={{ fontSize: '12px', color: '#888', marginLeft: '12px', marginTop: '2px' }}>
-                                      {seturiTextPentru(rows)}
-                                    </div>
-                                  )}
-                                </div>
-                              ))
-                            })()}
-                          </div>
-                          <button onClick={() => { setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                            style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                            {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
-                          </button>
-                        </>
                       )}
-                    </div>
+                      <SkillHomeSection
+                        titleLabel={t.homeWodSkillTitle}
+                        skillMovements={wodZiData.skill} skillName={wodZiData.skill_name}
+                        skillType={wodZiData.skill_type} skillFormatConfig={wodZiData.skill_format_config}
+                        logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
+                        onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        userProfile={userProfile} t={t} />
+                      <SkillHomeSection
+                        titleLabel={t.homeWodSkill2Title}
+                        skillMovements={wodZiData.skill2} skillName={wodZiData.skill2_name}
+                        skillType={wodZiData.skill2_type} skillFormatConfig={wodZiData.skill2_format_config}
+                        logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
+                        onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        userProfile={userProfile} t={t} />
+                    </>
                   )}
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
@@ -5003,6 +5080,7 @@ function App() {
                 setScreen('logWOD')
               }}
               onEditSkill={(sl) => {
+                setSkillLogSlot(sl.slot === 2 ? 2 : 1)
                 setSkillLogNote(sl.notes || ''); setSkillLogSets(normalizeSetsRows(sl.sets)); setSkillLogResult(sl.result || ''); setSkillLogCompleted(!!sl.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null)
                 if (sl.wods?.date) setDataAcasa(sl.wods.date)
                 setPrevScreen('log')
@@ -5165,25 +5243,32 @@ function App() {
         </div>
       )}
 
-      {screen === 'logSkill' && (
+      {screen === 'logSkill' && (() => {
+        const esteSlot2 = skillLogSlot === 2
+        const skillTypeCurent = (esteSlot2 ? wodZiData?.skill2_type : wodZiData?.skill_type) || 'Weightlifting'
+        const skillMiscariCurente = (esteSlot2 ? wodZiData?.skill2 : wodZiData?.skill) || []
+        const skillNameCurent = esteSlot2 ? wodZiData?.skill2_name : wodZiData?.skill_name
+        const skillFormatConfigCurent = esteSlot2 ? wodZiData?.skill2_format_config : wodZiData?.skill_format_config
+        return (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>
-              {wodZiData && skillLogs.find(l => l.wod_id === wodZiData.id) ? t.skillLogEditTitle : t.skillLogNewTitle}
+              {wodZiData && skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === skillLogSlot) ? t.skillLogEditTitle : t.skillLogNewTitle}
+              {esteSlot2 ? ` · ${t.homeWodSkill2Title}` : ''}
             </h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            {wodZiData?.skill_name && (
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{wodZiData.skill_name}</div>
+            {skillNameCurent && (
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{skillNameCurent}</div>
             )}
-            {getFormat(wodZiData?.skill_type || 'Weightlifting').family !== 'sets' && (wodZiData?.skill || []).map((m, mi) => (
+            {getFormat(skillTypeCurent).family !== 'sets' && skillMiscariCurente.map((m, mi) => (
               <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
             ))}
             <FormatLogger
-              formatId={wodZiData?.skill_type || 'Weightlifting'}
-              config={wodZiData?.skill_format_config}
-              movements={wodZiData?.skill || []}
+              formatId={skillTypeCurent}
+              config={skillFormatConfigCurent}
+              movements={skillMiscariCurente}
               value={{
                 sets: skillLogSets, result: skillLogResult, time: skillLogTime,
                 roundsCompleted: skillLogRoundsCompleted, partialReps: skillLogPartialReps, completed: skillLogCompleted,
@@ -5212,7 +5297,8 @@ function App() {
             onDone={() => { setSkillPrCandidates(null); setScreen(prevScreen || 'home') }}
             t={t} />
         </div>
-      )}
+        )
+      })()}
 
       {screen === 'newHeroWod' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
