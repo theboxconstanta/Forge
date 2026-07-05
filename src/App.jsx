@@ -1184,7 +1184,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
+function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
@@ -1709,13 +1709,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
       rx: (w.movements_rx || []).join('\n'),
     })
     setAdminTab('wod')
-    setScreen('admin')
-    // setScreen('admin') nu declanseaza reset-ul de scroll din useEffect-ul de
-    // schimbare ecran (ramanem deja pe 'admin') - fara asta, editarea unui WOD
-    // mai jos in lista lasa formularul de editare (sus) invizibil, in afara
-    // ecranului. Containerul care scroleaza de fapt e div-ul flex:1 de mai jos
-    // (mainScrollRef), nu document.body.
-    if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
+    // Admin e deja randat doar cand screen === 'admin' (vezi App()), nu are
+    // propriul lui setScreen - fara reset explicit aici, editarea unui WOD mai
+    // jos in lista lasa formularul de editare (sus) invizibil, in afara
+    // ecranului (containerul care scroleaza e mainScrollRef, primit ca prop
+    // din App()).
+    if (mainScrollRef?.current) mainScrollRef.current.scrollTop = 0
   }
 
   const cancelEditWod = () => {
@@ -5485,7 +5484,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} t={t} lang={lang} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
