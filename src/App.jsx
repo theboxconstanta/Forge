@@ -2913,20 +2913,34 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                     {w.result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{w.result}</span>}
                     {w.time_result && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><TimerIcon size={12} /> {w.time_result}</span>}
-                    {wHasSets && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{wSetsParti.length} seturi</span>}
+                    {wHasSets && <span style={{ fontSize: '12px', background: '#f0f0f0', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>{t.jurnalSetsCountLabel(wSetsParti.length)}</span>}
                     {w.log_meta?.completed && <span style={{ fontSize: '12px', background: '#F5FBEA', color: '#0E0E0E', padding: '3px 10px', borderRadius: '20px', fontWeight: '600' }}>✓</span>}
                     {!w.result && !w.time_result && !wHasSets && !w.log_meta?.completed && <span style={{ fontSize: '12px', color: '#aaa' }}>—</span>}
                   </div>
-                  {isOpen && (
+                  {isOpen && (() => {
+                    // Rezultatul (timp/scor/seturi/completat) era vizibil doar ca
+                    // chip-uri mici in randul de mai sus - in vederea extinsa nu se
+                    // repeta nicaieri, etichetat clar. Adaugat aici, separat printr-o
+                    // linie proprie de restul detaliilor, ca in aplicatiile de
+                    // referinta (nume+miscari sus, apoi REZULTAT clar dedesubt).
+                    const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
+                    const areRezultat = rezultatBucati.length > 0
+                    return (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {wodHeader && (
                         <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{wodHeader}</div>
                       )}
                       {miscariAfisate.length > 0 && (
-                        <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
+                        <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
                             <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
                           ))}
+                        </div>
+                      )}
+                      {areRezultat && (
+                        <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
                         </div>
                       )}
                       {wHasSets && (
@@ -2955,7 +2969,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         </button>
                       )}
                     </div>
-                  )}
+                    )
+                  })()}
                 </div>
               )
             })()}
