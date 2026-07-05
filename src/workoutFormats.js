@@ -104,6 +104,11 @@ export const WORKOUT_FORMATS = {
   },
   'Tabata': {
     family: 'sets', rowMode: 'interval',
+    // O runda Tabata = un singur numar de reps (cate ai facut in cele 20s) -
+    // nu un "set" cu greutate care se poate repeta de mai multe ori ca la
+    // Strength Sets. FormatLogger randeaza un singur input de reps per runda,
+    // fara camp de greutate si fara "+ Adauga set", cand acest flag e true.
+    simpleReps: true,
     config: {
       rounds: { type: 'number', required: true, default: 8, labelKey: 'fmtRounds' },
       workSec: { type: 'duration', required: true, default: 20, labelKey: 'fmtWork' },

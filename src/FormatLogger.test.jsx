@@ -26,14 +26,38 @@ describe('FormatLogger - family sets (EMOM)', () => {
   it('adaugă un rând nou fără să șteargă rândurile existente ale altei chei', () => {
     const onChange = vi.fn()
     render(
-      <FormatLogger formatId="Tabata" config={{ rounds: 2 }} movements={[]}
+      <FormatLogger formatId="EMOM" config={{ totalRounds: 2, intervalSec: 60 }} movements={[]}
         value={{}} onChange={onChange} weightUnit="kg" t={{}} />
     )
     const addButtons = screen.getAllByText('+ set')
     fireEvent.click(addButtons[0])
     const patch = onChange.mock.calls[0][0]
-    expect(patch.sets['Rundă 1']).toHaveLength(2)
-    expect(patch.sets['Rundă 2']).toHaveLength(1)
+    expect(patch.sets['Min 1']).toHaveLength(2)
+    expect(patch.sets['Min 2']).toHaveLength(1)
+  })
+})
+
+describe('FormatLogger - Tabata (simpleReps: un singur input de reps per rundă)', () => {
+  it('nu are câmp de greutate și nu are buton de adăugat set', () => {
+    render(
+      <FormatLogger formatId="Tabata" config={{ rounds: 2 }} movements={[]}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getAllByPlaceholderText('reps')).toHaveLength(2)
+    expect(screen.queryByPlaceholderText('kg')).not.toBeInTheDocument()
+    expect(screen.queryByText('+ set')).not.toBeInTheDocument()
+  })
+  it('editarea reps pe o rundă păstrează celelalte runde neatinse', () => {
+    const onChange = vi.fn()
+    render(
+      <FormatLogger formatId="Tabata" config={{ rounds: 2 }} movements={[]}
+        value={{}} onChange={onChange} weightUnit="kg" t={{}} />
+    )
+    const repsInputs = screen.getAllByPlaceholderText('reps')
+    fireEvent.change(repsInputs[0], { target: { value: '15' } })
+    const patch = onChange.mock.calls[0][0]
+    expect(patch.sets['Rundă 1'][0].reps).toBe('15')
+    expect(patch.sets['Rundă 2']).toEqual([{ weight: '', reps: '', completed: false }])
   })
 })
 

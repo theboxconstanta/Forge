@@ -109,13 +109,29 @@ function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
   )
 }
 
+// O singura valoare de reps per cheie (ex. o runda Tabata) - fara greutate,
+// fara posibilitatea de a adauga alt "set" in aceeasi runda, spre deosebire
+// de SetsRows (Strength Sets etc, unde chiar poti repeta un set).
+function SimpleRepsRow({ rowKey, rows, onChange, t }) {
+  const row = (rows && rows[0]) || { reps: '', weight: '', completed: false }
+  return (
+    <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', flex: 1 }}>{rowKey}</div>
+      <input type="number" value={row.reps || ''} onChange={e => onChange([{ ...row, reps: e.target.value }])}
+        placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+        style={{ width: '90px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+    </div>
+  )
+}
+
 function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t }) {
   const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
   const score = computeSetsScore(formatId, config, rowsByKey)
+  const Row = getFormat(formatId).simpleReps ? SimpleRepsRow : SetsRows
   return (
     <>
       {Object.entries(rowsByKey).map(([key, rows]) => (
-        <SetsRows key={key} rowKey={key} rows={rows}
+        <Row key={key} rowKey={key} rows={rows}
           onChange={nextRows => onChange({ ...rowsByKey, [key]: nextRows })}
           weightUnit={weightUnit} t={t} />
       ))}
