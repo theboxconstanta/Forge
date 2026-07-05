@@ -138,15 +138,15 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     const cashOutRows = (v.sets || {})['__cashOut'] ? { [cashOut.join(' + ')]: v.sets['__cashOut'] } : { [cashOut.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
     return (
       <>
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>Buy-In</div>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
         {Object.entries(buyInRows).map(([key, rows]) => (
           <SetsRows key={key} rowKey={key} rows={rows}
             onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })}
             weightUnit={weightUnit} t={t} />
         ))}
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>Main Work</div>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
         <ScoredFields scoreMode={config?.mainFormat === 'AMRAP' ? 'amrap' : 'fortime'} movements={movements || []} value={v} onChange={patch} t={t} />
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>Cash-Out</div>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
         {Object.entries(cashOutRows).map(([key, rows]) => (
           <SetsRows key={key} rowKey={key} rows={rows}
             onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}

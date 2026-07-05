@@ -1710,6 +1710,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, t, lang }) {
     })
     setAdminTab('wod')
     setScreen('admin')
+    // setScreen('admin') nu declanseaza reset-ul de scroll din useEffect-ul de
+    // schimbare ecran (ramanem deja pe 'admin') - fara asta, editarea unui WOD
+    // mai jos in lista lasa formularul de editare (sus) invizibil, in afara
+    // ecranului.
+    document.body.scrollTop = 0
   }
 
   const cancelEditWod = () => {

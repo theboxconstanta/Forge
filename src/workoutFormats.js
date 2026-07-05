@@ -19,72 +19,75 @@
 
 import { convertWeight } from './utils'
 
+// Fiecare camp de config are `labelKey`, o cheie din translations.js (nu text
+// literal) - catalogul e partajat intre UI romana/engleza, vezi
+// FormatConfigEditor care rezolva `t[labelKey]`.
 export const WORKOUT_FORMATS = {
   'AMRAP': {
     family: 'scored', scoreMode: 'amrap',
-    config: { durationSec: { type: 'duration', required: true, label: 'Durată' } },
+    config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
   },
   'For Time': {
     family: 'scored', scoreMode: 'fortime',
-    config: { timeCapSec: { type: 'duration', required: false, label: 'Time cap (opțional)' } },
+    config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'RFT': {
     family: 'scored', scoreMode: 'fortime_or_amrap',
     config: {
-      rounds: { type: 'number', required: true, label: 'Număr runde' },
-      timeCapSec: { type: 'duration', required: false, label: 'Time cap (opțional)' },
+      rounds: { type: 'number', required: true, labelKey: 'fmtRoundsCount' },
+      timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
   },
   'Chipper': {
     family: 'scored', scoreMode: 'fortime',
-    config: { timeCapSec: { type: 'duration', required: false, label: 'Time cap (opțional)' } },
+    config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'Ladder': {
     family: 'scored', scoreMode: 'fortime',
     config: {
-      ladderType: { type: 'select', options: ['Ascending', 'Descending', 'Asc-Desc'], required: true, label: 'Tip ladder' },
-      timeCapSec: { type: 'duration', required: false, label: 'Time cap (opțional)' },
+      ladderType: { type: 'select', options: ['Ascending', 'Descending', 'Asc-Desc'], required: true, labelKey: 'fmtLadderType' },
+      timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
   },
   'Partner WOD': {
     family: 'scored', scoreMode: 'fortime_or_amrap',
     config: {
-      splitType: { type: 'select', options: ['You go/I go', 'Shared reps', 'Synchro'], required: true, label: 'Tip split' },
-      baseFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, label: 'Format de bază' },
-      durationSec: { type: 'duration', required: false, label: 'Durată/time cap' },
+      splitType: { type: 'select', options: ['You go/I go', 'Shared reps', 'Synchro'], required: true, labelKey: 'fmtSplitType' },
+      baseFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, labelKey: 'fmtBaseFormat' },
+      durationSec: { type: 'duration', required: false, labelKey: 'fmtDurationOrTimeCap' },
     },
     extraLogFields: ['partnerName'],
   },
   'Death By': {
     family: 'sets', rowMode: 'interval',
     config: {
-      startReps: { type: 'number', required: true, label: 'Reps minutul 1' },
-      incrementReps: { type: 'number', required: true, default: 1, label: 'Increment reps/minut' },
-      intervalSec: { type: 'duration', required: true, default: 60, label: 'Durată interval' },
+      startReps: { type: 'number', required: true, labelKey: 'fmtStartReps' },
+      incrementReps: { type: 'number', required: true, default: 1, labelKey: 'fmtIncrementReps' },
+      intervalSec: { type: 'duration', required: true, default: 60, labelKey: 'fmtIntervalDuration' },
     },
   },
   'EMOM': {
     family: 'sets', rowMode: 'interval',
     config: {
-      totalRounds: { type: 'number', required: true, label: 'Număr intervale' },
-      intervalSec: { type: 'duration', required: true, default: 60, label: 'Durată interval' },
-      intervals: { type: 'intervalList', required: false, label: 'Mișcare per interval (opțional)' },
+      totalRounds: { type: 'number', required: true, labelKey: 'fmtIntervalCount' },
+      intervalSec: { type: 'duration', required: true, default: 60, labelKey: 'fmtIntervalDuration' },
+      intervals: { type: 'intervalList', required: false, labelKey: 'fmtMovementPerInterval' },
     },
   },
   'Tabata': {
     family: 'sets', rowMode: 'interval',
     config: {
-      rounds: { type: 'number', required: true, default: 8, label: 'Runde' },
-      workSec: { type: 'duration', required: true, default: 20, label: 'Lucru' },
-      restSec: { type: 'duration', required: true, default: 10, label: 'Odihnă' },
+      rounds: { type: 'number', required: true, default: 8, labelKey: 'fmtRounds' },
+      workSec: { type: 'duration', required: true, default: 20, labelKey: 'fmtWork' },
+      restSec: { type: 'duration', required: true, default: 10, labelKey: 'fmtRest' },
     },
   },
   'Intervals': {
     family: 'sets', rowMode: 'interval',
     config: {
-      rounds: { type: 'number', required: true, label: 'Runde' },
-      workSec: { type: 'duration', required: true, label: 'Lucru' },
-      restSec: { type: 'duration', required: true, label: 'Odihnă' },
+      rounds: { type: 'number', required: true, labelKey: 'fmtRounds' },
+      workSec: { type: 'duration', required: true, labelKey: 'fmtWork' },
+      restSec: { type: 'duration', required: true, labelKey: 'fmtRest' },
     },
   },
   // Id istoric (skill_type implicit dinainte de acest catalog) - pastrat ca
@@ -97,35 +100,35 @@ export const WORKOUT_FORMATS = {
   'Strength Sets': {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {
-      targetSets: { type: 'number', required: true, label: 'Nr. seturi' },
-      repsScheme: { type: 'text', required: false, label: 'Schemă reps (ex: 5x5, 3-3-3-3-3)' },
+      targetSets: { type: 'number', required: true, labelKey: 'fmtSetsCount' },
+      repsScheme: { type: 'text', required: false, labelKey: 'fmtRepsScheme' },
     },
   },
   'Build to Heavy/1RM': {
     family: 'sets', rowMode: 'movement', prEligible: true,
-    config: { targetLabel: { type: 'text', required: false, default: '1RM', label: 'Etichetă target' } },
+    config: { targetLabel: { type: 'text', required: false, default: '1RM', labelKey: 'fmtTargetLabel' } },
   },
   'Complex': {
     family: 'sets', rowMode: 'round', prEligible: true,
     config: {
-      complexMovements: { type: 'movementList', required: true, label: 'Mișcări complex, în ordine' },
-      rounds: { type: 'number', required: true, label: 'Nr. runde/încercări' },
+      complexMovements: { type: 'movementList', required: true, labelKey: 'fmtComplexMovements' },
+      rounds: { type: 'number', required: true, labelKey: 'fmtRoundsAttempts' },
     },
   },
   'Superset': {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {
-      movements: { type: 'movementList', required: true, label: 'Mișcări (alternate)' },
-      targetSets: { type: 'number', required: true, label: 'Nr. seturi' },
+      movements: { type: 'movementList', required: true, labelKey: 'fmtAlternatingMovements' },
+      targetSets: { type: 'number', required: true, labelKey: 'fmtSetsCount' },
     },
   },
   'Buy-In/Cash-Out': {
     family: 'mixed',
     config: {
-      buyIn: { type: 'movementList', required: true, label: 'Buy-In (mișcări)' },
-      cashOut: { type: 'movementList', required: true, label: 'Cash-Out (mișcări)' },
-      mainFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, label: 'Format main work' },
-      mainDurationSec: { type: 'duration', required: false, label: 'Durată/time cap main work' },
+      buyIn: { type: 'movementList', required: true, labelKey: 'fmtBuyInMovements' },
+      cashOut: { type: 'movementList', required: true, labelKey: 'fmtCashOutMovements' },
+      mainFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, labelKey: 'fmtMainWorkFormat' },
+      mainDurationSec: { type: 'duration', required: false, labelKey: 'fmtMainWorkDuration' },
     },
   },
   'Not For Time': {
@@ -133,7 +136,7 @@ export const WORKOUT_FORMATS = {
   },
   'Max Effort': {
     family: 'scored', scoreMode: 'single_value',
-    config: { movement: { type: 'text', required: false, label: 'Mișcare/test' } },
+    config: { movement: { type: 'text', required: false, labelKey: 'fmtMovementTest' } },
   },
 }
 

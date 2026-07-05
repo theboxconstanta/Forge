@@ -67,7 +67,7 @@ function SelectField({ label, value, options, onChange }) {
 // Listă simplă, ordonată, de nume de mișcări (Buy-In, Cash-Out, lanțul unui
 // Complex) - text liber + adaugă/șterge, fără autocomplete fuzzy (acela e
 // rezervat listei principale de mișcări ale WOD-ului, gestionată separat).
-function MovementListField({ label, value, onChange }) {
+function MovementListField({ label, value, onChange, placeholder }) {
   const [draft, setDraft] = useState('')
   const items = value || []
   const add = () => { if (draft.trim()) { onChange([...items, draft.trim()]); setDraft('') } }
@@ -83,7 +83,7 @@ function MovementListField({ label, value, onChange }) {
       ))}
       <div style={{ display: 'flex', gap: '8px' }}>
         <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-          placeholder="ex: Thrusters" style={{ ...inputStyle, flex: 1 }} />
+          placeholder={placeholder || 'ex: Thrusters'} style={{ ...inputStyle, flex: 1 }} />
         <button type="button" onClick={add} style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>+</button>
       </div>
     </div>
@@ -93,8 +93,8 @@ function MovementListField({ label, value, onChange }) {
 // Un exercițiu per interval (ex. EMOM alternat: min 1 = Row, min 2 = Wall
 // Ball...) - lista se reia ciclic peste numărul total de intervale definit
 // separat (vezi defaultRowsForFormat în workoutFormats.js).
-function IntervalListField({ label, value, onChange }) {
-  return <MovementListField label={label} value={value} onChange={onChange} />
+function IntervalListField({ label, value, onChange, placeholder }) {
+  return <MovementListField label={label} value={value} onChange={onChange} placeholder={placeholder} />
 }
 
 export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, t }) {
@@ -113,23 +113,24 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
         </select>
       </div>
       {Object.entries(format.config || {}).filter(([key]) => !excluded.includes(key)).map(([key, field]) => {
+        const label = t?.[field.labelKey] || field.labelKey
         if (field.type === 'duration') return (
-          <DurationField key={key} label={field.label} seconds={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
+          <DurationField key={key} label={label} seconds={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
         )
         if (field.type === 'number') return (
-          <NumberField key={key} label={field.label} value={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
+          <NumberField key={key} label={label} value={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
         )
         if (field.type === 'select') return (
-          <SelectField key={key} label={field.label} value={cfg[key]} options={field.options} onChange={v => setField(key, v)} />
+          <SelectField key={key} label={label} value={cfg[key]} options={field.options} onChange={v => setField(key, v)} />
         )
         if (field.type === 'text') return (
-          <TextField key={key} label={field.label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
+          <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
         )
         if (field.type === 'movementList') return (
-          <MovementListField key={key} label={field.label} value={cfg[key]} onChange={v => setField(key, v)} />
+          <MovementListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
         )
         if (field.type === 'intervalList') return (
-          <IntervalListField key={key} label={field.label} value={cfg[key]} onChange={v => setField(key, v)} />
+          <IntervalListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
         )
         return null
       })}
