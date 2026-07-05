@@ -3881,9 +3881,14 @@ function App() {
     const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? (wodMiscariCustom ?? wodZiData[cheieVarianta]) : []
     const miscariFinale = miscariWodZi.length > 0 ? miscariWodZi : wodMiscari
     const durStr = wodZiData ? formatWodDurata(wodZiData.duration) : ''
+    // La logare libera (fara wod_id), config-ul prescris de membru (ex. Numar
+    // runde la RFT) nu are unde sa fie salvat structurat (wod_logs nu are
+    // format_config, doar wods) - fara linia asta, valoarea era pierduta
+    // complet la salvare (se vedea in formular, dar disparea dupa "Salveaza").
+    const freeLogConfigDesc = variantaAleasa === null ? describeFormatConfig(wodTip, wodFormatConfig, t) : ''
     const wodHeaderLine = wodZiData
       ? `${wodZiData.type}${durStr ? ' · ' + durStr : ''}${wodZiData.name ? ' — "' + wodZiData.name + '"' : ''}`
-      : (variantaAleasa === null ? `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}` : null)
+      : (variantaAleasa === null ? `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}` : null)
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
