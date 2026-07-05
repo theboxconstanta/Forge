@@ -1228,6 +1228,18 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   )
 }
 
+// Comutator mic reutilizat pentru vizibilitatea WARM-UP/SKILL/SKILL 2 pe
+// Acasa - stopPropagation ca sa nu deschida/inchida dropdown-ul parinte cand
+// dai click doar pe switch.
+function MiniSwitch({ checked, onChange }) {
+  return (
+    <div onClick={(e) => { e.stopPropagation(); onChange(!checked) }} role="switch" aria-checked={checked}
+      style={{ width: '36px', height: '20px', borderRadius: '10px', background: checked ? '#ABE73C' : '#e0e0e0', position: 'relative', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}>
+      <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: checked ? '19px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+    </div>
+  )
+}
+
 function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [clase, setClase] = useState([])
@@ -1273,17 +1285,21 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [savingWod, setSavingWod] = useState(false)
   const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [warmupWod, setWarmupWod] = useState('')
-  // Switch admin: ascunde/arata WARM-UP + SKILL impreuna pe Acasa la membri.
-  const [warmupSkillVisibleWod, setWarmupSkillVisibleWod] = useState(true)
+  // Switch admin per sectiune: fiecare din WARM-UP/SKILL/SKILL 2 se poate
+  // ascunde independent de pe Acasa la membri (nu mai e un singur switch
+  // combinat - coach-ul vrea sa aleaga exact ce arata in ziua respectiva).
+  const [warmupVisibleWod, setWarmupVisibleWod] = useState(true)
   const [skillWod, setSkillWod] = useState('')
   const [skillNameWod, setSkillNameWod] = useState('')
   const [skillTypeWod, setSkillTypeWod] = useState('Weightlifting')
   const [skillFormatConfigWod, setSkillFormatConfigWod] = useState({})
+  const [skillVisibleWod, setSkillVisibleWod] = useState(true)
   // SKILL 2: oglinda completa a SKILL, independent (format/miscari proprii).
   const [skill2Wod, setSkill2Wod] = useState('')
   const [skillName2Wod, setSkillName2Wod] = useState('')
   const [skillType2Wod, setSkillType2Wod] = useState('Weightlifting')
   const [skillFormatConfig2Wod, setSkillFormatConfig2Wod] = useState({})
+  const [skill2VisibleWod, setSkill2VisibleWod] = useState(true)
   // WARM-UP/SKILL/SKILL 2/formularul principal sunt dropdown-uri in Admin -
   // implicit inchise, arata doar titlul, ca formularul sa nu fie tot pe un
   // singur scroll lung.
@@ -1735,15 +1751,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
       warmup: parseLinii(warmupWod),
-      warmup_skill_visible: warmupSkillVisibleWod,
+      warmup_visible: warmupVisibleWod,
       skill: parseLinii(skillWod),
       skill_name: skillNameWod.trim() || null,
       skill_type: skillTypeWod,
       skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null,
+      skill_visible: skillVisibleWod,
       skill2: parseLinii(skill2Wod),
       skill2_name: skillName2Wod.trim() || null,
       skill2_type: skillType2Wod,
       skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
+      skill2_visible: skill2VisibleWod,
       movements_onramp: parseLinii(wodVariante.onramp),
       movements_beginner: parseLinii(wodVariante.beginner),
       movements_intermediate: parseLinii(wodVariante.intermediate),
@@ -1757,8 +1775,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-      setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({})
-      setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
+      setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
+      setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
       setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
     }
@@ -1774,15 +1792,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setFormatConfigWod(w.format_config || {})
     setNumeWod(w.name || '')
     setWarmupWod((w.warmup || []).join('\n'))
-    setWarmupSkillVisibleWod(w.warmup_skill_visible !== false)
+    setWarmupVisibleWod(w.warmup_visible !== false)
     setSkillWod((w.skill || []).join('\n'))
     setSkillNameWod(w.skill_name || '')
     setSkillTypeWod(w.skill_type || 'Weightlifting')
     setSkillFormatConfigWod(w.skill_format_config || {})
+    setSkillVisibleWod(w.skill_visible !== false)
     setSkill2Wod((w.skill2 || []).join('\n'))
     setSkillName2Wod(w.skill2_name || '')
     setSkillType2Wod(w.skill2_type || 'Weightlifting')
     setSkillFormatConfig2Wod(w.skill2_format_config || {})
+    setSkill2VisibleWod(w.skill2_visible !== false)
     setWodVariante({
       onramp: (w.movements_onramp || []).join('\n'),
       beginner: (w.movements_beginner || []).join('\n'),
@@ -1803,8 +1823,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setWarmupSkillVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting')
-    setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({})
+    setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillVisibleWod(true)
+    setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
     setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
   }
@@ -2539,13 +2559,6 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       {adminTab === 'wod' && (
         <>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupSkillVisibleLabel}</div>
-              <div onClick={() => setWarmupSkillVisibleWod(v => !v)} role="switch" aria-checked={warmupSkillVisibleWod}
-                style={{ width: '42px', height: '24px', borderRadius: '12px', background: warmupSkillVisibleWod ? '#ABE73C' : '#e0e0e0', position: 'relative', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}>
-                <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: warmupSkillVisibleWod ? '21px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-              </div>
-            </div>
             {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/+WOD NOU */}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDateLabel}</div>
@@ -2554,7 +2567,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupLabel}</div>
-                <span style={{ fontSize: '11px', color: '#888' }}>{adminWarmupOpen ? '▲' : '▼'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <MiniSwitch checked={warmupVisibleWod} onChange={setWarmupVisibleWod} />
+                  <span style={{ fontSize: '11px', color: '#888' }}>{adminWarmupOpen ? '▲' : '▼'}</span>
+                </div>
               </div>
               {adminWarmupOpen && (
                 <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
@@ -2565,7 +2581,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div onClick={() => setAdminSkillOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkillLabel}</div>
-                <span style={{ fontSize: '11px', color: '#888' }}>{adminSkillOpen ? '▲' : '▼'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <MiniSwitch checked={skillVisibleWod} onChange={setSkillVisibleWod} />
+                  <span style={{ fontSize: '11px', color: '#888' }}>{adminSkillOpen ? '▲' : '▼'}</span>
+                </div>
               </div>
               {adminSkillOpen && (
                 <div style={{ marginTop: '8px' }}>
@@ -2586,7 +2605,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
               <div onClick={() => setAdminSkill2Open(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkill2Label}</div>
-                <span style={{ fontSize: '11px', color: '#888' }}>{adminSkill2Open ? '▲' : '▼'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <MiniSwitch checked={skill2VisibleWod} onChange={setSkill2VisibleWod} />
+                  <span style={{ fontSize: '11px', color: '#888' }}>{adminSkill2Open ? '▲' : '▼'}</span>
+                </div>
               </div>
               {adminSkill2Open && (
                 <div style={{ marginTop: '8px' }}>
@@ -4858,31 +4880,31 @@ function App() {
               </div>
               {wodDeschis && wodZiData && (
                 <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                  {wodZiData.warmup_skill_visible !== false && (
-                    <>
-                      {(wodZiData.warmup || []).length > 0 && (
-                        <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
-                          {wodZiData.warmup.map((m, mi) => (
-                            <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
-                          ))}
-                        </div>
-                      )}
-                      <SkillHomeSection
-                        titleLabel={t.homeWodSkillTitle}
-                        skillMovements={wodZiData.skill} skillName={wodZiData.skill_name}
-                        skillType={wodZiData.skill_type} skillFormatConfig={wodZiData.skill_format_config}
-                        logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
-                        onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                        userProfile={userProfile} t={t} />
-                      <SkillHomeSection
-                        titleLabel={t.homeWodSkill2Title}
-                        skillMovements={wodZiData.skill2} skillName={wodZiData.skill2_name}
-                        skillType={wodZiData.skill2_type} skillFormatConfig={wodZiData.skill2_format_config}
-                        logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
-                        onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                        userProfile={userProfile} t={t} />
-                    </>
+                  {wodZiData.warmup_visible !== false && (wodZiData.warmup || []).length > 0 && (
+                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
+                      {wodZiData.warmup.map((m, mi) => (
+                        <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                      ))}
+                    </div>
+                  )}
+                  {wodZiData.skill_visible !== false && (
+                    <SkillHomeSection
+                      titleLabel={t.homeWodSkillTitle}
+                      skillMovements={wodZiData.skill} skillName={wodZiData.skill_name}
+                      skillType={wodZiData.skill_type} skillFormatConfig={wodZiData.skill_format_config}
+                      logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
+                      onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                      userProfile={userProfile} t={t} />
+                  )}
+                  {wodZiData.skill2_visible !== false && (
+                    <SkillHomeSection
+                      titleLabel={t.homeWodSkill2Title}
+                      skillMovements={wodZiData.skill2} skillName={wodZiData.skill2_name}
+                      skillType={wodZiData.skill2_type} skillFormatConfig={wodZiData.skill2_format_config}
+                      logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
+                      onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                      userProfile={userProfile} t={t} />
                   )}
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
