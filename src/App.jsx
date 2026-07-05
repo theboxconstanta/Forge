@@ -461,10 +461,16 @@ function miscareSugestii(text) {
 
 function MiscareQuickAdd({ value, onChange, onAdd, placeholder }) {
   const sugestii = miscareSugestii(value)
+  // Click pe o sugestie adauga direct miscarea (nu doar completeaza textul) -
+  // altfel utilizatorul credea ca a adaugat-o (a dat click, a trecut mai
+  // departe), dar ramanea doar scrisa in input, niciodata in lista, si de
+  //-aia nu aparea la "Runde partiale" (nimic de aratat pentru o miscare
+  // care nu exista inca in lista).
   const alege = (m) => {
     const parts = value.split(/\s+/)
     parts[parts.length - 1] = m
-    onChange(parts.join(' ') + ' ')
+    onChange('')
+    onAdd(parts.join(' ').trim())
   }
   const add = () => { if (value.trim()) onAdd(value.trim()) }
   return (
