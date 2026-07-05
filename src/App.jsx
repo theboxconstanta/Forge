@@ -467,7 +467,12 @@ function miscareSugestii(text) {
 function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t }) {
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
-  const sugestii = miscareSugestii(value)
+  const [justSelected, setJustSelected] = useState(false)
+  const repsRef = useRef(null)
+  // Dupa ce alegi o sugestie, nu o mai arata din nou ca sugestie (altfel
+  // ramane vizibila peste casutele de reps/greutate) - dispare de indata ce
+  // userul mai scrie ceva in campul de miscare.
+  const sugestii = justSelected ? [] : miscareSugestii(value)
   const compose = (movementName) => {
     const parts = []
     if (reps.trim()) parts.push(reps.trim())
@@ -476,30 +481,38 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
     if (weight.trim()) text += ` @ ${weight.trim()}${weightUnit === 'lbs' ? 'lbs' : 'kg'}`
     return text
   }
-  // Click pe o sugestie adauga direct miscarea (nu doar completeaza textul) -
-  // altfel utilizatorul credea ca a adaugat-o (a dat click, a trecut mai
-  // departe), dar ramanea doar scrisa in input, niciodata in lista, si de
-  //-aia nu aparea la "Runde partiale" (nimic de aratat pentru o miscare
-  // care nu exista inca in lista).
-  const commit = (movementName) => {
-    if (!movementName.trim()) return
-    onAdd(compose(movementName))
-    onChange(''); setReps(''); setWeight('')
+  const add = () => {
+    if (!value.trim()) return
+    onAdd(compose(value))
+    onChange(''); setReps(''); setWeight(''); setJustSelected(false)
   }
-  const alege = (m) => commit(m)
-  const add = () => commit(value)
+  // Click pe o sugestie completeaza doar numele miscarii si muta focusul pe
+  // "reps" - nu adauga inca (userul vrea sa completeze reps/greutate imediat
+  // dupa ce alege miscarea, nu sa sara direct la urmatoarea). useEffect (nu
+  // requestAnimationFrame) ca sa ruleze sigur dupa ce React a randat inputul
+  // de reps (care nu exista in DOM pana valoarea nu e completata).
+  useEffect(() => {
+    if (justSelected) repsRef.current?.focus()
+  }, [justSelected])
+  const alege = (m) => {
+    onChange(m)
+    setJustSelected(true)
+  }
+  const onEnterCommit = (e) => { if (e.key === 'Enter') add() }
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: '8px' }}>
-        <input value={value} onChange={e => onChange(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && value.trim()) add() }}
+        <input value={value} onChange={e => { onChange(e.target.value); setJustSelected(false) }}
+          onKeyDown={onEnterCommit}
           placeholder={placeholder} style={{ flex: value.trim() ? 2 : 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
         {value.trim() && (
           <>
-            <input type="number" value={reps} onChange={e => setReps(e.target.value)}
+            <input ref={repsRef} type="number" value={reps} onChange={e => setReps(e.target.value)}
+              onKeyDown={onEnterCommit}
               placeholder={t?.skillLogRepsPlaceholder || 'reps'}
               style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
+              onKeyDown={onEnterCommit}
               placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
               style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           </>
