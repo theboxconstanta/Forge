@@ -459,28 +459,53 @@ function miscareSugestii(text) {
   return MISCARI.filter(m => m.toLowerCase().includes(cuvant.toLowerCase())).slice(0, 5)
 }
 
-function MiscareQuickAdd({ value, onChange, onAdd, placeholder }) {
+// Numele miscarii (cu autocomplete) + reps/greutate ca doua casute separate,
+// aparute doar dupa ce ai inceput sa scrii - compunem automat acelasi text
+// "21 Thrusters @ 43kg" care se salva si inainte (nimic nu se schimba in
+// restul aplicatiei), doar introducerea nu mai cere sa scrii totul manual
+// intr-un singur camp.
+function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t }) {
+  const [reps, setReps] = useState('')
+  const [weight, setWeight] = useState('')
   const sugestii = miscareSugestii(value)
+  const compose = (movementName) => {
+    const parts = []
+    if (reps.trim()) parts.push(reps.trim())
+    parts.push(movementName.trim())
+    let text = parts.join(' ')
+    if (weight.trim()) text += ` @ ${weight.trim()}${weightUnit === 'lbs' ? 'lbs' : 'kg'}`
+    return text
+  }
   // Click pe o sugestie adauga direct miscarea (nu doar completeaza textul) -
   // altfel utilizatorul credea ca a adaugat-o (a dat click, a trecut mai
   // departe), dar ramanea doar scrisa in input, niciodata in lista, si de
   //-aia nu aparea la "Runde partiale" (nimic de aratat pentru o miscare
   // care nu exista inca in lista).
-  const alege = (m) => {
-    const parts = value.split(/\s+/)
-    parts[parts.length - 1] = m
-    onChange('')
-    onAdd(parts.join(' ').trim())
+  const commit = (movementName) => {
+    if (!movementName.trim()) return
+    onAdd(compose(movementName))
+    onChange(''); setReps(''); setWeight('')
   }
-  const add = () => { if (value.trim()) onAdd(value.trim()) }
+  const alege = (m) => commit(m)
+  const add = () => commit(value)
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: '8px' }}>
         <input value={value} onChange={e => onChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && value.trim()) add() }}
-          placeholder={placeholder} style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          placeholder={placeholder} style={{ flex: value.trim() ? 2 : 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+        {value.trim() && (
+          <>
+            <input type="number" value={reps} onChange={e => setReps(e.target.value)}
+              placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
+              placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
+              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          </>
+        )}
         <button onClick={add}
-          style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+          style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>+</button>
       </div>
       {sugestii.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: '46px', zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
@@ -4980,7 +5005,8 @@ function App() {
               />
               <MiscareQuickAdd value={editLogMiscareCurenta} onChange={setEditLogMiscareCurenta}
                 onAdd={(v) => { setEditLogMiscari(prev => [...prev, v]); setEditLogMiscareCurenta('') }}
-                placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)} />
+                placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
+                weightUnit={userProfile?.weight_unit} t={t} />
             </div>
           ) : (
             <>
@@ -5050,7 +5076,8 @@ function App() {
                   />
                   <MiscareQuickAdd value={wodMiscareCurenta} onChange={setWodMiscareCurenta}
                     onAdd={(v) => { setWodMiscari(prev => [...prev, v]); setWodMiscareCurenta('') }}
-                    placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)} />
+                    placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
+                    weightUnit={userProfile?.weight_unit} t={t} />
                 </div>
               )}
             </>
@@ -5157,7 +5184,8 @@ function App() {
             />
             <MiscareQuickAdd value={newHeroWodMiscareCurenta} onChange={setNewHeroWodMiscareCurenta}
               onAdd={(v) => { setNewHeroWodMiscari(prev => [...prev, v]); setNewHeroWodMiscareCurenta('') }}
-              placeholder={t.heroWodMovementPlaceholder(userProfile?.weight_unit)} />
+              placeholder={t.heroWodMovementPlaceholder(userProfile?.weight_unit)}
+              weightUnit={userProfile?.weight_unit} t={t} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
             style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
