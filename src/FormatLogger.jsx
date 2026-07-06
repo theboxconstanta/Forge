@@ -3,9 +3,20 @@
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
 import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore } from './workoutFormats'
+import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }
+
+// Eticheta unui rand poate fi chiar numele miscarii (Superset/Weightlifting -
+// "Row") sau un interval cu miscare atasata (EMOM - "Min 1 · Row") - in ambele
+// cazuri, daca miscarea reala e de tip cardio, campurile de logare trebuie sa
+// fie metri/cal, nu reps+greutate (ca la MiscareQuickAdd din Log liber -
+// altfel aceeasi miscare se loga inconsecvent intre cele 2 fluxuri).
+function cardioMiscareDinEticheta(rowKey) {
+  const ultimaParte = rowKey.includes('·') ? rowKey.split('·').pop().trim() : rowKey.trim()
+  return CARDIO_MISCARI.find(c => c.toLowerCase() === ultimaParte.toLowerCase()) || null
+}
 
 function RoundsPartialFields({ movements, roundsCompleted, partialReps, onChange, t }) {
   return (
@@ -84,6 +95,8 @@ function ScoredFields({ scoreMode, movements, value, onChange, t }) {
 }
 
 function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
+  const miscareCardio = cardioMiscareDinEticheta(rowKey)
+  const cardioLabel = miscareCardio && (CARDIO_CU_CALORII.includes(miscareCardio) ? 'cal' : 'm')
   return (
     <div style={{ marginBottom: '16px' }}>
       <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{rowKey}</div>
@@ -91,12 +104,14 @@ function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
         <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <span style={{ fontSize: '11px', color: '#888', minWidth: '42px' }}>{t?.skillLogSetLabel ? t.skillLogSetLabel(si + 1) : `Set ${si + 1}`}</span>
           <input type="number" value={row.reps || ''} onChange={e => onChange(updateSetRow({ [rowKey]: rows }, rowKey, si, 'reps', e.target.value)[rowKey])}
-            placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+            placeholder={cardioLabel || t?.skillLogRepsPlaceholder || 'reps'}
             style={{ width: '70px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           {row.targetReps != null && <span style={{ fontSize: '11px', color: '#aaa', whiteSpace: 'nowrap' }}>/ {row.targetReps}</span>}
-          <input type="number" value={row.weight || ''} onChange={e => onChange(updateSetRow({ [rowKey]: rows }, rowKey, si, 'weight', e.target.value)[rowKey])}
-            placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
-            style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          {!miscareCardio && (
+            <input type="number" value={row.weight || ''} onChange={e => onChange(updateSetRow({ [rowKey]: rows }, rowKey, si, 'weight', e.target.value)[rowKey])}
+              placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          )}
           <button type="button" onClick={() => onChange(removeSetRow({ [rowKey]: rows }, rowKey, si)[rowKey])}
             style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer', lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>×</button>
         </div>
@@ -214,8 +229,8 @@ export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, 
     <div style={{ marginTop: '14px', background: '#F5FBEA', border: '1px solid #ABE73C', borderRadius: '12px', padding: '14px' }}>
       <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{t?.skillPrConfirmTitle || 'PR nou?'}</div>
       {candidates.map(c => (
-        <div key={c.reps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #ddeec4' }}>
-          <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{t?.prRepCountLabel ? t.prRepCountLabel(c.reps) : `${c.reps} reps`} — {c.weight}{c.unit}</span>
+        <div key={`${c.movement}-${c.reps}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #ddeec4' }}>
+          <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{c.movement} · {t?.prRepCountLabel ? t.prRepCountLabel(c.reps) : `${c.reps} reps`} — {c.weight}{c.unit}</span>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button onClick={() => onDismiss(c)}
               style={{ fontSize: '11px', padding: '5px 10px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer' }}>{t?.skillPrConfirmDismissButton || 'renunță'}</button>

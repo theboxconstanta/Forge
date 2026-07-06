@@ -152,6 +152,11 @@ describe('defaultRowsForFormat', () => {
     const rows = defaultRowsForFormat('Death By Weight', {}, [])
     expect(Object.keys(rows)).toEqual(['Min 1'])
   })
+  it('Superset folosește config.movements (nu parametrul generic movements) pentru rândurile alternante', () => {
+    const rows = defaultRowsForFormat('Superset', { movements: ['Pull-up', 'Push-up'], targetSets: 3 }, [])
+    expect(Object.keys(rows)).toEqual(['Pull-up', 'Push-up'])
+    expect(rows['Pull-up']).toHaveLength(3)
+  })
   it('formatele scored nu au rânduri', () => {
     expect(defaultRowsForFormat('AMRAP', {}, [])).toEqual({})
   })
@@ -252,6 +257,19 @@ describe('computeSetsPrCandidates', () => {
   it('ignoră rânduri incomplete (fără reps sau fără greutate)', () => {
     const rows = { 'Min 1': [{ reps: '', weight: '60' }, { reps: '5', weight: '' }] }
     expect(computeSetsPrCandidates('Back Squat', rows, 'kg', [])).toEqual([])
+  })
+  it('cu movementKeyed=true, atribuie fiecare candidat cheii randului (miscarii reale), nu unui nume generic', () => {
+    const rows = { 'Pull-up': [{ reps: '5', weight: '10' }], 'Push-up': [{ reps: '5', weight: '20' }] }
+    const candidates = computeSetsPrCandidates('Superset Skill', rows, 'kg', [], true)
+    expect(candidates).toEqual(expect.arrayContaining([
+      { movement: 'Pull-up', reps: 5, weight: 10, unit: 'kg', isNewPr: true },
+      { movement: 'Push-up', reps: 5, weight: 20, unit: 'kg', isNewPr: true },
+    ]))
+  })
+  it('fara movementKeyed, chei tip eticheta ("Min 1") nu devin nume de miscare', () => {
+    const rows = { 'Min 1': [{ reps: '5', weight: '60' }] }
+    const candidates = computeSetsPrCandidates('Back Squat', rows, 'kg', [])
+    expect(candidates).toEqual([{ movement: 'Back Squat', reps: 5, weight: 60, unit: 'kg', isNewPr: true }])
   })
 })
 

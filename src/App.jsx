@@ -849,12 +849,18 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // pot avea acelasi numar de runde complete dar cantitati diferite de munca
   // in runda ramasa neterminata; fara asta erau departajate arbitrar (dupa
   // ordinea din raspunsul serverului), nu dupa cine a muncit mai mult.
+  // Reps-ul FACUT (nu prescris) din runda partiala, per miscare. Formatul nou
+  // "facut/prescris Miscare" (ex. "3/15 Power Snatches", vezi composePartialText
+  // in workoutFormats.js) are 2 numere per segment - fara sa luam doar primul,
+  // suma insuma gresit si numarul prescris (3+15=18 in loc de 3 facute).
   const partialRepsOf = (log) => {
     const str = log.result || ''
     const plusIdx = str.indexOf('+')
     if (plusIdx === -1) return 0
-    const nums = str.slice(plusIdx + 1).match(/\d+(\.\d+)?/g) || []
-    return nums.reduce((sum, n) => sum + parseFloat(n), 0)
+    return str.slice(plusIdx + 1).split(',').reduce((sum, seg) => {
+      const match = seg.trim().match(/^(\d+(\.\d+)?)/)
+      return match ? sum + parseFloat(match[1]) : sum
+    }, 0)
   }
 
   // Clasare: intai cine a facut mai multe runde (cine a terminat tot WOD-ul
@@ -867,19 +873,37 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // timpul lui brut de oprire era mai mic).
   const sortLogs = (arr) => {
     const explicite = arr.map(l => parseScore(l.result)).filter(r => r != null)
-    const maxRunde = explicite.length > 0 ? Math.max(...explicite) : null
+    // Numarul real de runde prescrise (ex. RFT are format_config.rounds) e
+    // preferat fata de ghicitul din ce au notat participantii - altfel, daca
+    // NINENI dintre cei ce au terminat n-a notat un numar de runde (au umplut
+    // doar timpul), iar singurul numar explicit vine de la cineva care N-a
+    // terminat, maxRunde ar fi subestimat, egaland gresit finisheri cu
+    // non-finisheri (bug raportat). AMRAP nu are un plafon real - ramane pe
+    // euristica veche (cel mai mare numar notat explicit).
+    const rundePrescrise = parseInt(wodZiData?.format_config?.rounds) || null
+    const maxRunde = rundePrescrise != null ? rundePrescrise : (explicite.length > 0 ? Math.max(...explicite) : null)
     const rundeEfective = (log) => {
       const r = parseScore(log.result)
       if (r != null) return r
       if (maxRunde != null) return log.time_result ? maxRunde : -Infinity
       return log.time_result ? 0 : -Infinity
     }
+    // Fiecare pas poate produce NaN cand ambele loguri comparate au aceeasi
+    // valoare "goala" (-Infinity - -Infinity, sau Infinity - Infinity la
+    // timp) - un comparator Array.sort care intoarce NaN nu are un
+    // comportament garantat de specificatie. Verificam explicit NaN la
+    // fiecare pas si cadem pe urmatorul nivel; ultimul fallback (ordine
+    // cronologica) era prezent in sortarea veche si a fost eliminat
+    // accidental la unificare - il restauram ca sa garantam mereu un
+    // rezultat numeric valid.
     const compara = (a, b) => {
       const diffRunde = rundeEfective(b) - rundeEfective(a)
-      if (diffRunde !== 0) return diffRunde
+      if (diffRunde !== 0 && !Number.isNaN(diffRunde)) return diffRunde
       const diffPartial = partialRepsOf(b) - partialRepsOf(a)
       if (diffPartial !== 0) return diffPartial
-      return parseTime(a.time_result) - parseTime(b.time_result)
+      const diffTime = parseTime(a.time_result) - parseTime(b.time_result)
+      if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
+      return new Date(a.logged_at) - new Date(b.logged_at)
     }
     const byMember = {}
     arr.forEach(log => {
@@ -4167,7 +4191,7 @@ function App() {
     if (error) { showToast(t.toastGenericError); console.error(error); return }
     showToast(t.toastSkillPrSaved)
     await fetchPRuri()
-    setSkillPrCandidates(prev => (prev || []).filter(c => c.reps !== candidate.reps))
+    setSkillPrCandidates(prev => (prev || []).filter(c => !(c.reps === candidate.reps && c.movement === candidate.movement)))
   }
 
   const saveSkillLog = async () => {
@@ -4190,7 +4214,11 @@ function App() {
     } else if (format.family === 'nft') {
       logMeta = { completed: skillLogCompleted }
     } else {
-      resultCurat = format.scoreMode === 'amrap'
+      // Acelasi motiv ca la composeWodLogFields: la RFT/Ladder/Partner WOD,
+      // membrul poate alege sa completeze runde+reps partiale in loc de
+      // rezultat/timp - fara verificarea skillLogRoundsCompleted, acele date
+      // se pierdeau silentios (nu intrau niciodata pe ramura AMRAP).
+      resultCurat = (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && skillLogRoundsCompleted.trim() !== ''))
         ? composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscari)
         : [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
       resultCurat = resultCurat.trim() || null
@@ -4206,7 +4234,7 @@ function App() {
     await fetchSkillLogs()
     if (format.prEligible && skillNameCurent && setsCurate) {
       await fetchPRuri()
-      const candidates = computeSetsPrCandidates(skillNameCurent, setsCurate, userProfile?.weight_unit || 'kg', prDate)
+      const candidates = computeSetsPrCandidates(skillNameCurent, setsCurate, userProfile?.weight_unit || 'kg', prDate, skillType === 'Superset')
       if (candidates.length > 0) { setSkillPrCandidates(candidates); setSkillLogSaving(false); return }
     }
     setSkillPrCandidates(null)
@@ -4268,7 +4296,7 @@ function App() {
     const _td = new Date()
     const todayFallback = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
     const targetDate = dateStr || clasamentDate || todayFallback
-    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name').eq('date', targetDate).maybeSingle()
+    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name, format_config').eq('date', targetDate).maybeSingle()
     setClasamentWodData(wodZi || null)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     if (wodZi?.id) {
@@ -4367,7 +4395,15 @@ function App() {
     if (format.family === 'nft') {
       return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted } }
     }
-    const isAmrapScore = format.scoreMode === 'amrap' || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
+    // La RFT/Ladder/Partner WOD (scoreMode 'fortime_or_amrap'), FormatLogger
+    // arata AMBELE seturi de campuri (timp SI runde+reps partiale) - membrul
+    // completeaza doar unul, dupa cum a terminat sau nu in time cap. Fara
+    // verificarea wodRoundsCompleted aici, ramura AMRAP nu se activa NICIODATA
+    // pentru aceste formate (scoreMode nu e strict 'amrap'), iar runde+reps
+    // partiale completate de membru se pierdeau silentios la salvare.
+    const isAmrapScore = format.scoreMode === 'amrap'
+      || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
+      || (format.scoreMode === 'fortime_or_amrap' && wodRoundsCompleted.trim() !== '')
     const rezultatFinal = isAmrapScore ? composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog) : wodResult.trim()
     return {
       result: rezultatFinal || null, time_result: isAmrapScore ? null : (wodTime.trim() || null),
@@ -5371,7 +5407,15 @@ function App() {
                 setEditLogFormatConfig(log.wods?.format_config || null)
                 setEditLogMiscari(movimenteLog)
                 setEditLogMiscareCurenta('')
-                if (format.scoreMode === 'amrap') {
+                // La RFT/Ladder/Partner WOD (scoreMode 'fortime_or_amrap'),
+                // rezultatul salvat poate fi ori text liber (a terminat, are
+                // timp), ori compus ca "N runde + ..." (n-a terminat, a logat
+                // runde+reps partiale - vezi composeWodLogFields). Distingem
+                // dupa formatul textului, nu doar dupa scoreMode strict
+                // 'amrap' - altfel editarea unui log salvat cu runde partiale
+                // il arata gresit ca text liber in loc sa repopuleze campurile.
+                const areRundeCompuse = /^\d+\s+runde/.test((log.result || '').trim())
+                if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
                   const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
                   setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
                 } else {
@@ -5386,7 +5430,22 @@ function App() {
               }}
               onEditSkill={(sl) => {
                 setSkillLogSlot(sl.slot === 2 ? 2 : 1)
-                setSkillLogNote(sl.notes || ''); setSkillLogSets(normalizeSetsRows(sl.sets)); setSkillLogResult(sl.result || ''); setSkillLogCompleted(!!sl.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null)
+                // Acelasi motiv ca la onEditWod: la RFT/Ladder/Partner WOD,
+                // rezultatul salvat poate fi runde+reps partiale compuse
+                // ("N runde + ..."), nu doar text liber - fara sa distingem,
+                // editarea unui skill log logat cu runde partiale ar afisa
+                // gresit textul brut in loc sa repopuleze campurile.
+                const skillTypeEdit = (sl.slot === 2 ? sl.wods?.skill2_type : sl.wods?.skill_type) || 'Weightlifting'
+                const formatEdit = getFormat(skillTypeEdit)
+                const skillMiscariEdit = (sl.slot === 2 ? sl.wods?.skill2 : sl.wods?.skill) || []
+                const areRundeCompuse = /^\d+\s+runde/.test((sl.result || '').trim())
+                if (formatEdit.scoreMode === 'amrap' || (formatEdit.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
+                  const { rounds, partialArr } = parseAmrapResult(sl.result || '', skillMiscariEdit)
+                  setSkillLogResult(''); setSkillLogRoundsCompleted(rounds); setSkillLogPartialReps(partialArr)
+                } else {
+                  setSkillLogResult(sl.result || ''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([])
+                }
+                setSkillLogNote(sl.notes || ''); setSkillLogSets(normalizeSetsRows(sl.sets)); setSkillLogCompleted(!!sl.log_meta?.completed); setSkillLogTime(''); setSkillPrCandidates(null)
                 if (sl.wods?.date) setDataAcasa(sl.wods.date)
                 setPrevScreen('log')
                 setScreen('logSkill')
@@ -5597,7 +5656,7 @@ function App() {
             </button>
           </div>
           <PrCandidatesConfirm candidates={skillPrCandidates}
-            onDismiss={c => setSkillPrCandidates(prev => prev.filter(x => x.reps !== c.reps))}
+            onDismiss={c => setSkillPrCandidates(prev => prev.filter(x => !(x.reps === c.reps && x.movement === c.movement)))}
             onConfirm={confirmSkillPR}
             onDone={() => { setSkillPrCandidates(null); setScreen(prevScreen || 'home') }}
             t={t} />

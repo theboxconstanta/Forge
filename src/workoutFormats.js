@@ -408,10 +408,23 @@ export function defaultRowsForFormat(formatId, config, movements) {
     movs.forEach(m => { out[m] = scheme.map(targetReps => ({ ...emptyRow(), targetReps: targetReps ?? null })) })
     return out
   }
-  // Weightlifting / Superset / Build to Heavy/1RM: randuri per miscare. Fara
-  // targetSets prescris (Weightlifting, Build to Heavy) pornim de la 0
-  // randuri - membrul adauga manual cate seturi a facut, ca la Skill Work
-  // Weightlifting azi (nu presupunem un numar).
+  // Superset: mișcările alternante sunt configurate explicit de admin in
+  // config.movements (movementList din FormatConfigEditor), separat de
+  // parametrul generic `movements` (care la Skill Work e textul liber din
+  // textarea, nesincronizat cu acest config) - fara ramura asta, config.movements
+  // era ignorat complet si se genera un singur rand generic in loc de un rand
+  // per miscare alternanta.
+  if (formatId === 'Superset') {
+    const targetSets = parseInt(config?.targetSets) || 0
+    const movs = Array.isArray(config?.movements) && config.movements.length > 0 ? config.movements : ['']
+    const out = {}
+    movs.forEach(m => { out[m] = targetSets ? rowsOf(targetSets) : [] })
+    return out
+  }
+  // Weightlifting / Build to Heavy/1RM: randuri per miscare. Fara targetSets
+  // prescris (Weightlifting, Build to Heavy) pornim de la 0 randuri - membrul
+  // adauga manual cate seturi a facut, ca la Skill Work Weightlifting azi
+  // (nu presupunem un numar).
   const targetSets = parseInt(config?.targetSets) || 0
   const movs = (movements && movements.length > 0) ? movements : ['']
   const out = {}
@@ -441,20 +454,31 @@ export function computeSetsScore(formatId, config, rowsByKey) {
 // candidatii care bat recordul - generalizarea computeSkillPrCandidates() din
 // App.jsx, acum reutilizabila pentru orice log family:'sets' (nu doar Skill
 // Weightlifting).
-export function computeSetsPrCandidates(movement, rowsByKey, weightUnit, prDate) {
-  if (!movement) return []
-  const bestByReps = {}
-  Object.values(rowsByKey || {}).forEach(rows => (rows || []).forEach(r => {
-    const reps = parseInt(r.reps), weight = parseFloat(r.weight)
-    if (!reps || !weight) return
-    if (!bestByReps[reps] || weight > bestByReps[reps]) bestByReps[reps] = weight
-  }))
-  return Object.entries(bestByReps).map(([repsStr, weight]) => {
-    const reps = parseInt(repsStr)
-    const existingKg = (prDate || [])
-      .filter(r => r.movement === movement && (r.reps || 1) === reps && (r.unit === 'kg' || r.unit === 'lbs'))
-      .map(r => convertWeight(parseFloat(r.value), r.unit, weightUnit))
-    const bestExisting = existingKg.length ? Math.max(...existingKg) : null
-    return { movement, reps, weight, unit: weightUnit, isNewPr: bestExisting == null || weight > bestExisting }
-  }).filter(c => c.isNewPr).sort((a, b) => a.reps - b.reps)
+// Cheile din rowsByKey NU sunt mereu nume de miscari - la EMOM/Tabata/Complex
+// sunt etichete de interval/runda ("Min 1", "Rundă 1"), deci PR-ul trebuie
+// atribuit lui `fallbackMovement` (nume unic, pasat de apelant). Doar la
+// Superset (movementKeyed=true) cheile chiar sunt nume de miscari distincte -
+// fara acest flag, PR-urile de la miscari diferite se amestecau sub un
+// singur nume generic (skill_name).
+export function computeSetsPrCandidates(fallbackMovement, rowsByKey, weightUnit, prDate, movementKeyed = false) {
+  const out = []
+  Object.entries(rowsByKey || {}).forEach(([cheie, rows]) => {
+    const movement = (movementKeyed && cheie && cheie.trim()) ? cheie : fallbackMovement
+    if (!movement) return
+    const bestByReps = {}
+    ;(rows || []).forEach(r => {
+      const reps = parseInt(r.reps), weight = parseFloat(r.weight)
+      if (!reps || !weight) return
+      if (!bestByReps[reps] || weight > bestByReps[reps]) bestByReps[reps] = weight
+    })
+    Object.entries(bestByReps).forEach(([repsStr, weight]) => {
+      const reps = parseInt(repsStr)
+      const existingKg = (prDate || [])
+        .filter(r => r.movement === movement && (r.reps || 1) === reps && (r.unit === 'kg' || r.unit === 'lbs'))
+        .map(r => convertWeight(parseFloat(r.value), r.unit, weightUnit))
+      const bestExisting = existingKg.length ? Math.max(...existingKg) : null
+      out.push({ movement, reps, weight, unit: weightUnit, isNewPr: bestExisting == null || weight > bestExisting })
+    })
+  })
+  return out.filter(c => c.isNewPr).sort((a, b) => a.reps - b.reps)
 }
