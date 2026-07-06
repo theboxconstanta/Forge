@@ -1974,13 +1974,22 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataWod, wods, editWodId])
 
-  const cancelEditWod = () => {
-    setEditWodId(null); setDataWod(todayLocalStr()); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+  // Reseteaza toate campurile formularului la implicit, FARA sa atinga
+  // dataWod si editWodId - folosita de cancelEditWod (care le reseteaza
+  // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
+  // noua aleasa, nu s-o resetaze la azi).
+  const resetWodFormFields = () => {
+    setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillVisibleWod(true)
+    setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
     setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
-    setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
+    setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
     setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
+  }
+
+  const cancelEditWod = () => {
+    setEditWodId(null); setDataWod(todayLocalStr())
+    resetWodFormFields()
   }
 
   const stergeWod = async (id) => {
@@ -2716,7 +2725,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/Workout of the Day, aceeasi incadrare ca ele */}
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodDateLabel}</div>
-              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+              <input type="date" value={dataWod} onChange={e => {
+                // Schimbarea manuala a datei paraseste orice editare curenta -
+                // fara asta, editWodId ramanea legat de WOD-ul vechi si
+                // efectul de sincronizare de mai jos refuza sa incarce WOD-ul
+                // zilei noi (garda "if (editWodId) return"), lasand
+                // WARM-UP/SKILL/SKILL 2/Workout of the Day neschimbate.
+                setEditWodId(null); resetWodFormFields(); setDataWod(e.target.value)
+              }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
