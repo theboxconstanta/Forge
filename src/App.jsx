@@ -13,7 +13,7 @@ import {
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor,
 } from './utils'
-import { AvatarCircle, LevelDot } from './components'
+import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
 import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
@@ -565,14 +565,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
         <button onClick={add}
           style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>+</button>
       </div>
-      {sugestii.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: '46px', zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
-          {sugestii.map((s, i) => (
-            <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => alege(s)}
-              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #FFFFFF' : 'none' }}>{s}</div>
-          ))}
-        </div>
-      )}
+      <MovementSuggestions suggestions={sugestii} onSelect={alege} rightOffset="46px" />
     </div>
   )
 }
@@ -1887,12 +1880,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     else {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
-      setEditWodId(null); setDataWod(todayLocalStr()); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
-      setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
-      setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
-      setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
-      setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
-      setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
+      setEditWodId(null); setDataWod(todayLocalStr())
+      resetWodFormFields()
     }
     setSavingWod(false)
   }
@@ -1911,24 +1900,16 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (editWodId) {
       ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId))
     } else {
-      const { data, error: insErr } = await supabase.from('wods').insert(buildWodPayload(sectionFields)).select().single()
-      if (insErr?.code === '23505') {
-        // Data (implicit azi) coincide cu un WOD deja existent, dar formularul
-        // nu a fost deschis explicit prin "editeaza" (editWodId era null) -
-        // in loc sa esueze cu eroare de duplicat, gasim randul existent pentru
-        // aceasta data si facem update partial pe el (comportamentul asteptat:
-        // "salveaza in WOD-ul zilei", nu "creeaza un al doilea WOD azi").
-        const { data: existing, error: findErr } = await supabase.from('wods').select('id').eq('date', dataWod).single()
-        if (!findErr && existing) {
-          setEditWodId(existing.id)
-          ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', existing.id))
-        } else {
-          error = findErr || insErr
-        }
-      } else {
-        error = insErr
-        if (!error && data) setEditWodId(data.id)
-      }
+      // Acelasi upsert pe conflict de data ca la saveWod (nu insert simplu) -
+      // data implicita e azi, care poate coincide cu un WOD deja existent
+      // chiar daca formularul n-a fost deschis explicit prin "editeaza"
+      // (editWodId ramane null in cazul asta). Payload-ul complet e sigur de
+      // folosit aici (nu doar sectionFields) pentru ca efectul de sincronizare
+      // (syncWodFormFromRow) garanteaza ca restul campurilor formularului
+      // oglindesc deja randul real din DB cand data se potriveste.
+      const { data, error: upsertErr } = await supabase.from('wods').upsert(buildWodPayload(sectionFields), { onConflict: 'date' }).select().single()
+      error = upsertErr
+      if (!error && data) setEditWodId(data.id)
     }
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else { showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.() }

@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { FORMAT_IDS, getFormat } from './workoutFormats'
 import { miscareSugestii } from './movements'
+import { MovementSuggestions } from './components'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const labelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px' }
@@ -76,14 +77,7 @@ function MovementTextField({ label, value, onChange, placeholder }) {
       <div style={labelStyle}>{label}</div>
       <input value={val} onChange={e => { onChange(e.target.value); setJustSelected(false) }}
         placeholder={placeholder || 'ex: Back Squat'} style={inputStyle} />
-      {sugestii.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
-          {sugestii.map((s, i) => (
-            <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s); setJustSelected(true) }}
-              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
-          ))}
-        </div>
-      )}
+      <MovementSuggestions suggestions={sugestii} onSelect={s => { onChange(s); setJustSelected(true) }} />
     </div>
   )
 }
@@ -159,14 +153,7 @@ function MovementListField({ label, value, onChange, placeholder }) {
             placeholder={placeholder || 'ex: Thrusters'} style={{ ...inputStyle, flex: 1 }} />
           <button type="button" onClick={() => add()} style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>+</button>
         </div>
-        {sugestii.length > 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: '46px', zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
-            {sugestii.map((s, i) => (
-              <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => add(s)}
-                style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
-            ))}
-          </div>
-        )}
+        <MovementSuggestions suggestions={sugestii} onSelect={add} rightOffset="46px" />
       </div>
     </div>
   )
