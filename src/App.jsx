@@ -1012,7 +1012,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                         <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
-                          <div style={{ fontSize: '11px', color: '#aaa' }}>
+                          <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Clock size={10} strokeWidth={2} />
                             {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
