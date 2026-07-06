@@ -525,13 +525,13 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
         {value.trim() && (isCardio ? (
           <>
             <input ref={metriRef} type="number" value={metri} onChange={e => setMetri(e.target.value)}
-              onKeyDown={onEnterCommit}
+              onKeyDown={onEnterCommit} disabled={!!cal.trim()}
               placeholder="metri"
-              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: cal.trim() ? '#f0f0f0' : '#fafafa', color: cal.trim() ? '#bbb' : '#0E0E0E', boxSizing: 'border-box' }} />
             <input type="number" value={cal} onChange={e => setCal(e.target.value)}
-              onKeyDown={onEnterCommit}
+              onKeyDown={onEnterCommit} disabled={!!metri.trim()}
               placeholder="cal"
-              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: metri.trim() ? '#f0f0f0' : '#fafafa', color: metri.trim() ? '#bbb' : '#0E0E0E', boxSizing: 'border-box' }} />
           </>
         ) : (
           <>
