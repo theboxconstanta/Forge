@@ -827,13 +827,27 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
     return match ? parseFloat(match[1]) : null
   }
 
+  // Suma reps-urilor din runda partiala/neterminata ("6 runde + 5 Pull-ups, 3
+  // Push-ups" -> 8) - la AMRAP (si la RFT/Ladder neterminate) doua persoane
+  // pot avea acelasi numar de runde complete dar cantitati diferite de munca
+  // in runda ramasa neterminata; fara asta erau departajate arbitrar (dupa
+  // ordinea din raspunsul serverului), nu dupa cine a muncit mai mult.
+  const partialRepsOf = (log) => {
+    const str = log.result || ''
+    const plusIdx = str.indexOf('+')
+    if (plusIdx === -1) return 0
+    const nums = str.slice(plusIdx + 1).match(/\d+(\.\d+)?/g) || []
+    return nums.reduce((sum, n) => sum + parseFloat(n), 0)
+  }
+
   // Clasare: intai cine a facut mai multe runde (cine a terminat tot WOD-ul
   // fara sa noteze runde partiale e egalat cu maximul de runde notat explicit
   // in sectiune - nu poate fi mai mult decat atat), apoi in cadrul aceluiasi
-  // numar de runde, cine a fost mai rapid. Nu se mai compara direct timpul
-  // intre cineva care n-a terminat WOD-ul si cineva care a terminat (bug
-  // raportat: cineva cu mai putine runde aparea inaintea celor cu mai multe,
-  // doar pentru ca timpul lui brut de oprire era mai mic).
+  // numar de runde cine a muncit mai mult in runda neterminata (AMRAP), apoi
+  // cine a fost mai rapid. Nu se mai compara direct timpul intre cineva care
+  // n-a terminat WOD-ul si cineva care a terminat (bug raportat: cineva cu
+  // mai putine runde aparea inaintea celor cu mai multe, doar pentru ca
+  // timpul lui brut de oprire era mai mic).
   const sortLogs = (arr) => {
     const explicite = arr.map(l => parseScore(l.result)).filter(r => r != null)
     const maxRunde = explicite.length > 0 ? Math.max(...explicite) : null
@@ -844,8 +858,10 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       return log.time_result ? 0 : -Infinity
     }
     const compara = (a, b) => {
-      const diff = rundeEfective(b) - rundeEfective(a)
-      if (diff !== 0) return diff
+      const diffRunde = rundeEfective(b) - rundeEfective(a)
+      if (diffRunde !== 0) return diffRunde
+      const diffPartial = partialRepsOf(b) - partialRepsOf(a)
+      if (diffPartial !== 0) return diffPartial
       return parseTime(a.time_result) - parseTime(b.time_result)
     }
     const byMember = {}
