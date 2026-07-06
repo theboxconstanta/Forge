@@ -185,7 +185,13 @@ export const TRANSLATIONS = {
 
     // Log WOD - ecran principal
     logNewEntry: '+ Logare nouă',
+    logFreeTextTab: '✏️ Text liber',
     logJournalTab: '📓 Jurnal',
+    logFreeTextTitle: 'Descrie antrenamentul',
+    logFreeTextPlaceholder: 'ex: Fran\n4:22 Rx',
+    logFreeTextSaveButton: 'Salvează',
+    logFreeTextSaving: 'Se salvează...',
+    logFreeTextEntryLabel: 'Notă liberă',
 
     // Jurnal (lista de log-uri)
     jurnalEmpty: 'Niciun antrenament logat încă',
@@ -367,6 +373,7 @@ export const TRANSLATIONS = {
     toastSkillLogSaved: '✓ Skill work salvat!',
     toastSkillPrSaved: '✓ PR salvat!',
     toastFillResultOrTime: '❌ Completează cel puțin rezultatul, timpul sau o mișcare!',
+    toastFillFreeText: '❌ Scrie ceva înainte să salvezi!',
     toastFillPrValue: '❌ Completează cel puțin o valoare (greutate, reps, timp sau distanță)!',
     toastPrSaveError: '❌ Eroare!',
     toastPrUpdated: '✓ PR actualizat!',
@@ -918,7 +925,13 @@ export const TRANSLATIONS = {
 
     // Log WOD - ecran principal
     logNewEntry: '+ New entry',
+    logFreeTextTab: '✏️ Free text',
     logJournalTab: '📓 Journal',
+    logFreeTextTitle: 'Describe your workout',
+    logFreeTextPlaceholder: 'ex: Fran\n4:22 Rx',
+    logFreeTextSaveButton: 'Save',
+    logFreeTextSaving: 'Saving...',
+    logFreeTextEntryLabel: 'Free note',
 
     // Jurnal (lista de log-uri)
     jurnalEmpty: 'No workouts logged yet',
@@ -1100,6 +1113,7 @@ export const TRANSLATIONS = {
     toastSkillLogSaved: '✓ Skill work saved!',
     toastSkillPrSaved: '✓ PR saved!',
     toastFillResultOrTime: '❌ Fill in at least the result, time, or a movement!',
+    toastFillFreeText: '❌ Write something before saving!',
     toastFillPrValue: '❌ Fill in at least one value (weight, reps, time, or distance)!',
     toastPrSaveError: '❌ Error!',
     toastPrUpdated: '✓ PR updated!',

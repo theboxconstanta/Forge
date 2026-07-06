@@ -3582,6 +3582,8 @@ function App() {
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
   const [logTab, setLogTab] = useState('jurnal')
+  const [freeLogText, setFreeLogText] = useState('')
+  const [freeLogSaving, setFreeLogSaving] = useState(false)
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
@@ -4446,6 +4448,30 @@ function App() {
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
+  }
+
+  // Logare minimala, fara format/miscari/scor structurat - un singur camp de
+  // text liber, salvat direct in `notes` (fara separatorul '\n---\n' folosit
+  // la logarea structurata), ca sa apara ca "miscari" (linie cu linie, cu
+  // line-break-urile pastrate) in Jurnal, nu ca o nota separata de un
+  // rezultat gol. Nu se leaga de wod_id (nu concureaza pe Clasament - n-are
+  // scor structurat de comparat).
+  const saveFreeTextLog = async () => {
+    if (!freeLogText.trim()) { showToast(t.toastFillFreeText); return }
+    setFreeLogSaving(true)
+    const { error } = await supabase.from('wod_logs').insert({
+      member_id: user.id, wod_id: null,
+      variant_level: t.logFreeTextEntryLabel,
+      notes: freeLogText.trim(),
+    })
+    if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
+    else {
+      showToast(t.toastWodSaved)
+      await fetchWodLogs()
+      setFreeLogText('')
+      setLogTab('jurnal')
+    }
+    setFreeLogSaving(false)
   }
 
   const savePR = async () => {
@@ -5363,11 +5389,28 @@ function App() {
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
               {t.logNewEntry}
             </div>
+            <div onClick={() => setLogTab('liber')}
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'liber' ? '700' : '400', background: logTab === 'liber' ? '#fff' : 'transparent', color: logTab === 'liber' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'liber' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+              {t.logFreeTextTab}
+            </div>
             <div onClick={() => setLogTab('jurnal')}
-              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', background: '#fff', color: '#0E0E0E', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: 'all 0.15s' }}>
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'jurnal' ? '700' : '400', background: logTab === 'jurnal' ? '#fff' : 'transparent', color: logTab === 'jurnal' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'jurnal' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
               {t.logJournalTab}
             </div>
           </div>
+
+          {logTab === 'liber' && (
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{t.logFreeTextTitle}</div>
+              <textarea value={freeLogText} onChange={e => setFreeLogText(e.target.value)}
+                placeholder={t.logFreeTextPlaceholder} rows={6}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
+              <button onClick={saveFreeTextLog} disabled={freeLogSaving}
+                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: freeLogSaving ? 'default' : 'pointer', opacity: freeLogSaving ? 0.6 : 1 }}>
+                {freeLogSaving ? t.logFreeTextSaving : t.logFreeTextSaveButton}
+              </button>
+            </div>
+          )}
 
           {logTab === 'jurnal' && (
             <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} t={t} lang={lang}
