@@ -3512,7 +3512,7 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
   }
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', maxWidth: '360px', width: '100%', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', maxWidth: '360px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         <button onClick={onClose} aria-label={t.shareCardCloseLabel}
           style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0E0E0E', cursor: 'pointer' }}>
           <X size={16} strokeWidth={2.5} />
@@ -3532,7 +3532,7 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
             </div>
           )}
           {movements && movements.length > 0 && (
-            <div style={{ fontSize: '12px', color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', maxHeight: '110px', overflowY: 'auto' }}>
+            <div style={{ fontSize: '12px', color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
               {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
             </div>
           )}
