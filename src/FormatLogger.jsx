@@ -70,6 +70,9 @@ function SequentialPartialFields({ movements, partialReps, onChange, t }) {
               <input type="number" min="0" value={displayValue}
                 onChange={e => { const next = [...(partialReps || [])]; next[i] = e.target.value; onChange({ partialReps: next }) }}
                 style={{ width: '70px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }} />
+              <button type="button" onClick={() => { const next = [...(partialReps || [])]; next[i] = '0'; onChange({ partialReps: next }) }}
+                title={t?.logWodClearRepsLabel || 'Nu am făcut deloc'}
+                style={{ width: '28px', height: '28px', flexShrink: 0, borderRadius: '50%', border: '1px solid #e0e0e0', background: '#fff', color: '#999', fontSize: '13px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
             </div>
           )
         })}
