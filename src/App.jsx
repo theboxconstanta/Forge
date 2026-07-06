@@ -313,6 +313,35 @@ const PR_CATEGORII = {
     'Snatch','Power Snatch','Hang Snatch','Hang Power Snatch','Squat Snatch','Snatch Pull','Snatch Balance',
     'Thruster','Farmers Carry','Turkish Get Up','Good Morning','Hip Thrust',
     'Walking Lunge','Overhead Lunge','Front Rack Lunge',
+    // Completare din biblioteca-miscari-crossfit.md - Snatch/Clean/Jerk mai putin comune
+    'Clean','Muscle Snatch','Muscle Clean','Snatch from Blocks','Clean from Blocks',
+    'Heaving Snatch Balance','Pressing Snatch Balance','Drop Snatch',
+    'Snatch High Pull','Clean High Pull','Snatch Deadlift','Clean Deadlift',
+    'Snatch-Grip Push Press','Snatch-Grip Behind-the-Neck Press','Sotts Press',
+    'Squat Jerk','Power Jerk','Behind-the-Neck Jerk','Jerk Dip','Jerk Drive','Jerk Balance','Tall Jerk',
+    'Cluster','Shoulder-to-Overhead','Ground-to-Overhead','Bear Complex','DT Complex',
+    // Barbell Strength
+    'Tempo Squat','Zercher Squat','Bulgarian Split Squat','Barbell Lunge','Deficit Deadlift','Rack Pull',
+    'Close-Grip Bench Press','Incline Bench Press','Decline Bench Press','Floor Press','Z Press','Behind-the-Neck Press',
+    'Bent-Over Row','Pendlay Row','Barbell Shrug','Barbell Curl',
+    'Landmine Press','Landmine Row','Landmine Rotation','Barbell Rollout',
+    // Dumbbell
+    'DB Snatch','DB Power Clean','DB Hang Clean','DB Clean & Jerk','DB Push Press','DB Push Jerk',
+    'DB Strict Press','DB Thruster','Devil Press','Man Makers',
+    'DB Front Squat','DB Overhead Squat','DB Goblet Squat','DB Lunge','DB Overhead Lunge',
+    'DB Box Step-up','DB Box Step-over','DB Deadlift','DB Romanian Deadlift','DB Bench Press','DB Floor Press',
+    'Single-Arm DB Row','Renegade Row','DB Turkish Get Up','DB Farmers Carry','DB Overhead Carry',
+    'DB Front Rack Carry','DB Burpee Deadlift','DB Curl','Lateral Raise','DB Pullover','DB Skull Crusher',
+    // Kettlebell
+    'KB Dead Clean','KB Clean & Jerk','KB Strict Press','KB Push Press','Bottoms-Up Press','Goblet Squat',
+    'Double KB Front Squat','KB Thruster','KB Deadlift','KB Sumo Deadlift','KB Sumo Deadlift High Pull','KB Lunge',
+    'KB Windmill','KB Halo','Around the World','KB Row','Gorilla Row','KB Farmers Carry',
+    'Suitcase Carry','Rack Carry','Overhead Carry',
+    // Strongman / Odd Objects
+    'Sandbag Clean','Sandbag to Shoulder','Sandbag Carry','Sandbag Squat','Sandbag Lunge',
+    'D-Ball over Shoulder','D-Ball over Bar','Atlas Stone Lift','Yoke Carry','Husafell Carry',
+    'Sled Push','Sled Drag','Tire Flip','Sledgehammer Strikes','Log Press',
+    'Axle Bar Deadlift','Axle Clean & Press','Keg Carry','Keg Toss',
   ],
   GYMNASTICS: [
     'Air Squat','Pistol Squat',
@@ -323,8 +352,26 @@ const PR_CATEGORII = {
     'GHD Sit-up','GHD Back Extension',
     'KB Swing','Kettlebell Swing','Russian Kettlebell Swing','American Kettlebell Swing',
     'KB Clean','KB Snatch','KB Goblet Squat','Wall Ball',
+    // Completare din biblioteca-miscari-crossfit.md
+    'Strict Pull-up','Kipping Pull-up','Butterfly Pull-up','Chin-up','Weighted Pull-up',
+    'L Pull-up','Jumping Pull-up','Negative Pull-up','Legless Rope Climb','Peg Board Ascent',
+    'Hand-Release Push-up','Deficit Push-up','Ring Push-up','Parallette Push-up','Bench Dip',
+    'Strict Handstand Push-up','Deficit Handstand Push-up','Wall-Facing Handstand Push-up',
+    'Freestanding Handstand Push-up','Handstand Walk over Obstacle','Handstand Pirouette','Wall Walk','Shoulder Taps',
+    'Toes to Ring','Hanging Knee Raise','Skin the Cat','Front Lever','Back Lever',
+    'Jumping Squat','Lunge','Jumping Lunge','Step-up','Vertical Jump',
+    'Bar-Facing Burpee','Lateral Burpee','Burpee Pull-up','Burpee to Target',
+    'Burpee Box Jump','Burpee Box Jump Over','Burpee Broad Jump','Burpee Muscle-up',
+    'Bear Crawl','Crab Walk','Duck Walk','Candlestick Roll','Forward Roll',
+    'Box Jump Over','Box Step-up','Box Step-over','Seated Box Jump','Lateral Box Jump','Box Dip','Depth Jump',
+    'Wall Ball Sit-up','Medicine Ball Clean','Med Ball Slam','Med Ball Toss','Med Ball Run','Rotational Med Ball Throw',
+    'GHD Hip Extension','V-up','Tuck-up','Hollow Hold','Hollow Rock','Arch Hold','Superman',
+    'Plank','Side Plank','Sit-up','Weighted Sit-up','Russian Twist','Ab Wheel Rollout','Dragon Flag','Reverse Hyper',
   ],
-  CARDIO: CARDIO_MISCARI,
+  // Cardio separat de CARDIO_MISCARI (care alimenteaza si detectarea automata
+  // metri/cal la logare) - Triple Under/Stair Climb/Ruck sunt cardio dar nu
+  // se masoara in metri/calorii, deci n-ar trebui sa primeasca acele casute.
+  CARDIO: [...CARDIO_MISCARI, 'Triple Under', 'Double Under Crossover', 'Stair Climb', 'Ruck'],
   HERO_WODS: Object.keys(HERO_WODS_INFO),
 }
 
