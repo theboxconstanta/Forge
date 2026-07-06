@@ -864,38 +864,35 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // n-a terminat WOD-ul si cineva care a terminat (bug raportat: cineva cu
   // mai putine runde aparea inaintea celor cu mai multe, doar pentru ca
   // timpul lui brut de oprire era mai mic).
+  // Clasare in 2 nivele stricte, nu un singur numar "runde efective" comparat
+  // direct intre toata lumea: (1) cine a terminat (are time_result) - mereu
+  // inaintea (2) cine n-a terminat (are doar runde+reps partiale), indiferent
+  // de valori numerice. Incercarea anterioara de a da finisherilor un numar
+  // de "runde efective" (aproximat din ce au notat non-finisherii sau din
+  // format_config.rounds) esua exact la formate fara un numar real de runde
+  // prescrise (For Time/Ladder/Chipper, unde miscarile sunt o secventa, nu
+  // runde repetate) - un non-finisher cu reps partiale mari putea depasi
+  // numeric un finisher real. Verificarea stricta pe time_result elimina
+  // complet ambiguitatea: a terminat = are timp, punct.
   const sortLogs = (arr) => {
-    const explicite = arr.map(l => parseScore(l.result)).filter(r => r != null)
-    // Numarul real de runde prescrise (ex. RFT are format_config.rounds) e
-    // preferat fata de ghicitul din ce au notat participantii - altfel, daca
-    // NINENI dintre cei ce au terminat n-a notat un numar de runde (au umplut
-    // doar timpul), iar singurul numar explicit vine de la cineva care N-a
-    // terminat, maxRunde ar fi subestimat, egaland gresit finisheri cu
-    // non-finisheri (bug raportat). AMRAP nu are un plafon real - ramane pe
-    // euristica veche (cel mai mare numar notat explicit).
-    const rundePrescrise = parseInt(wodZiData?.format_config?.rounds) || null
-    const maxRunde = rundePrescrise != null ? rundePrescrise : (explicite.length > 0 ? Math.max(...explicite) : null)
-    const rundeEfective = (log) => {
-      const r = parseScore(log.result)
-      if (r != null) return r
-      if (maxRunde != null) return log.time_result ? maxRunde : -Infinity
-      return log.time_result ? 0 : -Infinity
-    }
-    // Fiecare pas poate produce NaN cand ambele loguri comparate au aceeasi
-    // valoare "goala" (-Infinity - -Infinity, sau Infinity - Infinity la
-    // timp) - un comparator Array.sort care intoarce NaN nu are un
-    // comportament garantat de specificatie. Verificam explicit NaN la
-    // fiecare pas si cadem pe urmatorul nivel; ultimul fallback (ordine
-    // cronologica) era prezent in sortarea veche si a fost eliminat
-    // accidental la unificare - il restauram ca sa garantam mereu un
-    // rezultat numeric valid.
+    const finished = (log) => !!log.time_result
+    // Fiecare comparatie numerica poate produce NaN cand ambele loguri au
+    // aceeasi valoare "goala" (Infinity - Infinity la timp) - un comparator
+    // Array.sort care intoarce NaN nu are comportament garantat de
+    // specificatie. Verificam explicit NaN la fiecare pas si cadem pe
+    // urmatorul nivel, cu ordinea cronologica drept fallback final.
     const compara = (a, b) => {
-      const diffRunde = rundeEfective(b) - rundeEfective(a)
-      if (diffRunde !== 0 && !Number.isNaN(diffRunde)) return diffRunde
+      const fa = finished(a), fb = finished(b)
+      if (fa !== fb) return fa ? -1 : 1
+      if (fa) {
+        const diffTime = parseTime(a.time_result) - parseTime(b.time_result)
+        if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
+        return new Date(a.logged_at) - new Date(b.logged_at)
+      }
+      const diffRunde = (parseScore(b.result) || 0) - (parseScore(a.result) || 0)
+      if (diffRunde !== 0) return diffRunde
       const diffPartial = partialRepsOf(b) - partialRepsOf(a)
       if (diffPartial !== 0) return diffPartial
-      const diffTime = parseTime(a.time_result) - parseTime(b.time_result)
-      if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
       return new Date(a.logged_at) - new Date(b.logged_at)
     }
     const byMember = {}
@@ -4277,7 +4274,7 @@ function App() {
     const _td = new Date()
     const todayFallback = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
     const targetDate = dateStr || clasamentDate || todayFallback
-    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name, format_config').eq('date', targetDate).maybeSingle()
+    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name').eq('date', targetDate).maybeSingle()
     setClasamentWodData(wodZi || null)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     if (wodZi?.id) {
