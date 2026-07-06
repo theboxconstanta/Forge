@@ -4047,6 +4047,12 @@ function App() {
 
   const uploadAvatar = async (file) => {
     if (!file) return
+    // Bucket-ul 'avatars' are file_size_limit=5242880 (5MB, vezi migratia
+    // 20260628_profiles_avatar_storage.sql) - fara verificare aici, un fisier
+    // prea mare esua cu StorageApiError generic ("The object exceeded the
+    // maximum allowed size", gasit in Sentry), fara niciun mesaj util pt
+    // membru despre CE trebuie sa faca diferit.
+    if (file.size > 5 * 1024 * 1024) { showToast(t.toastAvatarTooLarge); return }
     setAvatarUploading(true)
     const ext = file.name.split('.').pop().toLowerCase() || 'jpg'
     const path = `${user.id}/avatar.${ext}`
