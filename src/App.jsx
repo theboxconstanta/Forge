@@ -1818,8 +1818,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   // Payload complet, din starea curenta a formularului - folosit atat de
   // saveWod (salveaza tot) cat si de saveWodSection cand inca nu exista un
   // rand in DB (nu ai ce sa actualizezi partial, trebuie creat intreg randul
-  // o data, cu valorile implicite pentru sectiunile neatinse inca).
-  const buildWodPayload = () => {
+  // o data, cu valorile implicite pentru sectiunile neatinse inca). `overrides`
+  // e pentru cazul in care apelantul are o valoare mai proaspata decat starea
+  // React curenta (ex. switch-ul de vizibilitate cheama save chiar in acelasi
+  // tick cu setState-ul, inainte ca re-render-ul sa fi actualizat starea).
+  const buildWodPayload = (overrides = {}) => {
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
     return {
       date: dataWod, type: tipWod, duration: durataWod,
@@ -1841,6 +1844,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       movements_beginner: wodVariante.beginner,
       movements_intermediate: wodVariante.intermediate,
       movements_rx: wodVariante.rx,
+      ...overrides,
     }
   }
 
@@ -1883,7 +1887,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (editWodId) {
       ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId))
     } else {
-      const { data, error: insErr } = await supabase.from('wods').insert(buildWodPayload()).select().single()
+      const { data, error: insErr } = await supabase.from('wods').insert(buildWodPayload(sectionFields)).select().single()
       if (insErr?.code === '23505') {
         // Data (implicit azi) coincide cu un WOD deja existent, dar formularul
         // nu a fost deschis explicit prin "editeaza" (editWodId era null) -
@@ -2695,7 +2699,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
               <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupLabel}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={warmupVisibleWod} onChange={setWarmupVisibleWod} />
+                  <MiniSwitch checked={warmupVisibleWod} onChange={(v) => { setWarmupVisibleWod(v); saveWodSection({ warmup_visible: v }, t.adminWodWarmupLabel) }} />
                   <span style={{ fontSize: '11px', color: '#888' }}>{adminWarmupOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -2716,7 +2720,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
               <div onClick={() => setAdminSkillOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkillLabel}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={skillVisibleWod} onChange={setSkillVisibleWod} />
+                  <MiniSwitch checked={skillVisibleWod} onChange={(v) => { setSkillVisibleWod(v); saveWodSection({ skill_visible: v }, t.adminWodSkillLabel) }} />
                   <span style={{ fontSize: '11px', color: '#888' }}>{adminSkillOpen ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -2748,7 +2752,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
               <div onClick={() => setAdminSkill2Open(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkill2Label}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={skill2VisibleWod} onChange={setSkill2VisibleWod} />
+                  <MiniSwitch checked={skill2VisibleWod} onChange={(v) => { setSkill2VisibleWod(v); saveWodSection({ skill2_visible: v }, t.adminWodSkill2Label) }} />
                   <span style={{ fontSize: '11px', color: '#888' }}>{adminSkill2Open ? '▲' : '▼'}</span>
                 </div>
               </div>
