@@ -6,6 +6,7 @@
 // custom_hero_wods.format_config).
 import { useState } from 'react'
 import { FORMAT_IDS, getFormat } from './workoutFormats'
+import { miscareSugestii } from './movements'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const labelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px' }
@@ -107,8 +108,16 @@ function SelectField({ label, value, options, onChange }) {
 // rezervat listei principale de mișcări ale WOD-ului, gestionată separat).
 function MovementListField({ label, value, onChange, placeholder }) {
   const [draft, setDraft] = useState('')
+  const [justSelected, setJustSelected] = useState(false)
   const items = value || []
-  const add = () => { if (draft.trim()) { onChange([...items, draft.trim()]); setDraft('') } }
+  const add = (text) => {
+    const val = (text ?? draft).trim()
+    if (!val) return
+    onChange([...items, val]); setDraft(''); setJustSelected(false)
+  }
+  // La fel ca la MiscareQuickAdd - dupa ce alegi o sugestie, n-o mai arata
+  // din nou pana nu mai scrii ceva (altfel ramane vizibila peste lista).
+  const sugestii = justSelected ? [] : miscareSugestii(draft)
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
@@ -119,10 +128,21 @@ function MovementListField({ label, value, onChange, placeholder }) {
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
         </div>
       ))}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-          placeholder={placeholder || 'ex: Thrusters'} style={{ ...inputStyle, flex: 1 }} />
-        <button type="button" onClick={add} style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+      <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input value={draft} onChange={e => { setDraft(e.target.value); setJustSelected(false) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+            placeholder={placeholder || 'ex: Thrusters'} style={{ ...inputStyle, flex: 1 }} />
+          <button type="button" onClick={() => add()} style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>+</button>
+        </div>
+        {sugestii.length > 0 && (
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: '46px', zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+            {sugestii.map((s, i) => (
+              <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => add(s)}
+                style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
