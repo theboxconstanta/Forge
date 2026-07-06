@@ -518,31 +518,31 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
   const onEnterCommit = (e) => { if (e.key === 'Enter') add() }
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
         <input value={value} onChange={e => { onChange(e.target.value); setJustSelected(false) }}
           onKeyDown={onEnterCommit}
-          placeholder={placeholder} style={{ flex: value.trim() ? 2 : 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          placeholder={placeholder} style={{ flex: '1 1 140px', minWidth: 0, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
         {value.trim() && (isCardio ? (
           <>
             <input ref={metriRef} type="number" value={metri} onChange={e => setMetri(e.target.value)}
               onKeyDown={onEnterCommit}
               placeholder="metri"
-              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             <input type="number" value={cal} onChange={e => setCal(e.target.value)}
               onKeyDown={onEnterCommit}
               placeholder="cal"
-              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           </>
         ) : (
           <>
             <input ref={repsRef} type="number" value={reps} onChange={e => setReps(e.target.value)}
               onKeyDown={onEnterCommit}
               placeholder={t?.skillLogRepsPlaceholder || 'reps'}
-              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
               onKeyDown={onEnterCommit}
               placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
-              style={{ width: '64px', padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
           </>
         ))}
         <button onClick={add}
