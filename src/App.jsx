@@ -822,34 +822,38 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   }
 
   const parseScore = (str) => {
-    if (!str) return -Infinity
+    if (!str) return null
     const match = str.match(/(\d+(\.\d+)?)/)
-    return match ? parseFloat(match[1]) : -Infinity
+    return match ? parseFloat(match[1]) : null
   }
 
-  const deduplicateBest = (arr) => {
+  // Clasare: intai cine a facut mai multe runde (cine a terminat tot WOD-ul
+  // fara sa noteze runde partiale e egalat cu maximul de runde notat explicit
+  // in sectiune - nu poate fi mai mult decat atat), apoi in cadrul aceluiasi
+  // numar de runde, cine a fost mai rapid. Nu se mai compara direct timpul
+  // intre cineva care n-a terminat WOD-ul si cineva care a terminat (bug
+  // raportat: cineva cu mai putine runde aparea inaintea celor cu mai multe,
+  // doar pentru ca timpul lui brut de oprire era mai mic).
+  const sortLogs = (arr) => {
+    const explicite = arr.map(l => parseScore(l.result)).filter(r => r != null)
+    const maxRunde = explicite.length > 0 ? Math.max(...explicite) : null
+    const rundeEfective = (log) => {
+      const r = parseScore(log.result)
+      if (r != null) return r
+      if (maxRunde != null) return log.time_result ? maxRunde : -Infinity
+      return log.time_result ? 0 : -Infinity
+    }
+    const compara = (a, b) => {
+      const diff = rundeEfective(b) - rundeEfective(a)
+      if (diff !== 0) return diff
+      return parseTime(a.time_result) - parseTime(b.time_result)
+    }
     const byMember = {}
-    const withTime = arr.filter(l => l.time_result).length >= arr.filter(l => l.result).length && arr.some(l => l.time_result)
     arr.forEach(log => {
       const id = log.member_id
-      if (!byMember[id]) { byMember[id] = log; return }
-      const curr = byMember[id]
-      if (withTime) {
-        if (parseTime(log.time_result) < parseTime(curr.time_result)) byMember[id] = log
-      } else {
-        if (parseScore(log.result) > parseScore(curr.result)) byMember[id] = log
-      }
+      if (!byMember[id] || compara(log, byMember[id]) < 0) byMember[id] = log
     })
-    return Object.values(byMember)
-  }
-
-  const sortLogs = (arr) => {
-    const deduped = deduplicateBest(arr)
-    const withTime = deduped.filter(l => l.time_result).length
-    const withResult = deduped.filter(l => l.result).length
-    if (withTime >= withResult && withTime > 0) return deduped.sort((a, b) => parseTime(a.time_result) - parseTime(b.time_result))
-    if (withResult > 0) return deduped.sort((a, b) => parseScore(b.result) - parseScore(a.result))
-    return deduped.sort((a, b) => new Date(a.logged_at) - new Date(b.logged_at))
+    return Object.values(byMember).sort(compara)
   }
 
   const NIVELE = [
