@@ -53,6 +53,12 @@ describe('composePartialText / parsePartialText', () => {
     expect(text).toBe('15/15 Power Snatches, 3/5 Rope Climbs')
     expect(parsePartialText(text, miscariScara)).toEqual(['15', '3'])
   })
+  it('0 explicit (butonul de clear la For Time/Ladder) se pastreaza, nu e tratat ca "netouched"', () => {
+    const miscariScara = ['15 Power Snatches', '5 Rope Climbs']
+    const text = composePartialText(['0', '3'], miscariScara)
+    expect(text).toBe('0/15 Power Snatches, 3/5 Rope Climbs')
+    expect(parsePartialText(text, miscariScara)).toEqual(['0', '3'])
+  })
 })
 
 describe('composeAmrapResult / parseAmrapResult', () => {
