@@ -220,17 +220,36 @@ export function legacyHeaderTypeOf(headerLine) {
 // Genereaza textul "3 runde + 5 Pull-ups, 10 Push-ups" dintr-un numar de
 // runde complete + reps partiale per miscare. Genericul din spatele lui
 // composeAmrapResult() din App.jsx.
+// Cand textul miscarii are deja un numar la inceput (uzual la AMRAP scrise ca
+// scara descrescatoare - "15 Power Snatches", "12 Power Snatches"...), a pune
+// pur si simplu reps-ul partial inaintea textului producea dublari confuze
+// ("15 15 Power Snatches"). In cazul asta aratam "facut/prescris" ("3/15
+// Power Snatches") - fara ambiguitate, indiferent daca a terminat miscarea
+// integral sau nu ("15/15 Power Snatches" = a facut-o pe toata).
 export function composePartialText(partialArr, movements) {
   return movements
-    .map((m, i) => partialArr[i]?.trim() ? `${partialArr[i].trim()} ${m}` : null)
+    .map((m, i) => {
+      const val = partialArr[i]?.trim()
+      if (!val) return null
+      const cuNumar = m.match(/^(\d+)\s+(.+)$/)
+      return cuNumar ? `${val}/${cuNumar[1]} ${cuNumar[2]}` : `${val} ${m}`
+    })
     .filter(Boolean).join(', ')
 }
 
 export function parsePartialText(text, movements) {
   const partialArr = movements.map(() => '')
   ;(text || '').split(',').forEach(seg => {
-    const mm = seg.trim().match(/^(\d+)\s+(.+)$/)
-    if (mm) { const idx = movements.indexOf(mm[2].trim()); if (idx !== -1) partialArr[idx] = mm[1] }
+    const trimmed = seg.trim()
+    const cuNumar = trimmed.match(/^(\d+)\/(\d+)\s+(.+)$/)
+    if (cuNumar) {
+      const idx = movements.indexOf(`${cuNumar[2]} ${cuNumar[3]}`.trim())
+      if (idx !== -1) { partialArr[idx] = cuNumar[1]; return }
+    }
+    // Compatibilitate cu rezultate vechi, deja salvate inainte de acest fix
+    // (fara "/", numarul dublat direct in fata textului miscarii).
+    const simplu = trimmed.match(/^(\d+)\s+(.+)$/)
+    if (simplu) { const idx = movements.indexOf(simplu[2].trim()); if (idx !== -1) partialArr[idx] = simplu[1] }
   })
   return partialArr
 }

@@ -47,6 +47,12 @@ describe('composePartialText / parsePartialText', () => {
   it('ignoră mișcările fără reps parțiale', () => {
     expect(composePartialText(['', '10'], movements)).toBe('10 Push-ups')
   })
+  it('nu dublează numărul cand miscarea are deja unul in text (scara descrescatoare) - arata facut/prescris', () => {
+    const miscariScara = ['15 Power Snatches', '5 Rope Climbs']
+    const text = composePartialText(['15', '3'], miscariScara)
+    expect(text).toBe('15/15 Power Snatches, 3/5 Rope Climbs')
+    expect(parsePartialText(text, miscariScara)).toEqual(['15', '3'])
+  })
 })
 
 describe('composeAmrapResult / parseAmrapResult', () => {
