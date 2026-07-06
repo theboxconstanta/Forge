@@ -3025,11 +3025,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
               const areRezultat = rezultatBucati.length > 0
               const areDetalii = miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets || areRezultat
+              // Titlu: "Nume WOD" | Varianta (daca WOD-ul are nume) - altfel doar
+              // varianta, ca inainte. Subtitlu: formatul + durata reale ale WOD-ului
+              // legat (ex. "AMRAP 20:00") - la logare libera (fara wod_id) nu exista
+              // un WOD legat, iar variant_level e deja formatul insusi, deci n-are
+              // sens sa-l repetam pe un rand separat.
+              const wodNume = w.wods?.name || null
+              const wodSubtitlu = w.wods ? `${w.wods.type}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{w.variant_level || 'WOD'}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteWod && (
                         confirmDelete === logKey ? (
@@ -3047,6 +3054,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
+                  {wodSubtitlu && (
+                    <div style={{ marginTop: '2px', fontSize: '12px', color: '#888' }}>{wodSubtitlu}</div>
+                  )}
                   {!isOpen && !areRezultat && (
                     <div style={{ marginTop: '6px', fontSize: '12px', color: '#aaa' }}>—</div>
                   )}
