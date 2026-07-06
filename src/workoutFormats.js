@@ -28,11 +28,6 @@ export const REP_SCHEME_QUICK_OPTIONS = [
   '10-8-6-4-2', '5-4-3-2-1', '1-2-3-4-5-6-7-8-9-10',
 ]
 
-// Chips rapide peste campul liber targetLabel (Build to Heavy/1RM) - nu
-// limiteaza ce se poate scrie manual (ex. "Max Unbroken Reps"), doar
-// accelereaza cele mai comune tinte de rep-max.
-export const TARGET_LABEL_QUICK_OPTIONS = ['1RM', '2RM', '3RM', '5RM', 'Max Height', 'Max Distance']
-
 // Formate unde durata totala e 100% determinata de config (runde x
 // interval) - a cere si o durata manuala separata e redundant si poate sa
 // nu se potriveasca cu ce rezulta din config. Vezi estimateTotalDurationSec.
@@ -160,7 +155,7 @@ export const WORKOUT_FORMATS = {
   },
   'Build to Heavy/1RM': {
     family: 'sets', rowMode: 'movement', prEligible: true,
-    config: { targetLabel: { type: 'text', required: false, default: '1RM', labelKey: 'fmtTargetLabel', quickOptions: TARGET_LABEL_QUICK_OPTIONS } },
+    config: { targetLabel: { type: 'repMaxStepper', required: false, default: '1RM', labelKey: 'fmtTargetLabel' } },
   },
   'Complex': {
     family: 'sets', rowMode: 'round', prEligible: true,

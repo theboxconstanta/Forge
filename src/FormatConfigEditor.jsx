@@ -46,6 +46,25 @@ function NumberField({ label, value, onChange }) {
   )
 }
 
+// Stepper +/- pentru "N RM" (Build to Heavy/1RM) - in loc sa scrii manual
+// "3RM", alegi direct numarul (1-30) cu doua butoane, ca la o balanta.
+function RepMaxStepperField({ label, value, onChange }) {
+  const match = (value || '').match(/^(\d+)/)
+  const n = match ? parseInt(match[1]) : 1
+  const setN = (next) => onChange(`${Math.min(30, Math.max(1, next))}RM`)
+  const btnStyle = (disabled) => ({ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '20px', fontWeight: '700', color: '#0E0E0E', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1, lineHeight: 1 })
+  return (
+    <div style={fieldWrapStyle}>
+      <div style={labelStyle}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button type="button" onClick={() => setN(n - 1)} disabled={n <= 1} style={btnStyle(n <= 1)}>−</button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: '16px', fontWeight: '700', color: '#0E0E0E', padding: '9px 12px', background: '#fafafa', borderRadius: '10px', border: '1px solid #e0e0e0' }}>{n}RM</div>
+        <button type="button" onClick={() => setN(n + 1)} disabled={n >= 30} style={btnStyle(n >= 30)}>+</button>
+      </div>
+    </div>
+  )
+}
+
 function TextField({ label, value, onChange, placeholder, quickOptions }) {
   return (
     <div style={fieldWrapStyle}>
@@ -194,6 +213,9 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
         )
         if (field.type === 'text') return (
           <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />
+        )
+        if (field.type === 'repMaxStepper') return (
+          <RepMaxStepperField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
         )
         if (field.type === 'movementText') return (
           <MovementTextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
