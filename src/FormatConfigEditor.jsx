@@ -64,6 +64,30 @@ function TextField({ label, value, onChange, placeholder, quickOptions }) {
   )
 }
 
+// Un singur nume de miscare (ex. "Back Squat" la Max Effort) - text liber cu
+// sugestii din MISCARI, spre deosebire de TextField (folosit si pentru
+// campuri care NU sunt nume de miscari - repsScheme, targetLabel).
+function MovementTextField({ label, value, onChange, placeholder }) {
+  const [justSelected, setJustSelected] = useState(false)
+  const val = value || ''
+  const sugestii = justSelected ? [] : miscareSugestii(val)
+  return (
+    <div style={{ ...fieldWrapStyle, position: 'relative' }}>
+      <div style={labelStyle}>{label}</div>
+      <input value={val} onChange={e => { onChange(e.target.value); setJustSelected(false) }}
+        placeholder={placeholder || 'ex: Back Squat'} style={inputStyle} />
+      {sugestii.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+          {sugestii.map((s, i) => (
+            <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => { onChange(s); setJustSelected(true) }}
+              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < sugestii.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Schema de reps per set (ex: [5,3,1]) - un rand per set, fiecare cu propria
 // tinta de reps; numarul de seturi = lungimea listei (nu un camp separat).
 function RepsSchemeListField({ label, value, onChange }) {
@@ -104,8 +128,8 @@ function SelectField({ label, value, options, onChange }) {
 }
 
 // Listă simplă, ordonată, de nume de mișcări (Buy-In, Cash-Out, lanțul unui
-// Complex) - text liber + adaugă/șterge, fără autocomplete fuzzy (acela e
-// rezervat listei principale de mișcări ale WOD-ului, gestionată separat).
+// Complex, mișcare pe interval la EMOM) - cu sugestii din MISCARI, la fel ca
+// MiscareQuickAdd din App.jsx.
 function MovementListField({ label, value, onChange, placeholder }) {
   const [draft, setDraft] = useState('')
   const [justSelected, setJustSelected] = useState(false)
@@ -183,6 +207,9 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
         )
         if (field.type === 'text') return (
           <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />
+        )
+        if (field.type === 'movementText') return (
+          <MovementTextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
         )
         if (field.type === 'movementList') return (
           <MovementListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />

@@ -192,7 +192,7 @@ export const WORKOUT_FORMATS = {
   },
   'Max Effort': {
     family: 'scored', scoreMode: 'single_value',
-    config: { movement: { type: 'text', required: false, labelKey: 'fmtMovementTest' } },
+    config: { movement: { type: 'movementText', required: false, labelKey: 'fmtMovementTest' } },
   },
 }
 
