@@ -3582,6 +3582,7 @@ function App() {
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
   const [logTab, setLogTab] = useState('jurnal')
+  const [freeLogName, setFreeLogName] = useState('')
   const [freeLogText, setFreeLogText] = useState('')
   const [freeLogSaving, setFreeLogSaving] = useState(false)
   const [user, setUser] = useState(null)
@@ -4461,14 +4462,14 @@ function App() {
     setFreeLogSaving(true)
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: null,
-      variant_level: t.logFreeTextEntryLabel,
+      variant_level: freeLogName.trim() || t.logFreeTextEntryLabel,
       notes: freeLogText.trim(),
     })
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved)
       await fetchWodLogs()
-      setFreeLogText('')
+      setFreeLogName(''); setFreeLogText('')
       setLogTab('jurnal')
     }
     setFreeLogSaving(false)
@@ -5401,6 +5402,9 @@ function App() {
 
           {logTab === 'liber' && (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+              <input value={freeLogName} onChange={e => setFreeLogName(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"'
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{t.logFreeTextTitle}</div>
               <textarea value={freeLogText} onChange={e => setFreeLogText(e.target.value)}
                 placeholder={t.logFreeTextPlaceholder} rows={6}
