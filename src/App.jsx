@@ -1848,9 +1848,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (!dataWod) { showToast(t.toastPickDate); return }
     setSavingWod(true)
     const payload = buildWodPayload()
+    // upsert pe conflict de data (nu doar insert) - data implicita e azi, care
+    // poate coincide cu un WOD deja existent chiar daca formularul n-a fost
+    // deschis explicit prin "editeaza" (editWodId ramane null in cazul asta);
+    // fara upsert, insert-ul ar esua cu eroare de duplicat pe wods_date_key.
     const { error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId)
-      : await supabase.from('wods').insert(payload)
+      : await supabase.from('wods').upsert(payload, { onConflict: 'date' })
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
@@ -1880,8 +1884,23 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId))
     } else {
       const { data, error: insErr } = await supabase.from('wods').insert(buildWodPayload()).select().single()
-      error = insErr
-      if (!error && data) setEditWodId(data.id)
+      if (insErr?.code === '23505') {
+        // Data (implicit azi) coincide cu un WOD deja existent, dar formularul
+        // nu a fost deschis explicit prin "editeaza" (editWodId era null) -
+        // in loc sa esueze cu eroare de duplicat, gasim randul existent pentru
+        // aceasta data si facem update partial pe el (comportamentul asteptat:
+        // "salveaza in WOD-ul zilei", nu "creeaza un al doilea WOD azi").
+        const { data: existing, error: findErr } = await supabase.from('wods').select('id').eq('date', dataWod).single()
+        if (!findErr && existing) {
+          setEditWodId(existing.id)
+          ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', existing.id))
+        } else {
+          error = findErr || insErr
+        }
+      } else {
+        error = insErr
+        if (!error && data) setEditWodId(data.id)
+      }
     }
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else { showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.() }
