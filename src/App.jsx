@@ -5,7 +5,7 @@ import {
   Home, PenLine, Trophy, Medal, MessageCircle, Settings,
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
-  RotateCw, Clock, Mars, Venus, User, CheckCircle2,
+  RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
 } from 'lucide-react'
 import { supabase } from './supabase'
 import {
@@ -3485,6 +3485,68 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
   )
 }
 
+// Card de felicitare afisat dupa "Save Workout" - branding sala + antrenamentul
+// facut + scorul + variantă + data/ora + un mesaj de felicitare, cu buton de
+// distribuire (Web Share API - pe mobil deschide sheet-ul nativ cu WhatsApp/
+// social media direct, fara integrare separata per platforma).
+function WorkoutSharePopup({ data, onClose, t, lang }) {
+  if (!data) return null
+  const { wodName, variantLevel, variantColor, variantBg, result, timeResult, loggedAt } = data
+  const scoreParts = [result, timeResult].filter(Boolean)
+  const dataObj = new Date(loggedAt)
+  const shareText = [
+    'CrossFit C15',
+    wodName ? `"${wodName}"` : null,
+    scoreParts.length > 0 ? scoreParts.join(' · ') : null,
+    variantLevel ? `(${variantLevel})` : null,
+    '',
+    t.shareCardCongrats,
+  ].filter(Boolean).join('\n')
+  const handleShare = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ text: shareText }) } catch { /* userul a anulat share-ul - nimic de facut */ }
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(shareText)
+    }
+  }
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', maxWidth: '360px', width: '100%', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <button onClick={onClose} aria-label={t.shareCardCloseLabel}
+          style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0E0E0E', cursor: 'pointer' }}>
+          <X size={16} strokeWidth={2.5} />
+        </button>
+        <div style={{ background: '#0E0E0E', padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <img src="/forge.png" alt="Forge" style={{ height: '30px', width: '30px', borderRadius: '8px', objectFit: 'cover' }} />
+          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+          <span style={{ fontSize: '13px', fontWeight: '600' }}>
+            <span style={{ color: '#888' }}> · </span><span style={{ color: '#fff' }}>CrossFit </span><span style={{ color: '#ABE73C' }}>C15</span>
+          </span>
+        </div>
+        <div style={{ padding: '26px 24px', textAlign: 'center' }}>
+          {wodName && <div style={{ fontSize: '18px', fontWeight: '800', color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
+          {variantLevel && (
+            <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700', marginBottom: '14px' }}>
+              {variantLevel}
+            </div>
+          )}
+          <div style={{ fontSize: '30px', fontWeight: '800', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
+            {scoreParts.length > 0 ? scoreParts.join(' · ') : '—'}
+          </div>
+          <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '18px' }}>
+            {dataObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dataObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '22px' }}>{t.shareCardCongrats}</div>
+          <button onClick={handleShare}
+            style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [screen, setScreen] = useState('home')
   const [prevScreen, setPrevScreen] = useState('home')
@@ -3573,6 +3635,7 @@ function App() {
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
+  const [workoutSharePopup, setWorkoutSharePopup] = useState(null)
   const [wodTip, setWodTip] = useState('AMRAP')
   const [wodFormatConfig, setWodFormatConfig] = useState({})
   const [wodSets, setWodSets] = useState({})
@@ -4463,17 +4526,27 @@ function App() {
       : (variantaAleasa === null ? `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}` : null)
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
-    const tipSalvat = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
+    const varianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa] : null
+    const tipSalvat = varianta ? varianta.nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
+    const logFields = composeWodLogFields()
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, wod_id: wodZiData?.id || null,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
-      ...composeWodLogFields(),
+      ...logFields,
     })
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
+      setWorkoutSharePopup({
+        wodName: wodZiData?.name || null,
+        variantLevel: varianta?.nivel || null,
+        variantColor: varianta?.culoare || null,
+        variantBg: varianta?.bg || null,
+        result: logFields.result, timeResult: logFields.time_result,
+        loggedAt: new Date().toISOString(),
+      })
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
@@ -4923,6 +4996,8 @@ function App() {
           <span style={{ color: '#ABE73C' }}>C15</span>
         </span>
       </div>
+
+      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} />
 
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
