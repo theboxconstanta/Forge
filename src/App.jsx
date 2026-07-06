@@ -1317,7 +1317,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [durataWodMin, setDurataWodMin] = useState('20')
   const [durataWodSec, setDurataWodSec] = useState('0')
   const [formatConfigWod, setFormatConfigWod] = useState({})
-  const [dataWod, setDataWod] = useState('')
+  const [dataWod, setDataWod] = useState(() => todayLocalStr())
   // La EMOM/Tabata/Intervals durata totala e deja 100% determinata de config
   // (runde x interval) - o durata manuala separata ar putea sa nu se
   // potriveasca, deci o calculam si o sincronizam automat (vezi si JSX-ul
@@ -1829,7 +1829,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     else {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
-      setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+      setEditWodId(null); setDataWod(todayLocalStr()); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
       setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
       setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
       setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
@@ -1880,7 +1880,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   }
 
   const cancelEditWod = () => {
-    setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+    setEditWodId(null); setDataWod(todayLocalStr()); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillVisibleWod(true)
     setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
@@ -2621,7 +2621,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/Workout of the Day, aceeasi incadrare ca ele */}
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodDateLabel}</div>
-              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+              <input type="date" value={dataWod} onChange={e => setDataWod(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', textAlign: 'center' }} />
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
