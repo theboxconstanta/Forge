@@ -3252,6 +3252,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Calendar size={10} strokeWidth={2} />
+                      {new Date(w.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Clock size={10} strokeWidth={2} />
+                      {new Date(w.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
                   {wodSubtitlu && (
                     <div style={{ marginTop: '2px', fontSize: '12px', color: '#888' }}>{wodSubtitlu}</div>
                   )}
@@ -3343,6 +3353,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       )}
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{skillOpen ? '▲' : '▼'}</span>
                     </div>
+                  </div>
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Calendar size={10} strokeWidth={2} />
+                      {new Date(sl.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Clock size={10} strokeWidth={2} />
+                      {new Date(sl.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
                   {skillOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
