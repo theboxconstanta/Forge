@@ -41,8 +41,11 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'amrap',
     config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
   },
+  // Ca la RFT/Ladder: multe WOD-uri "For Time" sunt de fapt bazate pe runde
+  // ("5 runde: ...") - daca nu termini in time cap, trebuie sa poti loga
+  // runde complete + reps partiale in loc de timp, nu doar sa lasi scorul gol.
   'For Time': {
-    family: 'scored', scoreMode: 'fortime',
+    family: 'scored', scoreMode: 'fortime_or_amrap',
     config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'RFT': {
