@@ -1911,7 +1911,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setSavingWod(false)
   }
 
-  const startEditWod = (w) => {
+  // Populeaza toate campurile formularului din randul WOD dat, FARA efecte de
+  // navigare (scroll, expand dropdown-uri, schimbare tab) - folosita atat de
+  // startEditWod (editare explicita, cu navigare) cat si de sincronizarea
+  // silentioasa de mai jos (cand data aleasa coincide cu un WOD deja
+  // existent, fara sa fi apasat explicit "editeaza").
+  const syncWodFormFromRow = (w) => {
     setEditWodId(w.id)
     setDataWod(w.date)
     setTipWod(w.type || 'AMRAP')
@@ -1939,6 +1944,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     })
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  }
+
+  const startEditWod = (w) => {
+    syncWodFormFromRow(w)
     // La editare deschidem dropdown-urile automat (altfel adminul nu vede ce
     // e completat deja fara sa dea click pe fiecare titlu pe rand).
     setAdminWarmupOpen(true); setAdminSkillOpen(true); setAdminSkill2Open(true); setAdminWodFormOpen(true)
@@ -1950,6 +1959,20 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     // din App()).
     if (mainScrollRef?.current) mainScrollRef.current.scrollTop = 0
   }
+
+  // Daca data aleasa (implicit azi) coincide cu un WOD deja existent, dar
+  // formularul n-a fost deschis explicit prin "editeaza" (ex. la intrarea pe
+  // ecranul Admin, sau la revenirea de pe alt ecran), sincronizeaza campurile
+  // cu cele reale din DB - altfel switch-urile de vizibilitate (si tot
+  // restul) arata valorile implicite (ON), nu cele salvate cu adevarat,
+  // desi WOD-ul zilei chiar exista (bug raportat: switch-ul lasat OFF aparea
+  // din nou ON la reintrarea in Admin).
+  useEffect(() => {
+    if (editWodId) return
+    const existing = wods.find(w => w.date === dataWod)
+    if (existing) syncWodFormFromRow(existing)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataWod, wods, editWodId])
 
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(todayLocalStr()); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
