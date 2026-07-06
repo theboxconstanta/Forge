@@ -3407,13 +3407,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
 // Sectiune Skill Work pe Acasa (SKILL sau SKILL 2 - aceeasi randare, doar
 // alte date) - extrasa ca sa nu duplicam ~50 de linii JSX identice pentru
 // cele 2 sloturi.
-function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, skillFormatConfig, logZiSkill, isOpen, onToggle, onLogClick, userProfile, t }) {
+function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, skillFormatConfig, logZiSkill, isOpen, onToggle, onLogClick, userProfile, hiddenFromMembers, t }) {
   const areDate = (skillMovements || []).length > 0 || skillName || skillFormatConfig
   if (!areDate) return null
   return (
     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
       <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>{titleLabel}</div>
+        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>
+          {titleLabel}
+          {hiddenFromMembers && (
+            <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {skillName && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{skillName}</div>}
           <span style={{ fontSize: '10px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
@@ -5188,31 +5193,36 @@ function App() {
               </div>
               {wodDeschis && wodZiData && (
                 <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                  {wodZiData.warmup_visible !== false && (wodZiData.warmup || []).length > 0 && (
+                  {(wodZiData.warmup_visible !== false || isAdmin || isCoach) && (wodZiData.warmup || []).length > 0 && (
                     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.homeWodWarmupTitle}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                        {t.homeWodWarmupTitle}
+                        {wodZiData.warmup_visible === false && (isAdmin || isCoach) && (
+                          <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
+                        )}
+                      </div>
                       {wodZiData.warmup.map((m, mi) => (
                         <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
                       ))}
                     </div>
                   )}
-                  {wodZiData.skill_visible !== false && (
+                  {(wodZiData.skill_visible !== false || isAdmin || isCoach) && (
                     <SkillHomeSection
                       titleLabel={t.homeWodSkillTitle}
                       skillMovements={wodZiData.skill} skillName={wodZiData.skill_name}
                       skillType={wodZiData.skill_type} skillFormatConfig={wodZiData.skill_format_config}
                       logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
                       onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                      userProfile={userProfile} t={t} />
+                      userProfile={userProfile} hiddenFromMembers={wodZiData.skill_visible === false && (isAdmin || isCoach)} t={t} />
                   )}
-                  {wodZiData.skill2_visible !== false && (
+                  {(wodZiData.skill2_visible !== false || isAdmin || isCoach) && (
                     <SkillHomeSection
                       titleLabel={t.homeWodSkill2Title}
                       skillMovements={wodZiData.skill2} skillName={wodZiData.skill2_name}
                       skillType={wodZiData.skill2_type} skillFormatConfig={wodZiData.skill2_format_config}
                       logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
                       onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                      userProfile={userProfile} t={t} />
+                      userProfile={userProfile} hiddenFromMembers={wodZiData.skill2_visible === false && (isAdmin || isCoach)} t={t} />
                   )}
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
