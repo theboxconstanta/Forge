@@ -3491,12 +3491,13 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
 // social media direct, fara integrare separata per platforma).
 function WorkoutSharePopup({ data, onClose, t, lang }) {
   if (!data) return null
-  const { wodName, variantLevel, variantColor, variantBg, result, timeResult, loggedAt } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const dataObj = new Date(loggedAt)
   const shareText = [
     'CrossFit C15',
     wodName ? `"${wodName}"` : null,
+    (movements && movements.length > 0) ? movements.join(', ') : null,
     scoreParts.length > 0 ? scoreParts.join(' · ') : null,
     variantLevel ? `(${variantLevel})` : null,
     '',
@@ -3528,6 +3529,11 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
           {variantLevel && (
             <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700', marginBottom: '14px' }}>
               {variantLevel}
+            </div>
+          )}
+          {movements && movements.length > 0 && (
+            <div style={{ fontSize: '12px', color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', maxHeight: '110px', overflowY: 'auto' }}>
+              {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
             </div>
           )}
           <div style={{ fontSize: '30px', fontWeight: '800', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
@@ -4541,6 +4547,7 @@ function App() {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
       setWorkoutSharePopup({
         wodName: wodZiData?.name || null,
+        movements: miscariFinale,
         variantLevel: varianta?.nivel || null,
         variantColor: varianta?.culoare || null,
         variantBg: varianta?.bg || null,
