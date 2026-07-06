@@ -306,6 +306,16 @@ export function describeFormatConfig(formatId, config, t) {
   return parts.join(' · ')
 }
 
+// Eticheta scurta a formatului, cu numarul de runde inclus acolo unde e
+// conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time), nu doar
+// "RFT" urmat separat de "Numar runde: 5" (redundant si mai putin natural
+// de citit pe cardurile din Jurnal/Acasa).
+export function formatTypeLabel(formatId, config) {
+  const cfg = config || {}
+  if (formatId === 'RFT' && cfg.rounds) return `${cfg.rounds} RFT`
+  return formatId
+}
+
 // --- family: 'sets' -----------------------------------------------------
 
 // Accepta atat formatul vechi ({ miscare: ["40","50"] }, doar greutate ca

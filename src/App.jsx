@@ -21,6 +21,7 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
+  formatTypeLabel,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -3031,7 +3032,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // un WOD legat, iar variant_level e deja formatul insusi, deci n-are
               // sens sa-l repetam pe un rand separat.
               const wodNume = w.wods?.name || null
-              const wodSubtitlu = w.wods ? `${w.wods.type}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
+              const wodSubtitlu = w.wods ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
