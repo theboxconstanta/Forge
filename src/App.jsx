@@ -1813,23 +1813,26 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     showToast(t.toastClassDeleted); await fetchClase()
   }
 
-  const saveWod = async () => {
-    if (!dataWod) { showToast(t.toastPickDate); return }
-    setSavingWod(true)
-    const parseLinii = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const parseLiniiWod = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+
+  // Payload complet, din starea curenta a formularului - folosit atat de
+  // saveWod (salveaza tot) cat si de saveWodSection cand inca nu exista un
+  // rand in DB (nu ai ce sa actualizezi partial, trebuie creat intreg randul
+  // o data, cu valorile implicite pentru sectiunile neatinse inca).
+  const buildWodPayload = () => {
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
-    const payload = {
+    return {
       date: dataWod, type: tipWod, duration: durataWod,
       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
-      warmup: parseLinii(warmupWod),
+      warmup: parseLiniiWod(warmupWod),
       warmup_visible: warmupVisibleWod,
-      skill: parseLinii(skillWod),
+      skill: parseLiniiWod(skillWod),
       skill_name: skillNameWod.trim() || null,
       skill_type: skillTypeWod,
       skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null,
       skill_visible: skillVisibleWod,
-      skill2: parseLinii(skill2Wod),
+      skill2: parseLiniiWod(skill2Wod),
       skill2_name: skillName2Wod.trim() || null,
       skill2_type: skillType2Wod,
       skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
@@ -1839,6 +1842,12 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       movements_intermediate: wodVariante.intermediate,
       movements_rx: wodVariante.rx,
     }
+  }
+
+  const saveWod = async () => {
+    if (!dataWod) { showToast(t.toastPickDate); return }
+    setSavingWod(true)
+    const payload = buildWodPayload()
     const { error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId)
       : await supabase.from('wods').insert(payload)
@@ -1853,6 +1862,29 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
       setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
     }
+    setSavingWod(false)
+  }
+
+  // Salveaza o singura sectiune (WARM-UP/SKILL/SKILL 2/Workout of the Day),
+  // fara sa atinga campurile celorlalte sectiuni - daca WOD-ul exista deja,
+  // e un update partial (nu suprascrie modificari neterminate din alta
+  // sectiune care inca n-a fost salvata). Daca WOD-ul e nou (fara editWodId),
+  // nu exista ce sa actualizezi partial - se creeaza randul intreg o data,
+  // cu valorile curente din formular, si urmatoarele sectiuni salvate devin
+  // update-uri partiale pe acelasi rand.
+  const saveWodSection = async (sectionFields, sectionLabel) => {
+    if (!dataWod) { showToast(t.toastPickDate); return }
+    setSavingWod(true)
+    let error
+    if (editWodId) {
+      ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId))
+    } else {
+      const { data, error: insErr } = await supabase.from('wods').insert(buildWodPayload()).select().single()
+      error = insErr
+      if (!error && data) setEditWodId(data.id)
+    }
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else { showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.() }
     setSavingWod(false)
   }
 
@@ -2649,9 +2681,16 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                 </div>
               </div>
               {adminWarmupOpen && (
-                <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
-                  placeholder={t.adminWodWarmupPlaceholder} rows={3}
-                  style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                <>
+                  <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
+                    placeholder={t.adminWodWarmupPlaceholder} rows={3}
+                    style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                  <button onClick={() => saveWodSection({ warmup: parseLiniiWod(warmupWod), warmup_visible: warmupVisibleWod }, t.adminWodWarmupLabel)}
+                    disabled={savingWod}
+                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
+                    {t.adminWodSaveSectionButton}
+                  </button>
+                </>
               )}
             </div>
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
@@ -2675,6 +2714,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
                     placeholder={t.adminWodSkillPlaceholder} rows={3}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                  <button onClick={() => saveWodSection({
+                    skill: parseLiniiWod(skillWod), skill_name: skillNameWod.trim() || null, skill_type: skillTypeWod,
+                    skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null, skill_visible: skillVisibleWod,
+                  }, t.adminWodSkillLabel)}
+                    disabled={savingWod}
+                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
+                    {t.adminWodSaveSectionButton}
+                  </button>
                 </div>
               )}
             </div>
@@ -2699,6 +2746,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   <textarea value={skill2Wod} onChange={e => setSkill2Wod(e.target.value)}
                     placeholder={t.adminWodSkillPlaceholder} rows={3}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                  <button onClick={() => saveWodSection({
+                    skill2: parseLiniiWod(skill2Wod), skill2_name: skillName2Wod.trim() || null, skill2_type: skillType2Wod,
+                    skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null, skill2_visible: skill2VisibleWod,
+                  }, t.adminWodSkill2Label)}
+                    disabled={savingWod}
+                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
+                    {t.adminWodSaveSectionButton}
+                  </button>
                 </div>
               )}
             </div>
@@ -2774,6 +2829,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                       )}
                     </div>
                   ))}
+                  <button onClick={() => saveWodSection({
+                    type: tipWod, duration: `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`,
+                    format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
+                    name: numeWod.trim() || null,
+                    movements_onramp: wodVariante.onramp, movements_beginner: wodVariante.beginner,
+                    movements_intermediate: wodVariante.intermediate, movements_rx: wodVariante.rx,
+                  }, t.adminWodFormTitle)}
+                    disabled={savingWod}
+                    style={{ marginTop: '4px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
+                    {t.adminWodSaveSectionButton}
+                  </button>
                 </div>
               )}
             </div>
