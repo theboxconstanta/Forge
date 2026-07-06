@@ -45,14 +45,49 @@ function RoundsPartialFields({ movements, roundsCompleted, partialReps, onChange
   )
 }
 
-function TimeResultFields({ result, time, onChange, t }) {
+// Pentru formate secventiale (For Time/Ladder - vezi SequentialPartialFields
+// mai jos), campul liber "Rezultat" e ambiguu langa o lista structurata de
+// miscari - hideResult il ascunde, pastrand doar Timpul.
+// Pentru "For Time"/"Ladder" (secvente de miscari distincte, nu runde
+// repetate) - fiecare miscare din lista completa are propria casuta de
+// repetari, pre-completata cu numarul prescris (parsat din text, ex. "15
+// power snatches" -> 15). Membrul reduce doar la miscarile unde nu a ajuns
+// pana la capat (sau pune 0 la cele netouched) - fara "Runde complete",
+// care n-are sens intr-o secventa unica, nu repetata.
+function SequentialPartialFields({ movements, partialReps, onChange, t }) {
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ ...smallLabelStyle, marginBottom: '8px' }}>{t?.logWodPartialRoundLabel || 'Repetări'}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {movements.map((m, i) => {
+          const prescrisMatch = m.match(/^(\d+)\s+/)
+          const prescris = prescrisMatch ? prescrisMatch[1] : ''
+          const curent = (partialReps || [])[i]
+          const displayValue = (curent != null && curent !== '') ? curent : prescris
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>{m}</div>
+              <input type="number" min="0" value={displayValue}
+                onChange={e => { const next = [...(partialReps || [])]; next[i] = e.target.value; onChange({ partialReps: next }) }}
+                style={{ width: '70px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }} />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TimeResultFields({ result, time, onChange, t, hideResult }) {
   const [tMin, tSec] = (time || '').split(':')
   return (
     <>
-      <div style={{ marginBottom: '14px' }}>
-        <div style={smallLabelStyle}>{t?.logWodResultLabel || 'Rezultat'}</div>
-        <input value={result || ''} onChange={e => onChange({ result: e.target.value })} placeholder={t?.logWodResultPlaceholder} style={inputStyle} />
-      </div>
+      {!hideResult && (
+        <div style={{ marginBottom: '14px' }}>
+          <div style={smallLabelStyle}>{t?.logWodResultLabel || 'Rezultat'}</div>
+          <input value={result || ''} onChange={e => onChange({ result: e.target.value })} placeholder={t?.logWodResultPlaceholder} style={inputStyle} />
+        </div>
+      )}
       <div style={{ marginBottom: '14px' }}>
         <div style={smallLabelStyle}>{t?.logWodTimeLabel || 'Timp'}</div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -70,7 +105,7 @@ function TimeResultFields({ result, time, onChange, t }) {
   )
 }
 
-function ScoredFields({ scoreMode, movements, value, onChange, t }) {
+function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial }) {
   if (scoreMode === 'amrap') {
     return <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
   }
@@ -83,6 +118,15 @@ function ScoredFields({ scoreMode, movements, value, onChange, t }) {
     )
   }
   if (scoreMode === 'fortime_or_amrap') {
+    if (sequentialPartial) {
+      return (
+        <>
+          <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult />
+          <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodSequentialHint || 'Dacă nu ai terminat în time cap, ajustează repetările de mai jos la miscările unde nu ai ajuns:'}</div>
+          <SequentialPartialFields movements={movements} partialReps={value.partialReps} onChange={onChange} t={t} />
+        </>
+      )
+    }
     return (
       <>
         <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} />
@@ -220,7 +264,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   const scoreMode = formatId === 'Partner WOD' && config?.baseFormat
     ? (config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap')
     : format.scoreMode
-  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} />
+  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={format.sequentialPartial} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

@@ -41,11 +41,13 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'amrap',
     config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
   },
-  // Ca la RFT/Ladder: multe WOD-uri "For Time" sunt de fapt bazate pe runde
-  // ("5 runde: ...") - daca nu termini in time cap, trebuie sa poti loga
-  // runde complete + reps partiale in loc de timp, nu doar sa lasi scorul gol.
+  // Spre deosebire de RFT (runde reale, repetate), "For Time" e de obicei o
+  // secventa (ex. "TO THE SKY": 15-12-9-6-3) - "runde complete" nu are sens
+  // aici. sequentialPartial: daca nu termini in time cap, loghezi direct
+  // cate repetari ai facut la FIECARE miscare din lista (nu doar "runda
+  // partiala" a unei runde repetate) - vezi FormatLogger.
   'For Time': {
-    family: 'scored', scoreMode: 'fortime_or_amrap',
+    family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
     config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'RFT': {
@@ -60,10 +62,10 @@ export const WORKOUT_FORMATS = {
     config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'Ladder': {
-    // Ca la RFT: daca nu termini schema (21-15-9 etc) in time cap, trebuie sa
-    // poti loga runde complete + reps partiale in loc de timp - fara asta nu
-    // exista nicio cale sa notezi progresul unei ladder neterminate.
-    family: 'scored', scoreMode: 'fortime_or_amrap',
+    // La fel ca "For Time": o schema 21-15-9 e tot o secventa, nu runde
+    // repetate - sequentialPartial: daca nu termini, loghezi direct
+    // repetarile facute la fiecare treapta a scarii.
+    family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
     config: {
       // quickOptions: scheme clasice reutilizate des (21-15-9 etc), afisate ca
       // chip-uri peste inputul de text liber - vezi FormatConfigEditor.

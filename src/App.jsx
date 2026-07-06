@@ -846,11 +846,21 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // "facut/prescris Miscare" (ex. "3/15 Power Snatches", vezi composePartialText
   // in workoutFormats.js) are 2 numere per segment - fara sa luam doar primul,
   // suma insuma gresit si numarul prescris (3+15=18 in loc de 3 facute).
-  const partialRepsOf = (log) => {
+  // La formate secventiale (For Time/Ladder - sequentialPartial), rezultatul
+  // compus n-are prefixul "N runde +" (nu exista concept de runda) - tot
+  // textul e direct lista de segmente "facut/prescris miscare". La restul
+  // formatelor (AMRAP/RFT), segmentele de dupa '+' raman singura sursa.
+  const partialRepsOf = (log, isSequential) => {
     const str = log.result || ''
-    const plusIdx = str.indexOf('+')
-    if (plusIdx === -1) return 0
-    return str.slice(plusIdx + 1).split(',').reduce((sum, seg) => {
+    let segment
+    if (isSequential) {
+      segment = str
+    } else {
+      const plusIdx = str.indexOf('+')
+      if (plusIdx === -1) return 0
+      segment = str.slice(plusIdx + 1)
+    }
+    return segment.split(',').reduce((sum, seg) => {
       const match = seg.trim().match(/^(\d+(\.\d+)?)/)
       return match ? sum + parseFloat(match[1]) : sum
     }, 0)
@@ -876,6 +886,11 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // complet ambiguitatea: a terminat = are timp, punct.
   const sortLogs = (arr) => {
     const finished = (log) => !!log.time_result
+    // La formate secventiale (For Time/Ladder), rezultatul non-finisherilor
+    // nu are un numar de "runde" real de comparat (parseScore ar extrage
+    // doar numarul primei miscari din text, irelevant) - departajarea se
+    // face direct pe total reps facute (partialRepsOf).
+    const isSequential = !!getFormat(wodZiData?.type)?.sequentialPartial
     // Fiecare comparatie numerica poate produce NaN cand ambele loguri au
     // aceeasi valoare "goala" (Infinity - Infinity la timp) - un comparator
     // Array.sort care intoarce NaN nu are comportament garantat de
@@ -889,9 +904,11 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
         if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
         return new Date(a.logged_at) - new Date(b.logged_at)
       }
-      const diffRunde = (parseScore(b.result) || 0) - (parseScore(a.result) || 0)
-      if (diffRunde !== 0) return diffRunde
-      const diffPartial = partialRepsOf(b) - partialRepsOf(a)
+      if (!isSequential) {
+        const diffRunde = (parseScore(b.result) || 0) - (parseScore(a.result) || 0)
+        if (diffRunde !== 0) return diffRunde
+      }
+      const diffPartial = partialRepsOf(b, isSequential) - partialRepsOf(a, isSequential)
       if (diffPartial !== 0) return diffPartial
       return new Date(a.logged_at) - new Date(b.logged_at)
     }
@@ -4296,13 +4313,22 @@ function App() {
     } else if (format.family === 'nft') {
       logMeta = { completed: skillLogCompleted }
     } else {
-      // Acelasi motiv ca la composeWodLogFields: la RFT/Ladder/Partner WOD,
-      // membrul poate alege sa completeze runde+reps partiale in loc de
-      // rezultat/timp - fara verificarea skillLogRoundsCompleted, acele date
-      // se pierdeau silentios (nu intrau niciodata pe ramura AMRAP).
-      resultCurat = (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && skillLogRoundsCompleted.trim() !== ''))
-        ? composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscari)
-        : [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
+      // Acelasi motiv ca la composeWodLogFields: la RFT/Partner WOD, membrul
+      // poate alege sa completeze runde+reps partiale in loc de rezultat/
+      // timp - fara verificarea skillLogRoundsCompleted, acele date se
+      // pierdeau silentios (nu intrau niciodata pe ramura AMRAP). La For
+      // Time/Ladder (sequentialPartial), semnalul e absenta Timpului.
+      const isSequentialSkill = !!format.sequentialPartial
+      const useRepsSkill = isSequentialSkill
+        ? !skillLogTime.trim()
+        : (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && skillLogRoundsCompleted.trim() !== ''))
+      if (useRepsSkill && isSequentialSkill) {
+        resultCurat = composePartialText(repsEfectiveSecvential(skillLogPartialReps, skillMiscari), skillMiscari)
+      } else if (useRepsSkill) {
+        resultCurat = composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscari)
+      } else {
+        resultCurat = [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
+      }
       resultCurat = resultCurat.trim() || null
     }
     const { error } = await supabase.from('skill_logs').upsert({
@@ -4461,6 +4487,18 @@ function App() {
   // Compune result/time_result/sets/log_meta pt wod_logs pe baza familiei
   // formatului activ (scored/sets/mixed/nft) - generalizarea vechiului
   // `isAmrapLog ? composeAmrapResult() : wodResult`.
+  // Pentru secvente (For Time/Ladder - sequentialPartial in catalog):
+  // repetarile efective per miscare, cu fallback la numarul prescris
+  // (parsat din text, ex. "15 power snatches" -> 15) cand nu au fost
+  // atinse - consecvent cu ce arata SequentialPartialFields (o miscare
+  // netouched = presupusa terminata integral).
+  const repsEfectiveSecvential = (partialReps, movements) => movements.map((m, i) => {
+    const curent = (partialReps || [])[i]
+    if (curent != null && curent !== '') return curent
+    const prescrisMatch = m.match(/^(\d+)\s+/)
+    return prescrisMatch ? prescrisMatch[1] : ''
+  })
+
   const composeWodLogFields = () => {
     const format = getFormat(activeLogFormatId)
     const setsCurate = () => {
@@ -4477,18 +4515,33 @@ function App() {
     if (format.family === 'nft') {
       return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted } }
     }
-    // La RFT/Ladder/Partner WOD (scoreMode 'fortime_or_amrap'), FormatLogger
-    // arata AMBELE seturi de campuri (timp SI runde+reps partiale) - membrul
+    // La RFT/Partner WOD (scoreMode 'fortime_or_amrap'), FormatLogger arata
+    // AMBELE seturi de campuri (timp SI runde+reps partiale) - membrul
     // completeaza doar unul, dupa cum a terminat sau nu in time cap. Fara
     // verificarea wodRoundsCompleted aici, ramura AMRAP nu se activa NICIODATA
     // pentru aceste formate (scoreMode nu e strict 'amrap'), iar runde+reps
     // partiale completate de membru se pierdeau silentios la salvare.
-    const isAmrapScore = format.scoreMode === 'amrap'
-      || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
-      || (format.scoreMode === 'fortime_or_amrap' && wodRoundsCompleted.trim() !== '')
-    const rezultatFinal = isAmrapScore ? composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog) : wodResult.trim()
+    //
+    // La For Time/Ladder (sequentialPartial - secvente, nu runde repetate),
+    // nu mai exista camp de "runde complete" separat - semnalul ca membrul
+    // n-a terminat e absenta Timpului; in acel caz compunem direct din
+    // repetarile per miscare (cu fallback la prescris pt cele netouched).
+    const isSequential = !!format.sequentialPartial
+    const useReps = isSequential
+      ? !wodTime.trim()
+      : (format.scoreMode === 'amrap'
+        || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
+        || (format.scoreMode === 'fortime_or_amrap' && wodRoundsCompleted.trim() !== ''))
+    let rezultatFinal
+    if (useReps && isSequential) {
+      rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, miscariPentruLog), miscariPentruLog)
+    } else if (useReps) {
+      rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog)
+    } else {
+      rezultatFinal = wodResult.trim()
+    }
     return {
-      result: rezultatFinal || null, time_result: isAmrapScore ? null : (wodTime.trim() || null),
+      result: rezultatFinal || null, time_result: useReps ? null : (wodTime.trim() || null),
       sets: format.family === 'mixed' ? setsCurate() : null, log_meta: null,
     }
   }
@@ -5551,15 +5604,22 @@ function App() {
                 setEditLogFormatConfig(log.wods?.format_config || null)
                 setEditLogMiscari(movimenteLog)
                 setEditLogMiscareCurenta('')
-                // La RFT/Ladder/Partner WOD (scoreMode 'fortime_or_amrap'),
-                // rezultatul salvat poate fi ori text liber (a terminat, are
-                // timp), ori compus ca "N runde + ..." (n-a terminat, a logat
-                // runde+reps partiale - vezi composeWodLogFields). Distingem
-                // dupa formatul textului, nu doar dupa scoreMode strict
-                // 'amrap' - altfel editarea unui log salvat cu runde partiale
-                // il arata gresit ca text liber in loc sa repopuleze campurile.
+                // La RFT/Partner WOD (scoreMode 'fortime_or_amrap'), rezultatul
+                // salvat poate fi ori text liber (a terminat, are timp), ori
+                // compus ca "N runde + ..." (n-a terminat, a logat runde+reps
+                // partiale - vezi composeWodLogFields). Distingem dupa formatul
+                // textului, nu doar dupa scoreMode strict 'amrap' - altfel
+                // editarea unui log salvat cu runde partiale il arata gresit
+                // ca text liber in loc sa repopuleze campurile.
+                //
+                // La For Time/Ladder (sequentialPartial), stim direct din
+                // format ca orice rezultat salvat (non-null) e o compunere de
+                // repetari per miscare, fara sa mai ghicim din tiparul textului.
                 const areRundeCompuse = /^\d+\s+runde/.test((log.result || '').trim())
-                if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
+                if (format.sequentialPartial) {
+                  const partialArr = log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => '')
+                  setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
+                } else if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
                   const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
                   setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
                 } else {
@@ -5583,7 +5643,10 @@ function App() {
                 const formatEdit = getFormat(skillTypeEdit)
                 const skillMiscariEdit = (sl.slot === 2 ? sl.wods?.skill2 : sl.wods?.skill) || []
                 const areRundeCompuse = /^\d+\s+runde/.test((sl.result || '').trim())
-                if (formatEdit.scoreMode === 'amrap' || (formatEdit.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
+                if (formatEdit.sequentialPartial) {
+                  const partialArr = sl.result ? parsePartialText(sl.result, skillMiscariEdit) : skillMiscariEdit.map(() => '')
+                  setSkillLogResult(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps(partialArr)
+                } else if (formatEdit.scoreMode === 'amrap' || (formatEdit.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
                   const { rounds, partialArr } = parseAmrapResult(sl.result || '', skillMiscariEdit)
                   setSkillLogResult(''); setSkillLogRoundsCompleted(rounds); setSkillLogPartialReps(partialArr)
                 } else {
