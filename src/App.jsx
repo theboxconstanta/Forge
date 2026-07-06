@@ -1331,7 +1331,14 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   }, [tipWod, formatConfigWod])
   const [numeWod, setNumeWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
-  const [wodVariante, setWodVariante] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  // Miscarile fiecarei variante sunt o lista (nu text liber) - editabile prin
+  // MiscareQuickAdd (autocomplete + reps/kg sau metri/cal la cardio,
+  // reordonare), la fel ca la Logare libera. Ramane si un "paste rapid" -
+  // multi coach au deja WOD-ul scris in alta parte si vor sa-l lipeasca
+  // dintr-o data, nu sa reintroduca miscare cu miscare.
+  const [wodVariante, setWodVariante] = useState({ onramp: [], beginner: [], intermediate: [], rx: [] })
+  const [wodVarianteQuickAdd, setWodVarianteQuickAdd] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  const [wodVariantePaste, setWodVariantePaste] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [warmupWod, setWarmupWod] = useState('')
   // Switch admin per sectiune: fiecare din WARM-UP/SKILL/SKILL 2 se poate
   // ascunde independent de pe Acasa la membri (nu mai e un singur switch
@@ -1810,10 +1817,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       skill2_type: skillType2Wod,
       skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
       skill2_visible: skill2VisibleWod,
-      movements_onramp: parseLinii(wodVariante.onramp),
-      movements_beginner: parseLinii(wodVariante.beginner),
-      movements_intermediate: parseLinii(wodVariante.intermediate),
-      movements_rx: parseLinii(wodVariante.rx),
+      movements_onramp: wodVariante.onramp,
+      movements_beginner: wodVariante.beginner,
+      movements_intermediate: wodVariante.intermediate,
+      movements_rx: wodVariante.rx,
     }
     const { error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId)
@@ -1822,7 +1829,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     else {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
-      setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+      setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+      setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
       setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
       setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
       setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
@@ -1852,11 +1860,13 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setSkillFormatConfig2Wod(w.skill2_format_config || {})
     setSkill2VisibleWod(w.skill2_visible !== false)
     setWodVariante({
-      onramp: (w.movements_onramp || []).join('\n'),
-      beginner: (w.movements_beginner || []).join('\n'),
-      intermediate: (w.movements_intermediate || []).join('\n'),
-      rx: (w.movements_rx || []).join('\n'),
+      onramp: w.movements_onramp || [],
+      beginner: w.movements_beginner || [],
+      intermediate: w.movements_intermediate || [],
+      rx: w.movements_rx || [],
     })
+    setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
     // La editare deschidem dropdown-urile automat (altfel adminul nu vede ce
     // e completat deja fara sa dea click pe fiecare titlu pe rand).
     setAdminWarmupOpen(true); setAdminSkillOpen(true); setAdminSkill2Open(true); setAdminWodFormOpen(true)
@@ -1870,7 +1880,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   }
 
   const cancelEditWod = () => {
-    setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    setEditWodId(null); setDataWod(''); setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+    setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillVisibleWod(true)
     setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
     setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0')
@@ -2723,9 +2734,27 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   ].map(v => (
                     <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-                      <textarea value={wodVariante[v.key]} onChange={e => setWodVariante(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        placeholder={'ex:\n10 Pull-ups\n20 Push-ups\n30 Air Squats'} rows={4}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                      <SortableList
+                        items={wodVariante[v.key]}
+                        onReorder={(items) => setWodVariante(prev => ({ ...prev, [v.key]: items }))}
+                        onRemove={(i) => setWodVariante(prev => ({ ...prev, [v.key]: prev[v.key].filter((_, j) => j !== i) }))}
+                      />
+                      <MiscareQuickAdd value={wodVarianteQuickAdd[v.key]} onChange={(val) => setWodVarianteQuickAdd(prev => ({ ...prev, [v.key]: val }))}
+                        onAdd={(text) => setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], text] }))}
+                        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} />
+                      <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
+                        placeholder={t.adminWodVariantPastePlaceholder} rows={3}
+                        style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                      {wodVariantePaste[v.key].trim() && (
+                        <button onClick={() => {
+                          const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean)
+                          setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
+                          setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
+                        }}
+                          style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                          {t.adminWodVariantPasteButton}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
