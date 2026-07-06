@@ -3270,7 +3270,15 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
       </div>
       {isOpen && (
         <>
-          {describeFormatConfig(skillType, skillFormatConfig, t) && (
+          {skillType === 'Complex' && skillFormatConfig?.complexMovements?.length > 0 ? (
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E' }}>COMPLEX</div>
+              {skillFormatConfig.rounds && (
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.fmtRoundsAttempts}: {skillFormatConfig.rounds}</div>
+              )}
+              <div style={{ fontSize: '12px', color: '#555', marginTop: '3px' }}>{skillFormatConfig.complexMovements.join(' + ')}</div>
+            </div>
+          ) : describeFormatConfig(skillType, skillFormatConfig, t) && (
             <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{skillType} — {describeFormatConfig(skillType, skillFormatConfig, t)}</div>
           )}
           <div style={{ marginTop: '10px' }}>
