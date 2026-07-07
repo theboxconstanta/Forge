@@ -7,6 +7,7 @@ import {
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
+  maxWeightFromSets, setsDisplayScore,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -367,5 +368,33 @@ describe('AUTO_DURATION_FORMAT_IDS', () => {
   it('EMOM nu are un nr. implicit de intervale - fără totalRounds setat, durata nu poate fi calculată', () => {
     expect(estimateTotalDurationSec('EMOM', {})).toBe(null)
     expect(estimateTotalDurationSec('EMOM', { totalRounds: 12, intervalSec: 60 })).toBe(720)
+  })
+})
+
+describe('maxWeightFromSets / setsDisplayScore', () => {
+  it('gaseste cea mai mare greutate dintre mai multe randuri/miscari', () => {
+    const sets = { 'Front Squat': [{ reps: '3', weight: '90' }, { reps: '3', weight: '92.5' }, { reps: '3', weight: '100' }] }
+    expect(maxWeightFromSets(sets)).toBe(100)
+  })
+  it('ignora randurile fara greutate valida (goale sau necompletate)', () => {
+    const sets = { 'Deadlift': [{ reps: '5', weight: '' }, { reps: '5', weight: '120' }] }
+    expect(maxWeightFromSets(sets)).toBe(120)
+  })
+  it('fara niciun rand cu greutate -> null', () => {
+    expect(maxWeightFromSets({})).toBe(null)
+    expect(maxWeightFromSets(null)).toBe(null)
+    expect(maxWeightFromSets({ 'Squat': [{ reps: '5', weight: '' }] })).toBe(null)
+  })
+  it('setsDisplayScore foloseste scoringMode configurat (Tabata/Intervals) inaintea greutatii maxime', () => {
+    const rows = { 'Runda 1': [{ reps: '10' }], 'Runda 2': [{ reps: '8' }] }
+    expect(setsDisplayScore('Tabata', { scoringMode: 'Total Reps' }, rows)).toBe(18)
+    expect(setsDisplayScore('Tabata', { scoringMode: 'Lowest Reps' }, rows)).toBe(8)
+  })
+  it('setsDisplayScore cade pe greutatea maxima cand nu exista scoringMode (Build to Heavy/1RM, Weightlifting etc)', () => {
+    const sets = { 'Front Squat': [{ reps: '3', weight: '90' }, { reps: '3', weight: '100' }] }
+    expect(setsDisplayScore('Build to Heavy/1RM', {}, sets)).toBe(100)
+  })
+  it('fara nimic logat -> null (afisat ca "-" pe Clasament)', () => {
+    expect(setsDisplayScore('Build to Heavy/1RM', {}, null)).toBe(null)
   })
 })

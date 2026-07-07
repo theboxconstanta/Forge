@@ -23,7 +23,7 @@ import {
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, canonicalWeightKey,
-  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS,
+  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -900,7 +900,37 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // runde repetate) - un non-finisher cu reps partiale mari putea depasi
   // numeric un finisher real. Verificarea stricta pe time_result elimina
   // complet ambiguitatea: a terminat = are timp, punct.
+  // Scorul de afisat/clasat pt un log family:'sets' (Weightlifting/Build to
+  // Heavy/1RM/Strength Sets/Complex/Superset/Death By Weight/Tabata/Intervals)
+  // - vezi setsDisplayScore in workoutFormats.js.
+  const setsScoreOf = (log) => setsDisplayScore(wodZiData?.type, wodZiData?.format_config, log.sets)
+
   const sortLogs = (arr) => {
+    // Family 'sets' nu foloseste deloc time_result/result - composeWodLogFields
+    // le lasa null pt aceste formate, rezultatul real e in `sets` (structurat
+    // pe randuri). Fara ramura asta, TOATE log-urile family:'sets' cadeau pe
+    // "neterminat" (finished mereu false, time_result mereu null) si erau
+    // departajate doar dupa ordinea de logare, indiferent cat de greu s-a
+    // lucrat efectiv (bug raportat: 5 seturi reale, 90->100kg logate, aparea
+    // "-" pe Clasament, nesortat dupa performanta). Scorul e calculat o
+    // singura data si atasat pe log (_setsScore), reutilizat la afisare in
+    // randarea Clasamentului, fara sa recalculam.
+    if (wodZiFormat?.family === 'sets') {
+      const withScore = arr.map(log => ({ ...log, _setsScore: setsScoreOf(log) }))
+      const comparaSets = (a, b) => {
+        if (a._setsScore == null && b._setsScore == null) return new Date(a.logged_at) - new Date(b.logged_at)
+        if (a._setsScore == null) return 1
+        if (b._setsScore == null) return -1
+        if (a._setsScore !== b._setsScore) return b._setsScore - a._setsScore
+        return new Date(a.logged_at) - new Date(b.logged_at)
+      }
+      const byMemberSets = {}
+      withScore.forEach(log => {
+        const id = log.member_id
+        if (!byMemberSets[id] || comparaSets(log, byMemberSets[id]) < 0) byMemberSets[id] = log
+      })
+      return Object.values(byMemberSets).sort(comparaSets)
+    }
     const finished = (log) => !!log.time_result
     // La formate secventiale (For Time/Ladder), rezultatul non-finisherilor
     // nu are un numar de "runde" real de comparat (parseScore ar extrage
@@ -1095,7 +1125,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                     {group.logs.map((log, i) => {
                       const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
                       const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
-                      const result = log.time_result || log.result || '—'
+                      // Family 'sets' nu are niciodata time_result/result (vezi
+                      // setsScoreOf/sortLogs mai sus) - scorul calculat acolo
+                      // (_setsScore) e singura sursa de afisat, cu unitatea
+                      // preferata a membrului care a logat.
+                      const result = wodZiFormat?.family === 'sets'
+                        ? (log._setsScore != null ? `${log._setsScore}${(log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg'}` : '—')
+                        : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
                       const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config)
                       return (
@@ -4577,7 +4613,7 @@ function App() {
     const { data: logs } = await q
     if (logs && logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender, avatar_url').in('id', ids)
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender, avatar_url, weight_unit').in('id', ids)
       const map = {}
       if (profiles) profiles.forEach(p => { map[p.id] = p })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))

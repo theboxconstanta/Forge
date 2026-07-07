@@ -544,6 +544,32 @@ export function computeSetsScore(formatId, config, rowsByKey) {
   return Math.min(...repsValues)
 }
 
+// Cea mai mare greutate logata intr-un log family:'sets' FARA scoringMode
+// configurat (Weightlifting, Build to Heavy/1RM, Strength Sets, Death By
+// Weight, Complex, Superset - toate PR-eligible, centrate pe "cat de greu ai
+// mers", nu pe reps). null daca nu exista niciun rand cu greutate valida.
+export function maxWeightFromSets(rowsByKey) {
+  let max = null
+  Object.values(rowsByKey || {}).flat().forEach(row => {
+    const w = parseFloat(row?.weight)
+    if (!Number.isNaN(w) && (max == null || w > max)) max = w
+  })
+  return max
+}
+
+// Scorul de afisat/clasat pt un log family:'sets' - incearca intai
+// scoringMode-ul configurat explicit (Tabata/Intervals: Total Reps/Lowest
+// Reps), altfel cade pe greutatea maxima logata. Folosit de Clasament ca sa
+// nu mai arate "-" pt formate din familia 'sets' (bug raportat: 5 seturi
+// reale logate la "Build to Heavy/1RM", niciunul afisat/clasat pe
+// Leaderboard, pt ca acolo se citea doar time_result/result - ambele mereu
+// null la aceasta familie, rezultatul real fiind in sets).
+export function setsDisplayScore(formatId, config, rowsByKey) {
+  const configured = computeSetsScore(formatId, config, rowsByKey)
+  if (configured != null) return configured
+  return maxWeightFromSets(rowsByKey)
+}
+
 // Pentru fiecare numar de reps logat, ia cea mai mare greutate introdusa si o
 // compara cu cel mai mare PR existent la aceeasi miscare + acelasi numar
 // exact de reps (PR-urile se tin separat pe numar de reps). Returneaza doar
