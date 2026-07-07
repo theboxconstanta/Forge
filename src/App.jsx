@@ -15,7 +15,7 @@ import {
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
 import { getT } from './translations'
-import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii } from './movements'
+import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
@@ -3026,7 +3026,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                         style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
                       {wodVariantePaste[v.key].trim() && (
                         <button onClick={() => {
-                          const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean)
+                          const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
                           setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
                           setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
                         }}

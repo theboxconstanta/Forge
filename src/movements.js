@@ -91,3 +91,60 @@ export function miscareSugestii(text) {
   if (!cuvant || cuvant.length < 2) return []
   return MISCARI.filter(m => m.toLowerCase().includes(cuvant.toLowerCase())).slice(0, 5)
 }
+
+function titleCase(s) {
+  return s.split(/\s+/).map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w).join(' ')
+}
+
+// Recunoaste automat reps + miscare + greutate dintr-o linie de text liber,
+// lipita in bloc dintr-o sursa externa (WhatsApp, PDF etc. - "Paste rapid"
+// din editorul de variante Admin) - normalizeaza spre acelasi format
+// "{reps} {Miscare} @ {greutate}{unit}" pe care il produce si MiscareQuickAdd
+// cand adaugi manual o miscare. Nu e doar cosmetic: composePartialText/
+// parsePartialText (workoutFormats.js, folosite la For Time/Ladder pt
+// reps-ul prescris per miscare) cer exact acest format cu reps-ul la
+// inceput ca sa functioneze corect - text lipit in alt format (fara reps la
+// inceput) ar strica pre-completarea reps-urilor la logare.
+// Miscarea e normalizata la litera mare/mica canonica din MISCARI doar la
+// potrivire EXACTA (case-insensitive) - o miscare care nu se potriveste
+// (plural, varianta usor diferita, sau complet noua) ramane neschimbata (doar
+// title-case), fara sa fie blocata sau semnalata: MISCARI e o lista statica
+// din cod (nu un tabel editabil live), nu exista unde sa fie "adaugata" o
+// miscare noua la runtime - orice text e acceptat, la fel ca inainte.
+export function parseMiscareLinePasta(linie) {
+  const text = (linie || '').trim()
+  if (!text) return text
+
+  const cardioMatch = CARDIO_MISCARI.find(c => text.toLowerCase().includes(c.toLowerCase()))
+  if (cardioMatch) {
+    const metriM = text.match(/(\d+(?:\.\d+)?)\s*m\b/i)
+    const calM = text.match(/(\d+(?:\.\d+)?)\s*cal/i)
+    const parts = []
+    if (metriM) parts.push(`${metriM[1]}m`)
+    else if (calM) parts.push(`${calM[1]} Cal`)
+    parts.push(cardioMatch)
+    return parts.join(' ')
+  }
+
+  let rest = text
+  let reps = ''
+  const repsM = rest.match(/^(\d+(?:\.\d+)?)\s+(.+)$/)
+  if (repsM) { reps = repsM[1]; rest = repsM[2] }
+
+  let weight = ''
+  const weightM = rest.match(/\(?\s*(?:@\s*)?(\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?)\s*(kg|lbs)\s*\)?\s*$/i)
+  if (weightM) {
+    weight = `${weightM[1].replace(/\s+/g, '')}${weightM[2].toLowerCase()}`
+    rest = rest.slice(0, weightM.index).trim()
+  }
+
+  const exact = MISCARI.find(m => m.toLowerCase() === rest.toLowerCase())
+  const numeMiscare = exact || titleCase(rest)
+
+  const parts = []
+  if (reps) parts.push(reps)
+  parts.push(numeMiscare)
+  let final = parts.join(' ')
+  if (weight) final += ` @ ${weight}`
+  return final
+}
