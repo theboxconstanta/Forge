@@ -485,7 +485,12 @@ function CautareMiscare({ onAleage, preFill, t, label }) {
 // "21 Thrusters @ 43kg" care se salva si inainte (nimic nu se schimba in
 // restul aplicatiei), doar introducerea nu mai cere sa scrii totul manual
 // intr-un singur camp.
-function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t }) {
+// hideWeight: doar reps, fara casuta de greutate per miscare - folosit la
+// editorul de variante din Admin, unde greutatea WOD-ului se seteaza o
+// singura data prin Greutate M/F (per varianta), nu per miscare; celelalte
+// utilizari (logare libera, editare log, Hero WOD) n-au un echivalent de
+// greutate la nivel de WOD, deci pastreaza campul de greutate per miscare.
+function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, hideWeight }) {
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
   const [metri, setMetri] = useState('')
@@ -512,7 +517,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
     if (reps.trim()) parts.push(reps.trim())
     parts.push(movementName.trim())
     let text = parts.join(' ')
-    if (weight.trim()) text += ` @ ${weight.trim()}${weightUnit === 'lbs' ? 'lbs' : 'kg'}`
+    if (!hideWeight && weight.trim()) text += ` @ ${weight.trim()}${weightUnit === 'lbs' ? 'lbs' : 'kg'}`
     return text
   }
   const add = () => {
@@ -557,10 +562,12 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t })
               onKeyDown={onEnterCommit}
               placeholder={t?.skillLogRepsPlaceholder || 'reps'}
               style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-            <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
-              onKeyDown={onEnterCommit}
-              placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
-              style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            {!hideWeight && (
+              <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
+                onKeyDown={onEnterCommit}
+                placeholder={weightUnit === 'lbs' ? 'lbs' : 'kg'}
+                style={{ flex: '0 0 64px', minWidth: 0, padding: '10px 8px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            )}
           </>
         ))}
         <button onClick={add}
@@ -3013,7 +3020,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                       />
                       <MiscareQuickAdd value={wodVarianteQuickAdd[v.key]} onChange={(val) => setWodVarianteQuickAdd(prev => ({ ...prev, [v.key]: val }))}
                         onAdd={(text) => setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], text] }))}
-                        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} />
+                        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
                       <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
                         placeholder={t.adminWodVariantPastePlaceholder} rows={3}
                         style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
