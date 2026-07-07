@@ -272,6 +272,27 @@ export function parseAmrapResult(resultStr, movements) {
   return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
 }
 
+// Numele coloanei din wods care tine greutatea prescrisa a unei variante -
+// sursa unica pentru App.jsx (VARIANTE_CONFIG), JurnalList si Clasament, ca
+// sa nu existe 3 maps hardcodate care pot desincroniza.
+export function weightKeyForVariant(nivel) {
+  return { RX: 'rx_weight', Intermediate: 'intermediate_weight', Beginner: 'beginner_weight', OnRamp: 'onramp_weight' }[nivel] || null
+}
+
+// "Not RXd" = greutatea logata difera de cea prescrisa a variantei, SAU (la
+// formatele cu time cap real - For Time/RFT/Ladder, scoreMode
+// 'fortime_or_amrap') nu s-a terminat in time cap (fara time_result). AMRAP nu
+// are concept de "neterminat" (scorul e mereu cat ai facut in timp), deci nu
+// intra la a doua conditie. Derivat la citire, nu stocat - daca adminul
+// corecteaza greutatea prescrisa ulterior, eticheta ramane consistenta cu
+// valoarea curenta, fara o a doua sursa de adevar care poate desincroniza.
+export function isNotRxd(log, prescribedWeight, format) {
+  const greutateDiferita = !!prescribedWeight?.trim() && !!log?.weight_logged?.trim()
+    && log.weight_logged.trim().toLowerCase() !== prescribedWeight.trim().toLowerCase()
+  const neterminatInTimp = format?.scoreMode === 'fortime_or_amrap' && !log?.time_result
+  return greutateDiferita || neterminatInTimp
+}
+
 // Compune/parseaza header-ul text "TIP mm:ss" folosit de Hero WOD-uri
 // (custom_hero_wods.format) si de header-ul WOD-ului zilei din wod_logs.notes
 // - generalizarea composeHeroFormat()/parseHeroFormat() din App.jsx, acum

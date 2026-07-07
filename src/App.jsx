@@ -22,7 +22,7 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel,
+  formatTypeLabel, isNotRxd, weightKeyForVariant,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -952,6 +952,37 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
 
   const totalLogs = NIVELE.reduce((acc, n) => acc + getSectionLogs(n.id).length, 0)
 
+  // Cine scaleaza greutatea nu poate concura corect cu cine face greutatea
+  // integrala - fara asta, cineva la 40kg si cineva la 61kg apareau pe
+  // aceeasi lista, clasati doar dupa timp/reps, ca si cum ar fi comparabili.
+  // Daca varianta n-are greutate prescrisa configurata, comportament identic
+  // cu inainte (un singur grup, fara header suplimentar) - compatibil 100%
+  // cu WOD-urile vechi. `sectionLogs` e deja sortat de sortLogs() - un filtru
+  // pe un array sortat pastreaza ordinea relativa, deci fiecare subgrup
+  // ramane corect sortat intern fara sa resortam.
+  const getWeightGroups = (nivelId, sectionLogs) => {
+    const prescribedWeight = wodZiData?.[weightKeyForVariant(nivelId)] || null
+    if (!prescribedWeight) return [{ weight: null, label: null, logs: sectionLogs }]
+    const norm = (w) => (w || '').trim().toLowerCase()
+    const rxNorm = norm(prescribedWeight)
+    const isRx = (log) => norm(log.weight_logged) === '' || norm(log.weight_logged) === rxNorm
+    const rxLogs = sectionLogs.filter(isRx)
+    const scaledByWeight = {}
+    sectionLogs.filter(l => !isRx(l)).forEach(l => {
+      const key = l.weight_logged.trim()
+      ;(scaledByWeight[key] ||= []).push(l)
+    })
+    const scaledGroups = Object.entries(scaledByWeight)
+      .map(([weight, groupLogs]) => ({ weight, label: t.clasamentScaledGroupLabel(weight), logs: groupLogs }))
+      .sort((a, b) => {
+        const na = parseFloat(a.weight), nb = parseFloat(b.weight)
+        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return nb - na
+        if (Number.isNaN(na) !== Number.isNaN(nb)) return Number.isNaN(na) ? 1 : -1
+        return 0
+      })
+    return [{ weight: prescribedWeight, label: null, logs: rxLogs }, ...scaledGroups]
+  }
+
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -997,6 +1028,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
             if (sectionLogs.length === 0) return null
             const isForTime = sectionLogs.some(l => l.time_result) &&
               sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length
+            const format = getFormat(wodZiData?.type)
+            const weightGroups = getWeightGroups(nivel.id, sectionLogs).filter(g => g.logs.length > 0)
             return (
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
                 {/* Header secțiune */}
@@ -1014,36 +1047,49 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                     <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>🔄 AMRAP</div>
                   )}
                 </div>
-                {/* Carduri participanți */}
-                {sectionLogs.map((log, i) => {
-                  const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
-                  const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
-                  const result = log.time_result || log.result || '—'
-                  const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
-                  return (
-                    <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
-                          {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888' }}>#{i + 1}</span>}
-                        </div>
-                        <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
-                          <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Clock size={10} strokeWidth={2} />
-                            {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+                {/* Sub-grupuri pe greutate (RX intai, fara header suplimentar; apoi
+                    fiecare greutate scalata distincta, cu header propriu) - medaliile
+                    #1/#2/#3 se reseteaza per sub-grup, nu global pe sectiune. */}
+                {weightGroups.map((group, gi) => (
+                  <div key={group.weight ?? gi} style={{ marginBottom: gi < weightGroups.length - 1 ? '10px' : '0' }}>
+                    {group.label && (
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', margin: '4px 0 6px' }}>{group.label}</div>
+                    )}
+                    {group.logs.map((log, i) => {
+                      const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
+                      const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
+                      const result = log.time_result || log.result || '—'
+                      const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
+                      const notRxdLog = isNotRxd(log, wodZiData?.[weightKeyForVariant(nivel.id)] || null, format)
+                      return (
+                        <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
+                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888' }}>#{i + 1}</span>}
+                            </div>
+                            <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {name}
+                                {notRxdLog && <span style={{ fontSize: '9px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: '2px 7px' }}>{t.notRxdBadge}</span>}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <Clock size={10} strokeWidth={2} />
+                                {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare }}>{result}</div>
+                              {log.time_result && log.result && (
+                                <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare }}>{result}</div>
-                          {log.time_result && log.result && (
-                            <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
             )
           })}
@@ -1388,6 +1434,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [wodVariante, setWodVariante] = useState({ onramp: [], beginner: [], intermediate: [], rx: [] })
   const [wodVarianteQuickAdd, setWodVarianteQuickAdd] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [wodVariantePaste, setWodVariantePaste] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
+  // Greutate prescrisa per varianta (text liber, ex. "61/43kg") - comparata cu
+  // wod_logs.weight_logged la salvare, ca sa detectam automat "Not RXd" (vezi
+  // isNotRxd in workoutFormats.js).
+  const [wodVarianteWeight, setWodVarianteWeight] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [warmupWod, setWarmupWod] = useState('')
   // Switch admin per sectiune: fiecare din WARM-UP/SKILL/SKILL 2 se poate
   // ascunde independent de pe Acasa la membri (nu mai e un singur switch
@@ -1876,6 +1926,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       movements_beginner: wodVariante.beginner,
       movements_intermediate: wodVariante.intermediate,
       movements_rx: wodVariante.rx,
+      onramp_weight: wodVarianteWeight.onramp.trim() || null,
+      beginner_weight: wodVarianteWeight.beginner.trim() || null,
+      intermediate_weight: wodVarianteWeight.intermediate.trim() || null,
+      rx_weight: wodVarianteWeight.rx.trim() || null,
       ...overrides,
     }
   }
@@ -1962,6 +2016,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       intermediate: w.movements_intermediate || [],
       rx: w.movements_rx || [],
     })
+    setWodVarianteWeight({
+      onramp: w.onramp_weight || '', beginner: w.beginner_weight || '',
+      intermediate: w.intermediate_weight || '', rx: w.rx_weight || '',
+    })
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
   }
@@ -2000,6 +2058,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   // noua aleasa, nu s-o resetaze la azi).
   const resetWodFormFields = () => {
     setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+    setWodVarianteWeight({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
     setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
@@ -2888,6 +2947,9 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   ].map(v => (
                     <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
+                      <input value={wodVarianteWeight[v.key]} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: e.target.value }))}
+                        placeholder={`${t.adminWodWeightLabel} (${t.adminWodWeightPlaceholder})`}
+                        style={{ width: '100%', marginBottom: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
                       <SortableList
                         items={wodVariante[v.key]}
                         onReorder={(items) => setWodVariante(prev => ({ ...prev, [v.key]: items }))}
@@ -2917,6 +2979,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                     name: numeWod.trim() || null,
                     movements_onramp: wodVariante.onramp, movements_beginner: wodVariante.beginner,
                     movements_intermediate: wodVariante.intermediate, movements_rx: wodVariante.rx,
+                    onramp_weight: wodVarianteWeight.onramp.trim() || null, beginner_weight: wodVarianteWeight.beginner.trim() || null,
+                    intermediate_weight: wodVarianteWeight.intermediate.trim() || null, rx_weight: wodVarianteWeight.rx.trim() || null,
                   }, t.adminWodFormTitle)}
                     disabled={savingWod}
                     style={{ marginTop: '4px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
@@ -3247,11 +3311,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // sens sa-l repetam pe un rand separat.
               const wodNume = w.wods?.name || null
               const wodSubtitlu = w.wods ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
+              const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level)] || null
+              const notRxdLog = isNotRxd(w, prescribedWeightLog, getFormat(w.wods?.type || w.format_type))
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
+                      {notRxdLog && <span style={{ fontSize: '10px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: '2px 8px' }}>{t.notRxdBadge}</span>}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteWod && (
                         confirmDelete === logKey ? (
@@ -3508,7 +3577,7 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
 // social media direct, fara integrare separata per platforma).
 function WorkoutSharePopup({ data, onClose, t, lang }) {
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, notRxd } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const dataObj = new Date(loggedAt)
   const shareText = [
@@ -3544,8 +3613,15 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
         <div style={{ padding: '26px 24px', textAlign: 'center' }}>
           {wodName && <div style={{ fontSize: '18px', fontWeight: '800', color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
           {variantLevel && (
-            <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700', marginBottom: '14px' }}>
-              {variantLevel}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+              <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700' }}>
+                {variantLevel}
+              </div>
+              {notRxd && (
+                <div style={{ padding: '4px 10px', borderRadius: '20px', background: '#f0f0f0', color: '#888', fontSize: '11px', fontWeight: '700' }}>
+                  {t.notRxdBadge}
+                </div>
+              )}
             </div>
           )}
           {movements && movements.length > 0 && (
@@ -3655,6 +3731,13 @@ function App() {
   const [wodResult, setWodResult] = useState('')
   const [wodRoundsCompleted, setWodRoundsCompleted] = useState('')
   const [wodPartialReps, setWodPartialReps] = useState([])
+  // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
+  // cu greutatea prescrisa a variantei alese pentru a detecta "Not RXd" (vezi
+  // isNotRxd in workoutFormats.js). Semanata direct cu prescrisul la alegerea
+  // variantei (nu fallback la render) - acelasi motiv ca la bug-ul de reps
+  // reparat la SequentialPartialFields: fallback-ul la render impiedica
+  // editarea libera a campului.
+  const [wodWeightLogged, setWodWeightLogged] = useState('')
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
@@ -3691,6 +3774,10 @@ function App() {
   const [editLogFormatId, setEditLogFormatId] = useState(null)
   const [editLogFormatConfig, setEditLogFormatConfig] = useState(null)
   const [editLogMiscari, setEditLogMiscari] = useState([])
+  // Greutatea prescrisa a variantei logului editat (din wods.<varianta>_weight,
+  // via join-ul wods(...) din fetchWodLogs) - folosita ca sa aratam corect
+  // "Not RXd" si sa recalculam la editare (vezi isNotRxd in workoutFormats.js).
+  const [editLogPrescribedWeight, setEditLogPrescribedWeight] = useState('')
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
   const [logTab, setLogTab] = useState('jurnal')
@@ -4273,7 +4360,7 @@ function App() {
   }
 
   const fetchWodLogs = async () => {
-    const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration, format_config)').eq('member_id', user.id).order('logged_at', { ascending: false })
+    const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration, format_config, rx_weight, intermediate_weight, beginner_weight, onramp_weight)').eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -4543,6 +4630,7 @@ function App() {
     return {
       result: rezultatFinal || null, time_result: useReps ? null : (wodTime.trim() || null),
       sets: format.family === 'mixed' ? setsCurate() : null, log_meta: null,
+      weight_logged: wodWeightLogged.trim() || null,
     }
   }
 
@@ -4562,7 +4650,7 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
       return
@@ -4598,6 +4686,7 @@ function App() {
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
+      const prescribedWeight = varianta ? (wodZiData?.[varianta.weightKey] || null) : null
       setWorkoutSharePopup({
         wodName: wodZiData?.name || null,
         movements: miscariFinale,
@@ -4606,11 +4695,12 @@ function App() {
         variantBg: varianta?.bg || null,
         result: logFields.result, timeResult: logFields.time_result,
         loggedAt: new Date().toISOString(),
+        notRxd: isNotRxd(logFields, prescribedWeight, getFormat(activeLogFormatId)),
       })
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
@@ -4830,10 +4920,10 @@ function App() {
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
 
   const VARIANTE_CONFIG = [
-    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', key: 'movements_rx' },
-    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', key: 'movements_intermediate' },
-    { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', key: 'movements_beginner' },
-    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp' },
+    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', key: 'movements_rx', weightKey: 'rx_weight' },
+    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', key: 'movements_intermediate', weightKey: 'intermediate_weight' },
+    { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', key: 'movements_beginner', weightKey: 'beginner_weight' },
+    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp', weightKey: 'onramp_weight' },
   ]
 
   // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
@@ -4848,6 +4938,11 @@ function App() {
   const miscariPentruLog = editLogId
     ? editLogMiscari
     : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
+  // Greutatea prescrisa a variantei active (logare noua sau editare) - vezi
+  // isNotRxd in workoutFormats.js.
+  const prescribedWeightPentruLog = editLogId
+    ? editLogPrescribedWeight
+    : (variantaAleasa !== null ? (wodZiData?.[VARIANTE_CONFIG[variantaAleasa]?.weightKey] || '') : '')
 
   // Acelasi tratament AMRAP (runde + repetari partiale) si pentru Hero WOD-uri, la logarea unui PR.
   // FORMAT-ul unui Hero WOD (built-in sau custom) e mereu "TIP restul textului" pe prima linie
@@ -5362,7 +5457,11 @@ function App() {
                   {VARIANTE_CONFIG.map((v, i) => {
                     const miscari = wodZiData[v.key] || []
                     return (
-                      <div key={i} onClick={() => { setVariantaAleasa(variantaAleasa === i ? null : i); setWodMiscariCustom(null) }}
+                      <div key={i} onClick={() => {
+                        const dejaSelectata = variantaAleasa === i
+                        setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
+                        setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[v.weightKey] || ''))
+                      }}
                         style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? '#fff' : '#fafafa' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
                           <LevelDot nivel={v.nivel} />
@@ -5629,6 +5728,9 @@ function App() {
                 setWodSets(normalizeSetsRows(log.sets))
                 setWodCompleted(!!log.log_meta?.completed)
                 setWodNote(parts.length > 1 ? parts[1] : '')
+                setWodWeightLogged(log.weight_logged || '')
+                const variantaLog = VARIANTE_CONFIG.find(v => v.nivel === log.variant_level)
+                setEditLogPrescribedWeight((variantaLog && log.wods?.[variantaLog.weightKey]) || '')
                 setPrevScreen('log')
                 setScreen('logWOD')
               }}
@@ -5666,7 +5768,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               else if (logWodStep === 'score') { setLogWodStep('compose') }
               else { setScreen(prevScreen || 'home') }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
@@ -5788,9 +5890,11 @@ function App() {
               formatId={activeLogFormatId}
               config={activeLogFormatConfig}
               movements={miscariPentruLog}
+              prescribedWeight={prescribedWeightPentruLog}
               value={{
                 result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
                 partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
+                weightLogged: wodWeightLogged,
               }}
               onChange={(patch) => {
                 if ('result' in patch) setWodResult(patch.result)
@@ -5799,6 +5903,7 @@ function App() {
                 if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
                 if ('sets' in patch) setWodSets(patch.sets)
                 if ('completed' in patch) setWodCompleted(patch.completed)
+                if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
               }}
               weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
             <div style={{ marginBottom: '14px' }}>

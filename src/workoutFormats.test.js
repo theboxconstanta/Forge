@@ -6,6 +6,7 @@ import {
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
+  isNotRxd, weightKeyForVariant,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -58,6 +59,42 @@ describe('composePartialText / parsePartialText', () => {
     const text = composePartialText(['0', '3'], miscariScara)
     expect(text).toBe('0/15 Power Snatches, 3/5 Rope Climbs')
     expect(parsePartialText(text, miscariScara)).toEqual(['0', '3'])
+  })
+})
+
+describe('weightKeyForVariant', () => {
+  it('mapeaza fiecare nivel la coloana lui din wods', () => {
+    expect(weightKeyForVariant('RX')).toBe('rx_weight')
+    expect(weightKeyForVariant('Intermediate')).toBe('intermediate_weight')
+    expect(weightKeyForVariant('Beginner')).toBe('beginner_weight')
+    expect(weightKeyForVariant('OnRamp')).toBe('onramp_weight')
+  })
+  it('nivel necunoscut sau lipsa -> null', () => {
+    expect(weightKeyForVariant('Altceva')).toBe(null)
+    expect(weightKeyForVariant(undefined)).toBe(null)
+  })
+})
+
+describe('isNotRxd', () => {
+  const forTime = getFormat('For Time')
+  const amrap = getFormat('AMRAP')
+  it('greutate identica cu prescrisul (trim + case-insensitive) -> RXd', () => {
+    expect(isNotRxd({ weight_logged: ' 61/43KG ', time_result: '10:00' }, '61/43kg', forTime)).toBe(false)
+  })
+  it('greutate diferita de prescris -> Not RXd', () => {
+    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, '61/43kg', forTime)).toBe(true)
+  })
+  it('fara greutate logata (camp gol) -> presupus RXd la greutate', () => {
+    expect(isNotRxd({ weight_logged: '', time_result: '10:00' }, '61/43kg', forTime)).toBe(false)
+  })
+  it('For Time neterminat (fara time_result) -> Not RXd, chiar cu greutate corecta', () => {
+    expect(isNotRxd({ weight_logged: '61/43kg', time_result: null }, '61/43kg', forTime)).toBe(true)
+  })
+  it('AMRAP fara time_result -> tot RXd (nu exista concept de neterminat la AMRAP)', () => {
+    expect(isNotRxd({ weight_logged: '61/43kg', time_result: null }, '61/43kg', amrap)).toBe(false)
+  })
+  it('fara greutate prescrisa configurata -> nu poate fi Not RXd pe greutate', () => {
+    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, null, forTime)).toBe(false)
   })
 })
 

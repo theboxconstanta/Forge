@@ -224,6 +224,9 @@ export const TRANSLATIONS = {
     logWodPartialRoundHint: '(câte repetări ai făcut din fiecare mișcare)',
     logWodResultLabel: 'REZULTAT / SCOR',
     logWodResultPlaceholder: 'ex: 18 runde complete',
+    logWodWeightLabel: 'GREUTATE',
+    logWodWeightPlaceholder: 'ex. 61/43kg',
+    notRxdBadge: "Not RX'd",
     logWodTimeLabel: 'TIMP',
     logWodMinutesLabel: 'minute',
     logWodSecondsLabel: 'secunde',
@@ -413,6 +416,7 @@ export const TRANSLATIONS = {
       return n === 1 ? 'participant' : 'participanți'
     },
     clasamentAnonymous: 'Anonim',
+    clasamentScaledGroupLabel: (weight) => `Scaled · ${weight}`,
 
     // Feed
     feedTitle: 'Feed',
@@ -707,6 +711,8 @@ export const TRANSLATIONS = {
     adminWodNameOptional: '(opțional)',
     adminWodVariantPastePlaceholder: 'Paste rapid: lipește tot textul mișcărilor aici (o mișcare pe linie)',
     adminWodVariantPasteButton: '+ Adaugă din text',
+    adminWodWeightLabel: 'Greutate',
+    adminWodWeightPlaceholder: 'ex. 61/43kg',
     adminWodWarmupLabel: 'Warm-up',
     adminWodWarmupPlaceholder: 'ex:\n400m Run\n10 Air Squats\n10 PVC Pass Throughs',
     adminWodSkillLabel: 'Skill',
@@ -971,6 +977,9 @@ export const TRANSLATIONS = {
     logWodPartialRoundHint: '(how many reps you did of each movement)',
     logWodResultLabel: 'RESULT / SCORE',
     logWodResultPlaceholder: 'e.g. 18 rounds completed',
+    logWodWeightLabel: 'WEIGHT',
+    logWodWeightPlaceholder: 'e.g. 61/43kg',
+    notRxdBadge: "Not RX'd",
     logWodTimeLabel: 'TIME',
     logWodMinutesLabel: 'minutes',
     logWodSecondsLabel: 'seconds',
@@ -1157,6 +1166,7 @@ export const TRANSLATIONS = {
     clasamentEmptySubtitle: 'Be the first to log today!',
     clasamentParticipantWord: (n) => n === 1 ? 'participant' : 'participants',
     clasamentAnonymous: 'Anonymous',
+    clasamentScaledGroupLabel: (weight) => `Scaled · ${weight}`,
 
     // Feed
     feedTitle: 'Feed',
@@ -1451,6 +1461,8 @@ export const TRANSLATIONS = {
     adminWodNameOptional: '(optional)',
     adminWodVariantPastePlaceholder: 'Quick paste: paste the whole movements text here (one movement per line)',
     adminWodVariantPasteButton: '+ Add from text',
+    adminWodWeightLabel: 'Weight',
+    adminWodWeightPlaceholder: 'e.g. 61/43kg',
     adminWodWarmupLabel: 'Warm-up',
     adminWodWarmupPlaceholder: 'e.g.:\n400m Run\n10 Air Squats\n10 PVC Pass Throughs',
     adminWodSkillLabel: 'Skill',

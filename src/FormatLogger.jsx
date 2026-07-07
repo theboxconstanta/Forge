@@ -114,22 +114,44 @@ function TimeResultFields({ result, time, onChange, t, hideResult }) {
   )
 }
 
-function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial }) {
+// Un singur camp de greutate (nu per miscare) - aparut doar cand adminul a
+// prescris o greutate pentru varianta aleasa (wods.<varianta>_weight).
+// Folosit sa detectam "Not RXd" (vezi isNotRxd in workoutFormats.js) daca
+// greutatea logata difera de cea prescrisa. Pre-completat cu prescrisul de
+// catre App.jsx la alegerea variantei (seed in state-ul real, nu fallback la
+// render) - acelasi motiv ca la bug-ul de reps: fallback-ul la render
+// impiedica editarea libera a campului.
+function WeightField({ weightLogged, onChange, t }) {
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={smallLabelStyle}>{t?.logWodWeightLabel || 'Greutate'}</div>
+      <input value={weightLogged || ''} onChange={e => onChange({ weightLogged: e.target.value })}
+        placeholder={t?.logWodWeightPlaceholder || 'ex. 61/43kg'} style={inputStyle} />
+    </div>
+  )
+}
+
+function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight }) {
+  const greutateField = prescribedWeight ? <WeightField weightLogged={value.weightLogged} onChange={onChange} t={t} /> : null
   if (scoreMode === 'amrap') {
-    return <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
+    return <>{greutateField}<RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} /></>
   }
   if (scoreMode === 'single_value') {
     return (
-      <div style={{ marginBottom: '14px' }}>
-        <div style={smallLabelStyle}>{t?.logWodResultLabel || 'Rezultat maxim'}</div>
-        <input value={value.result || ''} onChange={e => onChange({ result: e.target.value })} placeholder={t?.logWodResultPlaceholder} style={inputStyle} />
-      </div>
+      <>
+        {greutateField}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={smallLabelStyle}>{t?.logWodResultLabel || 'Rezultat maxim'}</div>
+          <input value={value.result || ''} onChange={e => onChange({ result: e.target.value })} placeholder={t?.logWodResultPlaceholder} style={inputStyle} />
+        </div>
+      </>
     )
   }
   if (scoreMode === 'fortime_or_amrap') {
     if (sequentialPartial) {
       return (
         <>
+          {greutateField}
           <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult />
           <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodSequentialHint || 'Dacă nu ai terminat în time cap, ajustează repetările de mai jos la miscările unde nu ai ajuns:'}</div>
           <SequentialPartialFields movements={movements} partialReps={value.partialReps} onChange={onChange} t={t} />
@@ -138,13 +160,14 @@ function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPart
     }
     return (
       <>
+        {greutateField}
         <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} />
         <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
         <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
       </>
     )
   }
-  return <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} />
+  return <>{greutateField}<TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} /></>
 }
 
 function SetsRows({ rowKey, rows, onChange, weightUnit, t }) {
@@ -212,7 +235,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
@@ -241,7 +264,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
-        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} />
+        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} />
         {hasCashOut && (
           <>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
@@ -273,7 +296,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   const scoreMode = formatId === 'Partner WOD' && config?.baseFormat
     ? (config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap')
     : format.scoreMode
-  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={format.sequentialPartial} />
+  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={format.sequentialPartial} prescribedWeight={prescribedWeight} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {
