@@ -63,15 +63,19 @@ describe('composePartialText / parsePartialText', () => {
 })
 
 describe('weightKeyForVariant', () => {
-  it('mapeaza fiecare nivel la coloana lui din wods', () => {
-    expect(weightKeyForVariant('RX')).toBe('rx_weight')
-    expect(weightKeyForVariant('Intermediate')).toBe('intermediate_weight')
-    expect(weightKeyForVariant('Beginner')).toBe('beginner_weight')
-    expect(weightKeyForVariant('OnRamp')).toBe('onramp_weight')
+  it('mapeaza fiecare nivel + gen la coloana lui din wods', () => {
+    expect(weightKeyForVariant('RX', 'masculin')).toBe('rx_weight_male')
+    expect(weightKeyForVariant('RX', 'feminin')).toBe('rx_weight_female')
+    expect(weightKeyForVariant('Intermediate', 'masculin')).toBe('intermediate_weight_male')
+    expect(weightKeyForVariant('Beginner', 'feminin')).toBe('beginner_weight_female')
+    expect(weightKeyForVariant('OnRamp', 'masculin')).toBe('onramp_weight_male')
+  })
+  it('gen lipsa/necunoscut cade pe male (fallback existent inainte de completarea profilului)', () => {
+    expect(weightKeyForVariant('RX', undefined)).toBe('rx_weight_male')
   })
   it('nivel necunoscut sau lipsa -> null', () => {
-    expect(weightKeyForVariant('Altceva')).toBe(null)
-    expect(weightKeyForVariant(undefined)).toBe(null)
+    expect(weightKeyForVariant('Altceva', 'masculin')).toBe(null)
+    expect(weightKeyForVariant(undefined, 'masculin')).toBe(null)
   })
 })
 

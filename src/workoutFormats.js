@@ -272,11 +272,15 @@ export function parseAmrapResult(resultStr, movements) {
   return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
 }
 
-// Numele coloanei din wods care tine greutatea prescrisa a unei variante -
-// sursa unica pentru App.jsx (VARIANTE_CONFIG), JurnalList si Clasament, ca
-// sa nu existe 3 maps hardcodate care pot desincroniza.
-export function weightKeyForVariant(nivel) {
-  return { RX: 'rx_weight', Intermediate: 'intermediate_weight', Beginner: 'beginner_weight', OnRamp: 'onramp_weight' }[nivel] || null
+// Numele coloanei din wods care tine greutatea prescrisa a unei variante,
+// separata pe gen (RX barbati 61kg vs RX femei 43kg - o singura coloana
+// combinata nu se poate compara cu greutatea individuala logata de un
+// membru). Sursa unica pentru App.jsx (VARIANTE_CONFIG), JurnalList si
+// Clasament, ca sa nu existe mai multe maps hardcodate care pot desincroniza.
+export function weightKeyForVariant(nivel, gender) {
+  const baza = { RX: 'rx_weight', Intermediate: 'intermediate_weight', Beginner: 'beginner_weight', OnRamp: 'onramp_weight' }[nivel]
+  if (!baza) return null
+  return `${baza}_${gender === 'feminin' ? 'female' : 'male'}`
 }
 
 // "Not RXd" = greutatea logata difera de cea prescrisa a variantei, SAU (la
