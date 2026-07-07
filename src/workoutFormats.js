@@ -272,28 +272,94 @@ export function parseAmrapResult(resultStr, movements) {
   return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
 }
 
+// Sursa unica pt cele 4 variante + coloana lor de baza in wods - orice cod
+// care are nevoie de toate cele 8 coloane de greutate (select-uri Supabase,
+// payload-ul Admin de salvare, populare formular la editare) deriva lista din
+// VARIANTE_WEIGHT_BASE in loc sa o scrie de mana, ca sa nu existe N liste
+// hardcodate care pot desincroniza cand se adauga/redenumeste o varianta.
+export const VARIANTE_WEIGHT_BASE = [
+  { nivel: 'RX', key: 'rx' },
+  { nivel: 'Intermediate', key: 'intermediate' },
+  { nivel: 'Beginner', key: 'beginner' },
+  { nivel: 'OnRamp', key: 'onramp' },
+]
+
+// Toate cele 8 coloane de greutate (4 variante x 2 genuri) din wods, ca lista
+// flata de nume - folosita direct in select()-urile Supabase.
+export const ALL_WEIGHT_COLUMNS = VARIANTE_WEIGHT_BASE.flatMap(v => [`${v.key}_weight_male`, `${v.key}_weight_female`])
+
 // Numele coloanei din wods care tine greutatea prescrisa a unei variante,
 // separata pe gen (RX barbati 61kg vs RX femei 43kg - o singura coloana
 // combinata nu se poate compara cu greutatea individuala logata de un
 // membru). Sursa unica pentru App.jsx (VARIANTE_CONFIG), JurnalList si
 // Clasament, ca sa nu existe mai multe maps hardcodate care pot desincroniza.
 export function weightKeyForVariant(nivel, gender) {
-  const baza = { RX: 'rx_weight', Intermediate: 'intermediate_weight', Beginner: 'beginner_weight', OnRamp: 'onramp_weight' }[nivel]
-  if (!baza) return null
-  return `${baza}_${gender === 'feminin' ? 'female' : 'male'}`
+  const v = VARIANTE_WEIGHT_BASE.find(v => v.nivel === nivel)
+  if (!v) return null
+  return `${v.key}_weight_${gender === 'feminin' ? 'female' : 'male'}`
 }
 
-// "Not RXd" = greutatea logata difera de cea prescrisa a variantei, SAU (la
-// formatele cu time cap real - For Time/RFT/Ladder, scoreMode
-// 'fortime_or_amrap') nu s-a terminat in time cap (fara time_result). AMRAP nu
-// are concept de "neterminat" (scorul e mereu cat ai facut in timp), deci nu
-// intra la a doua conditie. Derivat la citire, nu stocat - daca adminul
-// corecteaza greutatea prescrisa ulterior, eticheta ramane consistenta cu
-// valoarea curenta, fara o a doua sursa de adevar care poate desincroniza.
-export function isNotRxd(log, prescribedWeight, format) {
-  const greutateDiferita = !!prescribedWeight?.trim() && !!log?.weight_logged?.trim()
-    && log.weight_logged.trim().toLowerCase() !== prescribedWeight.trim().toLowerCase()
-  const neterminatInTimp = format?.scoreMode === 'fortime_or_amrap' && !log?.time_result
+// scoreMode-ul REAL folosit la logare, nu doar cel din catalog. La Partner
+// WOD, catalogul are un scoreMode generic ('fortime_or_amrap') ca fallback -
+// alegerea reala de baseFormat (AMRAP/For Time) a antrenorului schimba UI-ul
+// de logare in FormatLogger (nu mai arata camp de Timp la baseFormat AMRAP).
+// Orice cod care decide dupa scoreMode (aici isNotRxd, dar si FormatLogger)
+// trebuie sa foloseasca ACELASI calcul - altfel un Partner WOD AMRAP e
+// judecat gresit dupa scoreMode-ul de fallback ('fortime_or_amrap'), desi
+// UI-ul de logare nu i-a cerut niciodata un time_result.
+// formatId absent/necunoscut (log fara wods legat, fara format_type, fara
+// header recunoscut) -> null, nu fallback-ul implicit al catalogului
+// (getFormat(undefined) ar cadea tacit pe 'For Time' altfel).
+export function effectiveScoreMode(formatId, config) {
+  if (!formatId) return null
+  if (formatId === 'Partner WOD' && config?.baseFormat) return config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap'
+  return getFormat(formatId)?.scoreMode ?? null
+}
+
+// Numarul de la inceputul textului de greutate (ex. "61kg" -> 61, "61.5 KG"
+// -> 61.5, "61" -> 61) - membrul si adminul scriu greutatea ca text liber, in
+// campuri separate, fara nicio conventie impusa de format; o comparatie de
+// text exact ar rata gresit ca "diferita" perechi ca "61kg"/"61 kg" (spatiu
+// intern) sau "61kg"/"61" (unitate omisa) sau "61.0kg"/"61kg" (zecimala),
+// desi e aceeasi greutate. Nu face conversie intre unitati (kg/lbs) - doar
+// normalizeaza formatarea aceleiasi unitati implicite.
+export function greutateNumerica(w) {
+  const match = (w || '').replace(/\s+/g, '').match(/^(\d+(\.\d+)?)/)
+  return match ? parseFloat(match[1]) : null
+}
+
+// Cheie canonica de greutate - numeric cand se poate extrage un numar din
+// text (unifica "61kg"/"61 kg"/"61KG"/"61.0kg"/"61" pe aceeasi cheie),
+// altfel text fara spatii/case. Sursa unica de normalizare, folosita atat de
+// isNotRxd (a comparat corect membru vs prescris) cat si de gruparea pe
+// greutate din Clasament (getWeightGroups in App.jsx) - inainte erau 2
+// normalizari separate care puteau desincroniza (cineva declarat "not RX" de
+// isNotRxd, dar grupat separat de altcineva cu aceeasi greutate scrisa
+// diferit, pe Clasament).
+export function canonicalWeightKey(w) {
+  const numeric = greutateNumerica(w)
+  return numeric != null ? String(numeric) : (w || '').trim().replace(/\s+/g, '').toLowerCase()
+}
+
+// Doua texte de greutate "insemna acelasi lucru" daca au aceeasi cheie
+// canonica. Nu face conversie intre unitati (kg/lbs) - doar normalizeaza
+// formatarea aceleiasi unitati implicite.
+export function weightMatches(a, b) {
+  if (!a?.trim() || !b?.trim()) return false
+  return canonicalWeightKey(a) === canonicalWeightKey(b)
+}
+
+// "Not RXd" = greutatea logata difera de cea prescrisa a variantei (vezi
+// weightMatches), SAU (la formatele cu time cap real - For Time/RFT/Ladder,
+// scoreMode 'fortime_or_amrap') nu s-a terminat in time cap (fara
+// time_result). AMRAP nu are concept de "neterminat" (scorul e mereu cat ai
+// facut in timp), deci nu intra la a doua conditie. Derivat la citire, nu
+// stocat - daca adminul corecteaza greutatea prescrisa ulterior, eticheta
+// ramane consistenta cu valoarea curenta, fara o a doua sursa de adevar care
+// poate desincroniza.
+export function isNotRxd(log, prescribedWeight, formatId, config) {
+  const greutateDiferita = !!prescribedWeight?.trim() && !!log?.weight_logged?.trim() && !weightMatches(log.weight_logged, prescribedWeight)
+  const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
   return greutateDiferita || neterminatInTimp
 }
 

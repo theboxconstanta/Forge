@@ -6,7 +6,7 @@ import {
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  isNotRxd, weightKeyForVariant,
+  isNotRxd, weightKeyForVariant, effectiveScoreMode,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -79,26 +79,62 @@ describe('weightKeyForVariant', () => {
   })
 })
 
+describe('effectiveScoreMode', () => {
+  it('formatId absent -> null, nu fallback-ul implicit al catalogului (For Time)', () => {
+    expect(effectiveScoreMode(undefined, null)).toBe(null)
+    expect(effectiveScoreMode(null, null)).toBe(null)
+  })
+  it('format normal -> scoreMode-ul din catalog', () => {
+    expect(effectiveScoreMode('For Time', null)).toBe('fortime_or_amrap')
+    expect(effectiveScoreMode('AMRAP', null)).toBe('amrap')
+  })
+  it('Partner WOD cu baseFormat AMRAP -> amrap, nu fallback-ul generic din catalog', () => {
+    expect(effectiveScoreMode('Partner WOD', { baseFormat: 'AMRAP' })).toBe('amrap')
+  })
+  it('Partner WOD cu baseFormat For Time -> fortime_or_amrap', () => {
+    expect(effectiveScoreMode('Partner WOD', { baseFormat: 'For Time' })).toBe('fortime_or_amrap')
+  })
+  it('Partner WOD fara baseFormat configurat -> fallback-ul generic din catalog', () => {
+    expect(effectiveScoreMode('Partner WOD', null)).toBe('fortime_or_amrap')
+  })
+})
+
 describe('isNotRxd', () => {
-  const forTime = getFormat('For Time')
-  const amrap = getFormat('AMRAP')
   it('greutate identica cu prescrisul (trim + case-insensitive) -> RXd', () => {
-    expect(isNotRxd({ weight_logged: ' 61/43KG ', time_result: '10:00' }, '61/43kg', forTime)).toBe(false)
+    expect(isNotRxd({ weight_logged: ' 61KG ', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
   })
   it('greutate diferita de prescris -> Not RXd', () => {
-    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, '61/43kg', forTime)).toBe(true)
+    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(true)
+  })
+  it('spatiu intern intre numar si unitate -> tot RXd ("61 kg" vs "61kg")', () => {
+    expect(isNotRxd({ weight_logged: '61 kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  })
+  it('unitate omisa de membru -> tot RXd cand numarul coincide ("61" vs "61kg")', () => {
+    expect(isNotRxd({ weight_logged: '61', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  })
+  it('zecimala redundanta -> tot RXd ("61.0kg" vs "61kg")', () => {
+    expect(isNotRxd({ weight_logged: '61.0kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
   })
   it('fara greutate logata (camp gol) -> presupus RXd la greutate', () => {
-    expect(isNotRxd({ weight_logged: '', time_result: '10:00' }, '61/43kg', forTime)).toBe(false)
+    expect(isNotRxd({ weight_logged: '', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
   })
   it('For Time neterminat (fara time_result) -> Not RXd, chiar cu greutate corecta', () => {
-    expect(isNotRxd({ weight_logged: '61/43kg', time_result: null }, '61/43kg', forTime)).toBe(true)
+    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'For Time')).toBe(true)
   })
   it('AMRAP fara time_result -> tot RXd (nu exista concept de neterminat la AMRAP)', () => {
-    expect(isNotRxd({ weight_logged: '61/43kg', time_result: null }, '61/43kg', amrap)).toBe(false)
+    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'AMRAP')).toBe(false)
   })
   it('fara greutate prescrisa configurata -> nu poate fi Not RXd pe greutate', () => {
-    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, null, forTime)).toBe(false)
+    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, null, 'For Time')).toBe(false)
+  })
+  it('formatId absent (log fara wods/format_type/header recunoscut) -> nu presupune "For Time", sare peste verificarea de time cap', () => {
+    expect(isNotRxd({ weight_logged: '', time_result: null }, null, undefined)).toBe(false)
+  })
+  it('Partner WOD cu baseFormat AMRAP, fara time_result -> tot RXd (UI-ul de logare nu a cerut niciodata timp)', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'AMRAP' })).toBe(false)
+  })
+  it('Partner WOD cu baseFormat For Time, fara time_result -> Not RXd', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'For Time' })).toBe(true)
   })
 })
 

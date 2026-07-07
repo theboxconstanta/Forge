@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, effectiveScoreMode } from './workoutFormats'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
@@ -126,7 +126,7 @@ function WeightField({ weightLogged, onChange, t }) {
     <div style={{ marginBottom: '14px' }}>
       <div style={smallLabelStyle}>{t?.logWodWeightLabel || 'Greutate'}</div>
       <input value={weightLogged || ''} onChange={e => onChange({ weightLogged: e.target.value })}
-        placeholder={t?.logWodWeightPlaceholder || 'ex. 61/43kg'} style={inputStyle} />
+        placeholder={t?.logWodWeightPlaceholder || 'ex. 61kg'} style={inputStyle} />
     </div>
   )
 }
@@ -293,9 +293,9 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   // antrenorului trebuie sa schimbe UI-ul de logare, altfel un Partner WOD
   // configurat ca AMRAP tot arata campurile de Timp si hint-ul "daca nu ai
   // terminat", care n-au sens pentru AMRAP (nu exista time cap/finish acolo).
-  const scoreMode = formatId === 'Partner WOD' && config?.baseFormat
-    ? (config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap')
-    : format.scoreMode
+  // effectiveScoreMode e aceeasi functie folosita de isNotRxd - un singur loc
+  // care decide scoreMode-ul real, nu 2 implementari care pot desincroniza.
+  const scoreMode = effectiveScoreMode(formatId, config) || format.scoreMode
   return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={format.sequentialPartial} prescribedWeight={prescribedWeight} />
 }
 

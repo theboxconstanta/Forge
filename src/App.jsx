@@ -22,7 +22,8 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, isNotRxd, weightKeyForVariant,
+  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, canonicalWeightKey,
+  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -817,6 +818,14 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   const [genderTab, setGenderTab] = useState('toti')
   const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
   const isToday = selectedDate === todayStr
+  // getFormat(undefined) cade tacit pe 'For Time' (fortime_or_amrap +
+  // sequentialPartial) - intr-o zi fara WOD programat (wodZiData null), dar cu
+  // loguri vechi/orfane inca in intervalul de date, asta ar trata gresit acele
+  // loguri ca fiind "neterminate in time cap" (isNotRxd) sau "secventiale"
+  // (sortLogs), doar pentru ca formatul necunoscut a cazut pe un fallback
+  // arbitrar. Calculat o singura data (nu per nivel/log) - null cand nu stim
+  // real formatul zilei, nu un fallback ghicit.
+  const wodZiFormat = wodZiData?.type ? getFormat(wodZiData.type) : null
   const goDay = (delta) => {
     const d = new Date(selectedDate + 'T00:00:00'); d.setDate(d.getDate() + delta)
     const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -890,7 +899,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
     // nu are un numar de "runde" real de comparat (parseScore ar extrage
     // doar numarul primei miscari din text, irelevant) - departajarea se
     // face direct pe total reps facute (partialRepsOf).
-    const isSequential = !!getFormat(wodZiData?.type)?.sequentialPartial
+    const isSequential = !!wodZiFormat?.sequentialPartial
     // Fiecare comparatie numerica poate produce NaN cand ambele loguri au
     // aceeasi valoare "goala" (Infinity - Infinity la timp) - un comparator
     // Array.sort care intoarce NaN nu are comportament garantat de
@@ -967,19 +976,31 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   // e considerat RX implicit (identic cu comportamentul dinainte de feature).
   const prescribedWeightFor = (nivelId, log) => wodZiData?.[weightKeyForVariant(nivelId, log.profile?.gender)] || null
   const getWeightGroups = (nivelId, sectionLogs) => {
-    const norm = (w) => (w || '').trim().toLowerCase()
-    const isRx = (log) => {
-      const prescribedWeight = prescribedWeightFor(nivelId, log)
-      return !prescribedWeight || norm(log.weight_logged) === '' || norm(log.weight_logged) === norm(prescribedWeight)
-    }
-    const rxLogs = sectionLogs.filter(isRx)
+    // Un singur pas peste sectionLogs (nu 2 filter-e care re-evalueaza isRx
+    // per log) - foloseste weightMatches (aceeasi normalizare ca isNotRxd),
+    // altfel gruparea putea decide diferit fata de badge-ul "Not RXd" pt
+    // acelasi log. Cheia de grupare foloseste canonicalWeightKey (acelasi
+    // numeric/text normalizat) - altfel "40kg" si "40KG" (aceeasi greutate,
+    // scrisa diferit) ar aparea in 2 sub-grupuri separate in loc sa fie
+    // clasati impreuna. Pastram si textul original (primul intalnit) pentru
+    // afisare - cheia canonica poate fi doar numarul, fara unitate.
+    const rxLogs = []
     const scaledByWeight = {}
-    sectionLogs.filter(l => !isRx(l)).forEach(l => {
-      const key = l.weight_logged.trim()
-      ;(scaledByWeight[key] ||= []).push(l)
+    sectionLogs.forEach(log => {
+      // prescribedWeight atasat direct pe log (nu doar folosit local) - randarea
+      // de mai jos il reutilizeaza la isNotRxd, in loc sa cheme prescribedWeightFor
+      // a treia oara pt acelasi log.
+      const prescribedWeight = prescribedWeightFor(nivelId, log)
+      const logCuGreutate = { ...log, _prescribedWeight: prescribedWeight }
+      const isRx = !prescribedWeight || !log.weight_logged?.trim() || weightMatches(log.weight_logged, prescribedWeight)
+      if (isRx) { rxLogs.push(logCuGreutate); return }
+      const raw = log.weight_logged.trim()
+      const key = canonicalWeightKey(raw)
+      if (!scaledByWeight[key]) scaledByWeight[key] = { display: raw, logs: [] }
+      scaledByWeight[key].logs.push(logCuGreutate)
     })
     const scaledGroups = Object.entries(scaledByWeight)
-      .map(([weight, groupLogs]) => ({ weight, label: t.clasamentScaledGroupLabel(weight), logs: groupLogs }))
+      .map(([key, { display, logs }]) => ({ weight: key, label: t.clasamentScaledGroupLabel(display), logs }))
       .sort((a, b) => {
         const na = parseFloat(a.weight), nb = parseFloat(b.weight)
         if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return nb - na
@@ -1038,7 +1059,6 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
             if (sectionLogs.length === 0) return null
             const isForTime = sectionLogs.some(l => l.time_result) &&
               sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length
-            const format = getFormat(wodZiData?.type)
             const weightGroups = getWeightGroups(nivel.id, sectionLogs).filter(g => g.logs.length > 0)
             return (
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
@@ -1070,7 +1090,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
                       const result = log.time_result || log.result || '—'
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
-                      const notRxdLog = isNotRxd(log, prescribedWeightFor(nivel.id, log), format)
+                      const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config)
                       return (
                         <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1081,7 +1101,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {name}
-                                {notRxdLog && <span style={{ fontSize: '9px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: '2px 7px' }}>{t.notRxdBadge}</span>}
+                                {notRxdLog && <NotRxdBadge t={t} compact />}
                               </div>
                               <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 <Clock size={10} strokeWidth={2} />
@@ -1444,14 +1464,27 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const [wodVariante, setWodVariante] = useState({ onramp: [], beginner: [], intermediate: [], rx: [] })
   const [wodVarianteQuickAdd, setWodVarianteQuickAdd] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
   const [wodVariantePaste, setWodVariantePaste] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
-  // Greutate prescrisa per varianta (text liber, ex. "61/43kg") - comparata cu
-  // wod_logs.weight_logged la salvare, ca sa detectam automat "Not RXd" (vezi
-  // isNotRxd in workoutFormats.js).
-  // Greutate separata per gen (RX barbati 61kg vs RX femei 43kg - o singura
-  // valoare combinata nu se poate compara cu greutatea individuala logata de
-  // un membru, vezi weightKeyForVariant in workoutFormats.js).
-  const golVarianteWeight = { onramp: { male: '', female: '' }, beginner: { male: '', female: '' }, intermediate: { male: '', female: '' }, rx: { male: '', female: '' } }
+  // Greutate prescrisa per varianta, separata per gen (RX barbati 61kg vs RX
+  // femei 43kg - o singura valoare combinata nu se poate compara cu greutatea
+  // individuala logata de un membru) - comparata cu wod_logs.weight_logged la
+  // salvare, ca sa detectam automat "Not RXd" (vezi isNotRxd in
+  // workoutFormats.js).
+  const golVarianteWeight = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, { male: '', female: '' }]))
   const [wodVarianteWeight, setWodVarianteWeight] = useState(golVarianteWeight)
+  // Payload-ul de scris (buildWodPayload si butonul de salvare partiala din
+  // sectiunea variantelor) si populare de citit (syncWodFormFromRow) pt cele
+  // 8 coloane de greutate - un singur loc care itereaza VARIANTE_WEIGHT_BASE,
+  // in loc sa fie scrise de mana in 3 locuri diferite (risc de a uita o
+  // varianta/gen la o modificare viitoare).
+  const buildVarianteWeightPayload = () => Object.fromEntries(
+    VARIANTE_WEIGHT_BASE.flatMap(v => [
+      [`${v.key}_weight_male`, wodVarianteWeight[v.key].male.trim() || null],
+      [`${v.key}_weight_female`, wodVarianteWeight[v.key].female.trim() || null],
+    ])
+  )
+  const parseVarianteWeightFromRow = (w) => Object.fromEntries(
+    VARIANTE_WEIGHT_BASE.map(v => [v.key, { male: w[`${v.key}_weight_male`] || '', female: w[`${v.key}_weight_female`] || '' }])
+  )
   const [warmupWod, setWarmupWod] = useState('')
   // Switch admin per sectiune: fiecare din WARM-UP/SKILL/SKILL 2 se poate
   // ascunde independent de pe Acasa la membri (nu mai e un singur switch
@@ -1940,14 +1973,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       movements_beginner: wodVariante.beginner,
       movements_intermediate: wodVariante.intermediate,
       movements_rx: wodVariante.rx,
-      onramp_weight_male: wodVarianteWeight.onramp.male.trim() || null,
-      onramp_weight_female: wodVarianteWeight.onramp.female.trim() || null,
-      beginner_weight_male: wodVarianteWeight.beginner.male.trim() || null,
-      beginner_weight_female: wodVarianteWeight.beginner.female.trim() || null,
-      intermediate_weight_male: wodVarianteWeight.intermediate.male.trim() || null,
-      intermediate_weight_female: wodVarianteWeight.intermediate.female.trim() || null,
-      rx_weight_male: wodVarianteWeight.rx.male.trim() || null,
-      rx_weight_female: wodVarianteWeight.rx.female.trim() || null,
+      ...buildVarianteWeightPayload(),
       ...overrides,
     }
   }
@@ -2034,12 +2060,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       intermediate: w.movements_intermediate || [],
       rx: w.movements_rx || [],
     })
-    setWodVarianteWeight({
-      onramp: { male: w.onramp_weight_male || '', female: w.onramp_weight_female || '' },
-      beginner: { male: w.beginner_weight_male || '', female: w.beginner_weight_female || '' },
-      intermediate: { male: w.intermediate_weight_male || '', female: w.intermediate_weight_female || '' },
-      rx: { male: w.rx_weight_male || '', female: w.rx_weight_female || '' },
-    })
+    setWodVarianteWeight(parseVarianteWeightFromRow(w))
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
   }
@@ -2967,14 +2988,24 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   ].map(v => (
                     <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                        <input value={wodVarianteWeight[v.key].male} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], male: e.target.value } }))}
-                          placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
-                          style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                        <input value={wodVarianteWeight[v.key].female} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], female: e.target.value } }))}
-                          placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
-                          style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                      </div>
+                      {/* Greutatea prescrisa se compara doar la formatele 'scored'/'mixed'
+                          (FormatLogger arata campul de Greutate doar acolo - vezi
+                          ScoredFields in FormatLogger.jsx) - la 'sets'/'nft' (EMOM,
+                          Weightlifting, Tabata, Strength Sets, Not For Time etc.) membrul
+                          nu vede niciodata acel camp, deci orice valoare scrisa aici ar fi
+                          complet inerta, fara niciun semnal ca nu face nimic. */}
+                      {['scored', 'mixed'].includes(getFormat(tipWod)?.family) ? (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <input value={wodVarianteWeight[v.key].male} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], male: e.target.value } }))}
+                            placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
+                            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+                          <input value={wodVarianteWeight[v.key].female} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], female: e.target.value } }))}
+                            placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
+                            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
+                      )}
                       <SortableList
                         items={wodVariante[v.key]}
                         onReorder={(items) => setWodVariante(prev => ({ ...prev, [v.key]: items }))}
@@ -3004,10 +3035,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                     name: numeWod.trim() || null,
                     movements_onramp: wodVariante.onramp, movements_beginner: wodVariante.beginner,
                     movements_intermediate: wodVariante.intermediate, movements_rx: wodVariante.rx,
-                    onramp_weight_male: wodVarianteWeight.onramp.male.trim() || null, onramp_weight_female: wodVarianteWeight.onramp.female.trim() || null,
-                    beginner_weight_male: wodVarianteWeight.beginner.male.trim() || null, beginner_weight_female: wodVarianteWeight.beginner.female.trim() || null,
-                    intermediate_weight_male: wodVarianteWeight.intermediate.male.trim() || null, intermediate_weight_female: wodVarianteWeight.intermediate.female.trim() || null,
-                    rx_weight_male: wodVarianteWeight.rx.male.trim() || null, rx_weight_female: wodVarianteWeight.rx.female.trim() || null,
+                    ...buildVarianteWeightPayload(),
                   }, t.adminWodFormTitle)}
                     disabled={savingWod}
                     style={{ marginTop: '4px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
@@ -3339,14 +3367,19 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const wodNume = w.wods?.name || null
               const wodSubtitlu = w.wods ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
               const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null
-              const notRxdLog = isNotRxd(w, prescribedWeightLog, getFormat(w.wods?.type || w.format_type))
+              // Incercam toate semnalele posibile pt tipul real (wods legat,
+              // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
+              // trateaza deja corect cazul cand niciunul nu exista (formatId absent
+              // -> nu presupune "For Time", sare peste verificarea de time cap).
+              const formatTipResolvat = w.wods?.type || w.format_type || (primaEsteHeader ? legacyHeaderTypeOf(linii[0]) : null)
+              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config)
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
-                      {notRxdLog && <span style={{ fontSize: '10px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: '2px 8px' }}>{t.notRxdBadge}</span>}
+                      {notRxdLog && <NotRxdBadge t={t} compact />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteWod && (
@@ -3598,6 +3631,18 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
   )
 }
 
+// Eticheta "Not RX'd" - randata identic in Clasament, JurnalList si
+// WorkoutSharePopup (inainte, 3 stiluri inline usor diferite intre ele, fara
+// niciun motiv functional). `compact` = varianta mica de pe cardurile de
+// Clasament (langa numele participantului).
+function NotRxdBadge({ t, compact }) {
+  return (
+    <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
+      {t.notRxdBadge}
+    </span>
+  )
+}
+
 // Card de felicitare afisat dupa "Save Workout" - branding sala + antrenamentul
 // facut + scorul + variantă + data/ora + un mesaj de felicitare, cu buton de
 // distribuire (Web Share API - pe mobil deschide sheet-ul nativ cu WhatsApp/
@@ -3644,11 +3689,7 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
               <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700' }}>
                 {variantLevel}
               </div>
-              {notRxd && (
-                <div style={{ padding: '4px 10px', borderRadius: '20px', background: '#f0f0f0', color: '#888', fontSize: '11px', fontWeight: '700' }}>
-                  {t.notRxdBadge}
-                </div>
-              )}
+              {notRxd && <NotRxdBadge t={t} />}
             </div>
           )}
           {movements && movements.length > 0 && (
@@ -4387,7 +4428,7 @@ function App() {
   }
 
   const fetchWodLogs = async () => {
-    const { data } = await supabase.from('wod_logs').select('*, wods(name, type, duration, format_config, rx_weight_male, rx_weight_female, intermediate_weight_male, intermediate_weight_female, beginner_weight_male, beginner_weight_female, onramp_weight_male, onramp_weight_female)').eq('member_id', user.id).order('logged_at', { ascending: false })
+    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, ${ALL_WEIGHT_COLUMNS.join(', ')})`).eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -4518,7 +4559,7 @@ function App() {
     const _td = new Date()
     const todayFallback = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
     const targetDate = dateStr || clasamentDate || todayFallback
-    const { data: wodZi } = await supabase.from('wods').select('id, type, duration, name, rx_weight_male, rx_weight_female, intermediate_weight_male, intermediate_weight_female, beginner_weight_male, beginner_weight_female, onramp_weight_male, onramp_weight_female').eq('date', targetDate).maybeSingle()
+    const { data: wodZi } = await supabase.from('wods').select(`id, type, duration, name, format_config, ${ALL_WEIGHT_COLUMNS.join(', ')}`).eq('date', targetDate).maybeSingle()
     setClasamentWodData(wodZi || null)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     if (wodZi?.id) {
@@ -4722,7 +4763,7 @@ function App() {
         variantBg: varianta?.bg || null,
         result: logFields.result, timeResult: logFields.time_result,
         loggedAt: new Date().toISOString(),
-        notRxd: isNotRxd(logFields, prescribedWeight, getFormat(activeLogFormatId)),
+        notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig),
       })
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
