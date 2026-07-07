@@ -54,6 +54,12 @@ function RoundsPartialFields({ movements, roundsCompleted, partialReps, onChange
 // power snatches" -> 15). Membrul reduce doar la miscarile unde nu a ajuns
 // pana la capat (sau pune 0 la cele netouched) - fara "Runde complete",
 // care n-are sens intr-o secventa unica, nu repetata.
+// Fallback-ul pe prescris trebuie sa se aplice DOAR cat timp campul n-a
+// fost atins deloc (curent === undefined) - daca verificam si curent !==
+// '', orice editare care trece prin starea goala (ex. stergi "12" cu
+// backspace ca sa scrii "9": 12 -> 1 -> "" -> 9) sarea inapoi la prescris
+// exact cand campul devenea gol, inainte sa apuci sa scrii cifra noua -
+// facea imposibila introducerea oricarui numar partial, nu doar a lui 0.
 function SequentialPartialFields({ movements, partialReps, onChange, t }) {
   return (
     <div style={{ marginBottom: '14px' }}>
@@ -63,7 +69,7 @@ function SequentialPartialFields({ movements, partialReps, onChange, t }) {
           const prescrisMatch = m.match(/^(\d+)\s+/)
           const prescris = prescrisMatch ? prescrisMatch[1] : ''
           const curent = (partialReps || [])[i]
-          const displayValue = (curent != null && curent !== '') ? curent : prescris
+          const displayValue = curent != null ? curent : prescris
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>{m}</div>
