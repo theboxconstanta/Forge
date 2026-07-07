@@ -823,6 +823,10 @@ function Timer({ onBack, defaultFortime, t }) {
 
 function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
+  // Card-ul de participant se extinde la click, aratand exact ce a logat
+  // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
+  // read-only (fara editare/stergere, e logul altcuiva).
+  const [expandedLogId, setExpandedLogId] = useState(null)
   const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
   const isToday = selectedDate === todayStr
   // getFormat(undefined) cade tacit pe 'For Time' (fortime_or_amrap +
@@ -1134,8 +1138,12 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
                       const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config)
+                      const cardKey = log.id || i
+                      const isExpanded = expandedLogId === cardKey
+                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii } = parseWodLogDetails(log, t)
                       return (
-                        <div key={log.id || i} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}` }}>
+                        <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
+                          style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
                               {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888' }}>#{i + 1}</span>}
@@ -1157,7 +1165,44 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                                 <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
                               )}
                             </div>
+                            <span style={{ fontSize: '13px', color: '#ccc', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
                           </div>
+                          {isExpanded && (
+                            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                              {miscariAfisate.length > 0 && (
+                                <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
+                                  {miscariAfisate.map((m, j) => (
+                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                                  ))}
+                                </div>
+                              )}
+                              {areRezultat && (
+                                <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: miscariAfisate.length > 0 ? '10px' : '0', borderTop: miscariAfisate.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                                  <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
+                                </div>
+                              )}
+                              {wHasSets && (
+                                <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                                  {wSetsParti.map((p, j) => (
+                                    <div key={j} style={{ marginBottom: '6px' }}>
+                                      <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
+                                      <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {noteLog && noteLog.trim() && (
+                                <div>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                                  <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                                </div>
+                              )}
+                              {!areDetalii && (
+                                <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -3357,6 +3402,38 @@ function SortableList({ items, onReorder, onRemove }) {
   )
 }
 
+// Extrage miscarile/rezultatul/seturile/nota unui wod_log din campurile brute
+// (notes/sets/result/time_result/log_meta) - o singura sursa de parsare
+// folosita atat de JurnalList (randul propriu, cu editare/stergere) cat si
+// de Clasament (dropdown-ul altui participant, doar de vizualizat) - fara
+// asta, cele 2 ecrane ar fi trebuit sa parseze aceleasi campuri separat, cu
+// risc sa diverga.
+function parseWodLogDetails(w, t) {
+  const parts = (w.notes || '').split('\n---\n')
+  const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
+  const noteLog = parts.length > 1 ? parts[1] : null
+  const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
+  // Formatul detectat din prima linie a header-ului text vechi (ex. "AMRAP
+  // 20:00") - null daca nu exista/nu se recunoaste. Folosit atat ca sa stim
+  // cate linii sa taiem de la inceputul listei de miscari, cat si ca ultim
+  // fallback pt tipul real al logului (vezi isNotRxd la ambele ecrane).
+  const headerFormatId = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
+  const miscariAfisate = linii.slice(headerFormatId ? 1 : 0)
+  const wHasSets = w.sets && Object.keys(w.sets).length > 0
+  const wSetsParti = wHasSets ? Object.entries(w.sets).map(([cheie, seturi]) => ({
+    cheie, seturiTxt: (seturi || []).map((set, si) => {
+      const bucati = []
+      if (set.reps) bucati.push(`${set.reps} reps`)
+      if (set.weight) bucati.push(`${set.weight}`)
+      return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
+    }).join(' · '),
+  })) : []
+  const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
+  const areRezultat = rezultatBucati.length > 0
+  const areDetalii = miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets || areRezultat
+  return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
+}
+
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, t, lang }) {
   const [deschis, setDeschis] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -3378,30 +3455,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
           <div key={entry.key}>
             <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{dataAfisata}</div>
             {w && (() => {
-              const parts = (w.notes || '').split('\n---\n')
-              const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
-              const noteLog = parts.length > 1 ? parts[1] : null
               const logKey = w.id
               const isOpen = deschis === logKey
-              const linii = miscariLog ? miscariLog.trim().split('\n').filter(Boolean) : []
-              const primaEsteHeader = linii.length > 0 && !!legacyHeaderTypeOf(linii[0])
-              const wodHeader = primaEsteHeader ? linii[0] : null
-              const miscariAfisate = linii.slice(primaEsteHeader ? 1 : 0)
-              const wHasSets = w.sets && Object.keys(w.sets).length > 0
-              const wSetsParti = wHasSets ? Object.entries(w.sets).map(([cheie, seturi]) => ({
-                cheie, seturiTxt: (seturi || []).map((set, si) => {
-                  const bucati = []
-                  if (set.reps) bucati.push(`${set.reps} reps`)
-                  if (set.weight) bucati.push(`${set.weight}`)
-                  return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
-                }).join(' · '),
-              })) : []
-              // Rezultatul (timp/scor/seturi/completat) - afisat o singura data, in
-              // sectiunea REZULTAT de mai jos (nu si ca chip-uri in randul de sus,
-              // care ar duplica aceeasi informatie ca titlul + REZULTAT).
-              const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
-              const areRezultat = rezultatBucati.length > 0
-              const areDetalii = miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets || areRezultat
+              const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
               // Titlu: "Nume WOD" | Varianta (daca WOD-ul are nume) - altfel doar
               // varianta, ca inainte. Subtitlu: formatul + durata reale ale WOD-ului
               // legat (ex. "AMRAP 20:00") - la logare libera (fara wod_id) nu exista
@@ -3414,7 +3470,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
               // trateaza deja corect cazul cand niciunul nu exista (formatId absent
               // -> nu presupune "For Time", sare peste verificarea de time cap).
-              const formatTipResolvat = w.wods?.type || w.format_type || (primaEsteHeader ? legacyHeaderTypeOf(linii[0]) : null)
+              const formatTipResolvat = w.wods?.type || w.format_type || headerFormatId
               const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config)
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
