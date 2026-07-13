@@ -7,7 +7,7 @@ import {
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
-  maxWeightFromSets, setsDisplayScore,
+  maxWeightFromSets, setsDisplayScore, isSequentialFormat,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -136,6 +136,25 @@ describe('isNotRxd', () => {
   })
   it('Partner WOD cu baseFormat For Time, fara time_result -> Not RXd', () => {
     expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'For Time' })).toBe(true)
+  })
+})
+
+describe('isSequentialFormat', () => {
+  it('For Time fara config sau cu structura implicita "Sequence" -> secvential', () => {
+    expect(isSequentialFormat('For Time', null)).toBe(true)
+    expect(isSequentialFormat('For Time', {})).toBe(true)
+    expect(isSequentialFormat('For Time', { structure: 'Sequence' })).toBe(true)
+  })
+  it('For Time cu structura explicita "Repeated Rounds" -> NU e secvential (identic cu RFT)', () => {
+    expect(isSequentialFormat('For Time', { structure: 'Repeated Rounds' })).toBe(false)
+  })
+  it('Ladder e mereu secvential, indiferent de config (schema descrescatoare nu are varianta "runde repetate")', () => {
+    expect(isSequentialFormat('Ladder', null)).toBe(true)
+    expect(isSequentialFormat('Ladder', { structure: 'Repeated Rounds' })).toBe(true)
+  })
+  it('RFT si alte formate fara sequentialPartial in catalog -> niciodata secvential', () => {
+    expect(isSequentialFormat('RFT', null)).toBe(false)
+    expect(isSequentialFormat('AMRAP', null)).toBe(false)
   })
 })
 

@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, effectiveScoreMode } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, effectiveScoreMode, isSequentialFormat } from './workoutFormats'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
@@ -296,7 +296,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   // effectiveScoreMode e aceeasi functie folosita de isNotRxd - un singur loc
   // care decide scoreMode-ul real, nu 2 implementari care pot desincroniza.
   const scoreMode = effectiveScoreMode(formatId, config) || format.scoreMode
-  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={format.sequentialPartial} prescribedWeight={prescribedWeight} />
+  return <ScoredFields scoreMode={scoreMode} movements={movements || []} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

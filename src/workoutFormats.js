@@ -41,14 +41,21 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'amrap',
     config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
   },
-  // Spre deosebire de RFT (runde reale, repetate), "For Time" e de obicei o
-  // secventa (ex. "TO THE SKY": 15-12-9-6-3) - "runde complete" nu are sens
-  // aici. sequentialPartial: daca nu termini in time cap, loghezi direct
-  // cate repetari ai facut la FIECARE miscare din lista (nu doar "runda
-  // partiala" a unei runde repetate) - vezi FormatLogger.
+  // "For Time" poate insemna 2 lucruri diferite: o secventa unica de miscari
+  // distincte (ex. "TO THE SKY": 15-12-9-6-3 - "runde complete" nu are sens
+  // aici) SAU runde repetate din aceleasi miscari (ex. "7 rounds for time
+  // of: ..." - identic cu RFT, doar numit "For Time" de admin). config.structure
+  // marcheaza explicit care caz e - vezi isSequentialFormat mai jos, singura
+  // sursa de adevar (nu mai citi direct .sequentialPartial static, poate fi
+  // gresit pt "Repeated Rounds"). Sequence: daca nu termini in time cap,
+  // loghezi direct cate repetari ai facut la FIECARE miscare din lista (nu
+  // doar "runda partiala" a unei runde repetate) - vezi FormatLogger.
   'For Time': {
     family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
-    config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
+    config: {
+      structure: { type: 'select', options: ['Sequence', 'Repeated Rounds'], required: true, default: 'Sequence', labelKey: 'fmtForTimeStructure' },
+      timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
+    },
   },
   'RFT': {
     family: 'scored', scoreMode: 'fortime_or_amrap',
@@ -314,6 +321,24 @@ export function effectiveScoreMode(formatId, config) {
   if (!formatId) return null
   if (formatId === 'Partner WOD' && config?.baseFormat) return config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap'
   return getFormat(formatId)?.scoreMode ?? null
+}
+
+// 'For Time' e ambiguu: poate fi o secventa unica (21-15-9, gen "TO THE
+// SKY") SAU runde repetate din aceleasi miscari (ex. "7 rounds for time of:
+// ...", identic cu RFT) - config.structure ('Repeated Rounds') marcheaza
+// explicit al doilea caz. Bug real gasit: un WOD "7 rounds for time of..."
+// tratat implicit ca secventa facea ca cineva cu doar 6 din 7 runde complete
+// (dar cu un time_result populat oricum) sa fie clasat pe Clasament ca
+// "terminat", inaintea celor care chiar terminasera toate cele 7 runde -
+// FormatLogger arata (gresit) reps per miscare in loc de runde
+// complete+reps partiale, iar sortLogs nu avea cum sa distinga runda
+// partiala de o secventa. 'Ladder' ramane intotdeauna o secventa (schema
+// descrescatoare e prin definitie secventiala, fara varianta "runde
+// repetate"). Orice cod care citea inainte direct `.sequentialPartial`
+// (static, din catalog) trebuie sa foloseasca acum aceasta functie.
+export function isSequentialFormat(formatId, config) {
+  if (formatId === 'For Time') return config?.structure !== 'Repeated Rounds'
+  return !!getFormat(formatId)?.sequentialPartial
 }
 
 // Numarul de la inceputul textului de greutate (ex. "61kg" -> 61, "61.5 KG"

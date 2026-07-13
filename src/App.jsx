@@ -23,7 +23,7 @@ import {
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, canonicalWeightKey,
-  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore,
+  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -940,7 +940,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
     // nu are un numar de "runde" real de comparat (parseScore ar extrage
     // doar numarul primei miscari din text, irelevant) - departajarea se
     // face direct pe total reps facute (partialRepsOf).
-    const isSequential = !!wodZiFormat?.sequentialPartial
+    const isSequential = isSequentialFormat(wodZiData?.type, wodZiData?.format_config)
     // Fiecare comparatie numerica poate produce NaN cand ambele loguri au
     // aceeasi valoare "goala" (Infinity - Infinity la timp) - un comparator
     // Array.sort care intoarce NaN nu are comportament garantat de
@@ -4532,7 +4532,7 @@ function App() {
   }
 
   const fetchSkillLogs = async () => {
-    const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill, skill2_name, skill2_type, skill2)').eq('member_id', user.id)
+    const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill, skill_format_config, skill2_name, skill2_type, skill2, skill2_format_config)').eq('member_id', user.id)
     if (data) setSkillLogs(data)
   }
 
@@ -4572,7 +4572,8 @@ function App() {
       // timp - fara verificarea skillLogRoundsCompleted, acele date se
       // pierdeau silentios (nu intrau niciodata pe ramura AMRAP). La For
       // Time/Ladder (sequentialPartial), semnalul e absenta Timpului.
-      const isSequentialSkill = !!format.sequentialPartial
+      const skillFormatConfigCurent = esteSlot2 ? wodZiData.skill2_format_config : wodZiData.skill_format_config
+      const isSequentialSkill = isSequentialFormat(skillType, skillFormatConfigCurent)
       const useRepsSkill = isSequentialSkill
         ? !skillLogTime.trim()
         : (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && skillLogRoundsCompleted.trim() !== ''))
@@ -4780,7 +4781,7 @@ function App() {
     // nu mai exista camp de "runde complete" separat - semnalul ca membrul
     // n-a terminat e absenta Timpului; in acel caz compunem direct din
     // repetarile per miscare (cu fallback la prescris pt cele netouched).
-    const isSequential = !!format.sequentialPartial
+    const isSequential = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
     const useReps = isSequential
       ? !wodTime.trim()
       : (format.scoreMode === 'amrap'
@@ -5882,7 +5883,7 @@ function App() {
                 // format ca orice rezultat salvat (non-null) e o compunere de
                 // repetari per miscare, fara sa mai ghicim din tiparul textului.
                 const areRundeCompuse = /^\d+\s+runde/.test((log.result || '').trim())
-                if (format.sequentialPartial) {
+                if (isSequentialFormat(formatId, log.wods?.format_config)) {
                   const partialArr = log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => '')
                   setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
                 } else if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
@@ -5911,7 +5912,8 @@ function App() {
                 const formatEdit = getFormat(skillTypeEdit)
                 const skillMiscariEdit = (sl.slot === 2 ? sl.wods?.skill2 : sl.wods?.skill) || []
                 const areRundeCompuse = /^\d+\s+runde/.test((sl.result || '').trim())
-                if (formatEdit.sequentialPartial) {
+                const skillFormatConfigEdit = sl.slot === 2 ? sl.wods?.skill2_format_config : sl.wods?.skill_format_config
+                if (isSequentialFormat(skillTypeEdit, skillFormatConfigEdit)) {
                   const partialArr = sl.result ? parsePartialText(sl.result, skillMiscariEdit) : skillMiscariEdit.map(() => '')
                   setSkillLogResult(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps(partialArr)
                 } else if (formatEdit.scoreMode === 'amrap' || (formatEdit.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
