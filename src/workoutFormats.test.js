@@ -8,6 +8,7 @@ import {
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
+  movementsChanged, isMixedCategory,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -136,6 +137,46 @@ describe('isNotRxd', () => {
   })
   it('Partner WOD cu baseFormat For Time, fara time_result -> Not RXd', () => {
     expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'For Time' })).toBe(true)
+  })
+})
+
+describe('movementsChanged', () => {
+  it('lista identica -> neschimbata', () => {
+    expect(movementsChanged(['21 Thrusters @ 43kg', '15 Pull-ups'], ['21 Thrusters @ 43kg', '15 Pull-ups'])).toBe(false)
+  })
+  it('trim + case-insensitive -> tot neschimbata', () => {
+    expect(movementsChanged([' 21 THRUSTERS @ 43KG ', '15 pull-ups'], ['21 Thrusters @ 43kg', '15 Pull-ups'])).toBe(false)
+  })
+  it('o miscare rescrisa (greutate diferita) -> schimbata', () => {
+    expect(movementsChanged(['21 Thrusters @ 24kg', '15 Pull-ups'], ['21 Thrusters @ 43kg', '15 Pull-ups'])).toBe(true)
+  })
+  it('miscare inlocuita cu alta -> schimbata', () => {
+    expect(movementsChanged(['21 Thrusters @ 43kg', '15 Ring Rows'], ['21 Thrusters @ 43kg', '15 Pull-ups'])).toBe(true)
+  })
+  it('numar diferit de miscari (adaugata/stearsa) -> schimbata', () => {
+    expect(movementsChanged(['21 Thrusters @ 43kg', '15 Pull-ups', '9 Burpees'], ['21 Thrusters @ 43kg', '15 Pull-ups'])).toBe(true)
+  })
+  it('fara lista prescrisa (WOD vechi/necompletat) -> nu poate fi "schimbata"', () => {
+    expect(movementsChanged(['21 Thrusters @ 24kg'], [])).toBe(false)
+    expect(movementsChanged(['21 Thrusters @ 24kg'], null)).toBe(false)
+  })
+  it('fara lista logata -> neschimbata (nimic de comparat)', () => {
+    expect(movementsChanged(null, ['21 Thrusters @ 43kg'])).toBe(false)
+  })
+})
+
+describe('isMixedCategory', () => {
+  it('greutate si miscari identice prescrisului -> nu e Mixed', () => {
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(false)
+  })
+  it('doar greutatea difera -> Mixed', () => {
+    expect(isMixedCategory('24kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(true)
+  })
+  it('doar miscarile difera -> Mixed', () => {
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg', '15 Ring Rows'], ['21 Thrusters @ 61kg', '15 Pull-ups'])).toBe(true)
+  })
+  it('nimic prescris (WOD vechi) -> nu poate fi Mixed', () => {
+    expect(isMixedCategory('24kg', null, ['orice'], null)).toBe(false)
   })
 })
 

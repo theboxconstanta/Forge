@@ -388,6 +388,31 @@ export function isNotRxd(log, prescribedWeight, formatId, config) {
   return greutateDiferita || neterminatInTimp
 }
 
+// Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,
+// stearsa, sau doar rescrisa) de lista prescrisa a variantei - membrul poate
+// edita liber miscarile la logarea WOD-ului oficial (SortableList permite tap
+// pentru rescriere), nu doar reordonare. Compara pozitie cu pozitie (nu ca
+// set neordonat) - o simpla reordonare tot conteaza ca "diferita" aici,
+// intentionat: pe Clasament(getSectionLogs) sortarea deja ignora ordinea
+// miscarilor, deci singurul motiv sa difere pozitional e ca a schimbat ceva.
+export function movementsChanged(loggedMovements, prescribedMovements) {
+  if (!Array.isArray(prescribedMovements) || prescribedMovements.length === 0) return false
+  if (!Array.isArray(loggedMovements)) return false
+  if (loggedMovements.length !== prescribedMovements.length) return true
+  return loggedMovements.some((m, i) => (m || '').trim().toLowerCase() !== (prescribedMovements[i] || '').trim().toLowerCase())
+}
+
+// "Mixed Categories" (Clasament) = compozitia antrenamentului difera de cea
+// prescrisa variantei - greutate diferita SAU miscari schimbate. Diferit de
+// isNotRxd (care include si "neterminat in time cap" - o chestiune de
+// performanta, nu de compozitie): cineva care a facut EXACT miscarile si
+// greutatea prescrisa dar n-a terminat in time cap ramane in categoria lui
+// normala (doar cu badge-ul "Not RXd"), nu e mutat la Mixed Categories.
+export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements) {
+  const greutateDiferita = !!prescribedWeight?.trim() && !!weightLogged?.trim() && !weightMatches(weightLogged, prescribedWeight)
+  return greutateDiferita || movementsChanged(loggedMovements, prescribedMovements)
+}
+
 // Compune/parseaza header-ul text "TIP mm:ss" folosit de Hero WOD-uri
 // (custom_hero_wods.format) si de header-ul WOD-ului zilei din wod_logs.notes
 // - generalizarea composeHeroFormat()/parseHeroFormat() din App.jsx, acum

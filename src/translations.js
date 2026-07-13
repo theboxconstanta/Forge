@@ -417,7 +417,7 @@ export const TRANSLATIONS = {
       return n === 1 ? 'participant' : 'participanți'
     },
     clasamentAnonymous: 'Anonim',
-    clasamentScaledGroupLabel: (weight) => `Scaled · ${weight}`,
+    clasamentMixedCategoriesLabel: 'Mixed Categories',
 
     // Feed
     feedTitle: 'Feed',
@@ -1173,7 +1173,7 @@ export const TRANSLATIONS = {
     clasamentEmptySubtitle: 'Be the first to log today!',
     clasamentParticipantWord: (n) => n === 1 ? 'participant' : 'participants',
     clasamentAnonymous: 'Anonymous',
-    clasamentScaledGroupLabel: (weight) => `Scaled · ${weight}`,
+    clasamentMixedCategoriesLabel: 'Mixed Categories',
 
     // Feed
     feedTitle: 'Feed',

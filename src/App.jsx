@@ -22,8 +22,9 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, canonicalWeightKey,
+  formatTypeLabel, isNotRxd, weightKeyForVariant,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
+  isMixedCategory,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -1192,58 +1193,64 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
 
   const totalLogs = NIVELE.reduce((acc, n) => acc + getSectionLogs(n.id).length, 0)
 
-  // Cine scaleaza greutatea nu poate concura corect cu cine face greutatea
-  // integrala - fara asta, cineva la 40kg si cineva la 61kg apareau pe
-  // aceeasi lista, clasati doar dupa timp/reps, ca si cum ar fi comparabili.
-  // Daca varianta n-are greutate prescrisa configurata, comportament identic
-  // cu inainte (un singur grup, fara header suplimentar) - compatibil 100%
-  // cu WOD-urile vechi. `sectionLogs` e deja sortat de sortLogs() - un filtru
-  // pe un array sortat pastreaza ordinea relativa, deci fiecare subgrup
-  // ramane corect sortat intern fara sa resortam.
+  // Cine a schimbat greutatea SAU miscarile fata de cele prescrise variantei
+  // nu poate concura corect cu cine a facut exact ce a fost programat - fara
+  // asta, cineva la 40kg si cineva la 61kg (sau cineva cu alte miscari cu
+  // totul) apareau pe aceeasi lista, clasati doar dupa timp/reps, ca si cum
+  // ar fi comparabili. Ii scoatem intr-o categorie separata, "Mixed
+  // Categories", grupata pe varianta lor originala (nu ii amestecam intre ei
+  // pe nivele diferite) - vezi isMixedCategory in workoutFormats.js. Daca
+  // varianta n-are greutate/miscari prescrise configurate, comportament
+  // identic cu inainte (nimeni nu poate fi "Mixed"). `sectionLogs` e deja
+  // sortat de sortLogs() - un filtru pe un array sortat pastreaza ordinea
+  // relativa, deci fiecare subgrup ramane corect sortat intern fara sa
+  // resortam.
   // Greutatea prescrisa difera pe gen (RX barbati 61kg vs RX femei 43kg) -
   // fiecare log se compara cu prescrisul GENULUI SAU, nu cu o singura valoare
   // per varianta (relevant mai ales pe tab-ul "Toti", unde sectiunea
   // amesteca ambele genuri). Daca genul lui n-are greutate configurata deloc,
   // e considerat RX implicit (identic cu comportamentul dinainte de feature).
   const prescribedWeightFor = (nivelId, log) => wodZiData?.[weightKeyForVariant(nivelId, log.profile?.gender)] || null
-  const getWeightGroups = (nivelId, sectionLogs) => {
-    // Un singur pas peste sectionLogs (nu 2 filter-e care re-evalueaza isRx
-    // per log) - foloseste weightMatches (aceeasi normalizare ca isNotRxd),
-    // altfel gruparea putea decide diferit fata de badge-ul "Not RXd" pt
-    // acelasi log. Cheia de grupare foloseste canonicalWeightKey (acelasi
-    // numeric/text normalizat) - altfel "40kg" si "40KG" (aceeasi greutate,
-    // scrisa diferit) ar aparea in 2 sub-grupuri separate in loc sa fie
-    // clasati impreuna. Pastram si textul original (primul intalnit) pentru
-    // afisare - cheia canonica poate fi doar numarul, fara unitate.
+  const prescribedMovementsFor = (nivelId) => wodZiData?.[`movements_${nivelId.toLowerCase()}`] || null
+  const splitRxSiMixed = (nivelId, sectionLogs) => {
     const rxLogs = []
-    const scaledByWeight = {}
+    const mixedLogs = []
+    const prescribedMovements = prescribedMovementsFor(nivelId)
     sectionLogs.forEach(log => {
-      // prescribedWeight atasat direct pe log (nu doar folosit local) - randarea
-      // de mai jos il reutilizeaza la isNotRxd, in loc sa cheme prescribedWeightFor
-      // a treia oara pt acelasi log.
+      // prescribedWeight/prescribedMovements atasate direct pe log (nu doar
+      // folosite local) - randarea de mai jos le reutilizeaza la isNotRxd, in
+      // loc sa cheme prescribedWeightFor a doua oara pt acelasi log.
       const prescribedWeight = prescribedWeightFor(nivelId, log)
-      const logCuGreutate = { ...log, _prescribedWeight: prescribedWeight }
-      const isRx = !prescribedWeight || !log.weight_logged?.trim() || weightMatches(log.weight_logged, prescribedWeight)
-      if (isRx) { rxLogs.push(logCuGreutate); return }
-      const raw = log.weight_logged.trim()
-      const key = canonicalWeightKey(raw)
-      if (!scaledByWeight[key]) scaledByWeight[key] = { display: raw, logs: [] }
-      scaledByWeight[key].logs.push(logCuGreutate)
+      const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId }
+      // wod_logs nu are o coloana structurata "movements" - miscarile efectiv
+      // logate (posibil editate de membru fata de prescris, vezi wodMiscariCustom)
+      // sunt scrise ca text liber in `notes` (impreuna cu header-ul de format si
+      // nota membrului) - parseWodLogDetails e acelasi parser folosit de Jurnal,
+      // singura sursa reala de adevar pt ce a logat efectiv membrul.
+      const { miscariAfisate } = parseWodLogDetails(log, t)
+      const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements)
+      if (isMixed) mixedLogs.push(logCuDetalii)
+      else rxLogs.push(logCuDetalii)
     })
-    const scaledGroups = Object.entries(scaledByWeight)
-      .map(([key, { display, logs }]) => ({ weight: key, label: t.clasamentScaledGroupLabel(display), logs }))
-      .sort((a, b) => {
-        const na = parseFloat(a.weight), nb = parseFloat(b.weight)
-        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return nb - na
-        if (Number.isNaN(na) !== Number.isNaN(nb)) return Number.isNaN(na) ? 1 : -1
-        return 0
-      })
-    // Fara nimeni scalat (sau varianta n-are greutate prescrisa configurata
-    // pe niciun gen), un singur grup, fara header suplimentar - identic cu
-    // comportamentul dinainte de feature.
-    if (scaledGroups.length === 0) return [{ weight: null, label: null, logs: rxLogs }]
-    return [{ weight: null, label: null, logs: rxLogs }, ...scaledGroups]
+    return { rxLogs, mixedLogs }
   }
+  const niveleData = NIVELE.map(nivel => ({ nivel, ...splitRxSiMixed(nivel.id, getSectionLogs(nivel.id)) }))
+  const toateLogurileMixed = niveleData.flatMap(nd => nd.mixedLogs)
+  // Sectiunile de afisat: cele 4 nivele normale (doar log-urile care respecta
+  // exact prescrisul), plus - daca exista macar unul - o a 5-a sectiune
+  // "Mixed Categories", cu cate un subgrup per nivel original (RX/
+  // Intermediate/Beginner/OnRamp), NU amestecati intre ei.
+  const sectionsDeAfisat = [
+    ...niveleData
+      .map(({ nivel, rxLogs }) => ({ nivel, weightGroups: [{ weight: null, label: null, logs: rxLogs }] }))
+      .filter(s => s.weightGroups[0].logs.length > 0),
+    ...(toateLogurileMixed.length > 0 ? [{
+      nivel: { id: t.clasamentMixedCategoriesLabel, culoare: '#5B4B8A', bg: '#EFEAF9' },
+      weightGroups: NIVELE
+        .map(n => ({ weight: n.id, label: n.id, logs: toateLogurileMixed.filter(l => l._nivelOriginal === n.id) }))
+        .filter(g => g.logs.length > 0),
+    }] : []),
+  ]
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -1285,12 +1292,10 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
         </div>
       ) : (
         <div>
-          {NIVELE.map(nivel => {
-            const sectionLogs = getSectionLogs(nivel.id)
-            if (sectionLogs.length === 0) return null
+          {sectionsDeAfisat.map(({ nivel, weightGroups }) => {
+            const sectionLogs = weightGroups.flatMap(g => g.logs)
             const isForTime = sectionLogs.some(l => l.time_result) &&
               sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length
-            const weightGroups = getWeightGroups(nivel.id, sectionLogs).filter(g => g.logs.length > 0)
             return (
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
                 {/* Header secțiune */}
@@ -4988,7 +4993,7 @@ function App() {
     const _td = new Date()
     const todayFallback = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
     const targetDate = dateStr || clasamentDate || todayFallback
-    const { data: wodZi } = await supabase.from('wods').select(`id, type, duration, name, format_config, ${ALL_WEIGHT_COLUMNS.join(', ')}`).eq('date', targetDate).maybeSingle()
+    const { data: wodZi } = await supabase.from('wods').select(`id, type, duration, name, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')}`).eq('date', targetDate).maybeSingle()
     setClasamentWodData(wodZi || null)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     if (wodZi?.id) {
