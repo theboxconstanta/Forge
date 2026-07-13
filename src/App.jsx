@@ -5113,17 +5113,26 @@ function App() {
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
-      const prescribedWeight = varianta ? (wodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
-      setWorkoutSharePopup({
-        wodName: wodZiData?.name || null,
-        movements: miscariFinale,
-        variantLevel: varianta?.nivel || null,
-        variantColor: varianta?.culoare || null,
-        variantBg: varianta?.bg || null,
-        result: logFields.result, timeResult: logFields.time_result,
-        loggedAt: new Date().toISOString(),
-        notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig),
-      })
+      // Pop-up-ul de felicitare (cu numele si scorul WOD-ului oficial al
+      // zilei) are sens doar cand membrul chiar a logat acea varianta
+      // oficiala (RX/Intermediate/Beginner/OnRamp) - nu si la o logare
+      // libera/separata (Logare Noua), chiar daca exista un WOD oficial
+      // programat in aceeasi zi (bug raportat: pop-up-ul aparea cu numele
+      // WOD-ului zilei - "GET UP" - la o logare libera de tip "Complex"
+      // care n-avea nicio legatura cu acel WOD).
+      if (variantaAleasa !== null) {
+        const prescribedWeight = varianta ? (wodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
+        setWorkoutSharePopup({
+          wodName: wodZiData?.name || null,
+          movements: miscariFinale,
+          variantLevel: varianta?.nivel || null,
+          variantColor: varianta?.culoare || null,
+          variantBg: varianta?.bg || null,
+          result: logFields.result, timeResult: logFields.time_result,
+          loggedAt: new Date().toISOString(),
+          notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig),
+        })
+      }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
