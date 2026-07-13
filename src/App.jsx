@@ -4048,14 +4048,28 @@ function App() {
   // cardul lui, sub aceeasi data. skillLogsArr e array (nu un singur log) -
   // cu SKILL 2 pot exista 2 skill_logs pentru acelasi wod_id (slot 1 si 2),
   // care altfel s-ar suprascrie unul pe altul in map.
+  // Fiecare wod_logs primeste propriul card, cheie pe id-ul LUI, nu pe
+  // wod_id - un membru poate avea mai multe loguri cu ACELASI wod_id (WOD-ul
+  // oficial al zilei + o a doua logare libera din "Logare Noua", care
+  // primeste tot wod_id-ul zilei cat timp exista un WOD oficial azi). Cheia
+  // veche (l.wod_id || ...) colapsa gresit toate logurile cu acelasi wod_id
+  // intr-un singur card, iar cel mai vechi castiga (ultimul din bucla, dupa
+  // sortarea descrescatoare) - al 2-lea antrenament aparea "nesalvat" desi
+  // era in baza de date, doar ascuns de Jurnal (bug confirmat cu date reale,
+  // 10 cazuri gasite live). Skill Work se asociaza cu logul WOD-ului
+  // OFICIAL al acelei zile (variant_level e unul dintre nivelele reale, nu
+  // un tip liber ales la "Logare Noua") - nu cu orice log care intampla sa
+  // aiba acelasi wod_id.
+  const NIVELE_OFICIALE = ['RX', 'Intermediate', 'Beginner', 'OnRamp']
   const jurnalEntries = useMemo(() => {
     const map = new Map()
     wodLogs.forEach(l => {
-      const key = l.wod_id || `wodlog-${l.id}`
-      map.set(key, { ...(map.get(key) || {}), key, date: (l.logged_at || '').slice(0, 10), wodLog: l })
+      const key = `wodlog-${l.id}`
+      map.set(key, { key, date: (l.logged_at || '').slice(0, 10), wodLog: l })
     })
     skillLogs.forEach(l => {
-      const key = l.wod_id || `skilllog-${l.id}`
+      const wodOficial = wodLogs.find(w => w.wod_id != null && w.wod_id === l.wod_id && NIVELE_OFICIALE.includes(w.variant_level))
+      const key = wodOficial ? `wodlog-${wodOficial.id}` : (l.wod_id ? `skilllog-wod-${l.wod_id}` : `skilllog-${l.id}`)
       const existing = map.get(key) || { key, date: (l.logged_at || '').slice(0, 10) }
       map.set(key, { ...existing, skillLogsArr: [...(existing.skillLogsArr || []), l] })
     })
