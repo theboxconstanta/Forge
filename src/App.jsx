@@ -2234,6 +2234,32 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
 
   const parseLiniiWod = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
 
+  // Extrage greutatea dintr-o linie de miscare deja normalizata (ex. "21
+  // Thrusters @ 43kg" sau "21 Thrusters @ 61/43kg") - "X/Y" e conventia
+  // RX barbati/femei (mai greu/mai usor), o singura valoare se aplica
+  // ambelor genuri (majoritatea miscarilor scalate n-au greutate diferentiata
+  // pe gen scrisa explicit in text).
+  const extractGreutateDinMiscare = (text) => {
+    const m = text.match(/@\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*(kg|lbs)/i)
+    if (!m) return null
+    const unit = m[3].toLowerCase()
+    const male = `${m[1]}${unit}`
+    const female = m[2] ? `${m[2]}${unit}` : male
+    return { male, female }
+  }
+  // Campul "Greutate M/F" (folosit la detectarea "Not RXd" - vezi isNotRxd in
+  // workoutFormats.js) e separat de greutatea scrisa in miscari - un coach
+  // care compune WOD-ul (Paste rapid sau manual) si scrie "21 Thrusters @
+  // 43kg" fara sa completeze SI campul separat lasa sistemul fara nimic de
+  // comparat, deci Clasamentul nu mai separa pe cine a scalat. Auto-completam
+  // din prima miscare cu greutate gasita, DOAR daca ambele campuri (M si F)
+  // sunt goale inca - nu suprascriem o valoare pusa explicit de admin.
+  const autoFillGreutateDacaGoala = (key, linii) => {
+    const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
+    if (!gasita) return
+    setWodVarianteWeight(prev => (prev[key].male || prev[key].female) ? prev : { ...prev, [key]: gasita })
+  }
+
   // Text ramas in caseta "Paste rapid" fara sa se fi apasat explicit "Adauga
   // din text" era pierdut silentios la Salvare - un coach care lipea text la
   // toate cele 4 variante dar uita sa apese butonul individual pentru una
@@ -2251,6 +2277,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       ramasCeva = true
       const linii = text.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
       efectiv = { ...efectiv, [key]: [...efectiv[key], ...linii] }
+      autoFillGreutateDacaGoala(key, linii)
     }
     if (ramasCeva) {
       setWodVariante(efectiv)
@@ -3335,7 +3362,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                         onRemove={(i) => setWodVariante(prev => ({ ...prev, [v.key]: prev[v.key].filter((_, j) => j !== i) }))}
                       />
                       <MiscareQuickAdd value={wodVarianteQuickAdd[v.key]} onChange={(val) => setWodVarianteQuickAdd(prev => ({ ...prev, [v.key]: val }))}
-                        onAdd={(text) => setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], text] }))}
+                        onAdd={(text) => {
+                          setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], text] }))
+                          autoFillGreutateDacaGoala(v.key, [text])
+                        }}
                         placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
                       <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
                         placeholder={t.adminWodVariantPastePlaceholder} rows={3}
@@ -3345,6 +3375,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                           const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
                           setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
                           setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
+                          autoFillGreutateDacaGoala(v.key, linii)
                         }}
                           style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
                           {t.adminWodVariantPasteButton}
