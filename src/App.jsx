@@ -3754,6 +3754,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const skillOpen = deschisSkill === skillKey
               const esteSlot2 = sl.slot === 2
               const skillTitleName = esteSlot2 ? sl.wods?.skill2_name : sl.wods?.skill_name
+              // Formatele family:'sets' fara scoringMode configurat (Complex,
+              // Weightlifting, Strength Sets, Build to Heavy/1RM, Death By
+              // Weight, Superset) nu arata NICIUN rezultat rezumat - doar
+              // defalcarea pe runde, ingropata in dropdown-ul expandat. Acelasi
+              // gol ca la Clasament (reparat cu setsDisplayScore) - membrul
+              // trebuia sa citeasca fiecare runda ca sa afle cea mai mare
+              // greutate cu care a terminat, in loc s-o vada dintr-o privire.
+              const skillFormatId = esteSlot2 ? sl.wods?.skill2_type : sl.wods?.skill_type
+              const skillFormatConfigActual = esteSlot2 ? sl.wods?.skill2_format_config : sl.wods?.skill_format_config
+              const skillScor = hasSets ? setsDisplayScore(skillFormatId, skillFormatConfigActual, sl.sets) : null
               const parti = []
               if (hasSets) {
                 Object.entries(sl.sets).forEach(([miscare, seturi]) => {
@@ -3801,6 +3811,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   </div>
                   {skillOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                      {skillScor != null && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{skillScor}</div>
+                        </div>
+                      )}
                       {hasSets ? (
                         <div style={{ marginBottom: sl.notes ? '10px' : 0 }}>
                           {parti.map((p, j) => (
