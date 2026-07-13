@@ -1330,7 +1330,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config)
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
-                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii } = parseWodLogDetails(log, t)
+                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t)
+                      // Family 'sets' fara scoringMode configurat (Complex,
+                      // Weightlifting, Build to Heavy/1RM etc.) - rezultatBucati
+                      // brut arata doar "X seturi" (fara nicio greutate), aceeasi
+                      // lipsa reparata deja la headline-ul "result" de mai sus -
+                      // prepend acelasi scor si in detaliul expandat.
+                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result, ...rezultatBucatiRaw] : rezultatBucatiRaw
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
@@ -3647,7 +3653,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
             {w && (() => {
               const logKey = w.id
               const isOpen = deschis === logKey
-              const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
+              const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
               // Titlu: "Nume WOD" | Varianta (daca WOD-ul are nume) - altfel doar
               // varianta, ca inainte. Subtitlu: formatul + durata reale ale WOD-ului
               // legat (ex. "AMRAP 20:00") - la logare libera (fara wod_id) nu exista
@@ -3662,6 +3668,13 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // -> nu presupune "For Time", sare peste verificarea de time cap).
               const formatTipResolvat = w.wods?.type || w.format_type || headerFormatId
               const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config)
+              // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
+              // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
+              // fara nicio greutate (bug raportat: un Complex cu greutate maxima
+              // 65kg logat separat aratat doar "10 seturi" in Jurnal). Aceeasi
+              // functie folosita deja la Clasament si la cardul de Skill Work.
+              const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, w.wods?.format_config, w.sets) : null
+              const rezultatBucati = wSetsScore != null ? [wSetsScore, ...rezultatBucatiRaw] : rezultatBucatiRaw
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -5056,16 +5069,25 @@ function App() {
     // format_config, doar wods) - fara linia asta, valoarea era pierduta
     // complet la salvare (se vedea in formular, dar disparea dupa "Salveaza").
     const freeLogConfigDesc = variantaAleasa === null ? describeFormatConfig(wodTip, wodFormatConfig, t) : ''
-    const wodHeaderLine = wodZiData
+    // wodHeaderLine si wod_id decid dupa variantaAleasa (a ales o varianta
+    // oficiala RX/Intermediate/Beginner/OnRamp?), NU dupa simpla existenta a
+    // unui WOD oficial azi (wodZiData) - o "Logare Noua" libera facuta in
+    // aceeasi zi cu un WOD oficial programat nu are nicio legatura cu acel
+    // WOD, chiar daca ambele exista in acceasi zi. Bug raportat: o logare
+    // libera "Complex" aparea in Jurnal cu titlul WOD-ului oficial al zilei
+    // ("GET UP") si subtitlul lui ("Build to Heavy/1RM 20:00"), pt ca
+    // wod_id era setat oricum la wodZiData.id, doar pentru ca exista un WOD
+    // oficial azi - indiferent ca userul alesese sa loga separat.
+    const wodHeaderLine = variantaAleasa !== null
       ? `${wodZiData.type}${durStr ? ' · ' + durStr : ''}${wodZiData.name ? ' — "' + wodZiData.name + '"' : ''}`
-      : (variantaAleasa === null ? `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}` : null)
+      : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}`
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const varianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa] : null
     const tipSalvat = varianta ? varianta.nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const logFields = composeWodLogFields()
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id, wod_id: wodZiData?.id || null,
+      member_id: user.id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
