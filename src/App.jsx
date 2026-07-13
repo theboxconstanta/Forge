@@ -22,7 +22,7 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, isNotRxd, weightKeyForVariant,
+  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isMixedCategory,
 } from './workoutFormats'
@@ -1372,6 +1372,27 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                           </div>
                           {isExpanded && (
                             <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                              {log.variant_level && (
+                                <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                  <div>
+                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
+                                    <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                      <LevelDot nivel={log.variant_level} /> {log.variant_level}
+                                    </div>
+                                  </div>
+                                  {log.weight_logged?.trim() && (
+                                    <div>
+                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
+                                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700' }}>
+                                        {log.weight_logged.trim()}
+                                        {log._prescribedWeight && !weightMatches(log.weight_logged, log._prescribedWeight) && (
+                                          <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '500', marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               {miscariAfisate.length > 0 && (
                                 <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {miscariAfisate.map((m, j) => (

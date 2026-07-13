@@ -418,6 +418,8 @@ export const TRANSLATIONS = {
     },
     clasamentAnonymous: 'Anonim',
     clasamentMixedCategoriesLabel: 'Mixed Categories',
+    clasamentVariantLabel: 'VARIANTĂ',
+    clasamentWeightPrescribedSuffix: (prescribed) => `(prescris: ${prescribed})`,
 
     // Feed
     feedTitle: 'Feed',
@@ -1174,6 +1176,8 @@ export const TRANSLATIONS = {
     clasamentParticipantWord: (n) => n === 1 ? 'participant' : 'participants',
     clasamentAnonymous: 'Anonymous',
     clasamentMixedCategoriesLabel: 'Mixed Categories',
+    clasamentVariantLabel: 'VARIANT',
+    clasamentWeightPrescribedSuffix: (prescribed) => `(prescribed: ${prescribed})`,
 
     // Feed
     feedTitle: 'Feed',
