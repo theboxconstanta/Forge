@@ -1741,6 +1741,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setDurataWodSec(String(totalSec % 60))
   }, [tipWod, formatConfigWod])
   const [numeWod, setNumeWod] = useState('')
+  const [noteWod, setNoteWod] = useState('')
   const [savingWod, setSavingWod] = useState(false)
   // Miscarile fiecarei variante sunt o lista (nu text liber) - editabile prin
   // MiscareQuickAdd (autocomplete + reps/kg sau metri/cal la cardio,
@@ -2268,6 +2269,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       date: dataWod, type: tipWod, duration: durataWod,
       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
+      notes: noteWod.trim() || null,
       warmup: parseLiniiWod(warmupWod),
       warmup_visible: warmupVisibleWod,
       skill: parseLiniiWod(skillWod),
@@ -2353,6 +2355,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     setDurataWodMin(dMin || '0'); setDurataWodSec(dSec || '0')
     setFormatConfigWod(w.format_config || {})
     setNumeWod(w.name || '')
+    setNoteWod(w.notes || '')
     setWarmupWod((w.warmup || []).join('\n'))
     setWarmupVisibleWod(w.warmup_visible !== false)
     setSkillWod((w.skill || []).join('\n'))
@@ -2409,7 +2412,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
   // noua aleasa, nu s-o resetaze la azi).
   const resetWodFormFields = () => {
-    setNumeWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
+    setNumeWod(''); setNoteWod(''); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
     setWodVarianteWeight(golVarianteWeight)
     setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
     setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
@@ -3291,6 +3294,8 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                   )}
                   <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
                   <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+                  <input value={noteWod} onChange={e => setNoteWod(e.target.value)} placeholder={t.adminWodNotesPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                   {[
                     { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
                     { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
@@ -3346,6 +3351,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                       type: tipWod, duration: `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`,
                       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
                       name: numeWod.trim() || null,
+                      notes: noteWod.trim() || null,
                       movements_onramp: variante.onramp, movements_beginner: variante.beginner,
                       movements_intermediate: variante.intermediate, movements_rx: variante.rx,
                       ...buildVarianteWeightPayload(),
@@ -5932,7 +5938,7 @@ function App() {
                           <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
                           {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: '#0E0E0E', color: '#fff', borderRadius: '20px' }}>{t.homeVariantSelected}</span>}
                         </div>
-                        {variantaAleasa === i && miscari.length > 0 && (
+                        {variantaAleasa === i && (miscari.length > 0 || wodZiData.notes) && (
                           <>
                             <div style={{ background: '#f0f0f0', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -5944,13 +5950,21 @@ function App() {
                                 <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
                               )}
                             </div>
-                            <div>
-                              {miscari.map((m, mi) => (
-                                <div key={mi} style={{ padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                                  <span style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</span>
-                                </div>
-                              ))}
-                            </div>
+                            {miscari.length > 0 && (
+                              <div>
+                                {miscari.map((m, mi) => (
+                                  <div key={mi} style={{ padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {wodZiData.notes && (
+                              <div style={{ padding: '8px 10px', background: '#FFF6DA', border: '1px solid #F3DE9C', borderRadius: '8px', marginTop: '6px' }}>
+                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#8A6D1D', letterSpacing: '0.06em', marginBottom: '2px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
+                                <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{wodZiData.notes}</span>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
