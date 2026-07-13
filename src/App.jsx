@@ -1370,7 +1370,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               {miscariAfisate.length > 0 && (
                                 <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {miscariAfisate.map((m, j) => (
-                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                                   ))}
                                 </div>
                               )}
@@ -3600,6 +3600,16 @@ function SortableList({ items, onReorder, onRemove }) {
   )
 }
 
+// Elimina greutatea de pornire ("@ 50kg") din afisarea unei miscari a unui
+// log family:'sets' (Complex, Weightlifting etc.) - e doar greutatea PRIMEI
+// runde, statica, nereprezentativa (creste/scade pe parcurs), iar progresia
+// reala e deja vizibila mai jos, in defalcarea pe runde si in REZULTAT
+// (greutatea maxima) - a o repeta aici static era confuz/redundant langa
+// scorul real.
+function stripWeightSuffix(movementLine) {
+  return movementLine.replace(/\s*@\s*[\d./]+\s*(kg|lbs)\s*$/i, '')
+}
+
 // Extrage miscarile/rezultatul/seturile/nota unui wod_log din campurile brute
 // (notes/sets/result/time_result/log_meta) - o singura sursa de parsare
 // folosita atat de JurnalList (randul propriu, cu editare/stergere) cat si
@@ -3728,7 +3738,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       {miscariAfisate.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
-                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {m}</div>
+                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
