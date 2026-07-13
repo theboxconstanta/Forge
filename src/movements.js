@@ -115,7 +115,12 @@ export function parseMiscareLinePasta(linie) {
   const text = (linie || '').trim()
   if (!text) return text
 
-  const cardioMatch = CARDIO_MISCARI.find(c => text.toLowerCase().includes(c.toLowerCase()))
+  // Potrivire pe limita de cuvant (nu substring simplu) - altfel "Row" (masina
+  // cardio) se potrivea si in mijlocul unor miscari de forta complet diferite
+  // care contin "row" ca substring, ex. "Ring Rows"/"Barbell Row" (deja in
+  // MISCARI ca "Ring Row") ajungeau trunchiate la doar "Row", pierzand reps-ul
+  // si restul numelui.
+  const cardioMatch = CARDIO_MISCARI.find(c => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text))
   if (cardioMatch) {
     const metriM = text.match(/(\d+(?:\.\d+)?)\s*m\b/i)
     const calM = text.match(/(\d+(?:\.\d+)?)\s*cal/i)

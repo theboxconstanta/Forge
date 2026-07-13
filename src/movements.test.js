@@ -36,4 +36,7 @@ describe('parseMiscareLinePasta', () => {
   it('fara reps la inceput - miscarea si greutatea tot se detecteaza', () => {
     expect(parseMiscareLinePasta('Deadlift (100kg)')).toBe('Deadlift @ 100kg')
   })
+  it('miscare de forta care contine "row" ca substring nu e confundata cu cardio-ul Row', () => {
+    expect(parseMiscareLinePasta('5 Ring Rows')).toBe('5 Ring Rows')
+  })
 })

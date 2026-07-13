@@ -2230,6 +2230,31 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
 
   const parseLiniiWod = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
 
+  // Text ramas in caseta "Paste rapid" fara sa se fi apasat explicit "Adauga
+  // din text" era pierdut silentios la Salvare - un coach care lipea text la
+  // toate cele 4 variante dar uita sa apese butonul individual pentru una
+  // din ele pierdea acea varianta fara niciun avertisment (bug raportat: RX
+  // salvat corect, celelalte variante goale). Flush-uim orice text ramas
+  // chiar inainte de orice salvare (sectiune sau WOD intreg), la fel ca la
+  // apasarea butonului - returnam varianta "efectiva" (cu flush-ul inclus)
+  // ca s-o foloseasca direct apelantul, fara sa astepte re-render-ul.
+  const flushWodVariantePaste = () => {
+    let efectiv = wodVariante
+    let ramasCeva = false
+    for (const key of ['onramp', 'beginner', 'intermediate', 'rx']) {
+      const text = wodVariantePaste[key]
+      if (!text.trim()) continue
+      ramasCeva = true
+      const linii = text.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
+      efectiv = { ...efectiv, [key]: [...efectiv[key], ...linii] }
+    }
+    if (ramasCeva) {
+      setWodVariante(efectiv)
+      setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    }
+    return efectiv
+  }
+
   // Payload complet, din starea curenta a formularului - folosit atat de
   // saveWod (salveaza tot) cat si de saveWodSection cand inca nu exista un
   // rand in DB (nu ai ce sa actualizezi partial, trebuie creat intreg randul
@@ -2237,7 +2262,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   // e pentru cazul in care apelantul are o valoare mai proaspata decat starea
   // React curenta (ex. switch-ul de vizibilitate cheama save chiar in acelasi
   // tick cu setState-ul, inainte ca re-render-ul sa fi actualizat starea).
-  const buildWodPayload = (overrides = {}) => {
+  const buildWodPayload = (overrides = {}, variante = wodVariante) => {
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
     return {
       date: dataWod, type: tipWod, duration: durataWod,
@@ -2255,10 +2280,10 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       skill2_type: skillType2Wod,
       skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
       skill2_visible: skill2VisibleWod,
-      movements_onramp: wodVariante.onramp,
-      movements_beginner: wodVariante.beginner,
-      movements_intermediate: wodVariante.intermediate,
-      movements_rx: wodVariante.rx,
+      movements_onramp: variante.onramp,
+      movements_beginner: variante.beginner,
+      movements_intermediate: variante.intermediate,
+      movements_rx: variante.rx,
       ...buildVarianteWeightPayload(),
       ...overrides,
     }
@@ -2267,7 +2292,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const saveWod = async () => {
     if (!dataWod) { showToast(t.toastPickDate); return }
     setSavingWod(true)
-    const payload = buildWodPayload()
+    const payload = buildWodPayload({}, flushWodVariantePaste())
     // upsert pe conflict de data (nu doar insert) - data implicita e azi, care
     // poate coincide cu un WOD deja existent chiar daca formularul n-a fost
     // deschis explicit prin "editeaza" (editWodId ramane null in cazul asta);
@@ -3315,14 +3340,17 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                       )}
                     </div>
                   ))}
-                  <button onClick={() => saveWodSection({
-                    type: tipWod, duration: `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`,
-                    format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
-                    name: numeWod.trim() || null,
-                    movements_onramp: wodVariante.onramp, movements_beginner: wodVariante.beginner,
-                    movements_intermediate: wodVariante.intermediate, movements_rx: wodVariante.rx,
-                    ...buildVarianteWeightPayload(),
-                  }, t.adminWodFormTitle)}
+                  <button onClick={() => {
+                    const variante = flushWodVariantePaste()
+                    saveWodSection({
+                      type: tipWod, duration: `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`,
+                      format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
+                      name: numeWod.trim() || null,
+                      movements_onramp: variante.onramp, movements_beginner: variante.beginner,
+                      movements_intermediate: variante.intermediate, movements_rx: variante.rx,
+                      ...buildVarianteWeightPayload(),
+                    }, t.adminWodFormTitle)
+                  }}
                     disabled={savingWod}
                     style={{ marginTop: '4px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
                     {t.adminWodSaveSectionButton}
