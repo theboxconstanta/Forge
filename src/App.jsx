@@ -1332,11 +1332,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t)
                       // Family 'sets' fara scoringMode configurat (Complex,
-                      // Weightlifting, Build to Heavy/1RM etc.) - rezultatBucati
-                      // brut arata doar "X seturi" (fara nicio greutate), aceeasi
-                      // lipsa reparata deja la headline-ul "result" de mai sus -
-                      // prepend acelasi scor si in detaliul expandat.
-                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result, ...rezultatBucatiRaw] : rezultatBucatiRaw
+                      // Weightlifting, Build to Heavy/1RM etc.) - result/
+                      // time_result/log_meta sunt mereu null la aceasta familie,
+                      // deci rezultatBucati brut n-are niciodata altceva in afara
+                      // de "X seturi" (fara nicio greutate) - inlocuim complet cu
+                      // acelasi scor deja calculat mai sus pt headline (cu unitate
+                      // inclusa), nu doar il adaugam langa "X seturi" fara sens.
+                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result] : rezultatBucatiRaw
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
@@ -3630,7 +3632,8 @@ function parseWodLogDetails(w, t) {
   return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
 }
 
-function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, t, lang }) {
+function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, t, lang }) {
+  const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   const [deschis, setDeschis] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deschisSkill, setDeschisSkill] = useState(null)
@@ -3671,10 +3674,14 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
               // fara nicio greutate (bug raportat: un Complex cu greutate maxima
-              // 65kg logat separat aratat doar "10 seturi" in Jurnal). Aceeasi
-              // functie folosita deja la Clasament si la cardul de Skill Work.
+              // 65kg logat separat aratat doar "10 seturi" in Jurnal, nefolositor).
+              // Pentru aceasta familie, result/time_result/log_meta sunt mereu
+              // null (composeWodLogFields) - rezultatBucatiRaw n-are niciodata
+              // altceva in afara de "X seturi", deci inlocuim complet (nu doar
+              // adaugam), altfel "65kg" si "10 seturi" ar aparea impreuna, unul
+              // util, celalalt fara sens langa greutatea reala.
               const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, w.wods?.format_config, w.sets) : null
-              const rezultatBucati = wSetsScore != null ? [wSetsScore, ...rezultatBucatiRaw] : rezultatBucatiRaw
+              const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`] : rezultatBucatiRaw
               return (
                 <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -3827,7 +3834,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       {skillScor != null && (
                         <div style={{ marginBottom: '12px' }}>
                           <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{skillScor}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{skillScor}{unitLabel}</div>
                         </div>
                       )}
                       {hasSets ? (
@@ -6098,7 +6105,7 @@ function App() {
           )}
 
           {logTab === 'jurnal' && (
-            <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} t={t} lang={lang}
+            <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} t={t} lang={lang}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
