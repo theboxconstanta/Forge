@@ -138,6 +138,15 @@ describe('isNotRxd', () => {
   it('Partner WOD cu baseFormat For Time, fara time_result -> Not RXd', () => {
     expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'For Time' })).toBe(true)
   })
+  it('miscari schimbate, greutate identica si terminat in timp -> Not RXd', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time', {}, ['21 Thrusters', '15 Wall Balls'], ['21 Thrusters', '15 Pull-ups'])).toBe(true)
+  })
+  it('miscari identice, greutate identica, terminat in timp -> RXd', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time', {}, ['21 Thrusters', '15 Pull-ups'], ['21 Thrusters', '15 Pull-ups'])).toBe(false)
+  })
+  it('loggedMovements/prescribedMovements omise (apelanti vechi) -> nu afecteaza rezultatul', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  })
 })
 
 describe('movementsChanged', () => {

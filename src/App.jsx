@@ -1221,13 +1221,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       // folosite local) - randarea de mai jos le reutilizeaza la isNotRxd, in
       // loc sa cheme prescribedWeightFor a doua oara pt acelasi log.
       const prescribedWeight = prescribedWeightFor(nivelId, log)
-      const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId }
       // wod_logs nu are o coloana structurata "movements" - miscarile efectiv
       // logate (posibil editate de membru fata de prescris, vezi wodMiscariCustom)
       // sunt scrise ca text liber in `notes` (impreuna cu header-ul de format si
       // nota membrului) - parseWodLogDetails e acelasi parser folosit de Jurnal,
       // singura sursa reala de adevar pt ce a logat efectiv membrul.
       const { miscariAfisate } = parseWodLogDetails(log, t)
+      const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements }
       const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements)
       if (isMixed) mixedLogs.push(logCuDetalii)
       else rxLogs.push(logCuDetalii)
@@ -1344,7 +1344,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                         ? (log._setsScore != null ? `${log._setsScore}${(log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg'}` : '—')
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
-                      const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config)
+                      const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config, log._loggedMovements, log._prescribedMovements)
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t)
@@ -3792,12 +3792,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const wodNume = w.wods?.name || null
               const wodSubtitlu = w.wods ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
               const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null
+              // Ca la weightKeyForVariant: doar variantele reale (RX/Intermediate/
+              // Beginner/OnRamp) au o coloana movements_* prescrisa pe wods - la o
+              // logare libera (fara wod_id) sau cu variant_level = numele unui
+              // format (nu al unei variante), accesul intoarce undefined -> null,
+              // fara sa dea eroare.
+              const prescribedMovementsLog = w.wods?.[`movements_${(w.variant_level || '').toLowerCase()}`] || null
               // Incercam toate semnalele posibile pt tipul real (wods legat,
               // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
               // trateaza deja corect cazul cand niciunul nu exista (formatId absent
               // -> nu presupune "For Time", sare peste verificarea de time cap).
               const formatTipResolvat = w.wods?.type || w.format_type || headerFormatId
-              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config)
+              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config, miscariAfisate, prescribedMovementsLog)
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
               // fara nicio greutate (bug raportat: un Complex cu greutate maxima
@@ -4894,7 +4900,7 @@ function App() {
   }
 
   const fetchWodLogs = async () => {
-    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, ${ALL_WEIGHT_COLUMNS.join(', ')})`).eq('member_id', user.id).order('logged_at', { ascending: false })
+    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')})`).eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -5242,6 +5248,7 @@ function App() {
       // care n-avea nicio legatura cu acel WOD).
       if (variantaAleasa !== null) {
         const prescribedWeight = varianta ? (wodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
+        const prescribedMovements = varianta ? (wodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
         setWorkoutSharePopup({
           wodName: wodZiData?.name || null,
           movements: miscariFinale,
@@ -5250,7 +5257,7 @@ function App() {
           variantBg: varianta?.bg || null,
           result: logFields.result, timeResult: logFields.time_result,
           loggedAt: new Date().toISOString(),
-          notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig),
+          notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig, miscariFinale, prescribedMovements),
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }

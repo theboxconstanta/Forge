@@ -375,17 +375,25 @@ export function weightMatches(a, b) {
 }
 
 // "Not RXd" = greutatea logata difera de cea prescrisa a variantei (vezi
-// weightMatches), SAU (la formatele cu time cap real - For Time/RFT/Ladder,
-// scoreMode 'fortime_or_amrap') nu s-a terminat in time cap (fara
+// weightMatches), SAU miscarile logate difera de cele prescrise (vezi
+// movementsChanged), SAU (la formatele cu time cap real - For Time/RFT/
+// Ladder, scoreMode 'fortime_or_amrap') nu s-a terminat in time cap (fara
 // time_result). AMRAP nu are concept de "neterminat" (scorul e mereu cat ai
-// facut in timp), deci nu intra la a doua conditie. Derivat la citire, nu
-// stocat - daca adminul corecteaza greutatea prescrisa ulterior, eticheta
+// facut in timp), deci nu intra la a treia conditie. loggedMovements/
+// prescribedMovements sunt optionale - apelantii care nu le au inca (ex.
+// inainte de refactorul Mixed Categories) primesc acelasi rezultat ca
+// inainte, fara sa strice apelurile existente. Derivat la citire, nu stocat -
+// daca adminul corecteaza greutatea/miscarile prescrise ulterior, eticheta
 // ramane consistenta cu valoarea curenta, fara o a doua sursa de adevar care
-// poate desincroniza.
-export function isNotRxd(log, prescribedWeight, formatId, config) {
+// poate desincroniza. Acelasi semnal e folosit peste tot (Jurnal, Clasament,
+// pop-up-ul de felicitare) - un membru care a schimbat doar o miscare (nu
+// greutatea) trebuie sa apara la fel de "Not RXd" oriunde, nu doar in
+// gruparea Mixed Categories de pe Clasament.
+export function isNotRxd(log, prescribedWeight, formatId, config, loggedMovements, prescribedMovements) {
   const greutateDiferita = !!prescribedWeight?.trim() && !!log?.weight_logged?.trim() && !weightMatches(log.weight_logged, prescribedWeight)
   const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
-  return greutateDiferita || neterminatInTimp
+  const miscariSchimbate = movementsChanged(loggedMovements, prescribedMovements)
+  return greutateDiferita || neterminatInTimp || miscariSchimbate
 }
 
 // Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,
