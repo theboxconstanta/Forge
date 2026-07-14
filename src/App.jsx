@@ -22,7 +22,7 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches,
+  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isMixedCategory,
 } from './workoutFormats'
@@ -1246,8 +1246,20 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       .filter(s => s.weightGroups[0].logs.length > 0),
     ...(toateLogurileMixed.length > 0 ? [{
       nivel: { id: t.clasamentMixedCategoriesLabel, culoare: '#5B4B8A', bg: '#EFEAF9' },
+      // In interiorul fiecarui subgrup, cine a scalat mai jos nu poate sta
+      // inaintea cuiva care a ridicat mai mult, doar pt ca a facut mai multe
+      // repetari - greutatea mai mica il coboara automat, indiferent de
+      // performanta. Sortare descrescatoare dupa greutatea logata (fara
+      // greutate logata - ex. doar miscare schimbata, nu greutate - conteaza
+      // ca "greutate maxima", nu e penalizat) - la egalitate de greutate,
+      // pastreaza ordinea de performanta deja calculata de sortLogs (sort
+      // stabil, nu reamesteca perechile egale).
       weightGroups: NIVELE
-        .map(n => ({ weight: n.id, label: n.id, logs: toateLogurileMixed.filter(l => l._nivelOriginal === n.id) }))
+        .map(n => ({
+          weight: n.id, label: n.id,
+          logs: toateLogurileMixed.filter(l => l._nivelOriginal === n.id)
+            .sort((a, b) => (greutateNumerica(b.weight_logged) ?? Infinity) - (greutateNumerica(a.weight_logged) ?? Infinity)),
+        }))
         .filter(g => g.logs.length > 0),
     }] : []),
   ]
