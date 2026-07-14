@@ -29,20 +29,41 @@ import {
 
 // Bold in stil markdown (**text**) - miscarile/notitele sunt text simplu
 // (nu HTML/rich text), stocate direct in coloane text[]/text din DB, deci nu
-// exista formatare reala. Ctrl+B incadreaza selectia curenta cu ** in orice
-// input/textarea de compunere a WOD-ului (Paste rapid, adaugare rapida,
-// notite, editare inline din SortableList) - boldizeText() desface apoi acel
-// text la afisare (Acasa, Jurnal, Clasament) intr-un <strong>.
-function handleBoldShortcut(e, value, setValue) {
-  if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b')) return
-  e.preventDefault()
-  const el = e.target
+// exista formatare reala. Incadreaza selectia curenta cu ** in orice
+// input/textarea de compunere a WOD-ului (Paste rapid, notite, editare
+// inline din SortableList) - boldizeText() desface apoi acel text la
+// afisare (Acasa, Jurnal, Clasament) intr-un <strong>. Doua moduri de
+// declansare: Ctrl+B (tastatura fizica, desktop) si un buton "B" separat
+// (telefon, unde Ctrl+B nu exista) - amandoua ajung la wrapBoldSelection.
+function wrapBoldSelection(el, value, setValue) {
+  if (!el) return
   const start = el.selectionStart ?? value.length
   const end = el.selectionEnd ?? value.length
   const newValue = value.slice(0, start) + '**' + value.slice(start, end) + '**' + value.slice(end)
   setValue(newValue)
   const cursorPos = start === end ? start + 2 : end + 4
-  requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = cursorPos })
+  requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = cursorPos })
+}
+function handleBoldShortcut(e, value, setValue) {
+  if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b')) return
+  e.preventDefault()
+  wrapBoldSelection(e.target, value, setValue)
+}
+// Buton separat pt telefon (fara tastatura fizica, deci fara Ctrl+B) - tine
+// inputul focusat cu onMouseDown+preventDefault (altfel blur-ul de dinainte
+// de click sterge selectia pe unele browsere mobile), citeste elementul din
+// getEl() abia la click (nu la randare, ca sa apuce cea mai proaspata
+// selectie facuta de utilizator prin tap&drag).
+function BoldButton({ getEl, value, setValue }) {
+  return (
+    <button type="button"
+      onMouseDown={e => e.preventDefault()}
+      onClick={() => wrapBoldSelection(getEl(), value, setValue)}
+      title="Bold (Ctrl+B)"
+      style={{ padding: '4px 9px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '11px', fontWeight: '800', color: '#555', cursor: 'pointer', lineHeight: 1.4, flexShrink: 0 }}>
+      B
+    </button>
+  )
 }
 function boldizeText(text) {
   if (!text) return text
@@ -1797,6 +1818,11 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   // un "wear a vest" poate fi relevant doar la RX, nu si la OnRamp.
   const golVarianteNote = { onramp: '', beginner: '', intermediate: '', rx: '' }
   const [wodVarianteNote, setWodVarianteNote] = useState(golVarianteNote)
+  // Referinte catre elementele DOM ale casetelor de "Paste rapid"/"Notite"
+  // per varianta - butonul "B" (BoldButton) are nevoie de elementul insusi
+  // ca sa citeasca selectia curenta de text la click, nu doar de valoare.
+  const wodVariantePasteRefs = useRef({})
+  const wodVarianteNoteRefs = useRef({})
   const [savingWod, setSavingWod] = useState(false)
   // Miscarile fiecarei variante sunt o lista (nu text liber) - editabile prin
   // MiscareQuickAdd (autocomplete + reps/kg sau metri/cal la cardio,
@@ -3421,24 +3447,32 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                         placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
                       <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
                         onKeyDown={e => handleBoldShortcut(e, wodVariantePaste[v.key], val => setWodVariantePaste(prev => ({ ...prev, [v.key]: val })))}
+                        ref={el => wodVariantePasteRefs.current[v.key] = el}
                         placeholder={t.adminWodVariantPastePlaceholder} rows={3}
                         style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-                      {wodVariantePaste[v.key].trim() && (
-                        <button onClick={() => {
-                          const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
-                          setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
-                          setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
-                          autoFillGreutateDacaGoala(v.key, linii)
-                        }}
-                          style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-                          {t.adminWodVariantPasteButton}
-                        </button>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                        <BoldButton getEl={() => wodVariantePasteRefs.current[v.key]} value={wodVariantePaste[v.key]} setValue={val => setWodVariantePaste(prev => ({ ...prev, [v.key]: val }))} />
+                        {wodVariantePaste[v.key].trim() && (
+                          <button onClick={() => {
+                            const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
+                            setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
+                            setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
+                            autoFillGreutateDacaGoala(v.key, linii)
+                          }}
+                            style={{ padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                            {t.adminWodVariantPasteButton}
+                          </button>
+                        )}
+                      </div>
                       <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-                      <input value={wodVarianteNote[v.key]} onChange={e => setWodVarianteNote(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        onKeyDown={e => handleBoldShortcut(e, wodVarianteNote[v.key], val => setWodVarianteNote(prev => ({ ...prev, [v.key]: val })))}
-                        placeholder={t.adminWodNotesPlaceholder}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input value={wodVarianteNote[v.key]} onChange={e => setWodVarianteNote(prev => ({ ...prev, [v.key]: e.target.value }))}
+                          onKeyDown={e => handleBoldShortcut(e, wodVarianteNote[v.key], val => setWodVarianteNote(prev => ({ ...prev, [v.key]: val })))}
+                          ref={el => wodVarianteNoteRefs.current[v.key] = el}
+                          placeholder={t.adminWodNotesPlaceholder}
+                          style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+                        <BoldButton getEl={() => wodVarianteNoteRefs.current[v.key]} value={wodVarianteNote[v.key]} setValue={val => setWodVarianteNote(prev => ({ ...prev, [v.key]: val }))} />
+                      </div>
                     </div>
                   ))}
                   <button onClick={() => {
@@ -3628,6 +3662,7 @@ function SortableList({ items, onReorder, onRemove }) {
   const [activeIdx, setActiveIdx] = useState(null)
   const [editIdx, setEditIdx] = useState(null)
   const [editVal, setEditVal] = useState('')
+  const editInputRef = useRef(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -3695,15 +3730,17 @@ function SortableList({ items, onReorder, onRemove }) {
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
           {editIdx === i ? (
-            <div style={{ position: 'relative', flex: 1 }}>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
               <input
                 autoFocus
+                ref={editInputRef}
                 value={editVal}
                 onChange={e => setEditVal(e.target.value)}
                 onBlur={() => commitEdit(i)}
                 onKeyDown={e => { if (e.key === 'Enter') { commitEdit(i); return } handleBoldShortcut(e, editVal, setEditVal) }}
-                style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '13px', color: '#0E0E0E', outline: 'none', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
+                style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: '13px', color: '#0E0E0E', outline: 'none', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
               />
+              <BoldButton getEl={() => editInputRef.current} value={editVal} setValue={setEditVal} />
               {miscareSugestii(editVal).length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
                   {miscareSugestii(editVal).map((s, si) => (
