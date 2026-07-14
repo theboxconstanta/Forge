@@ -4322,6 +4322,13 @@ function App() {
   const [isCoach, setIsCoach] = useState(false)
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
   const [gymBlocked, setGymBlocked] = useState(false)
+  // Un profil autentificat cu gym_id null in afara ferestrei live de
+  // bootstrap owner (vezi ownerBootstrapping) inseamna mereu o inregistrare
+  // intrerupta la mijloc (ex. reload de pagina in timpul secventei) - fara
+  // acest ecran, userul trece nedetectat prin onboarding normal si ajunge
+  // la paywall-ul de abonament ca un membru obisnuit, cu un mesaj complet
+  // fara legatura cu problema reala. Bug real gasit live (07-14).
+  const [registrationIncomplete, setRegistrationIncomplete] = useState(false)
   // Inainte de login nu exista userProfile din care sa citim limba - localStorage
   // (aceeasi convenție ca forge_remember_email) tine limba intre sesiuni pe acest
   // device; dupa login, se sincronizeaza cu profiles.language (sursa de adevar
@@ -4823,8 +4830,13 @@ function App() {
     if (data?.gym_id) {
       const { data: gymRow } = await supabase.from('gyms').select('id').eq('id', data.gym_id).maybeSingle()
       setGymBlocked(!gymRow)
+      setRegistrationIncomplete(false)
+    } else if (data && !ownerBootstrapping) {
+      setGymBlocked(false)
+      setRegistrationIncomplete(true)
     } else {
       setGymBlocked(false)
+      setRegistrationIncomplete(false)
     }
     const currentYear = new Date().getFullYear()
     const waiverInLS = localStorage.getItem(`waiver_${user?.id}_${currentYear}`) === '1'
@@ -5225,6 +5237,11 @@ function App() {
 
   const handleLogin = async () => {
     setAuthSubmitting(true); setAuthError('')
+    // Curata orice stare ramasa dintr-o incercare anterioara esuata de
+    // "Pornesc o sala noua" in acelasi tab - altfel un login reusit, cu alt
+    // cont, ar ramane blocat in spatele ecranului de auth (vezi
+    // ownerBootstrapping mai jos).
+    setOwnerBootstrapping(false)
     const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
     if (error) { setAuthError(error.message) }
     else { rememberMe ? localStorage.setItem('forge_remember_email', authEmail) : localStorage.removeItem('forge_remember_email') }
@@ -5275,6 +5292,12 @@ function App() {
 
   const handleRegister = async () => {
     setAuthSubmitting(true); setAuthError('')
+    // Reset defensiv - daca a ramas true dintr-o incercare anterioara
+    // esuata de owner in acelasi tab, un flux de membru reusit imediat dupa
+    // ar ramane blocat in spatele ecranului de auth (vezi handleLogin mai
+    // sus, acelasi motiv). Ramura de owner de mai jos il seteaza true din
+    // nou, dupa validare.
+    setOwnerBootstrapping(false)
     if (registerMode === 'owner') {
       if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
       if (!gymSignupCodeInput.trim()) { setAuthError(t.authGymSignupCodeRequired); setAuthSubmitting(false); return }
@@ -5304,19 +5327,27 @@ function App() {
         if (error) { setAuthError(error.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
         ownerId = signUpData.user.id
       }
+      // De aici incolo `user` e deja autentificat (async, via
+      // onAuthStateChange) - ownerBootstrapping NU se reseteaza la eroare,
+      // ca sa ramana pe ecranul de register (altfel gate-ul `!user ||
+      // ownerBootstrapping` ar cadea pe `false`, iar userul ar cadea direct
+      // in aplicatia principala, fara sala, cu eroarea afisata pe un ecran
+      // care oricum a disparut - exact bug-ul pe care ownerBootstrapping
+      // exista sa il previna). Se reseteaza doar la succesul final de mai
+      // jos, sau defensiv la inceputul lui handleLogin().
       const reserveRes = await supabase.rpc('reserve_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
-      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
+      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
       const { error: gymErr } = await supabase.from('gyms').insert({
         id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: ownerId,
       })
-      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
+      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
       await supabase.rpc('consume_my_reserved_gym_signup_code', { p_gym_id: newGymId })
       const { error: adminErr } = await supabase.from('admins').insert({ id: ownerId, email: authEmail, gym_id: newGymId })
-      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
+      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
       // Abia acum sala chiar exista - putem "revendica" profilul (null ->
       // valoare, singura tranzitie permisa de prevent_gym_id_change()).
       const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', ownerId)
-      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
+      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); return }
       // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
       // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
       // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
@@ -6014,6 +6045,19 @@ function App() {
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
+          </div>
+        </div>
+      )}
+
+      {registrationIncomplete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
+            <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.registrationIncompleteTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.registrationIncompleteText}</div>
+            <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              {t.paywallLogout}
+            </button>
           </div>
         </div>
       )}

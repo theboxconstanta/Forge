@@ -164,6 +164,8 @@ export const TRANSLATIONS = {
     platformAdminMembersCount: (n) => `${n} membri`,
     gymBlockedTitle: 'Acces suspendat',
     gymBlockedText: 'Abonamentul sălii tale a expirat sau a fost suspendat. Contactează administratorul platformei pentru reactivare.',
+    registrationIncompleteTitle: 'Înregistrare neterminată',
+    registrationIncompleteText: 'Contul a fost creat, dar sala nu a fost finalizată (ex. conexiune întreruptă la mijlocul înregistrării). Contactează administratorul platformei ca să deblocheze o nouă încercare - re-înregistrarea cu acest email nu va funcționa până atunci.',
 
     // Instalare PWA
     installTitle: 'Instalează Forge',
@@ -958,6 +960,8 @@ export const TRANSLATIONS = {
     platformAdminMembersCount: (n) => `${n} members`,
     gymBlockedTitle: 'Access suspended',
     gymBlockedText: "Your gym's subscription has expired or been suspended. Contact the platform admin to reactivate it.",
+    registrationIncompleteTitle: 'Registration incomplete',
+    registrationIncompleteText: "Your account was created, but the gym setup didn't finish (e.g. connection lost mid-registration). Contact the platform admin to unblock a retry - re-registering with this email won't work until then.",
 
     // Instalare PWA
     installTitle: 'Install Forge',
