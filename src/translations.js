@@ -140,6 +140,14 @@ export const TRANSLATIONS = {
     authFindGymPlaceholder: 'Caută după nume sau cod',
     authGymNameRequired: '❌ Introdu numele sălii!',
     authPickGymFirst: '❌ Alege o sală din listă!',
+    authGymCodeLabel: 'Cod de acces (de la antrenor)',
+    authGymCodePlaceholder: 'ex. C15FDR1',
+    authGymCodeRequired: '❌ Introdu codul de acces al sălii!',
+    authGymCodeInvalid: '❌ Cod invalid - cere-l antrenorului tău!',
+    adminGymCodeLabel: 'Cod de acces sală',
+    adminGymCodeHint: 'Dă acest cod membrilor sălii tale, ca să se poată înregistra.',
+    adminGymCodeRegenerate: 'Generează cod nou',
+    toastGymCodeRegenerated: '✓ Cod nou generat!',
 
     // Instalare PWA
     installTitle: 'Instalează Forge',
@@ -910,6 +918,14 @@ export const TRANSLATIONS = {
     authFindGymPlaceholder: 'Search by name or code',
     authGymNameRequired: '❌ Enter the gym name!',
     authPickGymFirst: '❌ Pick a gym from the list!',
+    authGymCodeLabel: 'Access code (from your coach)',
+    authGymCodePlaceholder: 'e.g. C15FDR1',
+    authGymCodeRequired: '❌ Enter the gym access code!',
+    authGymCodeInvalid: '❌ Invalid code - ask your coach for it!',
+    adminGymCodeLabel: 'Gym access code',
+    adminGymCodeHint: "Give this code to your gym's members so they can register.",
+    adminGymCodeRegenerate: 'Generate new code',
+    toastGymCodeRegenerated: '✓ New code generated!',
 
     // Instalare PWA
     installTitle: 'Install Forge',

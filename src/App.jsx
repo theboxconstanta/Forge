@@ -1863,6 +1863,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
   const [sortClienti, setSortClienti] = useState('toti')
   const [memberIdsCuRezervariViitoare, setMemberIdsCuRezervariViitoare] = useState(new Set())
   const [cancelWindowSetting, setCancelWindowSetting] = useState(2)
+  const [gymJoinCode, setGymJoinCode] = useState('')
+  const [regeneratingCode, setRegeneratingCode] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
   const [deleteClientConfirm, setDeleteClientConfirm] = useState(null)
@@ -1976,6 +1978,16 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
       const cwh = data.find(s => s.key === 'cancel_window_hours')
       if (cwh) setCancelWindowSetting(parseFloat(cwh.value) || 0)
     }
+    const { data: code } = await supabase.rpc('get_my_gym_join_code')
+    if (code) setGymJoinCode(code)
+  }
+
+  const regenerateGymJoinCode = async () => {
+    setRegeneratingCode(true)
+    const { data, error } = await supabase.rpc('regenerate_my_gym_join_code')
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else { setGymJoinCode(data); showToast(t.toastGymCodeRegenerated) }
+    setRegeneratingCode(false)
   }
 
   const fetchRapoarte = async () => {
@@ -3572,6 +3584,17 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymCodeLabel}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.adminGymCodeHint}</div>
+          <div style={{ fontSize: '28px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '3px', textAlign: 'center', background: '#f9f9f9', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+            {gymJoinCode || '······'}
+          </div>
+          <button onClick={regenerateGymJoinCode} disabled={regeneratingCode}
+            style={{ width: '100%', padding: '13px', background: regeneratingCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: regeneratingCode ? 'not-allowed' : 'pointer' }}>
+            {t.adminGymCodeRegenerate}
+          </button>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCoachTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminSettingsCoachSubtitle}</div>
           <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
@@ -4335,6 +4358,7 @@ function App() {
   const [gymQuery, setGymQuery] = useState('')
   const [gymResults, setGymResults] = useState([])
   const [selectedGym, setSelectedGym] = useState(null)
+  const [joinCodeInput, setJoinCodeInput] = useState('')
   const [resetMode, setResetMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
@@ -5186,8 +5210,16 @@ function App() {
       setUserProfile(freshProfile); setIsAdmin(true)
     } else {
       if (!selectedGym) { setAuthError(t.authPickGymFirst); setAuthSubmitting(false); return }
+      if (!joinCodeInput.trim()) { setAuthError(t.authGymCodeRequired); setAuthSubmitting(false); return }
+      // Verificare client-side, cu mesaj clar - inainte de signUp(), ca sa
+      // nu ajungem la eroarea opaca de la GoTrue daca handle_new_user()
+      // respinge codul (vezi bug-ul gasit azi la fluxul de owner). Verificarea
+      // REALA, care chiar conteaza pt izolarea intre sali, ramane server-side
+      // in handle_new_user() - asta e doar UX.
+      const codeOk = await supabase.rpc('verify_gym_join_code', { p_gym_id: selectedGym.id, p_code: joinCodeInput.trim() })
+      if (!codeOk.data) { setAuthError(t.authGymCodeInvalid); setAuthSubmitting(false); return }
       const { error } = await supabase.auth.signUp({
-        email: authEmail, password: authPassword, options: { data: { gym_id: selectedGym.id } },
+        email: authEmail, password: authPassword, options: { data: { gym_join_code: joinCodeInput.trim() } },
       })
       if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
     }
@@ -5781,12 +5813,17 @@ function App() {
                 <input value={gymQuery} onChange={e => searchGyms(e.target.value)} placeholder={t.authFindGymPlaceholder}
                   style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
                 {selectedGym && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#ABE73C', fontWeight: '600' }}>✓ {selectedGym.name}</div>
+                  <div>
+                    <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '12px', color: '#ABE73C', fontWeight: '600' }}>✓ {selectedGym.name}</div>
+                    <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymCodeLabel}</div>
+                    <input value={joinCodeInput} onChange={e => setJoinCodeInput(e.target.value.toUpperCase())} placeholder={t.authGymCodePlaceholder}
+                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', letterSpacing: '1px' }} />
+                  </div>
                 )}
                 {!selectedGym && gymResults.length > 0 && (
                   <div style={{ marginTop: '8px', background: '#1a1a1a', borderRadius: '10px', overflow: 'hidden' }}>
                     {gymResults.map(g => (
-                      <div key={g.id} onClick={() => { setSelectedGym(g); setGymQuery(g.name); setGymResults([]) }}
+                      <div key={g.id} onClick={() => { setSelectedGym(g); setGymQuery(g.name); setGymResults([]); setJoinCodeInput('') }}
                         style={{ padding: '10px 12px', fontSize: '13px', color: '#fff', cursor: 'pointer', borderBottom: '1px solid #292929' }}>
                         {g.name}
                       </div>
