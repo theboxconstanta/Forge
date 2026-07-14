@@ -4693,13 +4693,20 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // update, nu upsert - randul exista mereu deja (creat sincron de
+  // handle_new_user() la inregistrare) pana la primul apel autentificat al
+  // acestei functii. Bug real gasit in Sentry: cu upsert (INSERT ... ON
+  // CONFLICT DO UPDATE), Postgres verifica politica RLS de INSERT chiar si
+  // cand randul exista si merge pe ramura de UPDATE - iar payload-ul asta nu
+  // trimite gym_id (nu-l schimbam niciodata aici), ceea ce facea ca INSERT-ul
+  // "candidat" sa incerce gym_id=NULL si sa pice cu eroare RLS (in loc de
+  // eroarea clara de NOT NULL), blocand orice membru la fiecare login.
   const saveProfile = async () => {
     const { data: existing } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).maybeSingle()
-    await supabase.from('profiles').upsert({
-      id: user.id,
+    await supabase.from('profiles').update({
       email: user.email,
       full_name: existing?.full_name || user.user_metadata?.full_name || null,
-    }, { onConflict: 'id' })
+    }).eq('id', user.id)
   }
 
   const fetchUserProfile = async () => {
@@ -4833,7 +4840,7 @@ function App() {
     if (upErr) { showToast(t.toastAvatarUploadError); console.error(upErr); setAvatarUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
     const urlFinal = `${publicUrl}?t=${Date.now()}`
-    await supabase.from('profiles').upsert({ id: user.id, email: user.email, avatar_url: urlFinal }, { onConflict: 'id' })
+    await supabase.from('profiles').update({ email: user.email, avatar_url: urlFinal }).eq('id', user.id)
     setUserProfile(prev => ({ ...prev, avatar_url: urlFinal }))
     showToast(t.toastAvatarUpdated)
     setAvatarUploading(false)
