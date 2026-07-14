@@ -5866,7 +5866,7 @@ function App() {
                           </div>
                           <div style={{ fontSize: '12px', color: rezervat ? '#0E0E0E' : '#888', marginTop: '3px' }}>{c.name || t.homeDefaultClassName} · {c.coach}</div>
                           {deschis && (
-                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#b8eec0' : '#e0e0e0'}` }}
+                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#0E0E0E' : '#e0e0e0'}` }}
                               onClick={e => e.stopPropagation()}>
                               {(() => {
                                 const membri = rezervariPerClasa[c.id]?.membri || []
