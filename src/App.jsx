@@ -58,6 +58,12 @@ class ErrorBoundary extends Component {
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
+// Placeholder pt conversia la multi-tenant (Faza 0 din plan) - hardcodat la
+// singura sala reala de azi. Cand Faza 1+ aduc tabelul `gyms`, sursa asta se
+// inlocuieste cu sala curenta citita din DB (userProfile.gym_id -> gyms),
+// fara sa mai umble la cele ~8 locuri din UI/translations care il folosesc.
+const CURRENT_GYM = { name: 'CrossFit C15', primaryColor: '#ABE73C' }
+
 // Ajusteaza sessions_used printr-un citeste-apoi-scrie cu verificare optimista
 // (WHERE sessions_used = valoarea citita) - fara asta, doua booking/anulari
 // aproape simultane (ex: acelasi membru pe doua device-uri, sau o rezervare
@@ -4105,13 +4111,13 @@ function NotRxdBadge({ t, compact }) {
 // facut + scorul + variantă + data/ora + un mesaj de felicitare, cu buton de
 // distribuire (Web Share API - pe mobil deschide sheet-ul nativ cu WhatsApp/
 // social media direct, fara integrare separata per platforma).
-function WorkoutSharePopup({ data, onClose, t, lang }) {
+function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
   if (!data) return null
   const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, notRxd } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const dataObj = new Date(loggedAt)
   const shareText = [
-    'CrossFit C15',
+    gym.name,
     wodName ? `"${wodName}"` : null,
     (movements && movements.length > 0) ? movements.join(', ') : null,
     scoreParts.length > 0 ? scoreParts.join(' · ') : null,
@@ -4137,7 +4143,7 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
           <img src="/forge.png" alt="Forge" style={{ height: '30px', width: '30px', borderRadius: '8px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
           <span style={{ fontSize: '13px', fontWeight: '600' }}>
-            <span style={{ color: '#888' }}> · </span><span style={{ color: '#fff' }}>CrossFit </span><span style={{ color: '#ABE73C' }}>C15</span>
+            <span style={{ color: '#888' }}> · </span><span style={{ color: gym.primaryColor }}>{gym.name}</span>
           </span>
         </div>
         <div style={{ padding: '26px 24px', textAlign: 'center' }}>
@@ -5725,13 +5731,12 @@ function App() {
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
           <span onClick={() => { debugTapRef.current += 1; if (debugTapRef.current >= 5) { localStorage.setItem('navDebug', '1'); window.location.reload() } }} style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
-        <span style={{ fontSize: '14px', fontWeight: '600' }}>
-          <span style={{ color: '#fff' }}>CrossFit </span>
-          <span style={{ color: '#ABE73C' }}>C15</span>
+        <span style={{ fontSize: '14px', fontWeight: '600', color: CURRENT_GYM.primaryColor }}>
+          {CURRENT_GYM.name}
         </span>
       </div>
 
-      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} />
+      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={CURRENT_GYM} />
 
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
@@ -7290,12 +7295,12 @@ function App() {
                   {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalSubtitle : t.onboardingWaiverSubtitle}
                 </div>
                 <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading(CURRENT_GYM.name)}</div>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver1Title}</strong><br />{t.onboardingWaiver1Text}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver2Title}</strong><br />{t.onboardingWaiver2Text}</p>
-                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text}</p>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text(CURRENT_GYM.name)}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver4Title}</strong><br />{t.onboardingWaiver4Text}</p>
-                  <p><strong>{t.onboardingWaiver5Title}</strong><br />{t.onboardingWaiver5Text}</p>
+                  <p><strong>{t.onboardingWaiver5Title}</strong><br />{t.onboardingWaiver5Text(CURRENT_GYM.name)}</p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={onboardingWaiverAccepted} onChange={e => setOnboardingWaiverAccepted(e.target.checked)}
