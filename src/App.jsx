@@ -5873,7 +5873,7 @@ function App() {
                                 const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
                                 return membri.length > 0 ? (
                                   <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
+                                    <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                       {membri.map((m, mi) => (
                                         <span key={mi} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', background: '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', padding: '3px 8px 3px 3px', borderRadius: '20px', fontWeight: '500' }}>
@@ -5884,7 +5884,7 @@ function App() {
                                     </div>
                                   </div>
                                 ) : cnt > 0 ? (
-                                  <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{t.homeParticipantsCount(cnt)}</div>
+                                  <div style={{ fontSize: '11px', color: rezervat ? '#0E0E0E' : '#aaa', marginBottom: '10px' }}>{t.homeParticipantsCount(cnt)}</div>
                                 ) : null
                               })()}
                               {!esteInTrecut ? (
