@@ -1743,8 +1743,11 @@ function MiniSwitch({ checked, onChange }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScrollRef, t, lang }) {
+function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
+  const [allGymsPlatform, setAllGymsPlatform] = useState([])
+  const [signupCodes, setSignupCodes] = useState([])
+  const [generatingSignupCode, setGeneratingSignupCode] = useState(false)
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
   const [clienti, setClienti] = useState([])
@@ -1882,6 +1885,31 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
     if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin(); fetchCoaches() }
   }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
+  useEffect(() => { if (adminTab === 'platforma' && isPlatformAdmin) { fetchAllGymsPlatform(); fetchSignupCodes() } }, [adminTab])
+
+  const fetchAllGymsPlatform = async () => {
+    const { data } = await supabase.rpc('list_all_gyms_platform')
+    setAllGymsPlatform(data || [])
+  }
+
+  const fetchSignupCodes = async () => {
+    const { data } = await supabase.rpc('list_gym_signup_codes')
+    setSignupCodes(data || [])
+  }
+
+  const generateSignupCode = async () => {
+    setGeneratingSignupCode(true)
+    const { error } = await supabase.rpc('generate_gym_signup_code')
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else await fetchSignupCodes()
+    setGeneratingSignupCode(false)
+  }
+
+  const toggleGymActivePlatform = async (gymIdToToggle, nextActive) => {
+    const { error } = await supabase.rpc('set_gym_active_status', { p_gym_id: gymIdToToggle, p_active: nextActive })
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else await fetchAllGymsPlatform()
+  }
 
   const fetchClase = async () => {
     setLoadingClase(true)
@@ -2677,7 +2705,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }].filter(tab => !tab.adminOnly || isAdmin).map(tab => (
+        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }, { id: 'platforma', icon: Flag, lbl: t.platformAdminTab, adminOnly: true, platformOnly: true }].filter(tab => (!tab.adminOnly || isAdmin) && (!tab.platformOnly || isPlatformAdmin)).map(tab => (
           <div key={tab.id} onClick={() => setAdminTab(tab.id)}
             style={{ flex: adminTab === tab.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === tab.id ? '600' : '400', background: adminTab === tab.id ? '#0E0E0E' : '#fff', color: adminTab === tab.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <tab.icon size={13} color={adminTab === tab.id ? '#fff' : '#888'} />{adminTab === tab.id ? ` ${tab.lbl}` : ''}
@@ -3635,6 +3663,43 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScr
         </div>
         </>
       )}
+
+      {adminTab === 'platforma' && isPlatformAdmin && (
+        <>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminGymsTitle}</div>
+          {allGymsPlatform.map(g => (
+            <div key={g.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0', gap: '10px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
+                <div style={{ fontSize: '11px', color: '#888' }}>{g.owner_email} · {t.platformAdminMembersCount(g.member_count)}</div>
+              </div>
+              <button onClick={() => toggleGymActivePlatform(g.id, !g.is_active)}
+                style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: g.is_active ? '#FCEBEB' : '#EFF9E7', color: g.is_active ? '#C62828' : '#5C8A2E' }}>
+                {g.is_active ? t.platformAdminDeactivate : t.platformAdminActivate}
+              </button>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminCodesTitle}</div>
+          <button onClick={generateSignupCode} disabled={generatingSignupCode}
+            style={{ width: '100%', padding: '13px', background: generatingSignupCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: generatingSignupCode ? 'not-allowed' : 'pointer', marginBottom: '14px' }}>
+            {t.platformAdminGenerateCode}
+          </button>
+          {signupCodes.length === 0 ? (
+            <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '10px 0' }}>{t.platformAdminNoCodes}</div>
+          ) : signupCodes.map(c => (
+            <div key={c.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', letterSpacing: '1px' }}>{c.code}</span>
+              <span style={{ fontSize: '11px', color: c.used_at ? '#888' : '#5C8A2E', fontWeight: '600' }}>
+                {c.used_at ? `${t.platformAdminUsedLabel} · ${c.used_by_gym_name || ''}` : t.platformAdminUnusedLabel}
+              </span>
+            </div>
+          ))}
+        </div>
+        </>
+      )}
     </div>
   )
 }
@@ -4255,6 +4320,8 @@ function App() {
   const [toast, setToast] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [isCoach, setIsCoach] = useState(false)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  const [gymBlocked, setGymBlocked] = useState(false)
   // Inainte de login nu exista userProfile din care sa citim limba - localStorage
   // (aceeasi convenție ca forge_remember_email) tine limba intre sesiuni pe acest
   // device; dupa login, se sincronizeaza cu profiles.language (sursa de adevar
@@ -4359,6 +4426,7 @@ function App() {
   const [gymResults, setGymResults] = useState([])
   const [selectedGym, setSelectedGym] = useState(null)
   const [joinCodeInput, setJoinCodeInput] = useState('')
+  const [gymSignupCodeInput, setGymSignupCodeInput] = useState('')
   const [resetMode, setResetMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
@@ -4525,6 +4593,7 @@ function App() {
       fetchWodZi()
       checkAdmin()
       checkCoach()
+      checkPlatformAdmin()
       fetchAbonamentMeu(true)
       fetchClasament()
       registerPushSubscription()
@@ -4736,6 +4805,19 @@ function App() {
   const fetchUserProfile = async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     setUserProfile(data)
+    // Blocare acces sala (neplata catre platforma) - gyms_select_public
+    // filtreaza deja is_active=true, deci un fetch fara rezultat pt propriul
+    // gym_id inseamna sigur "sala dezactivata de platform admin", nu doar
+    // "n-am gasit-o" (gym_id vine dintr-un profil deja creat, referinta FK
+    // garanteaza ca randul exista in gyms, doar poate fi ascuns de RLS).
+    // gym_id null (fereastra tranzitorie la fluxul de owner, inainte de
+    // revendicare) nu blocheaza - nu e cazul real vizat aici.
+    if (data?.gym_id) {
+      const { data: gymRow } = await supabase.from('gyms').select('id').eq('id', data.gym_id).maybeSingle()
+      setGymBlocked(!gymRow)
+    } else {
+      setGymBlocked(false)
+    }
     const currentYear = new Date().getFullYear()
     const waiverInLS = localStorage.getItem(`waiver_${user?.id}_${currentYear}`) === '1'
     // Waiver expirat = nu a fost acceptat SAU a trecut mai mult de 1 an de la acceptare
@@ -4878,6 +4960,11 @@ function App() {
   const checkCoach = async () => {
     const { data } = await supabase.from('coaches').select('id').eq('id', user.id)
     setIsCoach(data && data.length > 0)
+  }
+
+  const checkPlatformAdmin = async () => {
+    const { data } = await supabase.rpc('is_platform_admin')
+    setIsPlatformAdmin(!!data)
   }
 
   const fetchAbonamentMeu = async (isFirstLoad = false) => {
@@ -5182,6 +5269,14 @@ function App() {
     setAuthSubmitting(true); setAuthError('')
     if (registerMode === 'owner') {
       if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
+      if (!gymSignupCodeInput.trim()) { setAuthError(t.authGymSignupCodeRequired); setAuthSubmitting(false); return }
+      // Verificare UX (mesaj clar), nu poarta reala de securitate - aia e
+      // reserve_gym_signup_code() + politica RLS gyms_bootstrap_insert de mai
+      // jos (cere un cod chiar rezervat de acest utilizator, nu doar "valid
+      // undeva in tabel" - inchide exact portita prin care cineva ar putea
+      // ocoli UI-ul si ar crea o sala fara sa fi platit).
+      const codeCheck = await supabase.rpc('verify_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
+      if (!codeCheck.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
       const newGymId = crypto.randomUUID()
       // Fara gym_id in metadata aici (spre deosebire de fluxul de membru mai
       // jos) - sala cu id-ul newGymId inca nu exista in `gyms` in acest
@@ -5192,10 +5287,13 @@ function App() {
       // mai jos, dupa ce sala chiar exista.
       const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
       if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+      const reserveRes = await supabase.rpc('reserve_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
+      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
       const { error: gymErr } = await supabase.from('gyms').insert({
         id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: signUpData.user.id,
       })
       if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
+      await supabase.rpc('consume_my_reserved_gym_signup_code', { p_gym_id: newGymId })
       const { error: adminErr } = await supabase.from('admins').insert({ id: signUpData.user.id, email: authEmail, gym_id: newGymId })
       if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
       // Abia acum sala chiar exista - putem "revendica" profilul (null ->
@@ -5805,7 +5903,10 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymNameLabel}</div>
                 <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', marginBottom: '12px' }} />
+                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymSignupCodeLabel}</div>
+                <input value={gymSignupCodeInput} onChange={e => setGymSignupCodeInput(e.target.value.toUpperCase())} placeholder={t.authGymSignupCodePlaceholder}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', letterSpacing: '1px' }} />
               </div>
             ) : (
               <div>
@@ -5888,6 +5989,16 @@ function App() {
       </div>
 
       <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={CURRENT_GYM} />
+
+      {gymBlocked && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
+            <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
+          </div>
+        </div>
+      )}
 
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
@@ -7171,7 +7282,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>

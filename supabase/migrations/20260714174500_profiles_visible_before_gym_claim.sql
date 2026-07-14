@@ -1,0 +1,31 @@
+-- Bug critic gasit live (nu prin cod-review, prin datele reale ale unui test
+-- anterior de inregistrare "Pornesc o sala noua"): fluxul de owner lasa
+-- profiles.gym_id null temporar (inainte de revendicare, dupa ce sala chiar
+-- exista - vezi 20260714160000_multitenant_owner_bootstrap_fix.sql). Dar
+-- profiles_select_all era `USING (gym_id = my_gym_id())` - pt un utilizator
+-- cu gym_id inca null, my_gym_id() (care citeste tot din propriul rand)
+-- returneaza SI el null, iar `NULL = NULL` in SQL e NULL, nu true. Randul
+-- propriu devenea invizibil.
+--
+-- Postgres, pt UPDATE/DELETE, aplica politicile de SELECT PE LANGA politica
+-- de UPDATE - un rand invizibil prin SELECT nu poate fi tinta unui UPDATE,
+-- chiar daca politica UPDATE (id = auth.uid()) ar fi satisfacuta separat.
+-- Exact asta bloca pasul de revendicare a salii, silentios, fara nicio
+-- eroare vizibila in UI (UPDATE-ul "reusea" cu 0 randuri afectate).
+--
+-- Prima incercare de fix (`gym_id = my_gym_id() or (gym_id is null and id =
+-- auth.uid())`) a rezolvat SELECT-ul, dar nu si tranzitia null -> valoare
+-- prin UPDATE: WITH CHECK-ul reverifica randul NOU fata de aceeasi politica,
+-- iar in cadrul aceleiasi comenzi, my_gym_id() (subquery pe acelasi tabel)
+-- inca "vede" valoarea VECHE (null) - randul nou (gym_id = valoare reala)
+-- nu se mai potrivea nici cu ramura null, nici cu gym_id = my_gym_id()
+-- (care raspundea tot null in acel moment).
+--
+-- Fix final, mai simplu si mai robust: propriul rand e mereu vizibil,
+-- indiferent de gym_id - "vad propriul profil" n-ar trebui sa depinda
+-- niciodata de valoarea gym_id-ului. Verificat live: nu slabeste izolarea
+-- (un membru tot nu vede randurile ALTOR utilizatori din alta sala), doar
+-- elimina o restrictie care n-avea sens aplicata propriului rand.
+alter policy profiles_select_all on profiles using (
+  id = auth.uid() or gym_id = my_gym_id()
+);
