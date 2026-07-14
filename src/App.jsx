@@ -27,32 +27,6 @@ import {
   isMixedCategory,
 } from './workoutFormats'
 
-// Bold in stil markdown (**text**) - miscarile/notitele sunt text simplu
-// (nu HTML/rich text), stocate direct in coloane text[]/text din DB, deci nu
-// exista formatare reala. Ctrl+B incadreaza selectia curenta cu ** in orice
-// input/textarea de compunere a WOD-ului (Paste rapid, adaugare rapida,
-// notite, editare inline din SortableList) - boldizeText() desface apoi acel
-// text la afisare (Acasa, Jurnal, Clasament) intr-un <strong>.
-function handleBoldShortcut(e, value, setValue) {
-  if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b')) return
-  e.preventDefault()
-  const el = e.target
-  const start = el.selectionStart ?? value.length
-  const end = el.selectionEnd ?? value.length
-  const newValue = value.slice(0, start) + '**' + value.slice(start, end) + '**' + value.slice(end)
-  setValue(newValue)
-  const cursorPos = start === end ? start + 2 : end + 4
-  requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = cursorPos })
-}
-function boldizeText(text) {
-  if (!text) return text
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (
-    part.startsWith('**') && part.endsWith('**') && part.length > 4
-      ? <strong key={i}>{part.slice(2, -2)}</strong>
-      : part
-  ))
-}
-
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
   static getDerivedStateFromError(error) { return { hasError: true, error } }
@@ -1422,7 +1396,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               {miscariAfisate.length > 0 && (
                                 <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {miscariAfisate.map((m, j) => (
-                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {boldizeText(wHasSets ? stripWeightSuffix(m) : m)}</div>
+                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                                   ))}
                                 </div>
                               )}
@@ -1445,7 +1419,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               {noteLog && noteLog.trim() && (
                                 <div>
                                   <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                                  <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{boldizeText(noteLog.trim())}</div>
+                                  <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                                 </div>
                               )}
                               {!areDetalii && (
@@ -3420,7 +3394,6 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                         }}
                         placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
                       <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        onKeyDown={e => handleBoldShortcut(e, wodVariantePaste[v.key], val => setWodVariantePaste(prev => ({ ...prev, [v.key]: val })))}
                         placeholder={t.adminWodVariantPastePlaceholder} rows={3}
                         style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
                       {wodVariantePaste[v.key].trim() && (
@@ -3436,7 +3409,6 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
                       )}
                       <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
                       <input value={wodVarianteNote[v.key]} onChange={e => setWodVarianteNote(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        onKeyDown={e => handleBoldShortcut(e, wodVarianteNote[v.key], val => setWodVarianteNote(prev => ({ ...prev, [v.key]: val })))}
                         placeholder={t.adminWodNotesPlaceholder}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
                     </div>
@@ -3701,7 +3673,7 @@ function SortableList({ items, onReorder, onRemove }) {
                 value={editVal}
                 onChange={e => setEditVal(e.target.value)}
                 onBlur={() => commitEdit(i)}
-                onKeyDown={e => { if (e.key === 'Enter') { commitEdit(i); return } handleBoldShortcut(e, editVal, setEditVal) }}
+                onKeyDown={e => { if (e.key === 'Enter') commitEdit(i) }}
                 style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '13px', color: '#0E0E0E', outline: 'none', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
               />
               {miscareSugestii(editVal).length > 0 && (
@@ -3724,7 +3696,7 @@ function SortableList({ items, onReorder, onRemove }) {
               )}
             </div>
           ) : (
-            <span style={{ fontSize: '13px', color: '#0E0E0E', flex: 1 }}>• {boldizeText(m)}</span>
+            <span style={{ fontSize: '13px', color: '#0E0E0E', flex: 1 }}>• {m}</span>
           )}
           {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto', flexShrink: 0 }}>×</button>}
         </div>
@@ -3871,7 +3843,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       {miscariAfisate.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
-                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {boldizeText(wHasSets ? stripWeightSuffix(m) : m)}</div>
+                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
@@ -4162,7 +4134,7 @@ function WorkoutSharePopup({ data, onClose, t, lang }) {
           )}
           {movements && movements.length > 0 && (
             <div style={{ fontSize: '12px', color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
-              {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {boldizeText(m)}</div>)}
+              {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
             </div>
           )}
           <div style={{ fontSize: '30px', fontWeight: '800', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
@@ -6060,7 +6032,7 @@ function App() {
                               <div>
                                 {miscari.map((m, mi) => (
                                   <div key={mi} style={{ padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                                    <span style={{ fontSize: '13px', color: '#0E0E0E' }}>• {boldizeText(m)}</span>
+                                    <span style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</span>
                                   </div>
                                 ))}
                               </div>
@@ -6068,7 +6040,7 @@ function App() {
                             {notaVarianta && (
                               <div style={{ padding: '8px 10px', background: '#FFF6DA', border: '1px solid #F3DE9C', borderRadius: '8px', marginTop: '6px' }}>
                                 <div style={{ fontSize: '10px', fontWeight: '700', color: '#8A6D1D', letterSpacing: '0.06em', marginBottom: '2px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
-                                <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{boldizeText(notaVarianta)}</span>
+                                <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{notaVarianta}</span>
                               </div>
                             )}
                           </>
