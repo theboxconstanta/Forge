@@ -16,6 +16,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // injectRegister:false - inregistram manual in main.jsx (virtual:pwa-register)
+      // in loc de script-ul auto-injectat (dist/registerSW.js), care apela
+      // navigator.serviceWorker.register(...) fara niciun .catch(). Rejection-ul
+      // (retea instabila la sala, quota storage, etc.) ajungea in Sentry ca
+      // unhandled promise rejection generic ("Error: Rejected"), fara sa fie
+      // vreodata gestionat - vezi SENTRY-CYAN-HARBOR-7.
+      injectRegister: false,
       includeAssets: ['favicon.ico', 'pwa-icon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Forge',

@@ -43,6 +43,21 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+// Inregistrare manuala (injectRegister:false in vite.config.js) - scriptul
+// auto-injectat de vite-plugin-pwa apela navigator.serviceWorker.register()
+// fara niciun .catch(), deci un rejection (retea instabila la sala, quota de
+// storage etc.) ajungea in Sentry ca unhandled promise rejection generic
+// ("Error: Rejected", fara context util). onRegisterError il trece prin
+// console.error, care ajunge in Sentry cu stacktrace real prin
+// captureConsoleIntegration, in loc sa fie o respingere nesupravegheata.
+// import() dinamic, fara await la nivel de modul - nu trebuie sa blocheze
+// randarea aplicatiei (createRoot de mai jos) pana se rezolva inregistrarea.
+if (import.meta.env.PROD) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({ immediate: true, onRegisterError: (error) => console.error('[SW] register error:', error) })
+  })
+}
+
 const lockPortrait = () => {
   // Modern API (Android Chrome, Edge)
   if (screen?.orientation?.lock) {
