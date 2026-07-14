@@ -4747,11 +4747,19 @@ function App() {
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         })
       }
+      // Nu userProfile din closure - efectul care apeleaza aceasta functie
+      // ruleaza pe [user], deci in acelasi tick cu fetchUserProfile() inca
+      // nepornit; userProfile e inca null la acel moment (bug real gasit
+      // live, 07-14: "Push registration failed: Cannot read properties of
+      // null (reading 'gym_id')" la fiecare login, silentios, prin catch-ul
+      // de mai jos). Fetch propriu, independent de starea React.
+      const { data: profileRow } = await supabase.from('profiles').select('gym_id').eq('id', user.id).maybeSingle()
+      if (!profileRow?.gym_id) return
       await supabase.from('push_subscriptions').upsert({
         member_email: user.email.toLowerCase(),
         subscription: sub.toJSON(),
         updated_at: new Date().toISOString(),
-        gym_id: userProfile.gym_id,
+        gym_id: profileRow.gym_id,
       }, { onConflict: 'member_email' })
     } catch (e) { console.error('Push registration failed:', e) }
   }
