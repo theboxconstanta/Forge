@@ -4653,8 +4653,17 @@ function App() {
 
   useEffect(() => {
     if (!user) return
-    const onVisible = () => {
+    // Bug real din Sentry (JWT expired la [Feed] query error si altele) - pe
+    // mobil, cand tab-ul/aplicatia sta in fundal (telefon blocat), timer-ul
+    // intern de auto-refresh al supabase-js e suspendat odata cu event
+    // loop-ul JS, deci la revenire JWT-ul poate fi deja expirat inainte ca
+    // refresh-ul automat sa apuce sa ruleze. getSession() verifica si
+    // reimprospateaza sesiunea daca a expirat, asteptat aici INAINTE sa
+    // pornim cele 5 fetch-uri de mai jos - altfel ele pot porni cu un JWT
+    // expirat si pica silentios (doar console.error, fara recuperare).
+    const onVisible = async () => {
       if (document.visibilityState === 'visible') {
+        await supabase.auth.getSession()
         fetchAbonamentMeu()
         fetchRezervari()
         fetchClaseDB()
