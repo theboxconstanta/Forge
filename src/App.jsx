@@ -5159,9 +5159,14 @@ function App() {
     if (registerMode === 'owner') {
       if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
       const newGymId = crypto.randomUUID()
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email: authEmail, password: authPassword, options: { data: { gym_id: newGymId } },
-      })
+      // Fara gym_id in metadata aici (spre deosebire de fluxul de membru mai
+      // jos) - sala cu id-ul newGymId inca nu exista in `gyms` in acest
+      // moment (nu poate fi creata inainte de signUp, are nevoie de
+      // auth.uid()). handle_new_user() ar incerca sa insereze un gym_id care
+      // incalca FK-ul spre gyms(id), iar signUp() ar pica generic cu 500 -
+      // bug real gasit live. profiles.gym_id ramane null pana la pasul de
+      // mai jos, dupa ce sala chiar exista.
+      const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
       if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
       const { error: gymErr } = await supabase.from('gyms').insert({
         id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: signUpData.user.id,
@@ -5169,11 +5174,14 @@ function App() {
       if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
       const { error: adminErr } = await supabase.from('admins').insert({ id: signUpData.user.id, email: authEmail, gym_id: newGymId })
       if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      // Abia acum sala chiar exista - putem "revendica" profilul (null ->
+      // valoare, singura tranzitie permisa de prevent_gym_id_change()).
+      const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', signUpData.user.id)
+      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); return }
       // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
       // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
       // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
-      // iar cele doua insert-uri de mai sus tocmai au schimbat ce ar gasi
-      // acele functii oricum.
+      // iar pasii de mai sus tocmai au schimbat ce ar gasi acele functii oricum.
       const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', signUpData.user.id).maybeSingle()
       setUserProfile(freshProfile); setIsAdmin(true)
     } else {
