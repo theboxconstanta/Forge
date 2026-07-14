@@ -1746,6 +1746,7 @@ function MiniSwitch({ checked, onChange }) {
 function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
+  const [paidUntilEdits, setPaidUntilEdits] = useState({})
   const [signupCodes, setSignupCodes] = useState([])
   const [generatingSignupCode, setGeneratingSignupCode] = useState(false)
   const [clase, setClase] = useState([])
@@ -1909,6 +1910,14 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     const { error } = await supabase.rpc('set_gym_active_status', { p_gym_id: gymIdToToggle, p_active: nextActive })
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else await fetchAllGymsPlatform()
+  }
+
+  const saveGymPaidUntil = async (gymIdToUpdate) => {
+    const newDate = paidUntilEdits[gymIdToUpdate]
+    if (!newDate) return
+    const { error } = await supabase.rpc('set_gym_paid_until', { p_gym_id: gymIdToUpdate, p_paid_until: newDate })
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else { showToast(t.toastGymPaidUntilSaved); await fetchAllGymsPlatform() }
   }
 
   const fetchClase = async () => {
@@ -3668,18 +3677,35 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminGymsTitle}</div>
-          {allGymsPlatform.map(g => (
-            <div key={g.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0', gap: '10px' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
-                <div style={{ fontSize: '11px', color: '#888' }}>{g.owner_email} · {t.platformAdminMembersCount(g.member_count)}</div>
+          {allGymsPlatform.map(g => {
+            const todayISO = new Date().toISOString().slice(0, 10)
+            const expired = g.paid_until && g.paid_until < todayISO
+            return (
+            <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>{g.owner_email} · {t.platformAdminMembersCount(g.member_count)}</div>
+                </div>
+                <button onClick={() => toggleGymActivePlatform(g.id, !g.is_active)}
+                  style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: g.is_active ? '#FCEBEB' : '#EFF9E7', color: g.is_active ? '#C62828' : '#5C8A2E' }}>
+                  {g.is_active ? t.platformAdminDeactivate : t.platformAdminActivate}
+                </button>
               </div>
-              <button onClick={() => toggleGymActivePlatform(g.id, !g.is_active)}
-                style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: g.is_active ? '#FCEBEB' : '#EFF9E7', color: g.is_active ? '#C62828' : '#5C8A2E' }}>
-                {g.is_active ? t.platformAdminDeactivate : t.platformAdminActivate}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: expired ? '#C62828' : '#888', flexShrink: 0 }}>
+                  {g.paid_until ? `${t.platformAdminPaidUntilLabel} ${g.paid_until}${expired ? ` · ${t.platformAdminPaidUntilExpired}` : ''}` : t.platformAdminPaidUntilNone}
+                </span>
+                <input type="date" value={paidUntilEdits[g.id] ?? g.paid_until ?? ''}
+                  onChange={e => setPaidUntilEdits(prev => ({ ...prev, [g.id]: e.target.value }))}
+                  style={{ flex: 1, minWidth: 0, padding: '6px 8px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '11px' }} />
+                <button onClick={() => saveGymPaidUntil(g.id)}
+                  style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: '#0E0E0E', color: '#fff' }}>
+                  {t.platformAdminPaidUntilSave}
+                </button>
+              </div>
             </div>
-          ))}
+          )})}
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminCodesTitle}</div>
