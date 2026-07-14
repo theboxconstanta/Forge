@@ -58,10 +58,13 @@ class ErrorBoundary extends Component {
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
-// Placeholder pt conversia la multi-tenant (Faza 0 din plan) - hardcodat la
-// singura sala reala de azi. Cand Faza 1+ aduc tabelul `gyms`, sursa asta se
-// inlocuieste cu sala curenta citita din DB (userProfile.gym_id -> gyms),
-// fara sa mai umble la cele ~8 locuri din UI/translations care il folosesc.
+// Fallback inainte ca sala reala sa fie incarcata din DB (userProfile.gym_id
+// -> gyms) sau daca fetch-ul esueaza - vezi myGym mai jos, care e sursa
+// efectiv folosita in UI. Bug real gasit live (07-14): pana la acest fix,
+// CURRENT_GYM ramasese hardcodat de la Faza 0 a conversiei multi-tenant si
+// nu fusese niciodata inlocuit - orice sala in afara de CrossFit C15 (inclusiv
+// waiver-ul legal la onboarding!) arata mereu "CrossFit C15", indiferent de
+// sala reala a userului logat.
 const CURRENT_GYM = { name: 'CrossFit C15', primaryColor: '#ABE73C' }
 
 // Ajusteaza sessions_used printr-un citeste-apoi-scrie cu verificare optimista
@@ -4501,6 +4504,7 @@ function App() {
   useEffect(() => { clasamentDateRef.current = clasamentDate }, [clasamentDate])
   const jurnalDateInputRef = useRef(null)
   const [userProfile, setUserProfile] = useState(null)
+  const [myGym, setMyGym] = useState(CURRENT_GYM)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
   const [calPickerYear, setCalPickerYear] = useState(new Date().getFullYear())
@@ -4889,9 +4893,10 @@ function App() {
     // gym_id null (fereastra tranzitorie la fluxul de owner, inainte de
     // revendicare) nu blocheaza - nu e cazul real vizat aici.
     if (data?.gym_id) {
-      const { data: gymRow } = await supabase.from('gyms').select('id').eq('id', data.gym_id).maybeSingle()
+      const { data: gymRow } = await supabase.from('gyms').select('id, name, primary_color').eq('id', data.gym_id).maybeSingle()
       setGymBlocked(!gymRow)
       setRegistrationIncomplete(false)
+      if (gymRow) setMyGym({ name: gymRow.name, primaryColor: gymRow.primary_color || CURRENT_GYM.primaryColor })
     } else if (data && !ownerBootstrapping) {
       setGymBlocked(false)
       setRegistrationIncomplete(true)
@@ -6100,12 +6105,12 @@ function App() {
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
           <span onClick={() => { debugTapRef.current += 1; if (debugTapRef.current >= 5) { localStorage.setItem('navDebug', '1'); window.location.reload() } }} style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
-        <span style={{ fontSize: '14px', fontWeight: '600', color: CURRENT_GYM.primaryColor }}>
-          {CURRENT_GYM.name}
+        <span style={{ fontSize: '14px', fontWeight: '600', color: myGym.primaryColor }}>
+          {myGym.name}
         </span>
       </div>
 
-      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={CURRENT_GYM} />
+      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={myGym} />
 
       {gymBlocked && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -7707,12 +7712,12 @@ function App() {
                   {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalSubtitle : t.onboardingWaiverSubtitle}
                 </div>
                 <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading(CURRENT_GYM.name)}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading(myGym.name)}</div>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver1Title}</strong><br />{t.onboardingWaiver1Text}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver2Title}</strong><br />{t.onboardingWaiver2Text}</p>
-                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text(CURRENT_GYM.name)}</p>
+                  <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text(myGym.name)}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver4Title}</strong><br />{t.onboardingWaiver4Text}</p>
-                  <p><strong>{t.onboardingWaiver5Title}</strong><br />{t.onboardingWaiver5Text(CURRENT_GYM.name)}</p>
+                  <p><strong>{t.onboardingWaiver5Title}</strong><br />{t.onboardingWaiver5Text(myGym.name)}</p>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={onboardingWaiverAccepted} onChange={e => setOnboardingWaiverAccepted(e.target.checked)}
