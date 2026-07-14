@@ -3036,7 +3036,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{t.adminClassColorLabel}</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              {[null, '#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8'].map(col => (
+              {[null, '#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8', '#E8871E', '#F2C94C', '#E24B4A', '#3B82C4'].map(col => (
                 <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
                   style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
                     background: col || '#e0e0e0',
@@ -5847,8 +5847,8 @@ function App() {
                         <div key={c.id}
                           onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
                           style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
-                            background: rezervat ? '#f0f0f0' : c.color ? c.color + '33' : deschis ? '#FFFFFF' : '#fafafa',
-                            border: rezervat ? '2px solid #0E0E0E' : c.color ? `2px solid ${c.color}` : deschis ? '2px solid #0E0E0E' : '1px solid #ececec' }}>
+                            background: rezervat ? '#ABE73C' : deschis ? '#FFFFFF' : '#fafafa',
+                            border: rezervat ? '2px solid #ABE73C' : deschis ? '2px solid #0E0E0E' : '1px solid #ececec' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#0E0E0E' : '#0E0E0E', letterSpacing: '-0.3px' }}>{c.start_time?.slice(0,5)}</span>
@@ -5856,7 +5856,7 @@ function App() {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               {rezervat
-                                ? <span style={{ fontSize: '11px', background: '#ABE73C', color: '#0E0E0E', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
+                                ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#ABE73C', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
                                 : peWaitlist
                                 ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                               : plin
