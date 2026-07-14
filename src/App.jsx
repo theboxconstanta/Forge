@@ -4801,6 +4801,13 @@ function App() {
     // maximum allowed size", gasit in Sentry), fara niciun mesaj util pt
     // membru despre CE trebuie sa faca diferit.
     if (file.size > 5 * 1024 * 1024) { showToast(t.toastAvatarTooLarge); return }
+    // Bug real din Sentry (StorageApiError: mime type video/mp4 is not
+    // supported): input-ul are accept="image/*" doar ca hint - pe unele
+    // picker-e Android/Samsung, membrul poate alege oricum un video din
+    // galerie, care trece de input si esueaza abia la upload cu o eroare
+    // generica de storage, fara sa stie CE a gresit. Verificam tipul aici,
+    // cu un mesaj clar, inainte sa incercam upload-ul.
+    if (!file.type.startsWith('image/')) { showToast(t.toastAvatarWrongType); return }
     setAvatarUploading(true)
     const ext = file.name.split('.').pop().toLowerCase() || 'jpg'
     const path = `${user.id}/avatar.${ext}`

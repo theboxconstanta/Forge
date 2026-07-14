@@ -479,6 +479,7 @@ export const TRANSLATIONS = {
     toastPasswordChanged: '✓ Parolă schimbată!',
     toastAvatarUploadError: '❌ Eroare la upload!',
     toastAvatarTooLarge: '❌ Imaginea e prea mare (max 5MB) - alege una mai mică!',
+    toastAvatarWrongType: '❌ Trebuie să fie o poză, nu un video sau alt tip de fișier!',
     toastAvatarUpdated: '✓ Poză de profil actualizată!',
 
     // Timer
@@ -1237,6 +1238,7 @@ export const TRANSLATIONS = {
     toastPasswordChanged: '✓ Password changed!',
     toastAvatarUploadError: '❌ Error uploading!',
     toastAvatarTooLarge: '❌ Image is too large (max 5MB) - pick a smaller one!',
+    toastAvatarWrongType: "❌ It needs to be a photo, not a video or another file type!",
     toastAvatarUpdated: '✓ Profile picture updated!',
 
     // Timer
