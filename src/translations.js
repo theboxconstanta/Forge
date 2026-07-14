@@ -132,6 +132,14 @@ export const TRANSLATIONS = {
     authEnterEmailFirst: 'Introdu emailul mai întâi.',
     authResetEmailSent: '✓ Email de resetare trimis! Verifică inbox-ul.',
     authCheckEmailConfirm: '✓ Verifică emailul pentru confirmare!',
+    authJoinGymTab: 'Mă alătur unei săli',
+    authStartGymTab: 'Pornesc o sală nouă',
+    authGymNameLabel: 'Numele sălii',
+    authGymNamePlaceholder: 'ex. CrossFit Nord',
+    authFindGymLabel: 'Găsește sala ta',
+    authFindGymPlaceholder: 'Caută după nume sau cod',
+    authGymNameRequired: '❌ Introdu numele sălii!',
+    authPickGymFirst: '❌ Alege o sală din listă!',
 
     // Instalare PWA
     installTitle: 'Instalează Forge',
@@ -894,6 +902,14 @@ export const TRANSLATIONS = {
     authEnterEmailFirst: 'Enter your email first.',
     authResetEmailSent: '✓ Reset email sent! Check your inbox.',
     authCheckEmailConfirm: '✓ Check your email to confirm!',
+    authJoinGymTab: 'Join a gym',
+    authStartGymTab: 'Start a new gym',
+    authGymNameLabel: 'Gym name',
+    authGymNamePlaceholder: 'e.g. CrossFit North',
+    authFindGymLabel: 'Find your gym',
+    authFindGymPlaceholder: 'Search by name or code',
+    authGymNameRequired: '❌ Enter the gym name!',
+    authPickGymFirst: '❌ Pick a gym from the list!',
 
     // Instalare PWA
     installTitle: 'Install Forge',

@@ -4328,6 +4328,13 @@ function App() {
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('forge_remember_email'))
+  // Inregistrare multi-tenant (Faza 3) - 'member' se alatura unei sali
+  // existente (cautata dupa nume/cod), 'owner' porneste o sala noua.
+  const [registerMode, setRegisterMode] = useState('member')
+  const [newGymName, setNewGymName] = useState('')
+  const [gymQuery, setGymQuery] = useState('')
+  const [gymResults, setGymResults] = useState([])
+  const [selectedGym, setSelectedGym] = useState(null)
   const [resetMode, setResetMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
@@ -5117,11 +5124,58 @@ function App() {
     setAuthSubmitting(false)
   }
 
+  // Cod scurt de alaturare per sala - fara 0/O/1/I (ambigue vizual). Coliziune
+  // extrem de improbabila la scara asta (32^6 combinatii), iar constrangerea
+  // UNIQUE din DB e garantia reala - un eventual conflict pica vizibil ca
+  // eroare la insert, nu se pierde silentios.
+  const generateJoinCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+    return code
+  }
+
+  // Cautare sala la inregistrare - dupa nume (unic, impus la creare) SAU cod
+  // de alaturare, intr-un singur camp. Rulează pe clientul anonim (inainte
+  // de autentificare) - politica gyms_select_public permite explicit asta.
+  const searchGyms = async (query) => {
+    setGymQuery(query); setSelectedGym(null)
+    if (!query.trim()) { setGymResults([]); return }
+    const q = query.trim()
+    const { data } = await supabase.from('gyms').select('id, name')
+      .eq('is_active', true).or(`name.ilike.%${q}%,join_code.ilike.${q}`).limit(8)
+    setGymResults(data || [])
+  }
+
   const handleRegister = async () => {
     setAuthSubmitting(true); setAuthError('')
-    const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
-    if (error) setAuthError(error.message)
-    else setAuthError(t.authCheckEmailConfirm)
+    if (registerMode === 'owner') {
+      if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
+      const newGymId = crypto.randomUUID()
+      const { data: signUpData, error } = await supabase.auth.signUp({
+        email: authEmail, password: authPassword, options: { data: { gym_id: newGymId } },
+      })
+      if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+      const { error: gymErr } = await supabase.from('gyms').insert({
+        id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: signUpData.user.id,
+      })
+      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
+      const { error: adminErr } = await supabase.from('admins').insert({ id: signUpData.user.id, email: authEmail, gym_id: newGymId })
+      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
+      // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
+      // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
+      // iar cele doua insert-uri de mai sus tocmai au schimbat ce ar gasi
+      // acele functii oricum.
+      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', signUpData.user.id).maybeSingle()
+      setUserProfile(freshProfile); setIsAdmin(true)
+    } else {
+      if (!selectedGym) { setAuthError(t.authPickGymFirst); setAuthSubmitting(false); return }
+      const { error } = await supabase.auth.signUp({
+        email: authEmail, password: authPassword, options: { data: { gym_id: selectedGym.id } },
+      })
+      if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+    }
     setAuthSubmitting(false)
   }
 
@@ -5688,6 +5742,46 @@ function App() {
           <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.authAppName}</h1>
           <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? t.authWelcomeBack : t.authCreateAccount}</p>
         </div>
+        {authScreen === 'register' && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <button type="button" onClick={() => setRegisterMode('member')}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'member' ? '#ABE73C' : '#222', color: registerMode === 'member' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'system-ui' }}>
+                {t.authJoinGymTab}
+              </button>
+              <button type="button" onClick={() => setRegisterMode('owner')}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'owner' ? '#ABE73C' : '#222', color: registerMode === 'owner' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'system-ui' }}>
+                {t.authStartGymTab}
+              </button>
+            </div>
+            {registerMode === 'owner' ? (
+              <div>
+                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymNameLabel}</div>
+                <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authFindGymLabel}</div>
+                <input value={gymQuery} onChange={e => searchGyms(e.target.value)} placeholder={t.authFindGymPlaceholder}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+                {selectedGym && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#ABE73C', fontWeight: '600' }}>✓ {selectedGym.name}</div>
+                )}
+                {!selectedGym && gymResults.length > 0 && (
+                  <div style={{ marginTop: '8px', background: '#1a1a1a', borderRadius: '10px', overflow: 'hidden' }}>
+                    {gymResults.map(g => (
+                      <div key={g.id} onClick={() => { setSelectedGym(g); setGymQuery(g.name); setGymResults([]) }}
+                        style={{ padding: '10px 12px', fontSize: '13px', color: '#fff', cursor: 'pointer', borderBottom: '1px solid #292929' }}>
+                        {g.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authEmailLabel}</div>
           <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
