@@ -5890,7 +5890,7 @@ function App() {
                               {!esteInTrecut ? (
                                 rezervat ? (
                                   <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                                    style={{ width: '100%', padding: '9px', background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                                    style={{ width: '100%', padding: '9px', background: 'transparent', color: '#0E0E0E', border: '1px solid #0E0E0E', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
                                     {t.homeCancelReservation}
                                   </button>
                                 ) : peWaitlist ? (
