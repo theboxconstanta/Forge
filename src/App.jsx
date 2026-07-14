@@ -3915,10 +3915,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
       {entries.map((entry, i) => {
         const w = entry.wodLog
         const skillLogsArr = entry.skillLogsArr || []
-        const dataAfisata = entry.date ? new Date(entry.date).toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—'
         return (
           <div key={entry.key}>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px', marginTop: i > 0 ? '4px' : '0' }}>{dataAfisata}</div>
             {w && (() => {
               const logKey = w.id
               const isOpen = deschis === logKey
@@ -4492,6 +4490,7 @@ function App() {
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
+  const [jurnalDate, setJurnalDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   // Citite de handlerele realtime (efect cu deps [user], deci create o
   // singura data la login) - fara refs, acele closures ar ramane cu
   // dataAcasa/clasamentDate de la momentul login-ului, suprascriind cu date
@@ -4500,6 +4499,7 @@ function App() {
   const clasamentDateRef = useRef(clasamentDate)
   useEffect(() => { dataAcasaRef.current = dataAcasa }, [dataAcasa])
   useEffect(() => { clasamentDateRef.current = clasamentDate }, [clasamentDate])
+  const jurnalDateInputRef = useRef(null)
   const [userProfile, setUserProfile] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
@@ -4599,6 +4599,26 @@ function App() {
     })
     return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
   }, [wodLogs, skillLogs])
+
+  // Jurnal - o singura zi vizibila per ecran (nu lista continua), navigabila
+  // cu sageti/swipe/calendar - vezi bara de deasupra JurnalList.
+  const jurnalEntriesForDate = useMemo(() => jurnalEntries.filter(e => e.date === jurnalDate), [jurnalEntries, jurnalDate])
+  const goJurnalDay = (delta) => {
+    const d = new Date(jurnalDate + 'T00:00:00'); d.setDate(d.getDate() + delta)
+    setJurnalDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+  }
+  const jurnalTodayISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
+  const jurnalTouchX = useRef(null)
+  const onJurnalTouchStart = (e) => { jurnalTouchX.current = e.touches[0].clientX }
+  const onJurnalTouchEnd = (e) => {
+    if (jurnalTouchX.current == null) return
+    const delta = e.changedTouches[0].clientX - jurnalTouchX.current
+    jurnalTouchX.current = null
+    if (Math.abs(delta) < 50) return
+    // Swipe stanga (delta negativ, degetul merge spre stanga) = ziua urmatoare,
+    // ca la o pagina care se "intoarce" - swipe dreapta = ziua anterioara.
+    if (delta < 0) { if (jurnalDate < jurnalTodayISO) goJurnalDay(1) } else { goJurnalDay(-1) }
+  }
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
@@ -6656,7 +6676,25 @@ function App() {
           )}
 
           {logTab === 'jurnal' && (
-            <JurnalList entries={jurnalEntries} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} t={t} lang={lang}
+            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#fff', borderRadius: '12px', padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <button onClick={() => goJurnalDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>
+                {jurnalDate === jurnalTodayISO ? t.clasamentToday : new Date(jurnalDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </div>
+              <button onClick={() => goJurnalDay(1)} disabled={jurnalDate >= jurnalTodayISO} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: jurnalDate >= jurnalTodayISO ? '#e0e0e0' : '#0E0E0E', color: jurnalDate >= jurnalTodayISO ? '#bbb' : '#fff', fontSize: '16px', cursor: jurnalDate >= jurnalTodayISO ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button onClick={() => jurnalDateInputRef.current?.showPicker?.() || jurnalDateInputRef.current?.click()}
+                  style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', color: '#0E0E0E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calendar size={15} strokeWidth={2} />
+                </button>
+                <input ref={jurnalDateInputRef} type="date" value={jurnalDate} max={jurnalTodayISO}
+                  onChange={e => e.target.value && setJurnalDate(e.target.value)}
+                  style={{ position: 'absolute', inset: 0, width: '32px', height: '32px', opacity: 0, cursor: 'pointer' }} />
+              </div>
+            </div>
+            <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} t={t} lang={lang}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
@@ -6727,6 +6765,8 @@ function App() {
                 setPrevScreen('log')
                 setScreen('logSkill')
               }} />
+            </div>
+            </>
           )}
 
         </div>
