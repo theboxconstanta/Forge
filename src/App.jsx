@@ -1920,6 +1920,15 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     else { showToast(t.toastGymPaidUntilSaved); await fetchAllGymsPlatform() }
   }
 
+  const clearGymPaidUntil = async (gymIdToUpdate) => {
+    const { error } = await supabase.rpc('set_gym_paid_until', { p_gym_id: gymIdToUpdate, p_paid_until: null })
+    if (error) { showToast(t.toastGenericError); console.error(error) }
+    else {
+      setPaidUntilEdits(prev => { const next = { ...prev }; delete next[gymIdToUpdate]; return next })
+      showToast(t.toastGymPaidUntilSaved); await fetchAllGymsPlatform()
+    }
+  }
+
   const fetchClase = async () => {
     setLoadingClase(true)
     const { data } = await supabase.from('classes').select('*').order('date', { ascending: true }).order('start_time', { ascending: true })
@@ -3703,6 +3712,12 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                   style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: '#0E0E0E', color: '#fff' }}>
                   {t.platformAdminPaidUntilSave}
                 </button>
+                {g.paid_until && (
+                  <button onClick={() => clearGymPaidUntil(g.id)}
+                    style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: '#fff', color: '#888' }}>
+                    {t.platformAdminPaidUntilClear}
+                  </button>
+                )}
               </div>
             </div>
           )})}
@@ -5399,7 +5414,14 @@ function App() {
     setAuthSubmitting(false)
   }
 
-  const handleLogout = async () => { await supabase.auth.signOut() }
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    // Reset explicit - altfel un login imediat urmator, cu alt cont, ar
+    // putea arata pentru o fractiune de secunda ecranul de blocare ramas
+    // de la contul anterior, pana ce fetchUserProfile() apuca sa corecteze.
+    setGymBlocked(false)
+    setRegistrationIncomplete(false)
+  }
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
