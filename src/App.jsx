@@ -4417,6 +4417,14 @@ function App() {
   const [authPassword, setAuthPassword] = useState('')
   const [authSubmitting, setAuthSubmitting] = useState(false)
   const [authError, setAuthError] = useState('')
+  // signUp() (fluxul de owner) declanseaza SIGNED_IN si seteaza `user` inainte
+  // ca restul secventei de bootstrap (rezervare cod, insert gym, insert admin,
+  // claim profil) sa se termine - fara acest flag, ecranul de login/register
+  // se demonteaza imediat dupa signUp(), userul ajunge in aplicatie fara sala
+  // (gym_id null), iar orice eroare ulterioara (ex. nume de sala deja folosit)
+  // se seteaza pe un ecran care nu mai exista si nu se vede niciodata. Bug
+  // real gasit live (07-14): cont creat, cod rezervat definitiv, nicio sala.
+  const [ownerBootstrapping, setOwnerBootstrapping] = useState(false)
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('forge_remember_email'))
   // Inregistrare multi-tenant (Faza 3) - 'member' se alatura unei sali
   // existente (cautata dupa nume/cod), 'owner' porneste o sala noua.
@@ -5277,6 +5285,7 @@ function App() {
       // ocoli UI-ul si ar crea o sala fara sa fi platit).
       const codeCheck = await supabase.rpc('verify_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
       if (!codeCheck.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
+      setOwnerBootstrapping(true)
       const newGymId = crypto.randomUUID()
       // Fara gym_id in metadata aici (spre deosebire de fluxul de membru mai
       // jos) - sala cu id-ul newGymId inca nu exista in `gyms` in acest
@@ -5285,27 +5294,36 @@ function App() {
       // incalca FK-ul spre gyms(id), iar signUp() ar pica generic cu 500 -
       // bug real gasit live. profiles.gym_id ramane null pana la pasul de
       // mai jos, dupa ce sala chiar exista.
-      const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
-      if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+      // Daca userul reincearca dupa un esec anterior (retry pe acelasi
+      // ecran, tinut deschis de ownerBootstrapping), sesiunea din prima
+      // incercare e deja activa - nu mai chemam signUp() a doua oara (ar
+      // esua cu "user already registered").
+      let ownerId = user?.id
+      if (!ownerId) {
+        const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+        if (error) { setAuthError(error.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
+        ownerId = signUpData.user.id
+      }
       const reserveRes = await supabase.rpc('reserve_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
-      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
+      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
       const { error: gymErr } = await supabase.from('gyms').insert({
-        id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: signUpData.user.id,
+        id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: ownerId,
       })
-      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
+      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
       await supabase.rpc('consume_my_reserved_gym_signup_code', { p_gym_id: newGymId })
-      const { error: adminErr } = await supabase.from('admins').insert({ id: signUpData.user.id, email: authEmail, gym_id: newGymId })
-      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      const { error: adminErr } = await supabase.from('admins').insert({ id: ownerId, email: authEmail, gym_id: newGymId })
+      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
       // Abia acum sala chiar exista - putem "revendica" profilul (null ->
       // valoare, singura tranzitie permisa de prevent_gym_id_change()).
-      const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', signUpData.user.id)
-      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); return }
+      const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', ownerId)
+      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
       // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
       // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
       // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
       // iar pasii de mai sus tocmai au schimbat ce ar gasi acele functii oricum.
-      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', signUpData.user.id).maybeSingle()
+      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', ownerId).maybeSingle()
       setUserProfile(freshProfile); setIsAdmin(true)
+      setOwnerBootstrapping(false)
     } else {
       if (!selectedGym) { setAuthError(t.authPickGymFirst); setAuthSubmitting(false); return }
       if (!joinCodeInput.trim()) { setAuthError(t.authGymCodeRequired); setAuthSubmitting(false); return }
@@ -5817,7 +5835,7 @@ function App() {
     </div>
   )
 
-  if (!user) return (
+  if (!user || ownerBootstrapping) return (
     <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', overflowY: 'auto', boxShadow: '0 60px 0 0 #0E0E0E' }}>
       {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxShadow: '0 60px 0 0 rgba(0,0,0,0.75)' }} onClick={() => setInstallDismissed(false)}>
         <div style={{ background: '#1c1c1e', borderRadius: '24px 24px 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: '430px' }} onClick={e => e.stopPropagation()}>
