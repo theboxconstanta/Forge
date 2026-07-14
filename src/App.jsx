@@ -102,7 +102,7 @@ async function checkAndBookFromWaitlist(classId) {
     .eq('class_id', classId).order('joined_at', { ascending: true }).limit(1).maybeSingle()
   if (!next) return
 
-  const { data: cls } = await supabase.from('classes').select('date, start_time, name').eq('id', classId).maybeSingle()
+  const { data: cls } = await supabase.from('classes').select('date, start_time, name, gym_id').eq('id', classId).maybeSingle()
   if (!cls) return
 
   const _td = new Date()
@@ -120,7 +120,7 @@ async function checkAndBookFromWaitlist(classId) {
     return
   }
 
-  const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: next.member_id })
+  const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: next.member_id, gym_id: cls.gym_id })
   if (error) { console.error('waitlist auto-book error', error); return }
 
   // Sterge intrarea din waitlist doar dupa ce rezervarea + decontarea sedintei
@@ -141,7 +141,7 @@ async function checkAndBookFromWaitlist(classId) {
   if (cls?.date && cls?.start_time) {
     const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
     if (remindAt > new Date())
-      supabase.from('class_reminders').upsert({ class_id: classId, member_email: next.member_email, remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
+      supabase.from('class_reminders').upsert({ class_id: classId, member_email: next.member_email, remind_at: remindAt.toISOString(), sent: false, gym_id: cls.gym_id }, { onConflict: 'class_id,member_email' })
   }
 
   const bc = supabase.channel('member-sessions-' + next.member_id)
@@ -1537,7 +1537,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   const posteaza = async () => {
     if (!postText.trim() || posting) return
     setPosting(true)
-    const { error } = await supabase.from('feed_posts').insert({ member_id: user.id, text: postText.trim() })
+    const { error } = await supabase.from('feed_posts').insert({ member_id: user.id, text: postText.trim(), gym_id: userProfile.gym_id })
     if (error) { showToast(t.feedToastPostError); console.error(error) }
     else { setPostText(''); showToast(t.feedToastPostSuccess) }
     setPosting(false)
@@ -1552,7 +1552,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
     })
     const { error } = iMine
       ? await supabase.from('feed_reactions').delete().eq('post_id', postId).eq('member_id', user.id).eq('emoji', emoji)
-      : await supabase.from('feed_reactions').insert({ post_id: postId, member_id: user.id, emoji })
+      : await supabase.from('feed_reactions').insert({ post_id: postId, member_id: user.id, emoji, gym_id: userProfile.gym_id })
     if (error) {
       // esec (ex: dublu-tap -> constraint unic, retea etc) - fara realtime event
       // care sa corecteze automat, revenim manual la starea optimista gresita.
@@ -1586,7 +1586,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
 
   const adaugaComentariu = async (postId) => {
     if (!comentariuText.trim()) return
-    const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim() })
+    const { error } = await supabase.from('feed_comments').insert({ post_id: postId, member_id: user.id, text: comentariuText.trim(), gym_id: userProfile.gym_id })
     if (error) { showToast(t.feedToastCommentError); console.error(error) }
     else { setComentariuText(''); setComentariuDeschis(null); showToast(t.feedToastCommentAdded) }
   }
@@ -1743,7 +1743,7 @@ function MiniSwitch({ checked, onChange }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef, t, lang }) {
+function Admin({ showToast, user, isAdmin, isCoach, gymId, onWodChanged, mainScrollRef, t, lang }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
@@ -1899,7 +1899,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   }
 
   const addCoach = async (memberId, email) => {
-    const { error } = await supabase.from('coaches').insert({ id: memberId, email })
+    const { error } = await supabase.from('coaches').insert({ id: memberId, email, gym_id: gymId })
     if (error) { showToast(t.toastGenericError); console.error(error); return }
     showToast(t.toastCoachAdded)
     setCoachSearch('')
@@ -2011,7 +2011,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
 
   const saveSettings = async () => {
     setSavingSettings(true)
-    await supabase.from('app_settings').upsert({ key: 'cancel_window_hours', value: String(cancelWindowSetting), updated_at: new Date().toISOString() })
+    await supabase.from('app_settings').upsert({ gym_id: gymId, key: 'cancel_window_hours', value: String(cancelWindowSetting), updated_at: new Date().toISOString() }, { onConflict: 'gym_id,key' })
     showToast(t.toastSettingsSaved)
     setSavingSettings(false)
   }
@@ -2068,7 +2068,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     const alreadyIn = (rezervariClasa[classId] || []).some(r => r.member_id === memberId)
     if (alreadyIn) { showToast(t.toastAlreadyBooked); return }
     await adjustMemberSessions(memberId, +1)
-    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId })
+    const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId, gym_id: gymId })
     if (error) {
       await adjustMemberSessions(memberId, -1)
       showToast(t.toastGenericError); console.error(error); return
@@ -2081,7 +2081,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       if (cls?.date && cls?.start_time) {
         const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
         if (remindAt > new Date())
-          supabase.from('class_reminders').upsert({ class_id: classId, member_email: memberEmail, remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
+          supabase.from('class_reminders').upsert({ class_id: classId, member_email: memberEmail, remind_at: remindAt.toISOString(), sent: false, gym_id: gymId }, { onConflict: 'class_id,member_email' })
       }
       const { className, classDate } = getClassNotifParams(classId)
       sendNotification('class_added', memberEmail, className, classDate)
@@ -2180,7 +2180,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (!dataClasa) { showToast(t.toastFillDate); return }
     if (repetitiva && zileRepetare.length === 0) { showToast(t.toastPickAtLeastOneDay); return }
     setSavingClasa(true)
-    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null }
+    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null, gym_id: gymId }
     const records = repetitiva
       ? genereazaDateRepetare().map(date => ({ ...baza, date }))
       : [{ ...baza, date: dataClasa }]
@@ -2340,6 +2340,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
   const buildWodPayload = (overrides = {}, variante = wodVariante) => {
     const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
     return {
+      gym_id: gymId,
       date: dataWod, type: tipWod, duration: durataWod,
       format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
       name: numeWod.trim() || null,
@@ -2378,7 +2379,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     // fara upsert, insert-ul ar esua cu eroare de duplicat pe wods_date_key.
     const { error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId)
-      : await supabase.from('wods').upsert(payload, { onConflict: 'date' })
+      : await supabase.from('wods').upsert(payload, { onConflict: 'gym_id,date' })
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else {
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
@@ -2410,7 +2411,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       // folosit aici (nu doar sectionFields) pentru ca efectul de sincronizare
       // (syncWodFormFromRow) garanteaza ca restul campurilor formularului
       // oglindesc deja randul real din DB cand data se potriveste.
-      const { data, error: upsertErr } = await supabase.from('wods').upsert(buildWodPayload(sectionFields), { onConflict: 'date' }).select().single()
+      const { data, error: upsertErr } = await supabase.from('wods').upsert(buildWodPayload(sectionFields), { onConflict: 'gym_id,date' }).select().single()
       error = upsertErr
       if (!error && data) setEditWodId(data.id)
     }
@@ -2535,6 +2536,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (hasValidActive) {
       // salveaza ca programat — va activa automat cand cel curent se termina
       const { error } = await supabase.from('subscriptions').insert({
+        gym_id: gymId,
         member_email: emailNorm,
         plan_id: planSelectat,
         sessions_total: plan?.sessions || null,
@@ -2556,6 +2558,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
       await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', emailNorm).eq('is_active', true)
       const endDateStr = addMonthsClamped(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
       const { error } = await supabase.from('subscriptions').insert({
+        gym_id: gymId,
         member_email: emailNorm,
         plan_id: planSelectat,
         sessions_total: plan?.sessions || null,
@@ -2583,6 +2586,7 @@ function Admin({ showToast, user, isAdmin, isCoach, onWodChanged, mainScrollRef,
     if (!numePlan) { showToast(t.toastEnterName); return }
     setSavingPlan(true)
     const { error } = await supabase.from('subscription_plans').insert({
+      gym_id: gymId,
       name: numePlan, sessions: sedintePlan ? parseInt(sedintePlan) : null, price: pretPlan ? parseFloat(pretPlan) : null, duration_months: durataPlan,
     })
     if (error) { showToast(t.toastGenericError); console.error(error) }
@@ -4529,6 +4533,7 @@ function App() {
         member_email: user.email.toLowerCase(),
         subscription: sub.toJSON(),
         updated_at: new Date().toISOString(),
+        gym_id: userProfile.gym_id,
       }, { onConflict: 'member_email' })
     } catch (e) { console.error('Push registration failed:', e) }
   }
@@ -4908,7 +4913,7 @@ function App() {
         setScreen('pr')
       }
     } else {
-      const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, ...payload }).select().single()
+      const { data, error } = await supabase.from('custom_hero_wods').insert({ member_id: user.id, gym_id: userProfile.gym_id, ...payload }).select().single()
       if (error) { showToast(t.toastHeroWodInsertError); console.error(error) }
       else {
         setCustomHeroWods(prev => [...prev, data])
@@ -4933,7 +4938,7 @@ function App() {
 
   const confirmSkillPR = async (candidate) => {
     const { error } = await supabase.from('personal_records').insert({
-      member_id: user.id, movement: candidate.movement, value: candidate.weight,
+      member_id: user.id, gym_id: userProfile.gym_id, movement: candidate.movement, value: candidate.weight,
       unit: candidate.unit, reps: candidate.reps, notes: t.prFromSkillWorkNote,
     })
     if (error) { showToast(t.toastGenericError); console.error(error); return }
@@ -4982,7 +4987,7 @@ function App() {
       resultCurat = resultCurat.trim() || null
     }
     const { error } = await supabase.from('skill_logs').upsert({
-      member_id: user.id, wod_id: wodZiData.id, slot: skillLogSlot,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData.id, slot: skillLogSlot,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
       logged_at: new Date().toISOString(),
@@ -5252,7 +5257,7 @@ function App() {
     const tipSalvat = varianta ? varianta.nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const logFields = composeWodLogFields()
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
@@ -5301,7 +5306,7 @@ function App() {
     if (!freeLogText.trim()) { showToast(t.toastFillFreeText); return }
     setFreeLogSaving(true)
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id, wod_id: null,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: null,
       variant_level: freeLogName.trim() || t.logFreeTextEntryLabel,
       notes: freeLogText.trim(),
     })
@@ -5325,7 +5330,7 @@ function App() {
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR)
     const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
     let insertData = { movement: miscarePR, notes: prNote || null }
-    if (!editPrId) insertData.member_id = user.id
+    if (!editPrId) { insertData.member_id = user.id; insertData.gym_id = userProfile.gym_id }
     if (isBenchmark && isAmrapHeroPr) {
       const partialStr = composePartialText(prPartialReps, miscariHeroPr)
       insertData.value = prRoundsCompleted ? parseInt(prRoundsCompleted) : null
@@ -5405,7 +5410,7 @@ function App() {
       setWaitlistMea(prev => prev.filter(id => id !== clasaId))
       showToast(t.toastWaitlistLeft)
     } else {
-      const { error } = await supabase.from('class_waitlist').insert({ class_id: clasaId, member_id: user.id, member_email: user.email.toLowerCase() })
+      const { error } = await supabase.from('class_waitlist').insert({ class_id: clasaId, member_id: user.id, member_email: user.email.toLowerCase(), gym_id: userProfile.gym_id })
       if (error) {
         if (error.code === '23505') { setWaitlistMea(prev => prev.includes(clasaId) ? prev : [...prev, clasaId]); showToast(t.toastWaitlistAlready); return }
         showToast(t.toastWaitlistError(error.message || error.code || t.toastErrorFallbackGeneric)); console.error(error); return
@@ -5482,7 +5487,7 @@ function App() {
       checkAndBookFromWaitlist(clasaId)
       showToast(t.toastBookingCancelled)
     } else {
-      const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId })
+      const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId, gym_id: userProfile.gym_id })
       if (insErr) { showToast(t.toastBookingError); console.error(insErr); return }
       setRezervariMele(prev => [...prev, clasaId])
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
@@ -5493,7 +5498,7 @@ function App() {
       if (cls?.date && cls?.start_time) {
         const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
         if (remindAt > new Date())
-          supabase.from('class_reminders').upsert({ class_id: clasaId, member_email: user.email.toLowerCase(), remind_at: remindAt.toISOString(), sent: false }, { onConflict: 'class_id,member_email' })
+          supabase.from('class_reminders').upsert({ class_id: clasaId, member_email: user.email.toLowerCase(), remind_at: remindAt.toISOString(), sent: false, gym_id: userProfile.gym_id }, { onConflict: 'class_id,member_email' })
       }
       showToast(t.toastBookingConfirmed)
     }
@@ -7020,7 +7025,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
