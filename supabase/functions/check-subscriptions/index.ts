@@ -36,16 +36,21 @@ function getContent(type: "expiring_3d" | "expiring_1d", planName: string, endDa
   };
 }
 
-const emailTemplate = (html: string) => `
+// gymName vine acum din join-ul subscriptions -> gyms (Edge Function-ul
+// ruleaza cu service-role, ocoleste RLS, deci vede orice sala) - fallback la
+// "Forge" doar pt randuri orfane fara gym_id (nu ar trebui sa existe dupa
+// Faza 1/3, dar mai sigur decat sa aratam un nume gol/undefined intr-un
+// email real.
+const emailTemplate = (html: string, gymName: string) => `
 <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fff">
   <div style="text-align:center;margin-bottom:24px;padding:20px;background:#3C3489;border-radius:16px">
     <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:2px">FORGE</div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:3px">CROSSFIT C15</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:3px">${gymName.toUpperCase()}</div>
   </div>
   <div style="background:#f8f8ff;border-radius:16px;padding:24px;margin-bottom:16px;color:#1a1a1a">
     ${html}
   </div>
-  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Forge Gym · CrossFit C15 · Constanța</p>
+  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Forge Gym · ${gymName}</p>
 </div>`;
 
 async function notify(
@@ -53,7 +58,8 @@ async function notify(
   email: string,
   type: "expiring_3d" | "expiring_1d",
   planName: string,
-  endDate: string
+  endDate: string,
+  gymName: string
 ) {
   const { title, body, html } = getContent(type, planName, endDate);
 
@@ -74,7 +80,7 @@ async function notify(
       sender: { name: FROM_NAME, email: FROM_EMAIL },
       to: [{ email }],
       subject: title,
-      htmlContent: emailTemplate(html),
+      htmlContent: emailTemplate(html, gymName),
     }),
   });
   if (!res.ok) console.error("Brevo error for", email, await res.text());
@@ -88,20 +94,22 @@ Deno.serve(async () => {
   const in1day = addDays(today, 1);
 
   const { data: exp3 } = await supabase.from("subscriptions")
-    .select("member_email, end_date, subscription_plans(name)")
+    .select("member_email, end_date, subscription_plans(name), gyms(name)")
     .eq("is_active", true).eq("end_date", in3days);
 
   const { data: exp1 } = await supabase.from("subscriptions")
-    .select("member_email, end_date, subscription_plans(name)")
+    .select("member_email, end_date, subscription_plans(name), gyms(name)")
     .eq("is_active", true).eq("end_date", in1day);
 
   for (const sub of exp3 || []) {
     const planName = (sub.subscription_plans as { name?: string })?.name || "Abonament";
-    await notify(supabase, sub.member_email, "expiring_3d", planName, sub.end_date);
+    const gymName = (sub.gyms as { name?: string })?.name || "Forge";
+    await notify(supabase, sub.member_email, "expiring_3d", planName, sub.end_date, gymName);
   }
   for (const sub of exp1 || []) {
     const planName = (sub.subscription_plans as { name?: string })?.name || "Abonament";
-    await notify(supabase, sub.member_email, "expiring_1d", planName, sub.end_date);
+    const gymName = (sub.gyms as { name?: string })?.name || "Forge";
+    await notify(supabase, sub.member_email, "expiring_1d", planName, sub.end_date, gymName);
   }
 
   return new Response(
