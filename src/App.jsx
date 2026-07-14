@@ -4999,12 +4999,15 @@ function App() {
     const allIds = [...new Set(data.map(b => b.member_id))]
     let profilesMap = {}
     if (allIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', allIds)
-      if (profiles) profiles.forEach(p => { profilesMap[p.id] = p.full_name })
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', allIds)
+      if (profiles) profiles.forEach(p => { profilesMap[p.id] = p })
     }
     const result = {}
     classIds.forEach(id => {
-      result[id] = { count: grouped[id].length, membri: grouped[id].map(mid => profilesMap[mid] || 'Membru') }
+      result[id] = {
+        count: grouped[id].length,
+        membri: grouped[id].map(mid => ({ name: profilesMap[mid]?.full_name || 'Membru', avatarUrl: profilesMap[mid]?.avatar_url || null })),
+      }
     })
     setRezervariPerClasa(prev => ({ ...prev, ...result }))
   }
@@ -5872,8 +5875,11 @@ function App() {
                                   <div style={{ marginBottom: '10px' }}>
                                     <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                      {membri.map((name, mi) => (
-                                        <span key={mi} style={{ fontSize: '11px', background: rezervat ? '#f0f0f0' : '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', padding: '3px 8px', borderRadius: '20px', fontWeight: '500' }}>{name}</span>
+                                      {membri.map((m, mi) => (
+                                        <span key={mi} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', background: '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', padding: '3px 8px 3px 3px', borderRadius: '20px', fontWeight: '500' }}>
+                                          <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={18} />
+                                          {m.name}
+                                        </span>
                                       ))}
                                     </div>
                                   </div>
