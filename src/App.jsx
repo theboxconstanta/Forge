@@ -1872,6 +1872,9 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [cancelWindowSetting, setCancelWindowSetting] = useState(2)
   const [gymJoinCode, setGymJoinCode] = useState('')
   const [regeneratingCode, setRegeneratingCode] = useState(false)
+  const [gymNameCurrent, setGymNameCurrent] = useState('')
+  const [gymNameInput, setGymNameInput] = useState('')
+  const [savingGymName, setSavingGymName] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [adaugaMembruSearch, setAdaugaMembruSearch] = useState({})
   const [deleteClientConfirm, setDeleteClientConfirm] = useState(null)
@@ -2029,6 +2032,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     }
     const { data: code } = await supabase.rpc('get_my_gym_join_code')
     if (code) setGymJoinCode(code)
+    const { data: gymRow } = await supabase.from('gyms').select('name').eq('id', gymId).maybeSingle()
+    if (gymRow) { setGymNameCurrent(gymRow.name); setGymNameInput(gymRow.name) }
   }
 
   const regenerateGymJoinCode = async () => {
@@ -2037,6 +2042,21 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else { setGymJoinCode(data); showToast(t.toastGymCodeRegenerated) }
     setRegeneratingCode(false)
+  }
+
+  // Redenumire sala - permisa direct oricarui admin al ei (gyms_admin_update:
+  // is_admin(id), fara restrictie de platform admin), nu doar la inregistrare.
+  // Propagarea la header/alti membri (inclusiv sesiunea proprie a adminului)
+  // se intampla prin subscriptia realtime pe `gyms` din App, nu de aici -
+  // Admin nu are acces direct la myGym din componenta parinte.
+  const saveGymName = async () => {
+    const trimmed = gymNameInput.trim()
+    if (!trimmed || trimmed === gymNameCurrent) return
+    setSavingGymName(true)
+    const { error } = await supabase.from('gyms').update({ name: trimmed }).eq('id', gymId)
+    if (error) { showToast(error.code === '23505' ? t.toastGymNameTaken : t.toastGenericError); console.error(error) }
+    else { setGymNameCurrent(trimmed); showToast(t.toastGymNameSaved) }
+    setSavingGymName(false)
   }
 
   const fetchRapoarte = async () => {
@@ -3633,6 +3653,16 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymNameLabel}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminGymNameHint}</div>
+          <input value={gymNameInput} onChange={e => setGymNameInput(e.target.value)}
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+          <button onClick={saveGymName} disabled={savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent}
+            style={{ width: '100%', padding: '13px', background: (savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent) ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: (savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent) ? 'not-allowed' : 'pointer' }}>
+            {t.adminGymNameSave}
+          </button>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymCodeLabel}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.adminGymCodeHint}</div>
           <div style={{ fontSize: '28px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '3px', textAlign: 'center', background: '#f9f9f9', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
@@ -3903,9 +3933,12 @@ function parseWodLogDetails(w, t) {
 
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
-  const [deschis, setDeschis] = useState(null)
+  // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
+  // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
+  // deschise, ca implicit (set gol) sa insemne "toate deschise".
+  const [closedKeys, setClosedKeys] = useState(() => new Set())
+  const toggleClosed = (key) => setClosedKeys(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next })
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [deschisSkill, setDeschisSkill] = useState(null)
   const [confirmDeleteSkill, setConfirmDeleteSkill] = useState(null)
   if (entries.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
@@ -3922,7 +3955,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
           <div key={entry.key}>
             {w && (() => {
               const logKey = w.id
-              const isOpen = deschis === logKey
+              const isOpen = !closedKeys.has(logKey)
               const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
               // Titlu: "Nume WOD" | Varianta (daca WOD-ul are nume) - altfel doar
               // varianta, ca inainte. Subtitlu: formatul + durata reale ale WOD-ului
@@ -3956,7 +3989,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, w.wods?.format_config, w.sets) : null
               const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`] : rezultatBucatiRaw
               return (
-                <div onClick={() => { setDeschis(isOpen ? null : logKey); setConfirmDelete(null) }}
+                <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -4044,7 +4077,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
             {skillLogsArr.map(sl => (() => {
               const hasSets = sl.sets && Object.keys(sl.sets).length > 0
               const skillKey = sl.id
-              const skillOpen = deschisSkill === skillKey
+              const skillOpen = !closedKeys.has(skillKey)
               const esteSlot2 = sl.slot === 2
               const skillTitleName = esteSlot2 ? sl.wods?.skill2_name : sl.wods?.skill_name
               // Formatele family:'sets' fara scoringMode configurat (Complex,
@@ -4071,7 +4104,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 })
               }
               return (
-                <div key={sl.id} onClick={() => { setDeschisSkill(skillOpen ? null : skillKey); setConfirmDeleteSkill(null) }}
+                <div key={sl.id} onClick={() => { toggleClosed(skillKey); setConfirmDeleteSkill(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
@@ -4505,6 +4538,11 @@ function App() {
   const jurnalDateInputRef = useRef(null)
   const [userProfile, setUserProfile] = useState(null)
   const [myGym, setMyGym] = useState(CURRENT_GYM)
+  // Citit de subscriptia realtime pe `gyms` (efect cu deps [user], creat o
+  // singura data la login) - fara ref, acel closure ar ramane cu gym_id-ul
+  // de la momentul login-ului (null, userProfile inca nefetch-uit atunci).
+  const myGymIdRef = useRef(null)
+  useEffect(() => { myGymIdRef.current = userProfile?.gym_id ?? null }, [userProfile])
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showCalPicker, setShowCalPicker] = useState(false)
   const [calPickerYear, setCalPickerYear] = useState(new Date().getFullYear())
@@ -4815,6 +4853,17 @@ function App() {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_comments' }, () => {
         recalcFeedUnreadRef.current?.()
+      })
+      // Redenumirea salii (Admin > Setari) trebuie sa apara instant, fara
+      // reload, la orice membru cu sesiunea deschisa - inclusiv adminului
+      // care tocmai a salvat. Filtrat client-side (myGymIdRef), nu prin
+      // filter:'id=eq....' la subscribe - la momentul in care ruleaza acest
+      // efect (deps [user]), userProfile inca nu s-a incarcat, deci gym_id-ul
+      // nu e inca disponibil pt un filtru server-side stabil.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gyms' }, (payload) => {
+        if (payload.new?.id === myGymIdRef.current) {
+          setMyGym({ name: payload.new.name, primaryColor: payload.new.primary_color || CURRENT_GYM.primaryColor })
+        }
       })
       .subscribe()
 
