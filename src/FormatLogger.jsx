@@ -266,7 +266,13 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     const cashOut = (config?.cashOut && config.cashOut.length > 0) ? config.cashOut : ['Cash-Out']
     const buyInRows = (v.sets || {})['__buyIn'] ? { [buyIn.join(' + ')]: v.sets['__buyIn'] } : { [buyIn.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
     const cashOutRows = (v.sets || {})['__cashOut'] ? { [cashOut.join(' + ')]: v.sets['__cashOut'] } : { [cashOut.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
-    const mainScoreMode = format.scoreMode || (config?.mainFormat === 'AMRAP' ? 'amrap' : 'fortime')
+    // effectiveScoreMode/isSequentialFormat - aceeasi sursa unica de adevar
+    // folosita peste tot (Partner WOD, Chipper etc), nu un calcul local
+    // duplicat. Bug real gasit (07-15): calculul local vechi nu marca
+    // niciodata mainFormat "For Time" ca secvential, deci un Buy-In/Cash-Out
+    // neterminat pe lucrul principal n-avea nicio urmarire structurata a
+    // repetarilor (doar Timp + text liber, la fel ca bug-ul Chipper).
+    const mainScoreMode = effectiveScoreMode(formatId, config) || format.scoreMode
     // Buy-In/Cash-Out sunt sarcini facute o singura data (ex. "50 Cal Row"),
     // nu seturi repetabile cu greutati diferite - acelasi motiv ca la Tabata:
     // un singur input de reps, fara greutate, fara "+ Adauga set".
@@ -279,7 +285,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
-        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} />
+        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} sequentialPartial={isSequentialFormat(formatId, config)} />
         {hasCashOut && (
           <>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>

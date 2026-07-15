@@ -95,8 +95,18 @@ export const WORKOUT_FORMATS = {
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
   },
+  // O secventa de miscari distincte facute o singura data ("chip away" prin
+  // lista) - structural identic cu 'For Time' (structura Sequence), doar
+  // pastrat ca id separat (nu redenumit, date deja salvate). Bug real gasit
+  // (07-15, la o verificare sistematica): scoreMode 'fortime' (nu
+  // 'fortime_or_amrap') nu era prins de NICIO ramura din ScoredFields -
+  // cadea pe fallback-ul generic (doar Timp + text liber), fara nicio
+  // urmarire structurata a repetarilor la un DNF, desi Chipper are deja
+  // time cap configurabil (deci un DNF e un caz real, nu ipotetic). Acelasi
+  // scoreMode/sequentialPartial ca 'For Time' rezolva exact aceeasi
+  // problema deja rezolvata acolo, fara cod nou.
   'Chipper': {
-    family: 'scored', scoreMode: 'fortime',
+    family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
     config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
   },
   'Ladder': {
@@ -501,6 +511,12 @@ export function weightKeyForVariant(nivel, gender) {
 export function effectiveScoreMode(formatId, config) {
   if (!formatId) return null
   if (formatId === 'Partner WOD' && config?.baseFormat) return config.baseFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap'
+  // Buy-In/Cash-Out: acelasi motiv ca Partner WOD - config.mainFormat
+  // (AMRAP/For Time) decide UI-ul real de logare al lucrului principal, nu
+  // scoreMode-ul din catalog (care lipseste complet la acest format - vezi
+  // mai jos). Bug real gasit (07-15): FormatLogger.jsx calcula acelasi lucru
+  // separat, local, in loc sa foloseasca aceasta functie unica.
+  if (formatId === 'Buy-In/Cash-Out' && config?.mainFormat) return config.mainFormat === 'AMRAP' ? 'amrap' : 'fortime_or_amrap'
   return getFormat(formatId)?.scoreMode ?? null
 }
 
@@ -519,6 +535,13 @@ export function effectiveScoreMode(formatId, config) {
 // (static, din catalog) trebuie sa foloseasca acum aceasta functie.
 export function isSequentialFormat(formatId, config) {
   if (formatId === 'For Time') return config?.structure !== 'Repeated Rounds'
+  // Lucrul principal al unui Buy-In/Cash-Out cu mainFormat "For Time" e o
+  // secventa (nu runde repetate, spre deosebire de "For Time" simplu, care
+  // are un camp explicit `structure` pt asta) - acelasi motiv ca Chipper mai
+  // sus. Bug real gasit (07-15): fara acest caz, un Buy-In/Cash-Out
+  // neterminat pe lucrul principal n-avea nicio urmarire structurata a
+  // repetarilor (doar Timp + text liber).
+  if (formatId === 'Buy-In/Cash-Out') return config?.mainFormat !== 'AMRAP'
   return !!getFormat(formatId)?.sequentialPartial
 }
 
