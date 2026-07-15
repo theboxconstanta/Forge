@@ -59,7 +59,24 @@ if ('serviceWorker' in navigator) {
 // servit peste update-uri noi din Play Store/App Store).
 if (import.meta.env.PROD && !Capacitor.isNativePlatform()) {
   import('virtual:pwa-register').then(({ registerSW }) => {
-    registerSW({ immediate: true, onRegisterError: (error) => console.error('[SW] register error:', error) })
+    registerSW({
+      immediate: true,
+      onRegisterError: (error) => console.error('[SW] register error:', error),
+      // Bug real gasit live (07-15): un membru real a ramas peste 16 ore pe
+      // un bundle stataut (cu bug-uri deja reparate de multe ori intre timp),
+      // pentru ca browser-ul nu verifica singur des destul un update - mai
+      // ales pt o PWA instalata, tinuta deschisa/in fundal, fara o navigare
+      // reala care sa declanseze verificarea implicita. registration.update()
+      // fortat periodic + la revenirea din fundal (visibilitychange) - odata
+      // detectat, controllerchange (mai sus) face reload automat.
+      onRegisteredSW(_url, registration) {
+        if (!registration) return
+        setInterval(() => registration.update(), 20 * 60 * 1000)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') registration.update()
+        })
+      },
+    })
   })
 }
 
