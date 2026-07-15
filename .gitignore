@@ -25,3 +25,9 @@ dist-ssr
 
 .vercel
 .env*
+
+# ios/ nu e comis - nu poate fi generat/verificat corect fara Xcode
+# (indisponibil pe Windows); Codemagic il genereaza fresh la fiecare build
+# (vezi codemagic.yaml). android/ RAMANE comis (a fost generat si verificat
+# ca se sincronizeaza corect, chiar fara Android Studio instalat local).
+ios/

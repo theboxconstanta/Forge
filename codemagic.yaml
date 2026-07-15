@@ -1,0 +1,79 @@
+workflows:
+  ios-forge:
+    name: Forge - iOS (App Store)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      node: 22
+      xcode: latest
+      cocoapods: default
+      groups:
+        # Grupul de variabile "appstore_credentials" se creeaza din UI-ul
+        # Codemagic (Teams -> Environment variables), NU aici - contine
+        # cheia API App Store Connect (Issuer ID, Key ID, fisierul .p8),
+        # generata din App Store Connect -> Users and Access -> Integrations.
+        - appstore_credentials
+      vars:
+        BUNDLE_ID: "com.forge.crossfit"
+        XCODE_SCHEME: "App"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Instaleaza dependintele npm
+        script: npm ci
+
+      - name: Build aplicatie web (Vite)
+        script: npm run build
+
+      # Proiectul ios/ NU e comis in git (nu poate fi generat/verificat
+      # corect fara Xcode, indisponibil pe Windows) - se genereaza aici,
+      # in mediul macOS real al Codemagic, la fiecare build. Daca la un
+      # moment dat se adauga cod nativ custom (permisiuni speciale,
+      # plugin-uri native suplimentare), proiectul ios/ trebuie comis
+      # in git si acest pas transformat in doar "npx cap sync ios".
+      - name: Adauga/sincronizeaza platforma iOS
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+
+      - name: Genereaza iconite/splash (din assets/icon.png, assets/splash.png)
+        script: npx capacitor-assets generate --ios --iconBackgroundColor '#0E0E0E' --iconBackgroundColorDark '#0E0E0E' --splashBackgroundColor '#0E0E0E' --splashBackgroundColorDark '#0E0E0E'
+
+      - name: Instaleaza dependintele CocoaPods
+        script: |
+          cd ios/App && pod install
+
+      - name: Configureaza semnarea automata (App Store Connect API key)
+        script: |
+          xcode-project use-profiles
+
+      - name: Incrementeaza numarul de build
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
+
+      - name: Compileaza .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "ios/App/App.xcworkspace" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # submit_to_app_store: false ramane implicit - primele build-uri
+        # merg doar in TestFlight (testare interna), nu direct spre
+        # aprobare publica App Store. Se schimba manual cand esti gata
+        # de lansare publica.
