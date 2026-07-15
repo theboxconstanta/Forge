@@ -191,9 +191,13 @@ function MovementListField({ label, value, onChange, placeholder }) {
   const [draft, setDraft] = useState('')
   const [justSelected, setJustSelected] = useState(false)
   const items = value || []
+  // Blocheaza adaugarea cand textul nu pare o miscare (text de structura ca
+  // "Then:"/"Amrap 19:" sau o nota libera) - vezi looksLikeMovementLine
+  // (acelasi bug real gasit si fix aplicat ca la MiscareQuickAdd, App.jsx).
+  // Draft-ul NU se goleste la refuz - userul isi vede textul, poate corecta.
   const add = (text) => {
     const val = (text ?? draft).trim()
-    if (!val) return
+    if (!val || !looksLikeMovementLine(val)) return
     onChange([...items, val]); setDraft(''); setJustSelected(false)
   }
   // La fel ca la MiscareQuickAdd - dupa ce alegi o sugestie, n-o mai arata
@@ -202,22 +206,13 @@ function MovementListField({ label, value, onChange, placeholder }) {
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
-      {items.map((m, i) => {
-        // Semnal vizual cand linia pare text de structura ("Then:", "Amrap
-        // 19:") sau o nota libera lipita din greseala ca miscare - vezi
-        // looksLikeMovementLine (acelasi bug real gasit la SortableList).
-        const paraMiscare = looksLikeMovementLine(m)
-        return (
+      {items.map((m, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: paraMiscare ? '#fff' : '#FCEBEB', borderRadius: '8px', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {!paraMiscare && <span title="Nu pare o mișcare - text de structură sau notă?">⚠️</span>}
-            <span>{i + 1}. {m}</span>
-          </div>
+          <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>{i + 1}. {m}</div>
           <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))}
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
         </div>
-        )
-      })}
+      ))}
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input value={draft} onChange={e => { setDraft(e.target.value); setJustSelected(false) }}

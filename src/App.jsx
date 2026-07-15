@@ -723,9 +723,19 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
     if (!hideWeight && weight.trim()) text += ` @ ${weight.trim()}${weightUnit === 'lbs' ? 'lbs' : 'kg'}`
     return text
   }
+  // Blocheaza adaugarea cand textul nu pare o miscare (text de structura ca
+  // "Then:"/"Amrap 19:" sau o nota libera) - bug real gasit (07-15): un WOD
+  // intreg copiat de pe BTWB, cu liniile de structura incluse, a ajuns in
+  // movements_rx, iar UI-ul de logare a aratat cate un camp de reps langa
+  // fiecare linie (inclusiv cele care nu erau miscari) - vezi
+  // looksLikeMovementLine. Campul NU se goleste la refuz (return inainte de
+  // onChange('')) - userul isi vede textul in continuare, poate sa-l
+  // corecteze in loc sa dispara fara explicatie.
   const add = () => {
     if (!value.trim()) return
-    onAdd(compose(value))
+    const composed = compose(value)
+    if (!looksLikeMovementLine(composed)) return
+    onAdd(composed)
     onChange(''); setReps(''); setWeight(''); setMetri(''); setCal(''); setJustSelected(false)
   }
   // Click pe o sugestie completeaza doar numele miscarii si muta focusul pe
@@ -3883,33 +3893,36 @@ function SortableList({ items, onReorder, onRemove }) {
     setActiveIdx(null)
   }
 
+  // Editarea nu se salveaza daca textul nu pare o miscare (text de structura
+  // ca "Then:"/"Amrap 19:" sau o nota libera) - bug real gasit (07-15): un
+  // WOD intreg copiat de pe BTWB, cu liniile de structura incluse, a ajuns in
+  // movements_rx, iar UI-ul de logare a aratat cate un camp de reps langa
+  // fiecare linie (inclusiv cele care nu erau miscari) - vezi
+  // looksLikeMovementLine. Nu blocheaza editarea (ramane deschisa, cu textul
+  // scris), doar nu o COMITE - userul poate corecta sau renunta (Escape/blur
+  // pe camp gol anuleaza, ca inainte).
   const commitEdit = (i) => {
-    if (editVal.trim()) {
+    const val = editVal.trim()
+    if (val && looksLikeMovementLine(val)) {
       const next = [...items]
-      next[i] = editVal.trim()
+      next[i] = val
       onReorder(next)
+      setEditIdx(null)
+      setEditVal('')
+    } else if (!val) {
+      setEditIdx(null)
+      setEditVal('')
     }
-    setEditIdx(null)
-    setEditVal('')
   }
 
   return (
     <div ref={containerRef}>
-      {items.map((m, i) => {
-        // Semnal vizual cand linia pare text de structura ("Then:", "Amrap
-        // 19:") sau o nota libera ("– No Rest...") lipita din greseala ca
-        // miscare - bug real gasit (07-15): un WOD intreg copiat de pe BTWB,
-        // cu liniile de structura incluse, a ajuns in movements_rx, iar
-        // UI-ul de logare a aratat cate un camp de reps langa fiecare linie
-        // (inclusiv cele care nu erau miscari) - vezi looksLikeMovementLine.
-        const paraMiscare = editIdx === i || looksLikeMovementLine(m)
-        return (
+      {items.map((m, i) => (
         <div key={i}
           onTouchStart={(e) => startDrag(e, i)}
           onTouchEnd={() => endDrag(i)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : (paraMiscare ? '#f0f0f0' : '#FCEBEB'), borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
-          {!paraMiscare && <span title="Nu pare o mișcare - text de structură sau notă?" style={{ fontSize: '13px', flexShrink: 0 }}>⚠️</span>}
           {editIdx === i ? (
             <div style={{ position: 'relative', flex: 1 }}>
               <input
@@ -3944,8 +3957,7 @@ function SortableList({ items, onReorder, onRemove }) {
           )}
           {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto', flexShrink: 0 }}>×</button>}
         </div>
-        )
-      })}
+      ))}
     </div>
   )
 }
