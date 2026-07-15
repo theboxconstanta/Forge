@@ -11,7 +11,7 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
 import {
-  todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor,
 } from './utils'
@@ -5320,7 +5320,10 @@ function App() {
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData.id, slot: skillLogSlot,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
-      logged_at: new Date().toISOString(),
+      // Acelasi motiv ca la wod_logs mai sus - Skill Work e mereu legat de un
+      // WOD oficial (wodZiData), poate al unei zile trecute daca membrul a
+      // navigat pe Acasa la o zi in urma inainte sa logheze.
+      logged_at: wodZiData.date ? dateWithCurrentTime(wodZiData.date) : new Date().toISOString(),
     }, { onConflict: 'member_id,wod_id,slot' })
     if (error) { showToast(t.toastGenericError); console.error(error); setSkillLogSaving(false); return }
     showToast(t.toastSkillLogSaved)
@@ -5714,11 +5717,20 @@ function App() {
     const varianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa] : null
     const tipSalvat = varianta ? varianta.nivel : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}`
     const logFields = composeWodLogFields()
+    // Logat pt un WOD oficial (variantaAleasa !== null) aflat pe o zi
+    // trecuta (membru care a uitat sa loge ieri/alaltaieri, navigheaza pe
+    // Acasa la acea zi si logheaza azi) - fara asta, logged_at cadea pe
+    // DEFAULT now() la insert (nesetat explicit), iar logul aparea in
+    // Jurnal/Clasament la ziua CURENTA, nu la ziua WOD-ului ales, desi
+    // wod_id era deja cel corect. Doar la WOD-uri oficiale - o "Logare
+    // Noua" libera ramane "azi, acum", ca inainte (vezi dateWithCurrentTime).
+    const loggedAt = (variantaAleasa !== null && wodZiData?.date) ? dateWithCurrentTime(wodZiData.date) : undefined
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
+      ...(loggedAt ? { logged_at: loggedAt } : {}),
       ...logFields,
     })
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }

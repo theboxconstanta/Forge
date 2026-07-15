@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
 } from './utils'
 
@@ -200,5 +200,18 @@ describe('todayLocalStr', () => {
     // am folosi gresit toISOString() intr-un fus orar la est de UTC
     vi.setSystemTime(new Date(2026, 6, 3, 0, 30, 0))
     expect(todayLocalStr()).toBe('2026-07-03')
+  })
+})
+
+describe('dateWithCurrentTime', () => {
+  it('pastreaza ora curenta, dar pe data ceruta (loguri pt un WOD dintr-o zi trecuta)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 15, 14, 22, 30))
+    const rezultat = new Date(dateWithCurrentTime('2026-07-13'))
+    expect(rezultat.getFullYear()).toBe(2026)
+    expect(rezultat.getMonth()).toBe(6)
+    expect(rezultat.getDate()).toBe(13)
+    expect(rezultat.getHours()).toBe(14)
+    expect(rezultat.getMinutes()).toBe(22)
   })
 })

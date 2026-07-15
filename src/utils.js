@@ -18,6 +18,20 @@ export function todayLocalStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Combina o data (YYYY-MM-DD, in fusul local) cu ora CURENTA - pentru loguri
+// de WOD care se refera la o zi trecuta (membru care a uitat sa loge ieri/
+// alaltaieri, navigheaza pe Acasa la acea zi si logheaza azi). Bug real
+// raportat: log_logs.logged_at cadea pe DEFAULT now() la insert (nesetat
+// explicit), deci logarea unui WOD prescris ieri aparea in Jurnal/Clasament
+// la ZIUA CURENTA, nu la ziua WOD-ului ales - desi wod_id chiar era cel
+// corect. Pastram ora curenta (nu miezul noptii) ca sa ramana o ordonare
+// sensibila intre mai multi membri care logheaza in aceeasi zi trecuta.
+export function dateWithCurrentTime(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const now = new Date()
+  return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
+}
+
 // Adauga `months` luni calendaristice la `startDate`, pastrand aceeasi zi a
 // lunii - si daca luna tinta nu are acea zi (ex: 31 ianuarie + 1 luna),
 // clampeaza la ultima zi a lunii tinta (28/29 februarie), in loc sa lase
