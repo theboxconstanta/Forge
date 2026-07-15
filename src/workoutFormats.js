@@ -199,6 +199,15 @@ export const WORKOUT_FORMATS = {
     config: {
       complexMovements: { type: 'movementList', required: true, labelKey: 'fmtComplexMovements' },
       rounds: { type: 'number', required: true, labelKey: 'fmtRoundsAttempts' },
+      // Optional (ca la EMOM, nu obligatoriu ca la Tabata) - un Complex tipic
+      // (ex. "Build to a 3-rep-max front squats") ramane corect pe fallback-ul
+      // existent (maxWeightFromSets = cea mai grea runda). Dar un EMOM-complex
+      // cu greutate DIFERITA per interval (ex. gasit pe BTWB la insusi acest
+      // sala: "Every 2 mins for 10 mins: Thrusters, Push Press, Front Squats",
+      // 20/30/40/40/40kg) e scorat acolo ca SUMA greutatilor peste runde
+      // (170kg), nu doar cea mai grea (40kg) - fara acest camp, Forge arunca
+      // silentios cea mai mare parte din munca depusa.
+      scoringMode: { type: 'select', options: ['Max Weight', 'Total Weight'], required: false, labelKey: 'fmtComplexScoring' },
     },
   },
   'Superset': {
@@ -660,11 +669,25 @@ export function defaultRowsForFormat(formatId, config, movements) {
 
 // Calculeaza scorul unui format family:'sets' cu scoringMode configurabil
 // (Tabata/Intervals: Total Reps = suma tuturor randurilor, Lowest Reps = cea
-// mai mica valoare dintre randuri cu reps completat). Intoarce null daca nu
-// exista randuri cu reps valide sau formatul nu are scoringMode.
+// mai mica valoare dintre randuri cu reps completat; Complex: Max Weight/
+// Total Weight, vezi mai jos). Intoarce null daca nu exista randuri cu date
+// valide (reps sau greutate, dupa caz) sau formatul nu are scoringMode.
 export function computeSetsScore(formatId, config, rowsByKey) {
   const scoringMode = config?.scoringMode
   if (!scoringMode) return null
+  // Total Weight: suma greutatilor logate pe fiecare runda (ex. Complex cu
+  // greutate diferita per runda, gasit pe BTWB - vezi comentariul de la
+  // formatul 'Complex') - Max Weight ramane identic numeric cu fallback-ul
+  // maxWeightFromSets, dar il face selectabil explicit, la fel ca Lowest/
+  // Total Reps mai jos.
+  if (scoringMode === 'Total Weight' || scoringMode === 'Max Weight') {
+    const weightValues = Object.values(rowsByKey || {})
+      .flat()
+      .map(r => parseFloat(r?.weight))
+      .filter(n => !isNaN(n))
+    if (weightValues.length === 0) return null
+    return scoringMode === 'Total Weight' ? weightValues.reduce((a, b) => a + b, 0) : Math.max(...weightValues)
+  }
   const repsValues = Object.values(rowsByKey || {})
     .flat()
     .map(r => parseInt(r?.reps))

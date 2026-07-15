@@ -328,6 +328,14 @@ describe('computeSetsScore', () => {
     expect(computeSetsScore('EMOM', {}, { 'Min 1': [{ reps: '5' }] })).toBe(null)
     expect(computeSetsScore('Tabata', { scoringMode: 'Total Reps' }, {})).toBe(null)
   })
+  it('Total Weight (Complex) însumează greutatea din fiecare rundă', () => {
+    const rows = { 'Rundă 1': [{ weight: '20' }], 'Rundă 2': [{ weight: '30' }], 'Rundă 3': [{ weight: '40' }] }
+    expect(computeSetsScore('Complex', { scoringMode: 'Total Weight' }, rows)).toBe(90)
+  })
+  it('Max Weight (Complex) ia greutatea maximă dintre runde', () => {
+    const rows = { 'Rundă 1': [{ weight: '20' }], 'Rundă 2': [{ weight: '40' }], 'Rundă 3': [{ weight: '30' }] }
+    expect(computeSetsScore('Complex', { scoringMode: 'Max Weight' }, rows)).toBe(40)
+  })
 })
 
 describe('REP_SCHEME_QUICK_OPTIONS', () => {
