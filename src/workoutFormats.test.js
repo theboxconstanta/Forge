@@ -8,7 +8,7 @@ import {
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
-  movementsChanged, isMixedCategory,
+  movementsChanged, isMixedCategory, composeFinishedRoundsText,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -61,6 +61,19 @@ describe('composePartialText / parsePartialText', () => {
     const text = composePartialText(['0', '3'], miscariScara)
     expect(text).toBe('0/15 Power Snatches, 3/5 Rope Climbs')
     expect(parsePartialText(text, miscariScara)).toEqual(['0', '3'])
+  })
+})
+
+describe('composeFinishedRoundsText', () => {
+  it('compune "N runde complete" dintr-un numar de runde configurat', () => {
+    expect(composeFinishedRoundsText(5)).toBe('5 runde complete')
+    expect(composeFinishedRoundsText('5')).toBe('5 runde complete')
+  })
+  it('null cand nu exista un numar de runde valid (nu string gol)', () => {
+    expect(composeFinishedRoundsText(undefined)).toBe(null)
+    expect(composeFinishedRoundsText(null)).toBe(null)
+    expect(composeFinishedRoundsText(0)).toBe(null)
+    expect(composeFinishedRoundsText('')).toBe(null)
   })
 })
 

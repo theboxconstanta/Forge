@@ -73,9 +73,21 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
     config: {
       structure: { type: 'select', options: ['Sequence', 'Repeated Rounds'], required: true, default: 'Sequence', labelKey: 'fmtForTimeStructure' },
+      // Opțional, relevant doar la structura "Repeated Rounds" (identic cu
+      // RFT) - vezi composeFinishedRoundsText mai jos si comentariul de la
+      // 'RFT'.rounds pt motiv.
+      rounds: { type: 'number', required: false, labelKey: 'fmtRoundsCount' },
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
   },
+  // rounds: numarul prescris de runde e mereu cunoscut dinainte (config), nu
+  // ceva ce membrul trebuie sa retina/scrie de mana la logare - a termina =
+  // a facut toate rundele prescrise, prin definitie. Bug real gasit (07-15):
+  // fara asta, campul "Rezultat" de la un RFT terminat era text liber (cu
+  // un placeholder-hint "ex: 18 runde complete"), iar cineva a scris doar
+  // "5" - afisat ambiguu pe Jurnal/Clasament ca "5 · 9:33" langa timp, fara
+  // unitate. Vezi composeFinishedRoundsText - deriva automat "N runde
+  // complete" din config.rounds, fara sa mai ceara input manual la finisheri.
   'RFT': {
     family: 'scored', scoreMode: 'fortime_or_amrap',
     config: {
@@ -106,6 +118,9 @@ export const WORKOUT_FORMATS = {
       splitType: { type: 'select', options: ['You go/I go', 'Shared reps', 'Synchro'], required: true, labelKey: 'fmtSplitType' },
       baseFormat: { type: 'select', options: ['AMRAP', 'For Time'], required: true, labelKey: 'fmtBaseFormat' },
       durationSec: { type: 'duration', required: false, labelKey: 'fmtDurationOrTimeCap' },
+      // Opțional, relevant doar la baseFormat "For Time" cu runde repetate -
+      // vezi comentariul de la 'RFT'.rounds.
+      rounds: { type: 'number', required: false, labelKey: 'fmtRoundsCount' },
     },
     extraLogFields: ['partnerName'],
   },
@@ -307,6 +322,17 @@ export function composeAmrapResult(roundsCompleted, partialArr, movements) {
   if (!(roundsCompleted || '').toString().trim()) return ''
   const partialStr = composePartialText(partialArr, movements)
   return `${roundsCompleted.toString().trim()} runde${partialStr ? ' + ' + partialStr : ' complete'}`
+}
+
+// Text de rezultat pt un log 'fortime_or_amrap' TERMINAT (are Timp) la un
+// format cu config.rounds cunoscut (RFT, sau For Time/Partner WOD cu runde
+// repetate) - vezi comentariul de la 'RFT'.rounds mai sus. null (nu string
+// gol) daca nu exista un numar de runde configurat, ca sa poata fi distins
+// de "0 runde" si sa cada pe fallback-ul de text liber la locul de apel.
+export function composeFinishedRoundsText(rounds) {
+  const n = parseInt(rounds)
+  if (!n) return null
+  return `${n} runde complete`
 }
 
 export function parseAmrapResult(resultStr, movements) {

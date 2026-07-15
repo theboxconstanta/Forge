@@ -131,7 +131,7 @@ function WeightField({ weightLogged, onChange, t }) {
   )
 }
 
-function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight }) {
+function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight, finishedRounds }) {
   const greutateField = prescribedWeight ? <WeightField weightLogged={value.weightLogged} onChange={onChange} t={t} /> : null
   if (scoreMode === 'amrap') {
     return <>{greutateField}<RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} /></>
@@ -158,10 +158,24 @@ function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPart
         </>
       )
     }
+    // Numarul de runde prescris (RFT, sau For Time/Partner WOD cu runde
+    // repetate configurate) e deja cunoscut - a termina (Timp completat)
+    // inseamna prin definitie ca ai facut toate rundele. Campul de "Rezultat"
+    // liber cerea cu placeholder "ex: 18 runde complete", dar era text
+    // netipizat - cineva scria doar "5", afisat ambiguu langa timp (fara
+    // unitate). Cand rundele sunt cunoscute, ascundem campul liber si
+    // compunem automat textul la salvare (vezi composeFinishedRoundsText in
+    // App.jsx) - membrul nu mai trebuie sa scrie de mana ceva deja stiut.
+    const roundsCunoscute = parseInt(finishedRounds) > 0
     return (
       <>
         {greutateField}
-        <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} />
+        <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult={roundsCunoscute} />
+        {roundsCunoscute && (
+          <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>
+            {t?.logWodFinishedRoundsHint ? t.logWodFinishedRoundsHint(finishedRounds) : `Dacă termini, se înregistrează automat ${finishedRounds} runde complete.`}
+          </div>
+        )}
         <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
         <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
       </>
@@ -306,7 +320,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   const efectiveMovements = format.ascending
     ? ascendingMovementsForRound(movements || [], (parseInt(v.roundsCompleted) || 0) + 1, config?.startReps, config?.incrementReps)
     : (movements || [])
-  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} />
+  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} finishedRounds={config?.rounds} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

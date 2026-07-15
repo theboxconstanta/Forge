@@ -27,6 +27,7 @@ import {
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
+  effectiveScoreMode, composeFinishedRoundsText,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -5642,7 +5643,18 @@ function App() {
         : miscariPentruLog
       rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
     } else {
-      rezultatFinal = wodResult.trim()
+      // RFT (mereu) sau For Time/Partner WOD cu runde repetate configurate -
+      // a termina (Timp completat) inseamna prin definitie ca ai facut toate
+      // rundele prescrise, nu trebuie retipat de mana (bug real gasit:
+      // cineva a scris doar "5" in campul liber, in loc de "5 runde
+      // complete" - vezi comentariul de la 'RFT'.rounds in workoutFormats.js
+      // si ScoredFields in FormatLogger.jsx, unde campul liber e ascuns in
+      // acest caz). Fallback la textul liber doar cand rundele nu sunt
+      // configurate (ex. For Time/Partner WOD fara acel camp completat).
+      const finishedRoundsText = (!isSequential && effectiveScoreMode(activeLogFormatId, activeLogFormatConfig) === 'fortime_or_amrap')
+        ? composeFinishedRoundsText(activeLogFormatConfig?.rounds)
+        : null
+      rezultatFinal = finishedRoundsText ?? wodResult.trim()
     }
     return {
       result: rezultatFinal || null, time_result: useReps ? null : (wodTime.trim() || null),
