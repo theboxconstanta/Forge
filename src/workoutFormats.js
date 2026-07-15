@@ -115,6 +115,15 @@ export const WORKOUT_FORMATS = {
       totalRounds: { type: 'number', required: true, labelKey: 'fmtIntervalCount' },
       intervalSec: { type: 'duration', required: true, default: 60, labelKey: 'fmtIntervalDuration' },
       intervals: { type: 'intervalList', required: false, labelKey: 'fmtMovementPerInterval' },
+      // Optional (spre deosebire de Tabata/Intervals, unde e obligatoriu) -
+      // multe EMOM-uri sunt centrate pe greutate (fallback-ul existent,
+      // maxWeightFromSets, ramane corect pt ele daca acest camp nu e setat).
+      // Dar un EMOM pur pe repetari (ex. "EMOM 10: 5 Burpees", fara greutate
+      // deloc) cadea pe acelasi fallback, care returneaza null - Clasament il
+      // arata neclasat ("-"), exact bug-ul deja reparat la Tabata/Build to
+      // Heavy dar niciodata extins la EMOM. Cu campul optional, adminul poate
+      // alege explicit scorarea pe reps pt EMOM-urile care chiar au nevoie.
+      scoringMode: { type: 'select', options: ['Total Reps', 'Lowest Reps'], required: false, labelKey: 'fmtIntervalScoring' },
     },
   },
   'Tabata': {
