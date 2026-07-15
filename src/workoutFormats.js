@@ -41,6 +41,25 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'amrap',
     config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
   },
+  // AMRAP cu runde care cresc (ex. "AVALANCHE": 3-3, 6-6, 9-9... burpees si
+  // deadlifts, +3 la fiecare runda) - gasit deja programat manual la aceasta
+  // sala, prin retiparea intregii secvente in miscari (movements_rx cu 6+
+  // randuri de tipul "3 burpee...", "6 burpee..."), inconsecvent de la o
+  // logare la alta (typo-uri, variante diferite ale numelui miscarii). Bug
+  // real gasit in datele existente (07-15): UI-ul de logare arata mereu
+  // tinta STATICA a primei runde scrise (3), nu tinta reala a rundei curente
+  // (ex. runda 6 are 18) - rezultate confuze/gresite ("2/3 burpees" cand ar
+  // fi trebuit sa fie "X/18"). Cu acest format, antrenorul scrie miscarile
+  // O SINGURA DATA (fara numere), iar tinta per runda se calculeaza automat
+  // (startReps + incrementReps * (runda-1)) - vezi repsForAscendingRound.
+  'Ascending AMRAP': {
+    family: 'scored', scoreMode: 'amrap', ascending: true,
+    config: {
+      durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' },
+      startReps: { type: 'number', required: true, default: 3, labelKey: 'fmtStartReps' },
+      incrementReps: { type: 'number', required: true, default: 3, labelKey: 'fmtIncrementReps' },
+    },
+  },
   // "For Time" poate insemna 2 lucruri diferite: o secventa unica de miscari
   // distincte (ex. "TO THE SKY": 15-12-9-6-3 - "runde complete" nu are sens
   // aici) SAU runde repetate din aceleasi miscari (ex. "7 rounds for time
@@ -286,6 +305,50 @@ export function parseAmrapResult(resultStr, movements) {
   const plusIdx = (resultStr || '').indexOf('+')
   const partialArr = plusIdx !== -1 ? parsePartialText(resultStr.slice(plusIdx + 1), movements) : movements.map(() => '')
   return { rounds: roundsMatch ? roundsMatch[1] : '', partialArr }
+}
+
+// --- AMRAP ascendent (runde care cresc, ex. "AVALANCHE": 3-3, 6-6, 9-9...) --
+
+export function repsForAscendingRound(round, startReps, incrementReps) {
+  const start = parseInt(startReps) || 0
+  const inc = parseInt(incrementReps) || 0
+  return start + inc * (Math.max(1, round) - 1)
+}
+
+// Reconstruieste lista de "miscari" (nume de baza, fara numere - vezi
+// catalogul) cu reps-ul corect prescris pt runda data, refolosind
+// composePartialText/parsePartialText existente FARA nicio modificare -
+// acelea deja stiu sa formateze "facut/prescris Miscare" cand textul
+// miscarii incepe cu un numar (vezi composePartialText mai sus).
+export function ascendingMovementsForRound(baseMovements, round, startReps, incrementReps) {
+  const reps = repsForAscendingRound(round, startReps, incrementReps)
+  return (baseMovements || []).map(m => `${reps} ${m}`)
+}
+
+// Parsare in 2 pasi a unui rezultat deja salvat: runda partiala (deci
+// reps-ul corect prescris pt fiecare miscare) depinde de roundsCompleted,
+// care se afla abia dupa un prim parse - vezi bug-ul real gasit in datele
+// existente (07-15, "AVALANCHE"): fara asta, UI-ul de editare/afisare ar
+// aplica mereu tinta STATICA a rundei 1, exact greseala pe care acest
+// format o repara.
+export function parseAscendingAmrapResult(resultStr, baseMovements, startReps, incrementReps) {
+  const { rounds } = parseAmrapResult(resultStr, baseMovements)
+  const roundsNum = parseInt(rounds) || 0
+  const currentRoundMovements = ascendingMovementsForRound(baseMovements, roundsNum + 1, startReps, incrementReps)
+  const { partialArr } = parseAmrapResult(resultStr, currentRoundMovements)
+  return { rounds, partialArr, currentRoundMovements }
+}
+
+// Suma reala de reps acumulate - runde complete (fiecare cu marimea ei,
+// per miscare) + reps partiale in runda curenta neterminata. Scorul de
+// clasat/afisat: "12 runde" nu e comparabil direct intre doi oameni (fiecare
+// runda are alta marime), dar "165 reps" da.
+export function totalRepsAscendingAmrap(roundsCompleted, partialArr, movementsCount, startReps, incrementReps) {
+  const rounds = parseInt(roundsCompleted) || 0
+  let total = 0
+  for (let r = 1; r <= rounds; r++) total += repsForAscendingRound(r, startReps, incrementReps) * movementsCount
+  ;(partialArr || []).forEach(v => { const n = parseInt(v); if (!Number.isNaN(n)) total += n })
+  return total
 }
 
 // Sursa unica pt cele 4 variante + coloana lor de baza in wods - orice cod

@@ -26,7 +26,7 @@ import {
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
-  isMixedCategory,
+  isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -1366,7 +1366,19 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       // de "X seturi" (fara nicio greutate) - inlocuim complet cu
                       // acelasi scor deja calculat mai sus pt headline (cu unitate
                       // inclusa), nu doar il adaugam langa "X seturi" fara sens.
-                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result] : rezultatBucatiRaw
+                      // Ascending AMRAP: aceeasi cifra de "reps totale" ca in Jurnal
+                      // (vezi parseWodLogDetails/JurnalList) - aici wodZiFormat/
+                      // wodZiData sunt deja cele ale WOD-ului afisat pe tot ecranul
+                      // de Clasament, nu trebuie rezolvate per-log ca acolo.
+                      const ascendingTotalReps = (wodZiFormat?.ascending && log.result && miscariAfisate.length > 0)
+                        ? (() => {
+                            const { rounds, partialArr } = parseAscendingAmrapResult(log.result, miscariAfisate, wodZiData?.format_config?.startReps, wodZiData?.format_config?.incrementReps)
+                            return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, wodZiData?.format_config?.startReps, wodZiData?.format_config?.incrementReps)
+                          })()
+                        : null
+                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result]
+                        : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
+                        : rezultatBucatiRaw
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
@@ -3989,7 +4001,21 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // adaugam), altfel "65kg" si "10 seturi" ar aparea impreuna, unul
               // util, celalalt fara sens langa greutatea reala.
               const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, w.wods?.format_config, w.sets) : null
-              const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`] : rezultatBucatiRaw
+              // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
+              // comparat dintr-o privire intre loguri - adaugam si totalul de
+              // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
+              // calculat din acelasi rezultat text + numarul de miscari de baza
+              // (miscariAfisate, fara cifre - vezi ascendingMovementsForRound).
+              const formatAfisat = getFormat(formatTipResolvat)
+              const ascendingTotalReps = (formatAfisat?.ascending && w.result && miscariAfisate.length > 0)
+                ? (() => {
+                    const { rounds, partialArr } = parseAscendingAmrapResult(w.result, miscariAfisate, w.wods?.format_config?.startReps, w.wods?.format_config?.incrementReps)
+                    return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, w.wods?.format_config?.startReps, w.wods?.format_config?.incrementReps)
+                  })()
+                : null
+              const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`]
+                : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
+                : rezultatBucatiRaw
               return (
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -5280,7 +5306,10 @@ function App() {
       if (useRepsSkill && isSequentialSkill) {
         resultCurat = composePartialText(repsEfectiveSecvential(skillLogPartialReps, skillMiscari), skillMiscari)
       } else if (useRepsSkill) {
-        resultCurat = composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscari)
+        const skillMiscariPtCompunere = format.ascending
+          ? ascendingMovementsForRound(skillMiscari, (parseInt(skillLogRoundsCompleted) || 0) + 1, skillFormatConfigCurent?.startReps, skillFormatConfigCurent?.incrementReps)
+          : skillMiscari
+        resultCurat = composeAmrapResult(skillLogRoundsCompleted, skillLogPartialReps, skillMiscariPtCompunere)
       } else {
         resultCurat = [skillLogResult.trim(), skillLogTime.trim()].filter(Boolean).join(' · ')
       }
@@ -5604,7 +5633,14 @@ function App() {
     if (useReps && isSequential) {
       rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, miscariPentruLog), miscariPentruLog)
     } else if (useReps) {
-      rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog)
+      // Ascending AMRAP: reps-urile partiale intra in runda CURENTA
+      // (roundsCompleted + 1, prima neterminata) - miscariPentruLog trebuie
+      // sa aiba tinta acelei runde, nu a rundei 1 (vezi FormatLogger, acelasi
+      // calcul, ca textul compus aici sa reflecte exact ce a vazut membrul).
+      const miscariPtCompunere = format.ascending
+        ? ascendingMovementsForRound(miscariPentruLog, (parseInt(wodRoundsCompleted) || 0) + 1, activeLogFormatConfig?.startReps, activeLogFormatConfig?.incrementReps)
+        : miscariPentruLog
+      rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
     } else {
       rezultatFinal = wodResult.trim()
     }
@@ -6819,7 +6855,14 @@ function App() {
                   const partialArr = log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => '')
                   setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
                 } else if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
-                  const { rounds, partialArr } = parseAmrapResult(log.result || '', movimenteLog)
+                  // Ascending AMRAP: movimenteLog sunt nume de baza (fara
+                  // numere) - runda partiala salvata a fost compusa cu tinta
+                  // rundei CURENTE de atunci (roundsCompleted+1), nu a rundei
+                  // 1 - parseAscendingAmrapResult reface exact acea tinta
+                  // inainte sa desfaca reps-urile partiale (vezi catalogul).
+                  const { rounds, partialArr } = format.ascending
+                    ? parseAscendingAmrapResult(log.result || '', movimenteLog, log.wods?.format_config?.startReps, log.wods?.format_config?.incrementReps)
+                    : parseAmrapResult(log.result || '', movimenteLog)
                   setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
                 } else {
                   setWodResult(log.result || ''); setWodRoundsCompleted(''); setWodPartialReps([])
