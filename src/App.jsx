@@ -8,6 +8,7 @@ import {
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
 import {
   todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
@@ -4351,6 +4352,7 @@ function App() {
   const [prevScreen, setPrevScreen] = useState('home')
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
+  const prevScreenRef = useRef('home')
   const mainScrollRef = useRef(null)
   const debugTapRef = useRef(0)
   const [wodDeschis, setWodDeschis] = useState(false)
@@ -4771,8 +4773,31 @@ function App() {
     } catch (e) { console.error('Push registration failed:', e) }
   }
 
+  // Butonul/gestul fizic Back pe Android inchide direct aplicatia in loc sa
+  // navigheze inapoi in ea - bug real gasit live (07-15), primul test in
+  // emulator: de pe "Abonamentul meu", Back a iesit complet din app in loc
+  // sa se intoarca la Acasa. Motivul: navigarea foloseste state React
+  // (screen/prevScreen), nu istoricul real al browser-ului/WebView-ului, pe
+  // care Capacitor l-ar fi putut folosi implicit ca sa "dea inapoi". Fix de
+  // prim nivel - acopera navigarea principala intre ecrane (acopera cazul
+  // gasit azi); ecrane/modale cu propria lor logica de inchidere (ex.
+  // onboarding, popup-uri) nu sunt inca acoperite aici, doar de butoanele
+  // proprii de pe ecran.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      if (screenRef.current !== 'home') {
+        setScreen(prevScreenRef.current || 'home')
+      } else {
+        CapacitorApp.minimizeApp()
+      }
+    })
+    return () => { listenerPromise.then(l => l.remove()) }
+  }, [])
+
   useEffect(() => {
     screenRef.current = screen
+    prevScreenRef.current = prevScreen
     // div-ul flex:1/overflow-y:auto de mai jos (mainScrollRef) e containerul
     // care scroleaza de fapt (nu document.body) - fara reset aici, la
     // schimbarea ecranului ramane cu offset-ul de scroll de pe ecranul
