@@ -488,7 +488,7 @@ const PR_CATEGORII = {
     'Freestanding Handstand Push-up','Handstand Walk over Obstacle','Handstand Pirouette','Wall Walk','Shoulder Taps',
     'Toes to Ring','Hanging Knee Raise','Skin the Cat','Front Lever','Back Lever',
     'Jumping Squat','Lunge','Jumping Lunge','Step-up','Vertical Jump',
-    'Bar-Facing Burpee','Lateral Burpee','Burpee Pull-up','Burpee to Target',
+    'Bar-Facing Burpee','Lateral Burpee','Lateral Burpee Over Bar','Burpee Pull-up','Burpee to Target',
     'Burpee Box Jump','Burpee Box Jump Over','Burpee Broad Jump','Burpee Muscle-up',
     'Bear Crawl','Crab Walk','Duck Walk','Candlestick Roll','Forward Roll',
     'Box Jump Over','Box Step-up','Box Step-over','Seated Box Jump','Lateral Box Jump','Box Dip','Depth Jump',

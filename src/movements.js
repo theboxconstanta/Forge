@@ -44,7 +44,7 @@ export const MISCARI = [
   'Freestanding Handstand Push-up', 'Box Handstand Push-up', 'Handstand Walk over Obstacle', 'Handstand Pirouette', 'Wall Walk', 'Shoulder Taps',
   'Toes to Ring', 'Hanging Knee Raise', 'Skin the Cat', 'Front Lever', 'Back Lever',
   'Jumping Squat', 'Lunge', 'Jumping Lunge', 'Step-up', 'Vertical Jump', 'Pull-to-Stand',
-  'Bar-Facing Burpee', 'Lateral Burpee', 'Burpee Pull-up', 'Burpee to Target', 'Box Burpee',
+  'Bar-Facing Burpee', 'Lateral Burpee', 'Lateral Burpee Over Bar', 'Burpee Pull-up', 'Burpee to Target', 'Box Burpee',
   'Burpee Box Jump', 'Burpee Box Jump Over', 'Burpee Box Step-over', 'Burpee Broad Jump', 'Burpee Muscle-up',
   'Bear Crawl', 'Crab Walk', 'Duck Walk', 'Candlestick Roll', 'Forward Roll',
   // Cardio / Monostructural
