@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as Sentry from '@sentry/react'
+import { Capacitor } from '@capacitor/core'
 import './index.css'
 import App from './App.jsx'
 import { supabase } from './supabase.js'
@@ -52,7 +53,11 @@ if ('serviceWorker' in navigator) {
 // captureConsoleIntegration, in loc sa fie o respingere nesupravegheata.
 // import() dinamic, fara await la nivel de modul - nu trebuie sa blocheze
 // randarea aplicatiei (createRoot de mai jos) pana se rezolva inregistrarea.
-if (import.meta.env.PROD) {
+// NU in shell-ul nativ (Capacitor) - acolo assets-urile sunt deja bundle-uite
+// local in APK/IPA, un service worker n-are ce sa mai cacheze util si ar
+// risca exact bug-ul de cache stataut vazut azi pe web (index.html vechi
+// servit peste update-uri noi din Play Store/App Store).
+if (import.meta.env.PROD && !Capacitor.isNativePlatform()) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({ immediate: true, onRegisterError: (error) => console.error('[SW] register error:', error) })
   })
