@@ -6419,7 +6419,7 @@ function App() {
 
       <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={myGym} />
 
-      {gymBlocked && (
+      {gymBlocked && !isPlatformAdmin && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
