@@ -9,6 +9,7 @@ import {
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
+  composeStageResult, totalRepsChained, totalRepsAmrapStage,
 } from './workoutFormats'
 import { getT } from './translations'
 
@@ -74,6 +75,52 @@ describe('composeFinishedRoundsText', () => {
     expect(composeFinishedRoundsText(null)).toBe(null)
     expect(composeFinishedRoundsText(0)).toBe(null)
     expect(composeFinishedRoundsText('')).toBe(null)
+  })
+})
+
+describe('WOD-uri inlantuite (Chained AMRAP)', () => {
+  it('totalRepsAmrapStage - runde complete x reps prescrise per runda + reps partiale', () => {
+    const movements = ['4 Strict Pull-ups', '11 Box Jumps', '13 Hand Release Push-ups', '23 Cal Bike']
+    // 3 runde complete (4+11+13+23=51 reps/runda) + 2 din Pull-ups in runda partiala
+    expect(totalRepsAmrapStage('3', ['2', '', '', ''], movements)).toBe(3 * 51 + 2)
+  })
+  it('totalRepsAmrapStage - caz degenerat "max reps o singura miscare" (fara prefix numeric, fara runde)', () => {
+    expect(totalRepsAmrapStage('', ['45'], ['Deadlifts'])).toBe(45)
+  })
+  it('composeStageResult kind amrap - text normal, cu runde', () => {
+    const stage = { kind: 'amrap', movements: ['4 Strict Pull-ups', '11 Box Jumps', '13 Hand Release Push-ups', '23 Cal Bike'] }
+    const { text, totalReps } = composeStageResult(stage, { roundsCompleted: '3', partialReps: ['2', '', '', ''] })
+    expect(text).toBe('3 runde + 2/4 Strict Pull-ups')
+    expect(totalReps).toBe(155)
+  })
+  it('composeStageResult kind amrap - caz degenerat "max reps o singura miscare" nu pierde reps-ul partial', () => {
+    const stage = { kind: 'amrap', movements: ['Deadlifts'] }
+    const { text, totalReps } = composeStageResult(stage, { roundsCompleted: '', partialReps: ['45'] })
+    expect(text).toBe('45 Deadlifts')
+    expect(totalReps).toBe(45)
+  })
+  it('composeStageResult kind interval - reutilizeaza computeSetsScore (Total Reps)', () => {
+    const stage = { kind: 'interval', movements: [] }
+    const { text, totalReps } = composeStageResult(stage, { sets: { 'Min 1': [{ reps: '10' }], 'Min 2': [{ reps: '8' }] } })
+    expect(text).toBe('18 reps')
+    expect(totalReps).toBe(18)
+  })
+  it('totalRepsChained - suma reps pe toate etapele (exemplul real: AMRAP 2 + AMRAP 19 + AMRAP 2)', () => {
+    const stages = [
+      { kind: 'amrap', movements: ['Deadlifts'] },
+      { kind: 'amrap', movements: ['4 Strict Pull-ups', '11 Box Jumps', '13 Hand Release Push-ups', '23 Cal Bike'] },
+      { kind: 'amrap', movements: ['Deadlifts'] },
+    ]
+    const values = [
+      { roundsCompleted: '', partialReps: ['45'] },
+      { roundsCompleted: '3', partialReps: ['2', '', '', ''] },
+      { roundsCompleted: '', partialReps: ['12'] },
+    ]
+    expect(totalRepsChained(stages, values)).toBe(45 + 155 + 12)
+  })
+  it('estimateTotalDurationSec - suma duratelor etapelor', () => {
+    const stages = [{ durationSec: 120 }, { durationSec: 1140 }, { durationSec: 120 }]
+    expect(estimateTotalDurationSec('Chained AMRAP', { stages })).toBe(1380)
   })
 })
 

@@ -254,6 +254,23 @@ export const WORKOUT_FORMATS = {
   'Not For Time': {
     family: 'nft', config: {},
   },
+  // WOD-uri "straight into" (ex. "AMRAP 2 max reps deadlifts, straight into
+  // AMRAP 19 cu 4 miscari, straight into AMRAP 2 din nou") - gasit real la
+  // aceasta sala (si pe BTWB, "Jack's Triangle") si imposibil de reprezentat
+  // in vreun format existent (toate au o singura "forma" fixa). O etapa poate
+  // fi 'amrap' (runde+reps partiale, exact ca AMRAP - "max reps dintr-o
+  // singura miscare" e doar cazul degenerat, o miscare fara prefix numeric)
+  // sau 'interval' (randuri reps/greutate per interval, exact ca EMOM) -
+  // acopera orice WOD real de conditionare cu etape inlantuite. Etape bazate
+  // pe timp (For Time) sunt scoase din scop deliberat - un scor total "reps"
+  // n-are sens langa o etapa cronometrata; se adauga daca apare un WOD real
+  // cu asa ceva, nu presupus dinainte.
+  'Chained AMRAP': {
+    family: 'chained',
+    config: {
+      stages: { type: 'stageList', required: true, labelKey: 'fmtStages' },
+    },
+  },
   'Max Effort': {
     family: 'scored', scoreMode: 'single_value',
     config: { movement: { type: 'movementText', required: false, labelKey: 'fmtMovementTest' } },
@@ -384,6 +401,63 @@ export function totalRepsAscendingAmrap(roundsCompleted, partialArr, movementsCo
   for (let r = 1; r <= rounds; r++) total += repsForAscendingRound(r, startReps, incrementReps) * movementsCount
   ;(partialArr || []).forEach(v => { const n = parseInt(v); if (!Number.isNaN(n)) total += n })
   return total
+}
+
+// --- WOD-uri inlantuite (etape 'amrap'/'interval' legate "straight into") --
+
+// Suma reps-urilor PRESCRISE intr-o singura runda, extrasa din prefixele
+// numerice ale textului miscarilor (ex. ["10 Pull-ups","15 KB Swings","20
+// Box Jumps"] -> 45). O miscare FARA prefix numeric (ex. "Deadlifts", cazul
+// "max reps dintr-o singura miscare continua", fara concept real de runda)
+// conteaza 0 - tot reps-ul acelei etape vine atunci din reps-ul partial logat
+// direct (vezi totalRepsAmrapStage mai jos).
+function repsPerRound(movements) {
+  return (movements || []).reduce((sum, m) => {
+    const match = m.match(/^(\d+)\s+/)
+    return sum + (match ? parseInt(match[1]) : 0)
+  }, 0)
+}
+
+// Total reps acumulate intr-o etapa 'amrap' (runde complete x reps prescrise
+// per runda, plus reps-ul facut in runda partiala/neterminata) - aceeasi
+// matematica dovedita corecta la totalRepsAscendingAmrap mai sus, generalizata
+// la runde cu marime FIXA (nu crescatoare).
+export function totalRepsAmrapStage(roundsCompleted, partialArr, movements) {
+  const rounds = parseInt(roundsCompleted) || 0
+  let total = rounds * repsPerRound(movements)
+  ;(partialArr || []).forEach(v => { const n = parseInt(v); if (!Number.isNaN(n)) total += n })
+  return total
+}
+
+// Rezultatul compus (text de afisat + total de reps) al unei singure etape -
+// 'amrap' reutilizeaza composeAmrapResult existent (identic cu AMRAP simplu);
+// 'interval' reutilizeaza computeSetsScore existent (Total Reps, identic cu
+// scorul EMOM pe reps). `value` e slice-ul din wodChainedStages[i]:
+// {roundsCompleted, partialReps} la 'amrap', {sets} la 'interval'.
+export function composeStageResult(stage, value) {
+  if (stage.kind === 'interval') {
+    const total = computeSetsScore('EMOM', { scoringMode: 'Total Reps' }, value?.sets || {})
+    return { text: total != null ? `${total} reps` : '', totalReps: total || 0 }
+  }
+  const roundsCompleted = value?.roundsCompleted || ''
+  const partialArr = value?.partialReps || []
+  const movements = stage.movements || []
+  const totalReps = totalRepsAmrapStage(roundsCompleted, partialArr, movements)
+  let text = composeAmrapResult(roundsCompleted, partialArr, movements)
+  // Caz degenerat "max reps dintr-o singura miscare continua" (roundsCompleted
+  // gol - fara concept real de runda, tot reps-ul vine din partialArr[0]) -
+  // composeAmrapResult returneaza mereu text gol cand roundsCompleted e
+  // falsy, indiferent de reps-ul partial real logat (vezi garda lui). Afisam
+  // direct "<reps> <miscare>" in loc sa pierdem singura valoare introdusa.
+  if (!text && totalReps > 0) text = `${totalReps} ${movements[0] || ''}`.trim()
+  return { text, totalReps }
+}
+
+// Scorul total al unui WOD inlantuit - suma reps pe toate etapele. `values`
+// e array paralel cu `stages` (wodChainedStages din App.jsx sau
+// log_meta.stages reconstruit la editare).
+export function totalRepsChained(stages, values) {
+  return (stages || []).reduce((sum, stage, i) => sum + (composeStageResult(stage, values?.[i]).totalReps || 0), 0)
 }
 
 // Sursa unica pt cele 4 variante + coloana lor de baza in wods - orice cod
@@ -556,6 +630,7 @@ export function estimateTotalDurationSec(formatId, config) {
   if (formatId === 'Tabata' || formatId === 'Intervals') return (parseInt(cfg.rounds) || 8) * ((cfg.workSec || 20) + (cfg.restSec || 10)) || null
   if (formatId === 'Buy-In/Cash-Out') return cfg.mainDurationSec || null
   if (formatId === 'AMRAP with Buy-In') return cfg.totalDurationSec || null
+  if (formatId === 'Chained AMRAP') return (cfg.stages || []).reduce((sum, s) => sum + (s.durationSec || 0), 0) || null
   return null
 }
 
@@ -580,6 +655,7 @@ export function describeFormatConfig(formatId, config, t) {
     if (field.type === 'duration') displayValue = secToTime(value)
     else if (field.type === 'movementList' || field.type === 'intervalList') displayValue = value.join(', ')
     else if (field.type === 'repsSchemeList') displayValue = value.join('-')
+    else if (field.type === 'stageList') displayValue = `${value.length} etape`
     else displayValue = String(value)
     parts.push(`${label}: ${displayValue}`)
   })

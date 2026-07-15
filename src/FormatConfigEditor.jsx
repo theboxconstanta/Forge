@@ -129,6 +129,50 @@ function RepsSchemeListField({ label, value, onChange }) {
   )
 }
 
+// Lista de etape a unui "Chained AMRAP" (WOD "straight into") - fiecare etapa
+// e un mini-card cu propriul tip (amrap/interval), durata, si (doar la
+// 'interval') durata unui interval, plus lista ei proprie de miscari.
+// Reutilizeaza DurationField/MovementListField existente pt sub-campuri, in
+// loc sa reinventeze input-uri de durata/miscari - vezi workoutFormats.js
+// pentru forma exacta a unei etape ({kind, durationSec, movements,
+// intervalSec?}).
+function StageListField({ label, value, onChange, t }) {
+  const stages = value || []
+  const setStage = (i, patch) => onChange(stages.map((s, idx) => idx === i ? { ...s, ...patch } : s))
+  const addStage = () => onChange([...stages, { kind: 'amrap', durationSec: null, movements: [] }])
+  const removeStage = (i) => onChange(stages.filter((_, idx) => idx !== i))
+  return (
+    <div style={fieldWrapStyle}>
+      <div style={labelStyle}>{label}</div>
+      {stages.map((stage, i) => (
+        <div key={i} style={{ border: '1px solid #e0e0e0', borderRadius: '10px', padding: '10px', marginBottom: '10px', background: '#fff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E' }}>{(t?.fmtStageLabel ? t.fmtStageLabel(i + 1) : `Etapa ${i + 1}`)}</div>
+            <button type="button" onClick={() => removeStage(i)}
+              style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
+          </div>
+          <div style={fieldWrapStyle}>
+            <div style={labelStyle}>{t?.fmtStageKind || 'Tip etapă'}</div>
+            <select value={stage.kind || 'amrap'} onChange={e => setStage(i, { kind: e.target.value })} style={inputStyle}>
+              <option value="amrap">{t?.fmtStageKindAmrap || 'AMRAP'}</option>
+              <option value="interval">{t?.fmtStageKindInterval || 'Interval (EMOM)'}</option>
+            </select>
+          </div>
+          <DurationField label={t?.fmtStageDuration || 'Durată etapă'} seconds={stage.durationSec ?? null} onChange={v => setStage(i, { durationSec: v })} />
+          {stage.kind === 'interval' && (
+            <DurationField label={t?.fmtIntervalDuration || 'Durată interval'} seconds={stage.intervalSec ?? null} onChange={v => setStage(i, { intervalSec: v })} />
+          )}
+          <MovementListField label={t?.fmtStageMovements || 'Mișcări'} value={stage.movements} onChange={v => setStage(i, { movements: v })} placeholder={t?.fmtMovementListPlaceholder} />
+        </div>
+      ))}
+      <button type="button" onClick={addStage}
+        style={{ padding: '8px 14px', borderRadius: '10px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+        {t?.fmtStageAdd || '+ Adaugă etapă'}
+      </button>
+    </div>
+  )
+}
+
 function SelectField({ label, value, options, onChange }) {
   return (
     <div style={fieldWrapStyle}>
@@ -228,6 +272,9 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
         )
         if (field.type === 'repsSchemeList') return (
           <RepsSchemeListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} />
+        )
+        if (field.type === 'stageList') return (
+          <StageListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} t={t} />
         )
         return null
       })}

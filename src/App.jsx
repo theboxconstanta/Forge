@@ -27,7 +27,7 @@ import {
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
-  effectiveScoreMode, composeFinishedRoundsText,
+  effectiveScoreMode, composeFinishedRoundsText, composeStageResult, totalRepsChained,
 } from './workoutFormats'
 
 class ErrorBoundary extends Component {
@@ -1138,6 +1138,27 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       })
       return Object.values(byMemberSets).sort(comparaSets)
     }
+    // WOD-uri inlantuite ("straight into") - la fel ca la 'sets', result/
+    // time_result raman mereu null (vezi composeWodLogFields), scorul real
+    // e precalculat la salvare in log_meta.totalReps - fara ramura asta ar
+    // cadea toate pe "neterminat" si ar fi departajate doar dupa ordinea de
+    // logare, indiferent de reps.
+    if (wodZiFormat?.family === 'chained') {
+      const comparaChained = (a, b) => {
+        const sa = a.log_meta?.totalReps, sb = b.log_meta?.totalReps
+        if (sa == null && sb == null) return new Date(a.logged_at) - new Date(b.logged_at)
+        if (sa == null) return 1
+        if (sb == null) return -1
+        if (sa !== sb) return sb - sa
+        return new Date(a.logged_at) - new Date(b.logged_at)
+      }
+      const byMemberChained = {}
+      arr.forEach(log => {
+        const id = log.member_id
+        if (!byMemberChained[id] || comparaChained(log, byMemberChained[id]) < 0) byMemberChained[id] = log
+      })
+      return Object.values(byMemberChained).sort(comparaChained)
+    }
     const finished = (log) => !!log.time_result
     // La formate secventiale (For Time/Ladder), rezultatul non-finisherilor
     // nu are un numar de "runde" real de comparat (parseScore ar extrage
@@ -1352,8 +1373,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       // setsScoreOf/sortLogs mai sus) - scorul calculat acolo
                       // (_setsScore) e singura sursa de afisat, cu unitatea
                       // preferata a membrului care a logat.
+                      // La fel ca 'sets' mai sus - 'chained' nu are niciodata
+                      // time_result/result (vezi composeWodLogFields), scorul
+                      // real e log_meta.totalReps, precalculat la salvare.
                       const result = wodZiFormat?.family === 'sets'
                         ? (log._setsScore != null ? `${log._setsScore}${(log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg'}` : '—')
+                        : wodZiFormat?.family === 'chained'
+                        ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
                       const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config, log._loggedMovements, log._prescribedMovements)
@@ -1377,9 +1403,19 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                             return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, wodZiData?.format_config?.startReps, wodZiData?.format_config?.incrementReps)
                           })()
                         : null
+                      // WOD-uri inlantuite - detaliu = textul deja compus per
+                      // etapa (log_meta.stages[].text), fara sa mai fie nevoie
+                      // de niciun re-parse (spre deosebire de Ascending AMRAP).
                       const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result]
+                        : wodZiFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
                         : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                         : rezultatBucatiRaw
+                      // parseWodLogDetails nu stie de 'chained' (result/
+                      // time_result/sets/log_meta.completed brute sunt mereu
+                      // null la aceasta familie) - fara asta, blocul REZULTAT
+                      // de mai jos nu s-ar afisa niciodata pt un WOD inlantuit.
+                      const areRezultatFinal = areRezultat || (wodZiFormat?.family === 'chained' && rezultatBucati.length > 0)
+                      const areDetaliiFinal = areDetalii || areRezultatFinal
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
@@ -1430,13 +1466,13 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                                 </div>
                               )}
                               {miscariAfisate.length > 0 && (
-                                <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
+                                <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {miscariAfisate.map((m, j) => (
                                     <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                                   ))}
                                 </div>
                               )}
-                              {areRezultat && (
+                              {areRezultatFinal && (
                                 <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: miscariAfisate.length > 0 ? '10px' : '0', borderTop: miscariAfisate.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
                                   <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                                   <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
@@ -1458,7 +1494,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                                   <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                                 </div>
                               )}
-                              {!areDetalii && (
+                              {!areDetaliiFinal && (
                                 <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
                               )}
                             </div>
@@ -4014,9 +4050,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, w.wods?.format_config?.startReps, w.wods?.format_config?.incrementReps)
                   })()
                 : null
+              // WOD-uri inlantuite - result/time_result/sets/log_meta.completed
+              // brute sunt mereu null la aceasta familie (vezi
+              // composeWodLogFields), deci parseWodLogDetails nu are cum sa
+              // stie de ele - construim direct din log_meta (totalReps +
+              // textul deja compus per etapa, fara niciun re-parse).
+              const chainedTotalReps = formatAfisat?.family === 'chained' ? (w.log_meta?.totalReps ?? null) : null
               const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`]
+                : chainedTotalReps != null ? [t.jurnalTotalRepsLabel(chainedTotalReps), ...(w.log_meta?.stages || []).map(s => s.text).filter(Boolean)]
                 : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                 : rezultatBucatiRaw
+              const areRezultatFinal = areRezultat || (chainedTotalReps != null)
+              const areDetaliiFinal = areDetalii || (chainedTotalReps != null)
               return (
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -4055,19 +4100,19 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   {wodSubtitlu && (
                     <div style={{ marginTop: '2px', fontSize: '12px', color: '#888' }}>{wodSubtitlu}</div>
                   )}
-                  {!isOpen && !areRezultat && (
+                  {!isOpen && !areRezultatFinal && (
                     <div style={{ marginTop: '6px', fontSize: '12px', color: '#aaa' }}>—</div>
                   )}
                   {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {miscariAfisate.length > 0 && (
-                        <div style={{ marginBottom: (wHasSets || areRezultat || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
+                        <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {miscariAfisate.map((m, j) => (
                             <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
-                      {areRezultat && (
+                      {areRezultatFinal && (
                         <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
                           <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
@@ -4089,7 +4134,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                           <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                         </div>
                       )}
-                      {!areDetalii && (
+                      {!areDetaliiFinal && (
                         <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
                       )}
                       {onEditWod && (
@@ -4483,6 +4528,11 @@ function App() {
   const [wodTip, setWodTip] = useState('AMRAP')
   const [wodFormatConfig, setWodFormatConfig] = useState({})
   const [wodSets, setWodSets] = useState({})
+  // WOD-uri inlantuite (family 'chained') - array paralel cu
+  // activeLogFormatConfig.stages, un slice per etapa
+  // ({roundsCompleted,partialReps} la 'amrap', {sets} la 'interval') - vezi
+  // FormatLogger.jsx si composeWodLogFields.
+  const [wodChainedStages, setWodChainedStages] = useState([])
   const [wodCompleted, setWodCompleted] = useState(false)
   // Doua casute (minute/secunde), ca la Admin - nu text liber, evita
   // ambiguitati ("20 minute" vs "20:00") si se compune direct in acelasi
@@ -5616,6 +5666,27 @@ function App() {
     if (format.family === 'nft') {
       return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted } }
     }
+    // WOD-uri inlantuite ("straight into") - result/time_result raman null
+    // (ca la 'sets'/'nft'), rezultatul real e in log_meta: textul compus +
+    // valoarea BRUTA per etapa (nu doar textul) - editarea ulterioara a
+    // logului trebuie sa poata reconstrui exact intrarile membrului (runde/
+    // reps partiale la 'amrap', randurile de reps la 'interval'), nu doar
+    // sa reafiseze textul deja compus. totalReps precalculat aici (nu
+    // recalculat la fiecare randare Jurnal/Clasament) - vezi sortLogs.
+    if (format.family === 'chained') {
+      const stages = activeLogFormatConfig?.stages || []
+      const stageLogMeta = stages.map((stage, i) => {
+        const sv = wodChainedStages[i] || {}
+        const { text, totalReps } = composeStageResult(stage, sv)
+        return stage.kind === 'interval'
+          ? { kind: 'interval', sets: sv.sets || {}, text, totalReps }
+          : { kind: 'amrap', roundsCompleted: sv.roundsCompleted || '', partialReps: sv.partialReps || [], text, totalReps }
+      })
+      return {
+        result: null, time_result: null, sets: null,
+        log_meta: { stages: stageLogMeta, totalReps: totalRepsChained(stages, wodChainedStages) },
+      }
+    }
     // La RFT/Partner WOD (scoreMode 'fortime_or_amrap'), FormatLogger arata
     // AMBELE seturi de campuri (timp SI runde+reps partiale) - membrul
     // completeaza doar unul, dupa cum a terminat sau nu in time cap. Fara
@@ -5682,13 +5753,21 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
       return
     }
+    // WOD-uri inlantuite: miscarile stau in config.stages, nu in wodMiscari
+    // (vezi catalogul) - fara verificarea asta, un Chained AMRAP completat
+    // integral in wodChainedStages ar fi respins ca "fara continut" (niciuna
+    // din conditiile de mai jos nu-l vede).
+    const chainedAreContiut = wodChainedStages.some(s =>
+      (s?.roundsCompleted || '').toString().trim() !== ''
+      || (s?.partialReps || []).some(v => (v || '').toString().trim() !== '')
+      || Object.values(s?.sets || {}).flat().some(r => (r?.reps || '').toString().trim() !== '' || (r?.weight || '').toString().trim() !== ''))
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
-      || Object.keys(wodSets).length > 0 || wodCompleted
+      || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
@@ -5760,7 +5839,7 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
@@ -6893,6 +6972,14 @@ function App() {
                 }
                 setWodTime(log.time_result || '')
                 setWodSets(normalizeSetsRows(log.sets))
+                // WOD-uri inlantuite: log_meta.stages tine deja intrarea BRUTA
+                // per etapa (nu doar textul compus), vezi composeWodLogFields -
+                // repopulam direct campurile de editare, simetric.
+                setWodChainedStages(format.family === 'chained'
+                  ? (log.log_meta?.stages || []).map(s => s.kind === 'interval'
+                    ? { sets: s.sets || {} }
+                    : { roundsCompleted: s.roundsCompleted || '', partialReps: s.partialReps || [] })
+                  : [])
                 setWodCompleted(!!log.log_meta?.completed)
                 setWodNote(parts.length > 1 ? parts[1] : '')
                 setWodWeightLogged(log.weight_logged || '')
@@ -6937,7 +7024,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               else if (logWodStep === 'score') { setLogWodStep('compose') }
               else { setScreen(prevScreen || 'home') }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
@@ -7063,7 +7150,7 @@ function App() {
               value={{
                 result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
                 partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
-                weightLogged: wodWeightLogged,
+                weightLogged: wodWeightLogged, stages: wodChainedStages,
               }}
               onChange={(patch) => {
                 if ('result' in patch) setWodResult(patch.result)
@@ -7071,6 +7158,7 @@ function App() {
                 if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
                 if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
                 if ('sets' in patch) setWodSets(patch.sets)
+                if ('stages' in patch) setWodChainedStages(patch.stages)
                 if ('completed' in patch) setWodCompleted(patch.completed)
                 if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
               }}

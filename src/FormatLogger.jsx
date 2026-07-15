@@ -4,6 +4,7 @@
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
 import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound } from './workoutFormats'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
+import { secToTime } from './utils'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }
@@ -299,6 +300,47 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
         <input type="checkbox" checked={!!v.completed} onChange={e => patch({ completed: e.target.checked })} style={{ width: '18px', height: '18px' }} />
         <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{t?.logWodCompletedLabel || 'Completat'}</span>
       </div>
+    )
+  }
+
+  // WOD-uri inlantuite ("straight into") - buclam etapele din config.stages,
+  // fiecare randata cu UI-ul deja existent al tipului ei: RoundsPartialFields
+  // (identic ca la AMRAP simplu) pt 'amrap', SetsRows (identic ca la EMOM,
+  // un singur numar de reps per interval) pt 'interval' - zero componente noi
+  // de input, doar bucla peste etape cu propriul slice din v.stages[i]. Vezi
+  // composeStageResult/totalRepsChained in workoutFormats.js pt scorul final.
+  if (format.family === 'chained') {
+    const stages = config?.stages || []
+    const stageValues = v.stages || []
+    const setStageValue = (i, p) => {
+      const next = [...stageValues]
+      next[i] = { ...(next[i] || {}), ...p }
+      onChange({ ...v, stages: next })
+    }
+    return (
+      <>
+        {stages.map((stage, i) => {
+          const sv = stageValues[i] || {}
+          const stageTitle = `${t?.fmtStageLabel ? t.fmtStageLabel(i + 1) : `Etapa ${i + 1}`}${stage.durationSec ? ' · ' + secToTime(stage.durationSec) : ''}`
+          const totalRounds = Math.max(1, Math.round((stage.durationSec || 0) / (stage.intervalSec || 60)) || 1)
+          const rowsByKey = stage.kind === 'interval'
+            ? (Object.keys(sv.sets || {}).length > 0 ? sv.sets : defaultRowsForFormat('EMOM', { totalRounds }, []))
+            : null
+          return (
+            <div key={i} style={{ marginBottom: '18px', paddingBottom: '14px', borderBottom: i < stages.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '8px' }}>{stageTitle}</div>
+              {stage.kind === 'interval'
+                ? Object.entries(rowsByKey).map(([key, rows]) => (
+                  <SetsRows key={key} rowKey={key} rows={rows}
+                    onChange={nextRows => setStageValue(i, { sets: { ...rowsByKey, [key]: nextRows } })}
+                    weightUnit={weightUnit} t={t} />
+                ))
+                : <RoundsPartialFields movements={stage.movements || []} roundsCompleted={sv.roundsCompleted} partialReps={sv.partialReps}
+                    onChange={p => setStageValue(i, p)} t={t} />}
+            </div>
+          )
+        })}
+      </>
     )
   }
 
