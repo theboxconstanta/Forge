@@ -7,6 +7,7 @@ import {
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
 } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from './supabase'
 import {
   todayLocalStr, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
@@ -4663,7 +4664,13 @@ function App() {
   }
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+  // Capacitor.isNativePlatform() - un WebView nativ (app-ul Android/iOS
+  // real) nu se raporteaza ca 'standalone' prin display-mode/navigator.standalone
+  // (astea sunt semnale specifice PWA), dar userul e deja "instalat" prin
+  // insusi faptul ca ruleaza aplicatia - bug real gasit live (07-15), la
+  // primul test in emulator: butonul "Add to home screen" aparea in
+  // interiorul app-ului nativ, unde n-are niciun sens.
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || Capacitor.isNativePlatform()
   const showInstall = !isStandalone && !installDismissed
 
   useEffect(() => {
