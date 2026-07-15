@@ -5558,12 +5558,22 @@ function App() {
   // Cautare sala la inregistrare - dupa nume (unic, impus la creare) SAU cod
   // de alaturare, intr-un singur camp. Rulează pe clientul anonim (inainte
   // de autentificare) - politica gyms_select_public permite explicit asta.
+  // Bug real gasit (07-15, raportat de user): rolul `anon` nu avea deloc
+  // GRANT SELECT pe `gyms` (doar politica RLS, care nu are efect fara
+  // GRANT-ul de baza) - orice cautare de sala la inregistrare esua tacit,
+  // niciun membru nou nu-si putea gasi sala. Fixat direct in DB (GRANT), dar
+  // eroarea era complet inghitita aici (`const { data } = await ...`, fara
+  // sa verifice `error`) - un membru vedea doar "0 rezultate", fara niciun
+  // indiciu ca ceva era stricat. console.error trece prin
+  // captureConsoleIntegration (Sentry), deci o eventuala regresie viitoare
+  // (alt GRANT/RLS lipsa) nu mai trece complet neobservata.
   const searchGyms = async (query) => {
     setGymQuery(query); setSelectedGym(null)
     if (!query.trim()) { setGymResults([]); return }
     const q = query.trim()
-    const { data } = await supabase.from('gyms').select('id, name')
+    const { data, error } = await supabase.from('gyms').select('id, name')
       .eq('is_active', true).or(`name.ilike.%${q}%,join_code.ilike.${q}`).limit(8)
+    if (error) console.error('searchGyms failed:', error)
     setGymResults(data || [])
   }
 

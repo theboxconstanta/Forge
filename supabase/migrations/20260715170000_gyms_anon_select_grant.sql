@@ -1,0 +1,16 @@
+-- Bug critic (07-15, raportat de user): rolul `anon` nu avea deloc GRANT
+-- SELECT pe `gyms` - politica RLS `gyms_select_public` (roles {anon,
+-- authenticated}, USING is_active = true) exista si e corecta, dar in
+-- Postgres o politica RLS restrictioneaza/filtreaza randuri DUPA ce
+-- GRANT-ul de baza pe tabel e satisfacut, nu inlocuieste GRANT-ul. Fara
+-- acest GRANT explicit, orice cautare de sala facuta de un membru NEautentificat
+-- (searchGyms, App.jsx - fluxul de inregistrare "Alătură-te unei săli
+-- existente") esua tacit cu "permission denied for table gyms", inghitit de
+-- cod (nu verifica `error`), aparand ca "sala nu exista" pentru orice sala,
+-- indiferent de nume.
+--
+-- `authenticated` nu avea nevoie de acest fix (are deja SELECT mostenit
+-- implicit de la grant-ul default pe schema `public` din Supabase) - de
+-- aceea bug-ul afecta STRICT inregistrarile noi (inainte de login), nu si
+-- utilizatorii deja autentificati.
+grant select on public.gyms to anon;
