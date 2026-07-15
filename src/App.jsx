@@ -1842,9 +1842,11 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [formatConfigWod, setFormatConfigWod] = useState({})
   const [dataWod, setDataWod] = useState(() => todayLocalStr())
   // Text lipit in caseta "Paste your workout" (varf de pagina, editor WOD) -
-  // deocamdata doar UI, fara AI in spate (vezi butonul "Analyze Workout" mai
-  // jos, care doar logheaza in consola). Nu atinge inca niciun camp existent.
+  // vezi analyzeWorkout() mai jos (Pasul 2B - apeleaza Edge Function-ul
+  // analyze-workout, doar console.log pe raspuns, nu atinge inca niciun camp
+  // existent din formular).
   const [aiParseText, setAiParseText] = useState('')
+  const [aiAnalyzing, setAiAnalyzing] = useState(false)
   // La EMOM/Tabata/Intervals durata totala e deja 100% determinata de config
   // (runde x interval) - o durata manuala separata ar putea sa nu se
   // potriveasca, deci o calculam si o sincronizam automat (vezi si JSX-ul
@@ -2513,6 +2515,33 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       ...buildVarianteWeightPayload(),
       ...overrides,
     }
+  }
+
+  // Pasul 2B din Workout Intelligence Engine - apeleaza Edge Function-ul
+  // analyze-workout (deja deployat, raspunde deocamdata cu JSON MOCK, vezi
+  // supabase/functions/analyze-workout). Acelasi tipar de autentificare ca
+  // adminStergeClient (singurul alt loc care apeleaza o Edge Function direct
+  // din client) - sesiunea curenta, fara nicio logica de auth custom. Doar
+  // console.log pe raspuns - NU populeaza niciun camp din formular, NU
+  // salveaza nimic (ramane pt un pas ulterior).
+  const analyzeWorkout = async () => {
+    if (!aiParseText.trim() || aiAnalyzing) return
+    setAiAnalyzing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/analyze-workout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ workout: aiParseText }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || t.toastGenericError)
+      console.log(json)
+    } catch (e) {
+      console.error('analyzeWorkout failed:', e)
+      showToast(t.toastAnalyzeWorkoutError)
+    }
+    setAiAnalyzing(false)
   }
 
   const saveWod = async () => {
@@ -3385,17 +3414,18 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       {/* WOD */}
       {adminTab === 'wod' && (
         <>
-          {/* "Paste your workout" - doar UI deocamdata (fara AI in spate), vezi
-              aiParseText mai sus. Click pe buton doar logheaza textul in consola -
-              nu atinge niciun camp existent, nu schimba fluxul de creare WOD. */}
+          {/* "Paste your workout" - apeleaza Edge Function-ul analyze-workout
+              (vezi analyzeWorkout() mai sus), care deocamdata raspunde cu JSON
+              MOCK. Raspunsul e doar afisat in consola - nu atinge inca niciun
+              camp existent din formular, nu schimba fluxul de creare WOD. */}
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodAiParseLabel}</div>
             <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
               placeholder={t.adminWodAiParsePlaceholder} rows={4}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-            <button onClick={() => console.log(aiParseText)}
-              style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              {t.adminWodAiParseButton}
+            <button onClick={analyzeWorkout} disabled={aiAnalyzing}
+              style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: aiAnalyzing ? 'not-allowed' : 'pointer', opacity: aiAnalyzing ? 0.7 : 1 }}>
+              {aiAnalyzing ? t.adminWodAiParseButtonLoading : t.adminWodAiParseButton}
             </button>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
