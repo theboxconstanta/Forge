@@ -66,15 +66,29 @@ if (import.meta.env.PROD && !Capacitor.isNativePlatform()) {
       // un bundle stataut (cu bug-uri deja reparate de multe ori intre timp),
       // pentru ca browser-ul nu verifica singur des destul un update - mai
       // ales pt o PWA instalata, tinuta deschisa/in fundal, fara o navigare
-      // reala care sa declanseze verificarea implicita. registration.update()
-      // fortat periodic + la revenirea din fundal (visibilitychange) - odata
-      // detectat, controllerchange (mai sus) face reload automat.
+      // reala care sa declanseze verificarea implicita.
+      //
+      // "Aproape instant" (cerinta explicita) - polling la 30 min ramane doar
+      // ca plasa de siguranta (retea cazuta la momentul push-ului realtime
+      // etc.), sursa principala de update e canalul realtime pe care oricum
+      // app-ul il tine deschis cat timp e activa (acelasi mecanism ca la
+      // redenumirea salii). La fiecare deploy, randul app_version e
+      // actualizat manual (npx supabase, dupa fiecare push - vezi nota din
+      // migratie) - toti clientii conectati primesc evenimentul in cateva
+      // sute de ms si forteaza imediat o verificare. Odata detectat un
+      // update real, controllerchange (mai sus) face reload automat.
       onRegisteredSW(_url, registration) {
         if (!registration) return
-        setInterval(() => registration.update(), 20 * 60 * 1000)
+        setInterval(() => registration.update(), 30 * 60 * 1000)
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') registration.update()
         })
+        supabase
+          .channel('app-version-watch')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_version' }, () => {
+            registration.update()
+          })
+          .subscribe()
       },
     })
   })
