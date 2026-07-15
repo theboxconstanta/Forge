@@ -760,6 +760,9 @@ export const TRANSLATIONS = {
     // Admin - tab WOD
     adminWodFormTitle: 'Workout of the Day',
     adminWodCancel: 'Anulează',
+    adminWodAiParseLabel: 'Lipește antrenamentul',
+    adminWodAiParsePlaceholder: 'Lipește antrenamentul aici...',
+    adminWodAiParseButton: 'Analizează antrenamentul',
     adminWodDateLabel: 'Data WOD',
     adminWodTypeLabel: 'Tip WOD',
     adminWodDurationLabel: 'Durată',
@@ -1575,6 +1578,9 @@ export const TRANSLATIONS = {
     // Admin - tab WOD
     adminWodFormTitle: 'Workout of the Day',
     adminWodCancel: 'Cancel',
+    adminWodAiParseLabel: 'Paste your workout',
+    adminWodAiParsePlaceholder: 'Paste your workout here...',
+    adminWodAiParseButton: 'Analyze Workout',
     adminWodDateLabel: 'WOD date',
     adminWodTypeLabel: 'WOD type',
     adminWodDurationLabel: 'Duration',

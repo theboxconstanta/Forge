@@ -1841,6 +1841,10 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [durataWodSec, setDurataWodSec] = useState('0')
   const [formatConfigWod, setFormatConfigWod] = useState({})
   const [dataWod, setDataWod] = useState(() => todayLocalStr())
+  // Text lipit in caseta "Paste your workout" (varf de pagina, editor WOD) -
+  // deocamdata doar UI, fara AI in spate (vezi butonul "Analyze Workout" mai
+  // jos, care doar logheaza in consola). Nu atinge inca niciun camp existent.
+  const [aiParseText, setAiParseText] = useState('')
   // La EMOM/Tabata/Intervals durata totala e deja 100% determinata de config
   // (runde x interval) - o durata manuala separata ar putea sa nu se
   // potriveasca, deci o calculam si o sincronizam automat (vezi si JSX-ul
@@ -3381,6 +3385,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       {/* WOD */}
       {adminTab === 'wod' && (
         <>
+          {/* "Paste your workout" - doar UI deocamdata (fara AI in spate), vezi
+              aiParseText mai sus. Click pe buton doar logheaza textul in consola -
+              nu atinge niciun camp existent, nu schimba fluxul de creare WOD. */}
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodAiParseLabel}</div>
+            <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
+              placeholder={t.adminWodAiParsePlaceholder} rows={4}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            <button onClick={() => console.log(aiParseText)}
+              style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+              {t.adminWodAiParseButton}
+            </button>
+          </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/Workout of the Day, aceeasi incadrare ca ele */}
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
