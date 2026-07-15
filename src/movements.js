@@ -94,6 +94,43 @@ export function miscareSugestii(text) {
   return MISCARI.filter(m => m.toLowerCase().includes(cuvant.toLowerCase())).slice(0, 5)
 }
 
+// Detecteaza cand o "linie de miscare" nu e de fapt o miscare, ci text de
+// structura a antrenamentului ("Then:", "Amrap 19:") sau o nota libera
+// ("– No Rest Between Amraps.", "wear a vest if you can") lipita din greseala
+// in lista de miscari - bug real gasit (07-15): un WOD intreg copiat de pe
+// BTWB, cu liniile de structura incluse, a fost salvat ca movements_rx -
+// UI-ul de logare arata atunci cate un camp de reps/greutate langa FIECARE
+// linie, inclusiv cele care nu sunt miscari, iar membrii chiar au completat
+// reps in ele (loguri reale corupte, vezi migrarea acelui WOD).
+//
+// Doar un SEMNAL VIZUAL (nu blocheaza salvarea) - MISCARI e o lista statica,
+// o miscare reala dar necunoscuta (noua/regionala/creativa) nu trebuie
+// respinsa, doar text CLAR non-miscare trebuie semnalat. 2 semnale foarte
+// sigure (aproape 0 fals-pozitive, acopera exact bug-ul gasit) plus un al
+// treilea, mai slab (lungime + nicio potrivire fuzzy in MISCARI):
+// 1. Se termina in ":" - un label de structura ("Then:", "Amrap 19:", "EMOM 10:")
+// 2. Incepe cu "-"/"–"/"*"/"•" - o nota/instructiune, nu o miscare
+// 3. Propozitie lunga (5+ cuvinte) FARA nicio potrivire in MISCARI - o
+//    miscare reala e aproape intotdeauna 1-4 cuvinte (chiar si numele mai
+//    lungi contin de obicei un cuvant recunoscut - "Overhead", "Squat" etc).
+// Cuvinte individuale din toate numele MISCARI (nu substring-uri libere ca la
+// miscareSugestii, care ar potrivi gresit "can" in interiorul "American" sau
+// "vest" in "Overhead" - aici avem nevoie de potrivire pe CUVANT intreg).
+const CUVINTE_MISCARI = new Set(MISCARI.flatMap(m => m.toLowerCase().split(/[\s-]+/)).filter(w => w.length >= 3))
+
+export function looksLikeMovementLine(text) {
+  const t = (text || '').trim()
+  if (!t) return true
+  if (/:\s*$/.test(t)) return false
+  if (/^[-–*•]/.test(t)) return false
+  const cuvinte = t.split(/\s+/)
+  if (cuvinte.length >= 5) {
+    const areMiscareCunoscuta = cuvinte.some(cuv => CUVINTE_MISCARI.has(cuv.toLowerCase().replace(/[^a-z0-9]/gi, '')))
+    if (!areMiscareCunoscuta) return false
+  }
+  return true
+}
+
 function titleCase(s) {
   return s.split(/\s+/).map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w).join(' ')
 }

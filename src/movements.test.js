@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMiscareLinePasta } from './movements'
+import { parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 
 describe('parseMiscareLinePasta', () => {
   it('linie goala -> goala', () => {
@@ -38,5 +38,34 @@ describe('parseMiscareLinePasta', () => {
   })
   it('miscare de forta care contine "row" ca substring nu e confundata cu cardio-ul Row', () => {
     expect(parseMiscareLinePasta('5 Ring Rows')).toBe('5 Ring Rows')
+  })
+})
+
+describe('looksLikeMovementLine', () => {
+  it('linii de structura care se termina in ":" - semnalate', () => {
+    expect(looksLikeMovementLine('Then:')).toBe(false)
+    expect(looksLikeMovementLine('Amrap 2:')).toBe(false)
+    expect(looksLikeMovementLine('Amrap 19:')).toBe(false)
+    expect(looksLikeMovementLine('EMOM 10:')).toBe(false)
+  })
+  it('note/instructiuni cu prefix "-"/"–" - semnalate (exemplul real gasit)', () => {
+    expect(looksLikeMovementLine('– No Rest Between Amraps.')).toBe(false)
+    expect(looksLikeMovementLine('- Scale as needed')).toBe(false)
+  })
+  it('propozitie lunga fara nicio potrivire in MISCARI - semnalata (exemplul userului)', () => {
+    expect(looksLikeMovementLine('wear a vest if you can')).toBe(false)
+  })
+  it('miscari reale, cunoscute sau nu - nu sunt semnalate (fara falsuri pozitive)', () => {
+    expect(looksLikeMovementLine('10 Thrusters')).toBe(true)
+    expect(looksLikeMovementLine('Max-reps Deadlifts @ 70/102kg')).toBe(true)
+    expect(looksLikeMovementLine('4 Strict Pull-ups')).toBe(true)
+    expect(looksLikeMovementLine('23 Cal Bike')).toBe(true)
+    // Miscare reala dar necunoscuta (nu in MISCARI) - scurta, nu trebuie
+    // respinsa doar pt ca nu e in lista statica.
+    expect(looksLikeMovementLine('Sandbag Bear Hug Carry')).toBe(true)
+  })
+  it('text gol -> considerat ok (nimic de semnalat)', () => {
+    expect(looksLikeMovementLine('')).toBe(true)
+    expect(looksLikeMovementLine('   ')).toBe(true)
   })
 })

@@ -6,7 +6,7 @@
 // custom_hero_wods.format_config).
 import { useState } from 'react'
 import { FORMAT_IDS, getFormat } from './workoutFormats'
-import { miscareSugestii } from './movements'
+import { miscareSugestii, looksLikeMovementLine } from './movements'
 import { MovementSuggestions } from './components'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
@@ -202,13 +202,22 @@ function MovementListField({ label, value, onChange, placeholder }) {
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
-      {items.map((m, i) => (
+      {items.map((m, i) => {
+        // Semnal vizual cand linia pare text de structura ("Then:", "Amrap
+        // 19:") sau o nota libera lipita din greseala ca miscare - vezi
+        // looksLikeMovementLine (acelasi bug real gasit la SortableList).
+        const paraMiscare = looksLikeMovementLine(m)
+        return (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>{i + 1}. {m}</div>
+          <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: paraMiscare ? '#fff' : '#FCEBEB', borderRadius: '8px', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {!paraMiscare && <span title="Nu pare o mișcare - text de structură sau notă?">⚠️</span>}
+            <span>{i + 1}. {m}</span>
+          </div>
           <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))}
             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
         </div>
-      ))}
+        )
+      })}
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input value={draft} onChange={e => { setDraft(e.target.value); setJustSelected(false) }}

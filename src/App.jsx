@@ -17,7 +17,7 @@ import {
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
 import { getT } from './translations'
-import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta } from './movements'
+import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
@@ -3895,12 +3895,21 @@ function SortableList({ items, onReorder, onRemove }) {
 
   return (
     <div ref={containerRef}>
-      {items.map((m, i) => (
+      {items.map((m, i) => {
+        // Semnal vizual cand linia pare text de structura ("Then:", "Amrap
+        // 19:") sau o nota libera ("– No Rest...") lipita din greseala ca
+        // miscare - bug real gasit (07-15): un WOD intreg copiat de pe BTWB,
+        // cu liniile de structura incluse, a ajuns in movements_rx, iar
+        // UI-ul de logare a aratat cate un camp de reps langa fiecare linie
+        // (inclusiv cele care nu erau miscari) - vezi looksLikeMovementLine.
+        const paraMiscare = editIdx === i || looksLikeMovementLine(m)
+        return (
         <div key={i}
           onTouchStart={(e) => startDrag(e, i)}
           onTouchEnd={() => endDrag(i)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : (paraMiscare ? '#f0f0f0' : '#FCEBEB'), borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
+          {!paraMiscare && <span title="Nu pare o mișcare - text de structură sau notă?" style={{ fontSize: '13px', flexShrink: 0 }}>⚠️</span>}
           {editIdx === i ? (
             <div style={{ position: 'relative', flex: 1 }}>
               <input
@@ -3935,7 +3944,8 @@ function SortableList({ items, onReorder, onRemove }) {
           )}
           {onRemove && <button onClick={(e) => { e.stopPropagation(); onRemove(i) }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1, touchAction: 'auto', flexShrink: 0 }}>×</button>}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
