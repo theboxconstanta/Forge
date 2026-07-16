@@ -10,6 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { WORKOUT_ANALYSIS_JSON_SCHEMA } from "./openaiSchema.ts";
 import { SYSTEM_PROMPT } from "./prompt.ts";
 import { toWorkoutAnalysis, validateWorkoutAnalysis } from "./transform.ts";
+import { matchBenchmark } from "./benchmarks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -129,6 +130,19 @@ Deno.serve(async (req) => {
       admin.from("coaches").select("id").eq("id", caller.id).maybeSingle(),
     ]);
     if (!adminRow && !coachRow) return errorResponse(403, "Doar coach/admin poate analiza un antrenament");
+
+    // Scurtatura pt WOD-uri benchmark/hero foarte cunoscute (Fran, Murph
+    // etc.) - structura lor RX e fixa de ani de zile, n-are rost sa mai fie
+    // "ghicita" de AI de fiecare data. Match STRICT (vezi matchBenchmark in
+    // benchmarks.ts) - doar cand textul lipit e practic doar numele WOD-ului,
+    // niciodata cand numele apare doar incidental intr-un text mai lung/
+    // structural diferit (ar insemna sa ignoram o varianta reala scrisa de
+    // coach). Fara acest match, se continua normal cu apelul catre OpenAI.
+    const benchmarkMatch = matchBenchmark(workout);
+    if (benchmarkMatch) {
+      const analysis = toWorkoutAnalysis(benchmarkMatch, workout);
+      return new Response(JSON.stringify(analysis), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
 
     if (!OPENAI_API_KEY) {
       console.error("analyze-workout: lipsește secretul OPENAI_API_KEY");

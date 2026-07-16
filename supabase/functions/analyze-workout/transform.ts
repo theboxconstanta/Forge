@@ -3,6 +3,7 @@
 // ce e aplatizat) - singurul loc care cunoaste ambele forme. Restul
 // Edge Function-ului (si tot ce e in afara ei) vede doar forma canonica.
 import { SCALING_LEVEL_VALUES, SCORE_TYPE_VALUES, WORKOUT_FORMAT_VALUES } from "./openaiSchema.ts";
+import { resolveCanonicalMovement } from "./movementCatalog.ts";
 
 const SCALING_LABELS: Record<string, string> = {
   beginner: "Beginner",
@@ -22,9 +23,15 @@ function toDistanceSpec(value: number | null, unit: string | null) {
 }
 
 function toMovement(m: any) {
+  const name = typeof m?.name === "string" ? m.name : "";
+  // Plasa de siguranta determinista - daca modelul a lasat canonicalName
+  // null, mai incercam o potrivire exacta/alias/plural pe cod (vezi
+  // movementCatalog.ts) inainte sa acceptam null definitiv. Nu suprascrie
+  // niciodata o valoare pe care modelul a completat-o deja.
+  const canonicalName = m?.canonicalName ?? resolveCanonicalMovement(name);
   return {
-    name: typeof m?.name === "string" ? m.name : "",
-    canonicalName: m?.canonicalName ?? null,
+    name,
+    canonicalName,
     reps: m?.reps ?? null,
     weight: toWeightSpec(m?.weightMale ?? null, m?.weightFemale ?? null, m?.weightUnit ?? null),
     distance: toDistanceSpec(m?.distanceValue ?? null, m?.distanceUnit ?? null),
