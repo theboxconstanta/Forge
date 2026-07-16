@@ -240,6 +240,81 @@ export interface WorkoutClassification {
   tags: string[]
 }
 
+// --- Workout Engine V2 - Sections (Faza 3, aditiv) --------------------------
+//
+// Reprezentarea noua, pe sectiuni ordonate (vezi discutia de arhitectura
+// Workout Engine V2 si migratiile Faza 0-2, supabase/migrations/
+// 202607160*). Camp NOU pe WorkoutAnalysis (mai jos) - toate campurile
+// vechi raman neschimbate, niciun consumator existent nu se strica.
+// Forma fiecarui WorkoutSectionDraft e aleasa sa mapeze aproape direct pe
+// coloanele reale din `workout_sections` (Faza 1) - singura transformare
+// ramasa la salvare (Faza 5C+) e rezolvarea `type` (string) intr-un
+// section_type_id real, ceea ce Edge Function-ul nu poate face (nu are
+// context de gym_id/DB aici) si nici n-ar trebui - ramane treaba
+// editorului, cand coach-ul chiar salveaza.
+
+export type SectionLoggingMode = 'none' | 'optional' | 'required'
+
+/** Config specific formatului - acopera parametrii comuni intre formate
+ * (time cap, runde, interval de lucru/pauza, schema Death By) - NU
+ * reproduce 1:1 forma bogata/variabila a lui `format_config` din Forge
+ * (fiecare din cele 20+ formate are propriul shape acolo) - suficient pt
+ * parser (Faza 3), fidelitate completa ramane pt cand editorul chiar
+ * populeaza FormatConfigEditor din raspunsul AI (Faza 5B/5C). */
+export interface SectionFormatConfig {
+  timeCapMinutes: number | null
+  rounds: number | null
+  intervalSeconds: number | null
+  workSeconds: number | null
+  restSeconds: number | null
+  startReps: number | null
+  incrementReps: number | null
+}
+
+export interface SectionBenchmarkMetadata {
+  name: string | null
+  isBenchmark: boolean
+  isHero: boolean
+}
+
+/** Varianta de scalare a UNEI sectiuni (nu a intregului WOD ca inainte) -
+ * o sectiune de Strength poate avea propriile variante RX/Scaled, distincte
+ * de cele ale Metcon-ului din aceeasi zi. */
+export interface SectionScalingVersion {
+  level: string // ex. 'rx' | 'intermediate' | 'beginner' | 'on_ramp' - vezi workout_scaling_levels (Faza 0)
+  movements: DetectedMovement[]
+  timeCapMinutes: number | null
+  notes: string | null
+}
+
+/** O sectiune independenta - unitatea de baza a Workout Engine V2. `type`
+ * ramane text liber (o cheie din workout_section_types, ex. 'warmup',
+ * 'metcon' - sau orice alta eticheta scurta daca textul descrie o sectiune
+ * care nu se potriveste bine cu niciuna cunoscuta) - AI-ul nu cunoaste
+ * UUID-uri generate de DB, doar chei text, exact ca in prompt.ts. `order`
+ * reflecta pozitia din array (indexul), nu un camp separat pe care AI-ul
+ * trebuie sa-l completeze corect - o singura sursa de adevar pt ordine. */
+export interface WorkoutSectionDraft {
+  type: string
+  title: string | null
+  description: string | null
+  order: number
+  format: WorkoutFormat | null
+  formatConfig: SectionFormatConfig
+  movements: DetectedMovement[]
+  equipment: EquipmentItem[]
+  scalingVersions: SectionScalingVersion[]
+  loggingMode: SectionLoggingMode
+  scoreType: ScoreType | null
+  durationMinutes: number | null
+  benchmarkMetadata: SectionBenchmarkMetadata
+  /** Acelasi continut ca WorkoutClassification + CoachingGuidance de mai
+   * sus, dar per-sectiune - majoritatea sectiunilor auxiliare (warmup,
+   * cooldown) au majoritatea campurilor null/goale, bogatia ramane de obicei
+   * pe sectiunea principala (metcon). */
+  metadata: WorkoutClassification & CoachingGuidance
+}
+
 // --- Structura completa ----------------------------------------------------
 
 /** Raspunsul complet al AI Workout Analysis Engine pt UN SINGUR text de
@@ -281,4 +356,12 @@ export interface WorkoutAnalysis {
   /** Textul original, EXACT asa cum a fost lipit de coach - pastrat pt
    * referinta/audit; AI-ul nu-l modifica niciodata. */
   sourceText: string
+
+  /** NOU (Faza 3, Workout Engine V2) - reprezentarea ordonata pe sectiuni,
+   * derivata din ACELASI raspuns AI ca toate campurile de mai sus (nu un
+   * al doilea apel/interpretare separata). ADITIV - campurile vechi de mai
+   * sus raman populate exact ca inainte (derivate determinist din
+   * `sections`, in cod, nu mai cer AI-ului sa "ghiceasca" incadrarea in 4
+   * sloturi fixe), niciun consumator existent al acestui tip nu se strica. */
+  sections: WorkoutSectionDraft[]
 }

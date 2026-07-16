@@ -1,25 +1,21 @@
 // Contract DOAR pt Structured Outputs (Responses API, `text.format`) - NU
 // generat la runtime din workout-analysis-schema.ts (Deno n-are acces la
-// tipurile TS oricum, iar cerinta explicita a fost sa nu incercam generare
-// automata din interfetele TS). NU trebuie sa fie identic structural cu acel
-// fisier: acolo e contractul CANONIC (nested, cu chei numite pt fiecare
-// nivel de scalare), aici e o varianta INTENTIONAT aplatizata, ca sa ramana
-// clar sub limitele de nesting/proprietati ale Structured Outputs strict
-// mode. `transform.ts` reconstruieste forma canonica din raspunsul
-// aplatizat inainte ca index.ts sa raspunda clientului - divergenta asta e
-// invizibila pt frontend.
+// tipurile TS oricum). NU trebuie sa fie identic structural cu acel fisier:
+// acolo e contractul CANONIC, aici e o varianta INTENTIONAT aplatizata, ca
+// sa ramana sub limitele de nesting/proprietati ale Structured Outputs
+// strict mode. `transform.ts` reconstruieste ambele forme (Workout Engine V2
+// sections + shape-ul vechi, pt compatibilitate API - vezi transform.ts)
+// din raspunsul aplatizat de aici.
 //
-// Aplatizari fata de workout-analysis-schema.ts:
-// - WeightSpec/DistanceSpec (obiecte imbricate in DetectedMovement) devin
-//   campuri scalare direct pe miscare (weightMale/weightFemale/weightUnit,
-//   distanceValue/distanceUnit) - elimina 2 niveluri de nesting pe fiecare
-//   miscare, inclusiv cele din interiorul lui scalingVersions.
-// - WorkoutScaling (4 chei numite: beginner/intermediate/rx/masters, fiecare
-//   cu propriul array de miscari) devine un singur array `scalingVersions`
-//   cu discriminator `level` - elimina 4x duplicarea schemei ScaledVersion.
-// - `sourceText` NU e generat de model (ar insemna sa retransmita tot textul
-//   original prin structured output - cost de tokeni si risc de
-//   parafrazare); index.ts il ataseaza el insusi din inputul original.
+// Faza 3 (Workout Engine V2) - schema asta nu mai cere modelului sa
+// incadreze antrenamentul in 4 sloturi fixe (warmup/skill/skill2/cooldown,
+// forma veche) - modelul produce direct un array ORDONAT de sectiuni,
+// exact cum apar in text, fiecare cu propriul tip/format/scoring. Slot-
+// fitting-ul de dinainte (SECTION_GUIDANCE in prompt.ts) a fost eliminat
+// din prompt - era exact genul de rationament fuzzy pe care un LLM nu-l
+// aplica 100% constant, inlocuit acum cu o mapare DETERMINISTA in cod
+// (transform.ts) pt raspunsul API vechi, pastrat neschimbat pt
+// compatibilitate.
 //
 // Valorile de enum de mai jos sunt o copie literala a union-urilor din
 // workout-analysis-schema.ts (WorkoutFormat/ScoreType/DifficultyLevel/
@@ -52,7 +48,17 @@ export const MUSCLE_GROUP_VALUES = [
   'Biceps', 'Triceps', 'Forearms', 'Core', 'Full Body',
 ] as const
 
-export const SCALING_LEVEL_VALUES = ['beginner', 'intermediate', 'rx', 'masters'] as const
+// Tipuri de sectiune "cunoscute" - copie din platform defaults ale
+// workout_section_types (Faza 0, supabase/migrations/20260715180000_*).
+// NU e o constrangere enum in schema (vezi SECTION_DEF mai jos, 'type' e
+// text liber) - o sala poate avea tipuri custom, iar modelul nu are acces
+// la DB ca sa le cunoasca pe toate. Lista e doar pt prompt.ts (ghidare).
+export const SECTION_TYPE_HINTS = [
+  'warmup', 'strength', 'skill', 'weightlifting', 'gymnastics', 'metcon',
+  'accessory', 'conditioning', 'mobility', 'recovery', 'cooldown', 'coach_notes',
+] as const
+
+export const LOGGING_MODE_VALUES = ['none', 'optional', 'required'] as const
 
 const MOVEMENT_DEF = {
   type: 'object',
@@ -76,15 +82,22 @@ const MOVEMENT_DEF = {
   ],
 }
 
-const SECTION_DEF = {
+const FORMAT_CONFIG_DEF = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    title: { type: ['string', 'null'] },
-    content: { type: 'array', items: { type: 'string' } },
-    durationMinutes: { type: ['number', 'null'] },
+    timeCapMinutes: { type: ['number', 'null'] },
+    rounds: { type: ['number', 'null'] },
+    intervalSeconds: { type: ['number', 'null'] },
+    workSeconds: { type: ['number', 'null'] },
+    restSeconds: { type: ['number', 'null'] },
+    startReps: { type: ['number', 'null'] },
+    incrementReps: { type: ['number', 'null'] },
   },
-  required: ['title', 'content', 'durationMinutes'],
+  required: [
+    'timeCapMinutes', 'rounds', 'intervalSeconds', 'workSeconds',
+    'restSeconds', 'startReps', 'incrementReps',
+  ],
 }
 
 const EQUIPMENT_ITEM_DEF = {
@@ -97,11 +110,27 @@ const EQUIPMENT_ITEM_DEF = {
   required: ['name', 'quantityHint'],
 }
 
-const SCALED_VERSION_DEF = {
+const BENCHMARK_METADATA_DEF = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    level: { type: 'string', enum: [...SCALING_LEVEL_VALUES] },
+    name: { type: ['string', 'null'] },
+    isBenchmark: { type: 'boolean' },
+    isHero: { type: 'boolean' },
+  },
+  required: ['name', 'isBenchmark', 'isHero'],
+}
+
+// Nivelul de scalare ramane text liber (NU enum fix) - Faza 0 face din
+// scaling levels un lookup table extensibil per-sala (rx/intermediate/
+// beginner/on_ramp implicite + orice adauga sala, ex. "masters"/"teens") -
+// o constrangere enum aici ar contrazice exact decizia de arhitectura care
+// a introdus lookup table-ul in loc de un set fix.
+const SECTION_SCALING_VERSION_DEF = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    level: { type: 'string' },
     movements: { type: 'array', items: { $ref: '#/$defs/movement' } },
     timeCapMinutes: { type: ['number', 'null'] },
     notes: { type: ['string', 'null'] },
@@ -109,7 +138,12 @@ const SCALED_VERSION_DEF = {
   required: ['level', 'movements', 'timeCapMinutes', 'notes'],
 }
 
-const CLASSIFICATION_DEF = {
+// Metadata unei sectiuni - acelasi continut ca vechile classification +
+// guidance (Faza 2B), acum atasat per-sectiune in loc de o singura data pt
+// tot WOD-ul. Majoritatea sectiunilor auxiliare vor avea majoritatea
+// campurilor null/goale - normal, nu orice sectiune are un "stimulus" de
+// coaching distinct.
+const SECTION_METADATA_DEF = {
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -121,17 +155,6 @@ const CLASSIFICATION_DEF = {
     priorityMuscles: { type: 'array', items: { type: 'string', enum: [...MUSCLE_GROUP_VALUES] } },
     mobilityFocus: { type: 'array', items: { type: 'string' } },
     tags: { type: 'array', items: { type: 'string' } },
-  },
-  required: [
-    'difficulty', 'primaryEnergySystem', 'secondaryEnergySystem', 'dominantMovementPatterns',
-    'muscleGroups', 'priorityMuscles', 'mobilityFocus', 'tags',
-  ],
-}
-
-const GUIDANCE_DEF = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
     stimulus: { type: ['string', 'null'] },
     coachNotes: { type: 'array', items: { type: 'string' } },
     commonFaults: { type: 'array', items: { type: 'string' } },
@@ -139,44 +162,59 @@ const GUIDANCE_DEF = {
     tips: { type: 'array', items: { type: 'string' } },
     safetyNotes: { type: 'array', items: { type: 'string' } },
   },
-  required: ['stimulus', 'coachNotes', 'commonFaults', 'coachingCues', 'tips', 'safetyNotes'],
+  required: [
+    'difficulty', 'primaryEnergySystem', 'secondaryEnergySystem', 'dominantMovementPatterns',
+    'muscleGroups', 'priorityMuscles', 'mobilityFocus', 'tags', 'stimulus', 'coachNotes',
+    'commonFaults', 'coachingCues', 'tips', 'safetyNotes',
+  ],
+}
+
+const SECTION_DEF = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    // Text liber (nu enum) - vezi SECTION_TYPE_HINTS mai sus; o cheie
+    // cunoscuta (warmup/strength/skill/...) sau o eticheta scurta custom
+    // daca textul descrie o sectiune care nu se potriveste bine cu niciuna.
+    type: { type: 'string' },
+    title: { type: ['string', 'null'] },
+    description: { type: ['string', 'null'] },
+    format: { type: ['string', 'null'], enum: [...WORKOUT_FORMAT_VALUES, null] },
+    formatConfig: { $ref: '#/$defs/formatConfig' },
+    movements: { type: 'array', items: { $ref: '#/$defs/movement' } },
+    equipment: { type: 'array', items: { $ref: '#/$defs/equipmentItem' } },
+    scalingVersions: { type: 'array', items: { $ref: '#/$defs/sectionScalingVersion' } },
+    loggingMode: { type: 'string', enum: [...LOGGING_MODE_VALUES] },
+    scoreType: { type: ['string', 'null'], enum: [...SCORE_TYPE_VALUES, null] },
+    durationMinutes: { type: ['number', 'null'] },
+    benchmarkMetadata: { $ref: '#/$defs/benchmarkMetadata' },
+    metadata: { $ref: '#/$defs/sectionMetadata' },
+  },
+  required: [
+    'type', 'title', 'description', 'format', 'formatConfig', 'movements', 'equipment',
+    'scalingVersions', 'loggingMode', 'scoreType', 'durationMinutes',
+    'benchmarkMetadata', 'metadata',
+  ],
 }
 
 /** Schema pt `text.format.schema` (Responses API, strict Structured
- * Outputs). Forma FLATTENED - vezi comentariul de la inceputul fisierului -
- * NU forma canonica din workout-analysis-schema.ts. */
+ * Outputs). Forma FLATTENED, pe sectiuni ordonate - vezi comentariul de la
+ * inceputul fisierului. */
 export const WORKOUT_ANALYSIS_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   $defs: {
     movement: MOVEMENT_DEF,
-    section: SECTION_DEF,
     equipmentItem: EQUIPMENT_ITEM_DEF,
-    scaledVersion: SCALED_VERSION_DEF,
-    classification: CLASSIFICATION_DEF,
-    guidance: GUIDANCE_DEF,
+    formatConfig: FORMAT_CONFIG_DEF,
+    benchmarkMetadata: BENCHMARK_METADATA_DEF,
+    sectionScalingVersion: SECTION_SCALING_VERSION_DEF,
+    sectionMetadata: SECTION_METADATA_DEF,
+    section: SECTION_DEF,
   },
   properties: {
     title: { type: ['string', 'null'] },
-    format: { type: 'string', enum: [...WORKOUT_FORMAT_VALUES] },
-    workoutType: { type: ['string', 'null'] },
-    timeCapMinutes: { type: ['number', 'null'] },
-    scoreType: { type: 'string', enum: [...SCORE_TYPE_VALUES] },
-    estimatedDurationMinutes: { type: ['number', 'null'] },
-    warmup: { anyOf: [{ $ref: '#/$defs/section' }, { type: 'null' }] },
-    skill: { anyOf: [{ $ref: '#/$defs/section' }, { type: 'null' }] },
-    skill2: { anyOf: [{ $ref: '#/$defs/section' }, { type: 'null' }] },
-    workoutDescription: { type: 'array', items: { type: 'string' } },
-    cooldown: { anyOf: [{ $ref: '#/$defs/section' }, { type: 'null' }] },
-    movements: { type: 'array', items: { $ref: '#/$defs/movement' } },
-    equipment: { type: 'array', items: { $ref: '#/$defs/equipmentItem' } },
-    scalingVersions: { type: 'array', items: { $ref: '#/$defs/scaledVersion' } },
-    classification: { $ref: '#/$defs/classification' },
-    guidance: { $ref: '#/$defs/guidance' },
+    sections: { type: 'array', items: { $ref: '#/$defs/section' } },
   },
-  required: [
-    'title', 'format', 'workoutType', 'timeCapMinutes', 'scoreType', 'estimatedDurationMinutes',
-    'warmup', 'skill', 'skill2', 'workoutDescription', 'cooldown', 'movements', 'equipment',
-    'scalingVersions', 'classification', 'guidance',
-  ],
+  required: ['title', 'sections'],
 }
