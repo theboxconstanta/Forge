@@ -40,6 +40,7 @@ const v2SectionRowsFixture = [
   {
     id: 'fa5378a2-0928-464a-996e-7d62d6c14aeb',
     type_key: 'metcon',
+    slot_key: 'metcon',
     title: null,
     description: null,
     order_index: 0,
@@ -150,6 +151,31 @@ describe('mapLegacyWodToWorkout', () => {
 
   it('null pt un wod null (nu arunca)', () => {
     expect(mapLegacyWodToWorkout(null)).toBeNull()
+  })
+
+  it('Faza 5B: slotKey e stabil pe ROL, nu pe pozitie - metcon primeste mereu slotKey "metcon"', () => {
+    const w = mapLegacyWodToWorkout(wodFixture)
+    expect(w.sections[0].slotKey).toBe('metcon')
+  })
+
+  it('Faza 5B: skill si skill2 primesc slotKey distincte ("skill"/"skill2"), desi ambele au type "skill"', () => {
+    const withBoth = {
+      ...wodFixture,
+      skill: ['Practice handstand holds'], skill_name: 'Skill', skill_type: 'Not For Time',
+      skill2: ['Practice pistol squats'], skill2_name: 'Skill 2', skill2_type: 'Not For Time',
+    }
+    const w = mapLegacyWodToWorkout(withBoth)
+    const skillSection = w.sections.find((s) => s.slotKey === 'skill')
+    const skill2Section = w.sections.find((s) => s.slotKey === 'skill2')
+    expect(skillSection.type).toBe('skill')
+    expect(skill2Section.type).toBe('skill')
+    expect(skillSection.movements[0].name).toBe('Practice handstand holds')
+    expect(skill2Section.movements[0].name).toBe('Practice pistol squats')
+  })
+
+  it('Faza 5B: id-ul sintetic depinde de slotKey, nu de pozitie - stabil chiar daca ordinea s-ar schimba', () => {
+    const w = mapLegacyWodToWorkout(wodFixture)
+    expect(w.sections[0].id).toBe(`legacy:${wodFixture.id}:metcon`)
   })
 })
 

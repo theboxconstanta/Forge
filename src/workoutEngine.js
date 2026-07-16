@@ -61,11 +61,13 @@ function legacyScalingVersion(level, movements, notes) {
 /** O sectiune sintetizata dintr-o coloana array a lui `wods` (warmup/skill/
  * skill2) - id STABIL dar sintetic (nu un UUID real, `wods` n-are randuri
  * de sectiune separate) - semnaleaza clar "randul asta nu exista ca atare
- * in DB, e derivat". */
-function legacySectionFromArray(wodId, type, order, movementsArr, title, format, formatConfig) {
+ * in DB, e derivat". `slotKey` (Faza 5B) e cheia naturala pe ROL semantic
+ * (nu pe pozitie) - id-ul sintetic o foloseste direct, fara `order`, ca sa
+ * ramana stabil chiar daca pozitia sectiunii se schimba. */
+function legacySectionFromArray(wodId, type, slotKey, order, movementsArr, title, format, formatConfig) {
   return {
-    id: `legacy:${wodId}:${type}:${order}`,
-    type, title: title ?? null, description: null, order,
+    id: `legacy:${wodId}:${slotKey}`,
+    type, slotKey, title: title ?? null, description: null, order,
     format: format ?? null, formatConfig: formatConfig ?? {},
     movements: (movementsArr || []).map(legacyMovementText),
     scalingVersions: [], loggingMode: 'none', scoreType: null,
@@ -92,8 +94,8 @@ function legacyMetconSection(wod, order) {
     scalingVersions.push(legacyScalingVersion('on_ramp', wod.movements_onramp, wod.notes_onramp))
   }
   return {
-    id: `legacy:${wod.id}:metcon:${order}`,
-    type: 'metcon', title: null, description: wod.notes_rx ?? null, order,
+    id: `legacy:${wod.id}:metcon`,
+    type: 'metcon', slotKey: 'metcon', title: null, description: wod.notes_rx ?? null, order,
     format: wod.type ?? null, formatConfig: wod.format_config ?? {},
     movements: (wod.movements_rx || []).map(legacyMovementText),
     scalingVersions,
@@ -120,13 +122,13 @@ export function mapLegacyWodToWorkout(wod) {
   const sections = []
   let order = 0
   if (wod.warmup && wod.warmup.length) {
-    sections.push(legacySectionFromArray(wod.id, 'warmup', order++, wod.warmup))
+    sections.push(legacySectionFromArray(wod.id, 'warmup', 'warmup', order++, wod.warmup))
   }
   if (wod.skill && wod.skill.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config))
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config))
   }
   if (wod.skill2 && wod.skill2.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config))
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config))
   }
   sections.push(legacyMetconSection(wod, order++))
 
@@ -142,6 +144,7 @@ export function mapV2SectionRow(row) {
   return {
     id: row.id,
     type: row.type_key ?? row.section_type_id,
+    slotKey: row.slot_key ?? null,
     title: row.title ?? null,
     description: row.description ?? null,
     order: row.order_index,
@@ -217,8 +220,8 @@ export async function loadWorkout(gymId, date) {
 }
 
 // ============================================================
-// Faza 5A - scriere (dual-write). Editorul continua sa scrie in `wods` ca
-// sursa de adevar - functiile de mai jos tin Workout Engine V2
+// Faza 5A/5B - scriere (dual-write). Editorul continua sa scrie in `wods`
+// ca sursa de adevar - functiile de mai jos tin Workout Engine V2
 // sincronizat, ca efect secundar "best effort": o eroare aici NU trebuie sa
 // strice salvarea reala (deja reusita in `wods` pana cand aceste functii
 // sunt apelate) - de-asta isi prind singure erorile (console.error, vizibil
@@ -227,72 +230,53 @@ export async function loadWorkout(gymId, date) {
 // mapLegacyWodToWorkout (Faza 4) - aceeasi mapare, atat pt citire cat si
 // pt calculul a "ce ar trebui sa contina Workout Engine V2" la scriere -
 // nicio logica duplicata intre cele doua directii.
+//
+// Faza 5B: sincronizarea propriu-zisa (upsert workout + upsert/sterge
+// sectiuni) s-a mutat intr-un singur RPC atomic (sync_workout_engine_v2,
+// vezi migratia 20260716110000) - JS-ul de aici calculeaza DOAR maparea
+// (mapLegacyWodToWorkout, neschimbata) si trimite sectiunile deja mapate
+// intr-un singur apel. Niciun rezolvare de section_type_id in JS (RPC-ul o
+// face server-side) si niciun delete separat de sectiuni - ON CONFLICT pe
+// (workout_id, slot_key) pastreaza id-ul existent al fiecarei sectiuni.
 // ============================================================
 
-// Doar tipurile implicite de platforma (gym_id null) - editorul din Faza 5A
-// produce mereu doar warmup/skill/metcon (structura fixa de azi), niciodata
-// tipuri custom de sala (asta ramane pt editarea flexibila de sectiuni,
-// faza ulterioara) - cache la nivel de modul, sigur cross-gym fiindca
-// tipurile de platforma sunt identice pt toate salile.
-let sectionTypeIdCache = null
-async function resolveSectionTypeIds() {
-  if (sectionTypeIdCache) return sectionTypeIdCache
-  const { data, error } = await supabase.from('workout_section_types').select('id, key').is('gym_id', null)
-  if (error) throw error
-  sectionTypeIdCache = Object.fromEntries((data || []).map((t) => [t.key, t.id]))
-  return sectionTypeIdCache
-}
-
 /** Sincronizeaza Workout Engine V2 cu un rand `wods` deja salvat cu succes
- * (are `id`). Determinist: upsert pe (gym_id, date) pt `workouts` - acelasi
- * tipar de conflict ca saveWod pe `wods` - deci o editare repetata a
- * ACELUIASI WOD actualizeaza acelasi rand Workout, nu creeaza duplicate.
- * Sectiunile sunt sterse si reinserate integral la fiecare sincronizare
- * (nu update partial) - simplu si determinist, cu costul ca id-urile
- * sectiunilor NU raman stabile intre doua salvari (vezi raportul Fazei 5A,
- * "datorie tehnica" - conteaza doar cand ceva chiar refera section.id
- * persistent, ex. logging-ul din Faza 6, inca neconstruit).
- * Best effort - nu arunca niciodata, intoarce true/false. */
+ * (are `id`), printr-un singur apel RPC atomic. Determinist: upsert pe
+ * (gym_id, date) pt `workouts` (acelasi tipar de conflict ca saveWod pe
+ * `wods`) + upsert pe (workout_id, slot_key) pt sectiuni - o editare
+ * repetata a ACELUIASI WOD actualizeaza aceleasi randuri (id-uri stabile),
+ * nu creeaza duplicate si nu le sterge/reinsereaza. Best effort - nu
+ * arunca niciodata, intoarce true/false. */
 export async function syncWorkoutEngineV2FromLegacyWod(wod) {
   try {
     const domainWorkout = mapLegacyWodToWorkout(wod)
     if (!domainWorkout) return false
 
-    const { data: workoutRow, error: workoutErr } = await supabase
-      .from('workouts')
-      .upsert(
-        { gym_id: wod.gym_id, date: wod.date, title: wod.name ?? null, legacy_wod_id: wod.id },
-        { onConflict: 'gym_id,date' }
-      )
-      .select()
-      .single()
-    if (workoutErr) throw workoutErr
-
-    const { error: deleteErr } = await supabase.from('workout_sections').delete().eq('workout_id', workoutRow.id)
-    if (deleteErr) throw deleteErr
-
-    const typeIds = await resolveSectionTypeIds()
-    const sectionRows = domainWorkout.sections.map((s) => ({
-      workout_id: workoutRow.id,
-      gym_id: wod.gym_id,
-      section_type_id: typeIds[s.type] || typeIds.metcon,
-      order_index: s.order,
+    const sections = domainWorkout.sections.map((s) => ({
+      type: s.type,
+      slotKey: s.slotKey,
+      order: s.order,
       title: s.title,
       description: s.description,
       format: s.format,
-      format_config: s.formatConfig,
+      formatConfig: s.formatConfig,
       movements: s.movements,
-      scaling_versions: s.scalingVersions,
-      logging_mode: s.loggingMode,
-      score_type: s.scoreType,
-      duration_minutes: s.duration,
-      benchmark_metadata: s.benchmarkMetadata,
+      scalingVersions: s.scalingVersions,
+      loggingMode: s.loggingMode,
+      scoreType: s.scoreType,
+      duration: s.duration,
+      benchmarkMetadata: s.benchmarkMetadata,
       metadata: s.metadata,
     }))
-    if (sectionRows.length) {
-      const { error: insertErr } = await supabase.from('workout_sections').insert(sectionRows)
-      if (insertErr) throw insertErr
-    }
+
+    const { error } = await supabase.rpc('sync_workout_engine_v2', {
+      p_gym_id: wod.gym_id,
+      p_date: wod.date,
+      p_title: wod.name ?? null,
+      p_legacy_wod_id: wod.id,
+      p_sections: sections,
+    })
+    if (error) throw error
     return true
   } catch (err) {
     console.error('Workout Engine V2 sync failed (wods rămâne sursa de adevăr, salvarea reală nu e afectată):', err)
