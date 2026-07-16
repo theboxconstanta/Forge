@@ -30,6 +30,10 @@ import {
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   effectiveScoreMode, composeFinishedRoundsText, composeStageResult, totalRepsChained,
 } from './workoutFormats'
+import {
+  extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
+  sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy,
+} from './wodSections'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -788,6 +792,220 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
           style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>+</button>
       </div>
       <MovementSuggestions suggestions={sugestii} onSelect={alege} rightOffset="46px" />
+    </div>
+  )
+}
+
+// Faza 6 - corpul sectiunii PRIMARE (format+durata+nume+cele 4 variante de
+// scalare) - identic cu vechiul card "Workout of the Day", doar ca citeste/
+// scrie din `section` in loc de starea individuala de dinainte de Faza 6.
+function PrimarySectionBody({ section, onChange, updateVariant, t }) {
+  return (
+    <div>
+      <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
+        config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })}
+        excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
+      {AUTO_DURATION_FORMAT_IDS.includes(section.format) ? (
+        <div style={{ marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
+            {estimateTotalDurationSec(section.format, section.formatConfig) != null
+              ? <>{secToTime(estimateTotalDurationSec(section.format, section.formatConfig))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
+              : t.adminWodDurationPending}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ flex: 1 }}>
+              <input type="number" min="0" value={section.durationMin} onChange={e => onChange({ durationMin: e.target.value })} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <input type="number" min="0" max="59" value={section.durationSec} onChange={e => onChange({ durationSec: e.target.value })} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+            </div>
+          </div>
+        </>
+      )}
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+      <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+      {VARIANT_LEVELS.map(v => {
+        const sv = section.variants[v.key]
+        return (
+          <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
+            {['scored', 'mixed'].includes(getFormat(section.format)?.family) ? (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input value={sv.weight.male} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, male: e.target.value } })}
+                  placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+                <input value={sv.weight.female} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, female: e.target.value } })}
+                  placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+              </div>
+            ) : (
+              <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
+            )}
+            <SortableList
+              items={sv.movements}
+              onReorder={(items) => updateVariant(v.key, { movements: items })}
+              onRemove={(i) => updateVariant(v.key, (cv) => ({ movements: cv.movements.filter((_, j) => j !== i) }))}
+            />
+            <MiscareQuickAdd value={sv.quickAdd} onChange={(val) => updateVariant(v.key, { quickAdd: val })}
+              onAdd={(text) => {
+                // Forma functie (nu obiect simplu) - vezi comentariul din
+                // updateVariant (SectionCard) - MiscareQuickAdd.add() cheama
+                // onAdd si apoi onChange('') (golirea inputului) sincron,
+                // in aceeasi tranzactie; fara forma functie aici, al doilea
+                // apel ar suprascrie miscarea abia adaugata (bug real gasit
+                // in aceeasi sesiune).
+                updateVariant(v.key, (cv) => {
+                  const gasita = extractGreutateDinMiscare(text)
+                  return {
+                    movements: [...cv.movements, text],
+                    weight: (cv.weight.male || cv.weight.female) || !gasita ? cv.weight : gasita,
+                  }
+                })
+              }}
+              placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
+            <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
+              placeholder={t.adminWodVariantPastePlaceholder} rows={3}
+              style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            {sv.paste.trim() && (
+              <button onClick={() => {
+                const linii = sv.paste.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
+                const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
+                updateVariant(v.key, {
+                  movements: [...sv.movements, ...linii], paste: '',
+                  weight: (sv.weight.male || sv.weight.female) || !gasita ? sv.weight : gasita,
+                })
+              }}
+                style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+                {t.adminWodVariantPasteButton}
+              </button>
+            )}
+            <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+            <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
+              placeholder={t.adminWodNotesPlaceholder}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Faza 6 - card generic pt o Workout Section: header (tip/titlu/reordonare/
+// vizibilitate/expand) + corp specific tipului. Reutilizeaza controalele
+// existente (FormatConfigEditor/CautareMiscare/MiscareQuickAdd/SortableList)
+// in loc sa le reimplementeze - vezi discutia de arhitectura din aceeasi
+// sesiune (Faza 6).
+function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, onMove, onMakePrimary, onSave, savingWod, t }) {
+  // `patch` poate fi un obiect simplu SAU o functie `(variantaCurenta) =>
+  // patch` - vezi comentariul din updateSection (App()) pentru motiv (doi
+  // handlere onChange declansati sincron, al doilea trebuie sa vada
+  // rezultatul primului, nu starea dinainte).
+  const updateVariant = (key, patch) => onChange((s) => {
+    const current = s.variants[key]
+    const resolved = typeof patch === 'function' ? patch(current) : patch
+    return { variants: { ...s.variants, [key]: { ...current, ...resolved } } }
+  })
+  const typeLabel = sectionTypes.find(st => st.key === section.typeKey)?.label || section.typeKey
+  const isPlainText = section.typeKey === 'warmup' && !section.isPrimary && section.format == null
+  const reorderBtn = { padding: '4px 7px', borderRadius: '6px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', cursor: 'pointer', color: '#555' }
+
+  return (
+    <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div onClick={() => onChange({ open: !section.open })} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
+            {section.title.trim() || typeLabel}
+            {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '700' }}>★ {t.wodSectionPrimaryBadge}</span>}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button onClick={() => onMove(-1)} disabled={index === 0} style={{ ...reorderBtn, opacity: index === 0 ? 0.4 : 1 }}>↑</button>
+          <button onClick={() => onMove(1)} disabled={index === total - 1} style={{ ...reorderBtn, opacity: index === total - 1 ? 0.4 : 1 }}>↓</button>
+          {!section.isPrimary && <MiniSwitch checked={section.visible} onChange={(v) => onChange({ visible: v })} />}
+          <span onClick={() => onChange({ open: !section.open })} style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>{section.open ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      {section.open && (
+        <div style={{ marginTop: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <select value={section.typeKey}
+              onChange={e => onChange({ typeKey: e.target.value, format: e.target.value === 'warmup' && !section.isPrimary ? null : (section.format || 'Weightlifting') })}
+              style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff' }}>
+              {sectionTypes.map(st => <option key={st.key} value={st.key}>{st.label}</option>)}
+            </select>
+            <input value={section.title} onChange={e => onChange({ title: e.target.value })} placeholder={t.wodSectionTitlePlaceholder}
+              style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff' }} />
+          </div>
+          {!section.isPrimary && (
+            <button onClick={onMakePrimary}
+              style={{ marginBottom: '10px', fontSize: '11px', padding: '5px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', color: '#555', cursor: 'pointer' }}>
+              {t.wodSectionMakePrimary}
+            </button>
+          )}
+
+          {isPlainText ? (
+            <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
+              placeholder={t.adminWodWarmupPlaceholder} rows={3}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+          ) : section.isPrimary ? (
+            <PrimarySectionBody section={section} onChange={onChange} updateVariant={updateVariant} t={t} />
+          ) : (
+            <>
+              <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
+                config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })} t={t} />
+              {section.format === 'Weightlifting' ? (
+                <CautareMiscare key={section.id} preFill={section.movementName} onAleage={m => onChange({ movementName: m })} t={t} label={t.adminWodSkillMovementLabel} />
+              ) : (
+                <input value={section.movementName} onChange={e => onChange({ movementName: e.target.value })} placeholder={t.adminWodSkillNamePlaceholder}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+              )}
+              <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
+                placeholder={t.adminWodSkillPlaceholder} rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <button onClick={onSave} disabled={savingWod}
+              style={{ flex: 1, padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
+              {t.adminWodSaveSectionButton}
+            </button>
+            <button onClick={onRemove}
+              style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>
+              {t.wodSectionRemove}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Faza 6 - controlul de adaugat o sectiune noua (oricate, orice tip din
+// catalog) la finalul listei. Componenta separata (nu inline in JSX) fiindca
+// are nevoie de propriul state pt tipul selectat inainte de a apasa "Adauga".
+function AddSectionControl({ sectionTypes, onAdd, t }) {
+  // Fallback 'skill' inainte ca sectionTypes sa se incarce (fetch async la
+  // mount) - coincide oricum cu un key real din catalog, deci selectul
+  // ramane valid din primul render, fara sincronizare suplimentara.
+  const [typeKey, setTypeKey] = useState('skill')
+  return (
+    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+      <select value={typeKey} onChange={e => setTypeKey(e.target.value)}
+        style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa' }}>
+        {sectionTypes.map(st => <option key={st.key} value={st.key}>{st.label}</option>)}
+      </select>
+      <button onClick={() => onAdd(typeKey)}
+        style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid #e0e0e0', background: '#fff', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        {t.wodSectionAddButton}
+      </button>
     </div>
   )
 }
@@ -1837,10 +2055,6 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [laInfinit, setLaInfinit] = useState(false)
   const [savingClasa, setSavingClasa] = useState(false)
 
-  const [tipWod, setTipWod] = useState('AMRAP')
-  const [durataWodMin, setDurataWodMin] = useState('20')
-  const [durataWodSec, setDurataWodSec] = useState('0')
-  const [formatConfigWod, setFormatConfigWod] = useState({})
   const [dataWod, setDataWod] = useState(() => todayLocalStr())
   // Text lipit in caseta "Paste your workout" (varf de pagina, editor WOD) -
   // vezi analyzeWorkout() mai jos (Pasul 2B - apeleaza Edge Function-ul
@@ -1848,76 +2062,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   // existent din formular).
   const [aiParseText, setAiParseText] = useState('')
   const [aiAnalyzing, setAiAnalyzing] = useState(false)
-  // La EMOM/Tabata/Intervals durata totala e deja 100% determinata de config
-  // (runde x interval) - o durata manuala separata ar putea sa nu se
-  // potriveasca, deci o calculam si o sincronizam automat (vezi si JSX-ul
-  // care ascunde inputul manual pentru aceste formate).
-  useEffect(() => {
-    if (!AUTO_DURATION_FORMAT_IDS.includes(tipWod)) return
-    const totalSec = estimateTotalDurationSec(tipWod, formatConfigWod)
-    if (totalSec == null) return
-    setDurataWodMin(String(Math.floor(totalSec / 60)))
-    setDurataWodSec(String(totalSec % 60))
-  }, [tipWod, formatConfigWod])
-  const [numeWod, setNumeWod] = useState('')
-  // Notita coach-ului e independenta per varianta (nu comuna la tot WOD-ul) -
-  // un "wear a vest" poate fi relevant doar la RX, nu si la OnRamp.
-  const golVarianteNote = { onramp: '', beginner: '', intermediate: '', rx: '' }
-  const [wodVarianteNote, setWodVarianteNote] = useState(golVarianteNote)
   const [savingWod, setSavingWod] = useState(false)
-  // Miscarile fiecarei variante sunt o lista (nu text liber) - editabile prin
-  // MiscareQuickAdd (autocomplete + reps/kg sau metri/cal la cardio,
-  // reordonare), la fel ca la Logare libera. Ramane si un "paste rapid" -
-  // multi coach au deja WOD-ul scris in alta parte si vor sa-l lipeasca
-  // dintr-o data, nu sa reintroduca miscare cu miscare.
-  const [wodVariante, setWodVariante] = useState({ onramp: [], beginner: [], intermediate: [], rx: [] })
-  const [wodVarianteQuickAdd, setWodVarianteQuickAdd] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
-  const [wodVariantePaste, setWodVariantePaste] = useState({ onramp: '', beginner: '', intermediate: '', rx: '' })
-  // Greutate prescrisa per varianta, separata per gen (RX barbati 61kg vs RX
-  // femei 43kg - o singura valoare combinata nu se poate compara cu greutatea
-  // individuala logata de un membru) - comparata cu wod_logs.weight_logged la
-  // salvare, ca sa detectam automat "Not RXd" (vezi isNotRxd in
-  // workoutFormats.js).
-  const golVarianteWeight = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, { male: '', female: '' }]))
-  const [wodVarianteWeight, setWodVarianteWeight] = useState(golVarianteWeight)
-  // Payload-ul de scris (buildWodPayload si butonul de salvare partiala din
-  // sectiunea variantelor) si populare de citit (syncWodFormFromRow) pt cele
-  // 8 coloane de greutate - un singur loc care itereaza VARIANTE_WEIGHT_BASE,
-  // in loc sa fie scrise de mana in 3 locuri diferite (risc de a uita o
-  // varianta/gen la o modificare viitoare).
-  const buildVarianteWeightPayload = () => Object.fromEntries(
-    VARIANTE_WEIGHT_BASE.flatMap(v => [
-      [`${v.key}_weight_male`, wodVarianteWeight[v.key].male.trim() || null],
-      [`${v.key}_weight_female`, wodVarianteWeight[v.key].female.trim() || null],
-    ])
-  )
-  const parseVarianteWeightFromRow = (w) => Object.fromEntries(
-    VARIANTE_WEIGHT_BASE.map(v => [v.key, { male: w[`${v.key}_weight_male`] || '', female: w[`${v.key}_weight_female`] || '' }])
-  )
-  const [warmupWod, setWarmupWod] = useState('')
-  // Switch admin per sectiune: fiecare din WARM-UP/SKILL/SKILL 2 se poate
-  // ascunde independent de pe Acasa la membri (nu mai e un singur switch
-  // combinat - coach-ul vrea sa aleaga exact ce arata in ziua respectiva).
-  const [warmupVisibleWod, setWarmupVisibleWod] = useState(true)
-  const [skillWod, setSkillWod] = useState('')
-  const [skillNameWod, setSkillNameWod] = useState('')
-  const [skillTypeWod, setSkillTypeWod] = useState('Weightlifting')
-  const [skillFormatConfigWod, setSkillFormatConfigWod] = useState({})
-  const [skillVisibleWod, setSkillVisibleWod] = useState(true)
-  // SKILL 2: oglinda completa a SKILL, independent (format/miscari proprii).
-  const [skill2Wod, setSkill2Wod] = useState('')
-  const [skillName2Wod, setSkillName2Wod] = useState('')
-  const [skillType2Wod, setSkillType2Wod] = useState('Weightlifting')
-  const [skillFormatConfig2Wod, setSkillFormatConfig2Wod] = useState({})
-  const [skill2VisibleWod, setSkill2VisibleWod] = useState(true)
-  // WARM-UP/SKILL/SKILL 2/formularul principal sunt dropdown-uri in Admin -
-  // implicit inchise, arata doar titlul, ca formularul sa nu fie tot pe un
-  // singur scroll lung.
-  const [adminWarmupOpen, setAdminWarmupOpen] = useState(false)
-  const [adminSkillOpen, setAdminSkillOpen] = useState(false)
-  const [adminSkill2Open, setAdminSkill2Open] = useState(false)
-  const [adminWodFormOpen, setAdminWodFormOpen] = useState(false)
   const [editWodId, setEditWodId] = useState(null)
+  // Faza 6 (Native Workout Section Editor) - vezi createSection/
+  // sectionsFromLegacyWod/legacyPayloadFromSections/validateSectionsForLegacy
+  // (scope de modul, definite langa SectionCard). `wodSections` inlocuieste
+  // toate campurile individuale WARM-UP/SKILL/SKILL 2/Workout of the Day de
+  // dinainte - editorul gestioneaza acum o LISTA ordonata de sectiuni, nu 4
+  // sloturi fixe (fiecare sectiune isi tine si starea de expand/collapse in
+  // campul propriu `open`, nu mai e un state separat per slot). `sectionTypes`
+  // = catalogul de tipuri (Faza 0, workout_section_types), incarcat o singura
+  // data (fetchSectionTypes).
+  const [wodSections, setWodSections] = useState(() => DEFAULT_NEW_WOD_SECTIONS())
+  const [sectionTypes, setSectionTypes] = useState([])
 
   const [emailAbonament, setEmailAbonament] = useState('')
   const [_numeAbonament, setNumeAbonament] = useState('')
@@ -1956,7 +2113,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     // lista in sine (nume/email, profiles_select_all e deja RLS-open oricui) e folosita si de
     // adminAdaugaInClasa/adminScoateDinClasa (cautare membru + notificari) din tab-ul Clase,
     // accesibil coach-ului. Fara asta, "Adauga manual" nu gasea pe nimeni pentru un coach.
-    fetchClase(); fetchWods(); fetchClienti()
+    fetchClase(); fetchWods(); fetchClienti(); fetchSectionTypes()
     if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin(); fetchCoaches() }
   }, [])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
@@ -2013,6 +2170,16 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const fetchWods = async () => {
     const { data } = await supabase.from('wods').select('*').order('date', { ascending: false })
     if (data) setWods(data)
+  }
+
+  // Faza 6 - catalogul de tipuri de sectiune (Faza 0, workout_section_types),
+  // folosit de selectorul de tip din SectionCard/AddSectionControl. Doar
+  // platform defaults (gym_id null) deocamdata - tipuri custom per sala sunt
+  // suportate de schema (Faza 0), dar nu inca de UI (nu a fost ceruta inca).
+  const fetchSectionTypes = async () => {
+    const { data } = await supabase.from('workout_section_types').select('key, label')
+      .is('gym_id', null).eq('is_active', true).order('sort_order', { ascending: true })
+    if (data) setSectionTypes(data)
   }
 
   const fetchCoaches = async () => {
@@ -2425,98 +2592,66 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     showToast(t.toastClassDeleted); await fetchClase()
   }
 
-  const parseLiniiWod = (text) => text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  // Faza 6 - editorul de sectiuni traieste in `wodSections` (vezi
+  // createSection/sectionsFromLegacyWod/legacyPayloadFromSections/
+  // validateSectionsForLegacy, definite la scope de modul mai sus). Aici
+  // raman doar operatiile CRUD pe lista + persistenta.
+  // `patch` poate fi un obiect simplu SAU o functie `(sectionCurenta) =>
+  // patch` - forma functie e necesara cand doi handlere onChange se
+  // declanseaza in aceeasi tranzactie sincrona (ex. MiscareQuickAdd.add()
+  // cheama intai onAdd, apoi onChange('') ca sa goleasca inputul) - fara
+  // forma functie, al doilea apel ar construi patch-ul din `section`
+  // (varianta INAINTE de primul apel, capturata in closure la randare), nu
+  // din starea deja actualizata de primul apel, si l-ar suprascrie (bug
+  // real gasit si reparat in aceeasi sesiune: adaugarea unei miscari la
+  // Metcon disparea instant, fiindca goli-rea campului "Adauga miscare"
+  // rula al doilea si stergea miscarea abia adaugata).
+  const updateSection = (id, patch) => setWodSections(prev => prev.map(s => {
+    if (s.id !== id) return s
+    const resolved = typeof patch === 'function' ? patch(s) : patch
+    return { ...s, ...resolved }
+  }))
+  const removeSection = (id) => setWodSections(prev => prev.filter(s => s.id !== id))
+  const moveSection = (id, dir) => setWodSections(prev => {
+    const i = prev.findIndex(s => s.id === id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= prev.length) return prev
+    const next = [...prev]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    return next
+  })
+  const makePrimarySection = (id) => setWodSections(prev => prev.map(s => ({ ...s, isPrimary: s.id === id })))
+  const addSection = (typeKey) => setWodSections(prev => [...prev, { ...createSection(typeKey, false), open: true }])
 
-  // Extrage greutatea dintr-o linie de miscare deja normalizata (ex. "21
-  // Thrusters @ 43kg" sau "21 Thrusters @ 61/43kg") - "X/Y" e conventia
-  // RX barbati/femei (mai greu/mai usor), o singura valoare se aplica
-  // ambelor genuri (majoritatea miscarilor scalate n-au greutate diferentiata
-  // pe gen scrisa explicit in text).
-  const extractGreutateDinMiscare = (text) => {
-    const m = text.match(/@\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*(kg|lbs)/i)
-    if (!m) return null
-    const unit = m[3].toLowerCase()
-    const male = `${m[1]}${unit}`
-    const female = m[2] ? `${m[2]}${unit}` : male
-    return { male, female }
-  }
-  // Campul "Greutate M/F" (folosit la detectarea "Not RXd" - vezi isNotRxd in
-  // workoutFormats.js) e separat de greutatea scrisa in miscari - un coach
-  // care compune WOD-ul (Paste rapid sau manual) si scrie "21 Thrusters @
-  // 43kg" fara sa completeze SI campul separat lasa sistemul fara nimic de
-  // comparat, deci Clasamentul nu mai separa pe cine a scalat. Auto-completam
-  // din prima miscare cu greutate gasita, DOAR daca ambele campuri (M si F)
-  // sunt goale inca - nu suprascriem o valoare pusa explicit de admin.
-  const autoFillGreutateDacaGoala = (key, linii) => {
-    const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
-    if (!gasita) return
-    setWodVarianteWeight(prev => (prev[key].male || prev[key].female) ? prev : { ...prev, [key]: gasita })
-  }
-
-  // Text ramas in caseta "Paste rapid" fara sa se fi apasat explicit "Adauga
-  // din text" era pierdut silentios la Salvare - un coach care lipea text la
-  // toate cele 4 variante dar uita sa apese butonul individual pentru una
-  // din ele pierdea acea varianta fara niciun avertisment (bug raportat: RX
-  // salvat corect, celelalte variante goale). Flush-uim orice text ramas
-  // chiar inainte de orice salvare (sectiune sau WOD intreg), la fel ca la
-  // apasarea butonului - returnam varianta "efectiva" (cu flush-ul inclus)
-  // ca s-o foloseasca direct apelantul, fara sa astepte re-render-ul.
-  const flushWodVariantePaste = () => {
-    let efectiv = wodVariante
+  // Text ramas in caseta "Paste rapid" (sectiunea primara) fara sa se fi
+  // apasat explicit "Adauga din text" era pierdut silentios la Salvare - un
+  // coach care lipea text la toate cele 4 variante dar uita sa apese butonul
+  // individual pentru una din ele pierdea acea varianta fara niciun
+  // avertisment (bug real, dinainte de Faza 6). Flush-uim orice text ramas
+  // chiar inainte de orice salvare, pe sectiunea primara curenta - returnam
+  // lista "efectiva" de sectiuni (cu flush-ul inclus) ca s-o foloseasca
+  // direct apelantul, fara sa astepte re-render-ul.
+  const flushSectionsForSave = (sections) => sections.map(s => {
+    if (!s.isPrimary) return s
+    let variants = s.variants
     let ramasCeva = false
-    for (const key of ['onramp', 'beginner', 'intermediate', 'rx']) {
-      const text = wodVariantePaste[key]
+    for (const v of VARIANTE_WEIGHT_BASE) {
+      const text = variants[v.key]?.paste || ''
       if (!text.trim()) continue
       ramasCeva = true
       const linii = text.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
-      efectiv = { ...efectiv, [key]: [...efectiv[key], ...linii] }
-      autoFillGreutateDacaGoala(key, linii)
+      const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
+      const curent = variants[v.key]
+      variants = {
+        ...variants,
+        [v.key]: {
+          ...curent, paste: '', movements: [...curent.movements, ...linii],
+          weight: (curent.weight.male || curent.weight.female) || !gasita ? curent.weight : gasita,
+        },
+      }
     }
-    if (ramasCeva) {
-      setWodVariante(efectiv)
-      setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    }
-    return efectiv
-  }
-
-  // Payload complet, din starea curenta a formularului - folosit atat de
-  // saveWod (salveaza tot) cat si de saveWodSection cand inca nu exista un
-  // rand in DB (nu ai ce sa actualizezi partial, trebuie creat intreg randul
-  // o data, cu valorile implicite pentru sectiunile neatinse inca). `overrides`
-  // e pentru cazul in care apelantul are o valoare mai proaspata decat starea
-  // React curenta (ex. switch-ul de vizibilitate cheama save chiar in acelasi
-  // tick cu setState-ul, inainte ca re-render-ul sa fi actualizat starea).
-  const buildWodPayload = (overrides = {}, variante = wodVariante) => {
-    const durataWod = `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`
-    return {
-      gym_id: gymId,
-      date: dataWod, type: tipWod, duration: durataWod,
-      format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
-      name: numeWod.trim() || null,
-      notes_onramp: wodVarianteNote.onramp.trim() || null,
-      notes_beginner: wodVarianteNote.beginner.trim() || null,
-      notes_intermediate: wodVarianteNote.intermediate.trim() || null,
-      notes_rx: wodVarianteNote.rx.trim() || null,
-      warmup: parseLiniiWod(warmupWod),
-      warmup_visible: warmupVisibleWod,
-      skill: parseLiniiWod(skillWod),
-      skill_name: skillNameWod.trim() || null,
-      skill_type: skillTypeWod,
-      skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null,
-      skill_visible: skillVisibleWod,
-      skill2: parseLiniiWod(skill2Wod),
-      skill2_name: skillName2Wod.trim() || null,
-      skill2_type: skillType2Wod,
-      skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null,
-      skill2_visible: skill2VisibleWod,
-      movements_onramp: variante.onramp,
-      movements_beginner: variante.beginner,
-      movements_intermediate: variante.intermediate,
-      movements_rx: variante.rx,
-      ...buildVarianteWeightPayload(),
-      ...overrides,
-    }
-  }
+    return ramasCeva ? { ...s, variants } : s
+  })
 
   // Pasul 2B din Workout Intelligence Engine - apeleaza Edge Function-ul
   // analyze-workout (deja deployat, raspunde deocamdata cu JSON MOCK, vezi
@@ -2545,17 +2680,30 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     setAiAnalyzing(false)
   }
 
-  const saveWod = async () => {
+  // Faza 6 - punctul unic de persistenta pt editorul de sectiuni. Inlocuieste
+  // saveWod/saveWodSection: fiindca toate sectiunile traiesc acum intr-o
+  // singura lista controlata (`wodSections`), nu mai exista o distinctie
+  // reala intre "salveaza o sectiune" si "salveaza tot" - payload-ul complet
+  // se deriva mereu din starea curenta a listei (legacyPayloadFromSections).
+  // `sectionLabel` (opt.) doar schimba textul toast-ului si evita reset-ul
+  // total al formularului dupa salvare (la fel ca saveWodSection inainte).
+  const saveWod = async (sectionLabel) => {
     if (!dataWod) { showToast(t.toastPickDate); return }
+    const flushed = flushSectionsForSave(wodSections)
+    setWodSections(flushed)
+    // Gate-ul de validare (decizia userului, Faza 6) - vezi
+    // validateSectionsForLegacy mai sus. Bannerul de eroare (randat langa
+    // butoanele de salvare) arata deja motivul - aici doar refuzam sa
+    // scriem, silentios, fara toast dublu.
+    if (!validateSectionsForLegacy(flushed, t).valid) return
     setSavingWod(true)
-    const payload = buildWodPayload({}, flushWodVariantePaste())
+    const payload = { gym_id: gymId, date: dataWod, ...legacyPayloadFromSections(flushed) }
     // upsert pe conflict de data (nu doar insert) - data implicita e azi, care
     // poate coincide cu un WOD deja existent chiar daca formularul n-a fost
     // deschis explicit prin "editeaza" (editWodId ramane null in cazul asta);
     // fara upsert, insert-ul ar esua cu eroare de duplicat pe wods_date_key.
-    // .select().single() (nou, Faza 5A) - randul salvat e necesar pt
-    // sincronizarea Workout Engine V2 mai jos (are nevoie de `id`, printre
-    // altele) - nu schimba ce se scrie, doar ce se intoarce.
+    // .select().single() (Faza 5A) - randul salvat e necesar pt sincronizarea
+    // Workout Engine V2 mai jos (are nevoie de `id`, printre altele).
     const { data, error } = editWodId
       ? await supabase.from('wods').update(payload).eq('id', editWodId).select().single()
       : await supabase.from('wods').upsert(payload, { onConflict: 'gym_id,date' }).select().single()
@@ -2566,99 +2714,33 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       // reusita) - wods ramane sursa de adevar, o eroare aici doar se
       // logheaza (vizibila in Sentry), fara sa afecteze coach-ul.
       syncWorkoutEngineV2FromLegacyWod(data)
-      showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
+      showToast(sectionLabel ? t.toastSectionSaved(sectionLabel) : (editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin))
       await fetchWods(); onWodChanged?.()
-      setEditWodId(null); setDataWod(todayLocalStr())
-      resetWodFormFields()
+      if (sectionLabel) {
+        if (!editWodId) setEditWodId(data.id)
+      } else {
+        setEditWodId(null); setDataWod(todayLocalStr()); resetWodFormFields()
+      }
     }
     setSavingWod(false)
   }
-
-  // Salveaza o singura sectiune (WARM-UP/SKILL/SKILL 2/Workout of the Day),
-  // fara sa atinga campurile celorlalte sectiuni - daca WOD-ul exista deja,
-  // e un update partial (nu suprascrie modificari neterminate din alta
-  // sectiune care inca n-a fost salvata). Daca WOD-ul e nou (fara editWodId),
-  // nu exista ce sa actualizezi partial - se creeaza randul intreg o data,
-  // cu valorile curente din formular, si urmatoarele sectiuni salvate devin
-  // update-uri partiale pe acelasi rand.
-  const saveWodSection = async (sectionFields, sectionLabel) => {
-    if (!dataWod) { showToast(t.toastPickDate); return }
-    setSavingWod(true)
-    let error, savedRow
-    if (editWodId) {
-      // .select().single() (nou, Faza 5A) - update-ul e partial (doar
-      // campurile sectiunii), dar sincronizarea Workout Engine V2 are nevoie
-      // de RANDUL INTREG (toate sectiunile, nu doar cea salvata acum) - un
-      // singur round-trip in plus (PostgREST intoarce randul actualizat
-      // direct din update), nu o interogare separata.
-      ;({ data: savedRow, error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId).select().single())
-    } else {
-      // Acelasi upsert pe conflict de data ca la saveWod (nu insert simplu) -
-      // data implicita e azi, care poate coincide cu un WOD deja existent
-      // chiar daca formularul n-a fost deschis explicit prin "editeaza"
-      // (editWodId ramane null in cazul asta). Payload-ul complet e sigur de
-      // folosit aici (nu doar sectionFields) pentru ca efectul de sincronizare
-      // (syncWodFormFromRow) garanteaza ca restul campurilor formularului
-      // oglindesc deja randul real din DB cand data se potriveste.
-      const { data, error: upsertErr } = await supabase.from('wods').upsert(buildWodPayload(sectionFields), { onConflict: 'gym_id,date' }).select().single()
-      error = upsertErr
-      savedRow = data
-      if (!error && data) setEditWodId(data.id)
-    }
-    if (error) { showToast(t.toastGenericError); console.error(error) }
-    else {
-      // Faza 5A - vezi saveWod mai sus (acelasi tipar: best effort, fire-and-forget).
-      syncWorkoutEngineV2FromLegacyWod(savedRow)
-      showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.()
-    }
-    setSavingWod(false)
-  }
+  const saveSection = (sectionLabel) => saveWod(sectionLabel)
 
   // Populeaza toate campurile formularului din randul WOD dat, FARA efecte de
   // navigare (scroll, expand dropdown-uri, schimbare tab) - folosita atat de
   // startEditWod (editare explicita, cu navigare) cat si de sincronizarea
   // silentioasa de mai jos (cand data aleasa coincide cu un WOD deja
   // existent, fara sa fi apasat explicit "editeaza").
-  const syncWodFormFromRow = (w) => {
+  const syncWodFormFromRow = (w, opts) => {
     setEditWodId(w.id)
     setDataWod(w.date)
-    setTipWod(w.type || 'AMRAP')
-    const [dMin, dSec] = (w.duration || '20:0').split(':')
-    setDurataWodMin(dMin || '0'); setDurataWodSec(dSec || '0')
-    setFormatConfigWod(w.format_config || {})
-    setNumeWod(w.name || '')
-    setWodVarianteNote({
-      onramp: w.notes_onramp || '', beginner: w.notes_beginner || '',
-      intermediate: w.notes_intermediate || '', rx: w.notes_rx || '',
-    })
-    setWarmupWod((w.warmup || []).join('\n'))
-    setWarmupVisibleWod(w.warmup_visible !== false)
-    setSkillWod((w.skill || []).join('\n'))
-    setSkillNameWod(w.skill_name || '')
-    setSkillTypeWod(w.skill_type || 'Weightlifting')
-    setSkillFormatConfigWod(w.skill_format_config || {})
-    setSkillVisibleWod(w.skill_visible !== false)
-    setSkill2Wod((w.skill2 || []).join('\n'))
-    setSkillName2Wod(w.skill2_name || '')
-    setSkillType2Wod(w.skill2_type || 'Weightlifting')
-    setSkillFormatConfig2Wod(w.skill2_format_config || {})
-    setSkill2VisibleWod(w.skill2_visible !== false)
-    setWodVariante({
-      onramp: w.movements_onramp || [],
-      beginner: w.movements_beginner || [],
-      intermediate: w.movements_intermediate || [],
-      rx: w.movements_rx || [],
-    })
-    setWodVarianteWeight(parseVarianteWeightFromRow(w))
-    setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
+    setWodSections(sectionsFromLegacyWod(w, opts))
   }
 
   const startEditWod = (w) => {
-    syncWodFormFromRow(w)
-    // La editare deschidem dropdown-urile automat (altfel adminul nu vede ce
+    // La editare deschidem toate cardurile automat (altfel adminul nu vede ce
     // e completat deja fara sa dea click pe fiecare titlu pe rand).
-    setAdminWarmupOpen(true); setAdminSkillOpen(true); setAdminSkill2Open(true); setAdminWodFormOpen(true)
+    syncWodFormFromRow(w, { open: true })
     setAdminTab('wod')
     // Admin e deja randat doar cand screen === 'admin' (vezi App()), nu are
     // propriul lui setScreen - fara reset explicit aici, editarea unui WOD mai
@@ -2687,13 +2769,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
   // noua aleasa, nu s-o resetaze la azi).
   const resetWodFormFields = () => {
-    setNumeWod(''); setWodVarianteNote(golVarianteNote); setWodVariante({ onramp: [], beginner: [], intermediate: [], rx: [] })
-    setWodVarianteWeight(golVarianteWeight)
-    setWodVarianteQuickAdd({ onramp: '', beginner: '', intermediate: '', rx: '' }); setWodVariantePaste({ onramp: '', beginner: '', intermediate: '', rx: '' })
-    setWarmupWod(''); setWarmupVisibleWod(true); setSkillWod(''); setSkillNameWod(''); setSkillTypeWod('Weightlifting'); setSkillFormatConfigWod({}); setSkillVisibleWod(true)
-    setSkill2Wod(''); setSkillName2Wod(''); setSkillType2Wod('Weightlifting'); setSkillFormatConfig2Wod({}); setSkill2VisibleWod(true)
-    setTipWod('AMRAP'); setDurataWodMin('20'); setDurataWodSec('0'); setFormatConfigWod({})
-    setAdminWarmupOpen(false); setAdminSkillOpen(false); setAdminSkill2Open(false); setAdminWodFormOpen(false)
+    setWodSections(DEFAULT_NEW_WOD_SECTIONS())
   }
 
   const cancelEditWod = () => {
@@ -3452,224 +3528,52 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
             </button>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            {/* Panoul cu data - fix, mereu vizibil, deasupra dropdown-urilor WARM-UP/SKILL/SKILL 2/Workout of the Day, aceeasi incadrare ca ele */}
+            {/* Panoul cu data - fix, mereu vizibil, deasupra listei de Workout Sections */}
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodDateLabel}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodDateLabel}</div>
+                {editWodId && (
+                  <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
+                )}
+              </div>
               <input type="date" value={dataWod} onChange={e => {
                 // Schimbarea manuala a datei paraseste orice editare curenta -
                 // fara asta, editWodId ramanea legat de WOD-ul vechi si
                 // efectul de sincronizare de mai jos refuza sa incarce WOD-ul
-                // zilei noi (garda "if (editWodId) return"), lasand
-                // WARM-UP/SKILL/SKILL 2/Workout of the Day neschimbate.
+                // zilei noi (garda "if (editWodId) return"), lasand sectiunile
+                // neschimbate.
                 setEditWodId(null); resetWodFormFields(); setDataWod(e.target.value)
               }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
             </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div onClick={() => setAdminWarmupOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodWarmupLabel}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={warmupVisibleWod} onChange={(v) => { setWarmupVisibleWod(v); saveWodSection({ warmup_visible: v }, t.adminWodWarmupLabel) }} />
-                  <span style={{ fontSize: '11px', color: '#888' }}>{adminWarmupOpen ? '▲' : '▼'}</span>
+
+            {/* Faza 6 (Native Workout Section Editor) - lista ordonata de
+                Workout Sections, in loc de cele 4 carduri fixe WARM-UP/SKILL/
+                SKILL 2/Workout of the Day de dinainte - vezi SectionCard mai
+                sus, definit la scope de modul. */}
+            {wodSections.map((s, i) => (
+              <SectionCard key={s.id} section={s} index={i} total={wodSections.length}
+                sectionTypes={sectionTypes}
+                onChange={(patch) => updateSection(s.id, patch)}
+                onRemove={() => removeSection(s.id)}
+                onMove={(dir) => moveSection(s.id, dir)}
+                onMakePrimary={() => makePrimarySection(s.id)}
+                onSave={() => saveSection(sectionTypes.find(st => st.key === s.typeKey)?.label || s.typeKey)}
+                savingWod={savingWod} t={t} />
+            ))}
+
+            <AddSectionControl sectionTypes={sectionTypes} onAdd={addSection} t={t} />
+
+            {(() => {
+              const validation = validateSectionsForLegacy(wodSections, t)
+              return !validation.valid && (
+                <div style={{ background: '#FCEBEB', border: '1px solid #F7C1C1', borderRadius: '10px', padding: '10px 12px', marginTop: '14px', fontSize: '12px', color: '#791F1F' }}>
+                  {validation.errors.map((err, i) => <div key={i} style={{ marginTop: i > 0 ? '4px' : 0 }}>{err}</div>)}
                 </div>
-              </div>
-              {adminWarmupOpen && (
-                <>
-                  <textarea value={warmupWod} onChange={e => setWarmupWod(e.target.value)}
-                    placeholder={t.adminWodWarmupPlaceholder} rows={3}
-                    style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-                  <button onClick={() => saveWodSection({ warmup: parseLiniiWod(warmupWod), warmup_visible: warmupVisibleWod }, t.adminWodWarmupLabel)}
-                    disabled={savingWod}
-                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
-                    {t.adminWodSaveSectionButton}
-                  </button>
-                </>
-              )}
-            </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-              <div onClick={() => setAdminSkillOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkillLabel}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={skillVisibleWod} onChange={(v) => { setSkillVisibleWod(v); saveWodSection({ skill_visible: v }, t.adminWodSkillLabel) }} />
-                  <span style={{ fontSize: '11px', color: '#888' }}>{adminSkillOpen ? '▲' : '▼'}</span>
-                </div>
-              </div>
-              {adminSkillOpen && (
-                <div style={{ marginTop: '8px' }}>
-                  <FormatConfigEditor formatId={skillTypeWod} onFormatChange={setSkillTypeWod}
-                    config={skillFormatConfigWod} onConfigChange={setSkillFormatConfigWod} t={t} />
-                  {skillTypeWod === 'Weightlifting' ? (
-                    <CautareMiscare key={editWodId || 'new'} preFill={skillNameWod} onAleage={m => setSkillNameWod(m)} t={t} label={t.adminWodSkillMovementLabel} />
-                  ) : (
-                    <input value={skillNameWod} onChange={e => setSkillNameWod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
-                  )}
-                  <textarea value={skillWod} onChange={e => setSkillWod(e.target.value)}
-                    placeholder={t.adminWodSkillPlaceholder} rows={3}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-                  <button onClick={() => saveWodSection({
-                    skill: parseLiniiWod(skillWod), skill_name: skillNameWod.trim() || null, skill_type: skillTypeWod,
-                    skill_format_config: Object.keys(skillFormatConfigWod).length > 0 ? skillFormatConfigWod : null, skill_visible: skillVisibleWod,
-                  }, t.adminWodSkillLabel)}
-                    disabled={savingWod}
-                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
-                    {t.adminWodSaveSectionButton}
-                  </button>
-                </div>
-              )}
-            </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
-              <div onClick={() => setAdminSkill2Open(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodSkill2Label}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <MiniSwitch checked={skill2VisibleWod} onChange={(v) => { setSkill2VisibleWod(v); saveWodSection({ skill2_visible: v }, t.adminWodSkill2Label) }} />
-                  <span style={{ fontSize: '11px', color: '#888' }}>{adminSkill2Open ? '▲' : '▼'}</span>
-                </div>
-              </div>
-              {adminSkill2Open && (
-                <div style={{ marginTop: '8px' }}>
-                  <FormatConfigEditor formatId={skillType2Wod} onFormatChange={setSkillType2Wod}
-                    config={skillFormatConfig2Wod} onConfigChange={setSkillFormatConfig2Wod} t={t} />
-                  {skillType2Wod === 'Weightlifting' ? (
-                    <CautareMiscare key={(editWodId || 'new') + '-skill2'} preFill={skillName2Wod} onAleage={m => setSkillName2Wod(m)} t={t} label={t.adminWodSkillMovementLabel} />
-                  ) : (
-                    <input value={skillName2Wod} onChange={e => setSkillName2Wod(e.target.value)} placeholder={t.adminWodSkillNamePlaceholder}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
-                  )}
-                  <textarea value={skill2Wod} onChange={e => setSkill2Wod(e.target.value)}
-                    placeholder={t.adminWodSkillPlaceholder} rows={3}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-                  <button onClick={() => saveWodSection({
-                    skill2: parseLiniiWod(skill2Wod), skill2_name: skillName2Wod.trim() || null, skill2_type: skillType2Wod,
-                    skill2_format_config: Object.keys(skillFormatConfig2Wod).length > 0 ? skillFormatConfig2Wod : null, skill2_visible: skill2VisibleWod,
-                  }, t.adminWodSkill2Label)}
-                    disabled={savingWod}
-                    style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
-                    {t.adminWodSaveSectionButton}
-                  </button>
-                </div>
-              )}
-            </div>
-            <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '14px' }}>
-              <div onClick={() => setAdminWodFormOpen(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodFormTitle}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {editWodId && (
-                    <div onClick={(e) => { e.stopPropagation(); cancelEditWod() }} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
-                  )}
-                  <span style={{ fontSize: '11px', color: '#888' }}>{adminWodFormOpen ? '▲' : '▼'}</span>
-                </div>
-              </div>
-              {adminWodFormOpen && (
-                <div style={{ marginTop: '12px' }}>
-                  <FormatConfigEditor formatId={tipWod} onFormatChange={setTipWod}
-                    config={formatConfigWod} onConfigChange={setFormatConfigWod}
-                    excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
-                  {AUTO_DURATION_FORMAT_IDS.includes(tipWod) ? (
-                    <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-                      <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
-                        {estimateTotalDurationSec(tipWod, formatConfigWod) != null
-                          ? <>{secToTime(estimateTotalDurationSec(tipWod, formatConfigWod))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
-                          : t.adminWodDurationPending}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                        <div style={{ flex: 1 }}>
-                          <input type="number" min="0" value={durataWodMin} onChange={e => setDurataWodMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <input type="number" min="0" max="59" value={durataWodSec} onChange={e => setDurataWodSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-                  <input value={numeWod} onChange={e => setNumeWod(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-                  {[
-                    { key: 'onramp', label: 'OnRamp', nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
-                    { key: 'beginner', label: 'Beginner', nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
-                    { key: 'intermediate', label: 'Intermediate', nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
-                    { key: 'rx', label: 'RX', nivel: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
-                  ].map(v => (
-                    <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-                      {/* Greutatea prescrisa se compara doar la formatele 'scored'/'mixed'
-                          (FormatLogger arata campul de Greutate doar acolo - vezi
-                          ScoredFields in FormatLogger.jsx) - la 'sets'/'nft' (EMOM,
-                          Weightlifting, Tabata, Strength Sets, Not For Time etc.) membrul
-                          nu vede niciodata acel camp, deci orice valoare scrisa aici ar fi
-                          complet inerta, fara niciun semnal ca nu face nimic. */}
-                      {['scored', 'mixed'].includes(getFormat(tipWod)?.family) ? (
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                          <input value={wodVarianteWeight[v.key].male} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], male: e.target.value } }))}
-                            placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
-                            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                          <input value={wodVarianteWeight[v.key].female} onChange={e => setWodVarianteWeight(prev => ({ ...prev, [v.key]: { ...prev[v.key], female: e.target.value } }))}
-                            placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
-                            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
-                      )}
-                      <SortableList
-                        items={wodVariante[v.key]}
-                        onReorder={(items) => setWodVariante(prev => ({ ...prev, [v.key]: items }))}
-                        onRemove={(i) => setWodVariante(prev => ({ ...prev, [v.key]: prev[v.key].filter((_, j) => j !== i) }))}
-                      />
-                      <MiscareQuickAdd value={wodVarianteQuickAdd[v.key]} onChange={(val) => setWodVarianteQuickAdd(prev => ({ ...prev, [v.key]: val }))}
-                        onAdd={(text) => {
-                          setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], text] }))
-                          autoFillGreutateDacaGoala(v.key, [text])
-                        }}
-                        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
-                      <textarea value={wodVariantePaste[v.key]} onChange={e => setWodVariantePaste(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        placeholder={t.adminWodVariantPastePlaceholder} rows={3}
-                        style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
-                      {wodVariantePaste[v.key].trim() && (
-                        <button onClick={() => {
-                          const linii = wodVariantePaste[v.key].split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
-                          setWodVariante(prev => ({ ...prev, [v.key]: [...prev[v.key], ...linii] }))
-                          setWodVariantePaste(prev => ({ ...prev, [v.key]: '' }))
-                          autoFillGreutateDacaGoala(v.key, linii)
-                        }}
-                          style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-                          {t.adminWodVariantPasteButton}
-                        </button>
-                      )}
-                      <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-                      <input value={wodVarianteNote[v.key]} onChange={e => setWodVarianteNote(prev => ({ ...prev, [v.key]: e.target.value }))}
-                        placeholder={t.adminWodNotesPlaceholder}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                    </div>
-                  ))}
-                  <button onClick={() => {
-                    const variante = flushWodVariantePaste()
-                    saveWodSection({
-                      type: tipWod, duration: `${parseInt(durataWodMin) || 0}:${String(parseInt(durataWodSec) || 0).padStart(2, '0')}`,
-                      format_config: Object.keys(formatConfigWod).length > 0 ? formatConfigWod : null,
-                      name: numeWod.trim() || null,
-                      notes_onramp: wodVarianteNote.onramp.trim() || null,
-                      notes_beginner: wodVarianteNote.beginner.trim() || null,
-                      notes_intermediate: wodVarianteNote.intermediate.trim() || null,
-                      notes_rx: wodVarianteNote.rx.trim() || null,
-                      movements_onramp: variante.onramp, movements_beginner: variante.beginner,
-                      movements_intermediate: variante.intermediate, movements_rx: variante.rx,
-                      ...buildVarianteWeightPayload(),
-                    }, t.adminWodFormTitle)
-                  }}
-                    disabled={savingWod}
-                    style={{ marginTop: '4px', width: '100%', padding: '8px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.6 : 1 }}>
-                    {t.adminWodSaveSectionButton}
-                  </button>
-                </div>
-              )}
-            </div>
-            <button onClick={saveWod} disabled={savingWod} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingWod ? 'not-allowed' : 'pointer', opacity: savingWod ? 0.7 : 1 }}>
+              )
+            })()}
+
+            <button onClick={() => saveWod()} disabled={savingWod || !validateSectionsForLegacy(wodSections, t).valid}
+              style={{ width: '100%', marginTop: '14px', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: (savingWod || !validateSectionsForLegacy(wodSections, t).valid) ? 'not-allowed' : 'pointer', opacity: (savingWod || !validateSectionsForLegacy(wodSections, t).valid) ? 0.5 : 1 }}>
               {savingWod ? t.adminWodSaving : editWodId ? t.adminWodSaveEdit : t.adminWodCreateButton}
             </button>
           </div>

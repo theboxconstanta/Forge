@@ -796,6 +796,17 @@ export const TRANSLATIONS = {
     adminWodCreateButton: '+ Creează WOD',
     adminWodListHeader: (n) => `WOD-URI (${n})`,
 
+    // Admin - tab WOD - Faza 6, editor nativ de Workout Sections
+    wodSectionPrimaryBadge: 'sectiune principala',
+    wodSectionTitlePlaceholder: 'Titlu (opțional)',
+    wodSectionMakePrimary: 'Marchează ca sectiunea principală',
+    wodSectionRemove: 'Șterge',
+    wodSectionAddButton: '+ Adaugă sectiune',
+    wodSectionsErrorPrimaryCount: (n) => n === 0
+      ? 'Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - niciuna nu e marcată acum.'
+      : `Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - ${n} sunt marcate acum.`,
+    wodSectionsErrorTooMany: (n) => `Prea multe sectiuni suplimentare (${n}) - Member View-ul actual poate arăta cel mult 3, pe lângă sectiunea principală. Șterge sau reorganizează sectiunile ca să poți salva.`,
+
     // Admin - tab Planuri
     adminPlansNewTitle: '+ Plan nou',
     adminPlansNameLabel: 'Nume plan',
@@ -1615,6 +1626,17 @@ export const TRANSLATIONS = {
     adminWodSaveSectionButton: 'Save',
     adminWodCreateButton: '+ Create WOD',
     adminWodListHeader: (n) => `WODS (${n})`,
+
+    // Admin - tab WOD - Phase 6, native Workout Section editor
+    wodSectionPrimaryBadge: 'primary section',
+    wodSectionTitlePlaceholder: 'Title (optional)',
+    wodSectionMakePrimary: 'Mark as the primary section',
+    wodSectionRemove: 'Remove',
+    wodSectionAddButton: '+ Add section',
+    wodSectionsErrorPrimaryCount: (n) => n === 0
+      ? 'Exactly one section must be marked as the primary (scored) workout - none is marked right now.'
+      : `Exactly one section must be marked as the primary (scored) workout - ${n} are marked right now.`,
+    wodSectionsErrorTooMany: (n) => `Too many additional sections (${n}) - the current Member View can show at most 3 alongside the primary section. Remove or reorganize sections to save.`,
 
     // Admin - tab Planuri
     adminPlansNewTitle: '+ New plan',
