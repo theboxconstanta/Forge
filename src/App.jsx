@@ -20,7 +20,10 @@ import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
-import { syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId } from './workoutEngine'
+import {
+  syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId,
+  loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
+} from './workoutEngine'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
@@ -4429,6 +4432,14 @@ function App() {
   const [claseHomeDeschis, setClaseHomeDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
+  // Faza 7 (Member View -> Workout Engine V2) - randul V2 (workouts +
+  // workout_sections), daca exista deja pt gym+data curenta. `wodZiData`
+  // (legacy, de mai sus) ramane NEATINS - alimenteaza in continuare Logarea
+  // (variantaAleasa, wod_logs/skill_logs, comparatia de greutate) exact ca
+  // azi. `wodZiWorkoutV2` alimenteaza DOAR randarea generica, read-only, a
+  // cardului WOD (vezi workoutForDisplay mai jos) - Logging nu-l citeste
+  // niciodata.
+  const [wodZiWorkoutV2, setWodZiWorkoutV2] = useState(null)
   const [dataAcasa, setDataAcasa] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [prSelectat, setPrSelectat] = useState(null)
   const [prConfirmDelete, setPrConfirmDelete] = useState(null)
@@ -4899,7 +4910,12 @@ function App() {
 
   useEffect(() => {
     if (user) fetchWodZi(dataAcasa)
-  }, [dataAcasa]) // eslint-disable-line react-hooks/exhaustive-deps
+    // userProfile.gym_id in dependinte (nu doar dataAcasa) - profilul se
+    // incarca async, dupa acest efect; fara re-declansare cand devine
+    // disponibil, fetchWodZiWorkoutV2 (are nevoie de gym_id) ar ramane
+    // permanent null pt prima zi afisata dupa login.
+    if (user && userProfile?.gym_id) fetchWodZiWorkoutV2(dataAcasa)
+  }, [dataAcasa, userProfile?.gym_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user || claseDB.length === 0) return
@@ -4951,6 +4967,7 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wods' }, () => {
         fetchWodZi(dataAcasaRef.current)
+        fetchWodZiWorkoutV2(dataAcasaRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
         fetchWodLogs(); fetchClasament(clasamentDateRef.current)
@@ -5467,6 +5484,24 @@ function App() {
     const data_str = data_param || dataAcasa || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
     const { data } = await supabase.from('wods').select('*').eq('date', data_str).maybeSingle()
     setWodZiData(data || null)
+  }
+
+  // Faza 7 - incearca DOAR calea Workout Engine V2 (nu si compozitul
+  // loadWorkout, care ar re-interoga si `wods` intern) - fallback-ul legacy
+  // se calculeaza mai jos (workoutForDisplay) pur, din wodZiData deja
+  // incarcat de fetchWodZi mai sus, fara nicio interogare suplimentara cand
+  // V2 inca nu exista pt acest WOD.
+  const fetchWodZiWorkoutV2 = async (data_param) => {
+    if (!userProfile?.gym_id) return
+    const _fwd = new Date()
+    const data_str = data_param || dataAcasa || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
+    try {
+      const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, data_str)
+      setWodZiWorkoutV2(v2)
+    } catch (err) {
+      console.error('fetchWodZiWorkoutV2 failed (cade pe fallback legacy, vezi workoutForDisplay):', err)
+      setWodZiWorkoutV2(null)
+    }
   }
 
   const handleLogin = async () => {
@@ -6071,6 +6106,27 @@ function App() {
     { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp', notesKey: 'notes_onramp' },
   ]
 
+  // Faza 7 - Workout Engine V2 daca exista deja pt gym+data curenta, altfel
+  // maparea legacy PURA (mapLegacyWodToWorkout) peste wodZiData deja
+  // incarcat - fallback transparent, fara interogare suplimentara (vezi
+  // fetchWodZiWorkoutV2 mai sus). Folosit STRICT pt randare - Logarea
+  // continua sa citeasca wodZiData/variantaAleasa, neschimbate.
+  const workoutForDisplay = wodZiWorkoutV2 || mapLegacyWodToWorkout(wodZiData)
+  const primarySectionV = workoutForDisplay?.sections?.find(s => s.loggingMode === 'required') || null
+  const supportingSectionsV = (workoutForDisplay?.sections || []).filter(s => s !== primarySectionV)
+
+  // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
+  // sectiunea primara a modelului de domeniu - logica pura (RX = baza
+  // sectiunii, scalingVersions pt restul, greutatea din
+  // metadata.legacyWeights) traieste in workoutEngine.js
+  // (metconScalingVariantsForDisplay, testata separat) - aici doar
+  // adaugam stilizarea (culoare/bg), treaba UI-ului. Greutatea nu era
+  // afisata nicaieri in cardul WOD nici inainte de Faza 7 (folosita doar
+  // la selectarea variantei, pt comparatia din Logare - wodZiData ramane
+  // sursa aceea, neschimbata) - dusa mai departe aici doar pt completitudine.
+  const metconVariantsForDisplay = (section) =>
+    metconScalingVariantsForDisplay(section).map((v, i) => ({ ...VARIANTE_CONFIG[i], ...v }))
+
   // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
   // ales liber de membru) - inlocuieste vechiul isAmrapLog/miscariPentruAmrapLog,
   // acum generalizat prin catalogul din workoutFormats.js (FormatLogger).
@@ -6601,14 +6657,21 @@ function App() {
                 <div>
                   <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: '#0E0E0E' }}>
-                    {wodZiData ? (wodZiData.name ? `"${wodZiData.name}"` : `${wodZiData.type} ${formatWodDurata(wodZiData.duration)}`) : t.homeNoWodToday}
+                    {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
-                  {wodZiData?.name && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div>}
-                  {wodZiData && describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
-                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                  {/* Durata ramane cititA din wodZiData (legacy) - modelul de
+                      domeniu nu duce inca o durata utilizabila pt sectiunea
+                      primara (section.duration e mereu null, atat pt calea
+                      legacy cat si pt randurile V2 deja sincronizate -
+                      mapLegacyWodToWorkout n-a calculat niciodata asta din
+                      wods.duration). Exceptie documentata, ca la Logare -
+                      vezi raportul Fazei 7. */}
+                  {workoutForDisplay?.title && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
+                  {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                   )}
-                  {!wodDeschis && wodZiData && (wodZiData.movements_rx || []).length > 0 && (
-                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{(wodZiData.movements_rx || []).join(' · ')}</div>
+                  {!wodDeschis && primarySectionV && (primarySectionV.movements || []).length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{primarySectionV.movements.map(m => m.name).join(' · ')}</div>
                   )}
                   {logZiWod && (
                     <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -6639,42 +6702,69 @@ function App() {
                   {wodDeschis ? '−' : '+'}
                 </div>
               </div>
-              {wodDeschis && wodZiData && (
+              {wodDeschis && workoutForDisplay && (
                 <div style={{ marginTop: '16px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-                  {(wodZiData.warmup_visible !== false || isAdmin || isCoach) && (wodZiData.warmup || []).length > 0 && (
-                    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                        {t.homeWodWarmupTitle}
-                        {wodZiData.warmup_visible === false && (isAdmin || isCoach) && (
-                          <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
-                        )}
+                  {/* Continutul (miscari/format/titlu) vine din
+                      workoutForDisplay (Workout Engine V2 daca exista, altfel
+                      fallback legacy) - vizibilitatea (warmup_visible/
+                      skill_visible/skill2_visible) ramane cititA din
+                      wodZiData, fiindca acest flag nu exista deloc inca in
+                      schema Workout Engine V2 (nicio coloana pe
+                      workout_sections) - vezi raportul Fazei 7, datorie de
+                      migratie documentata explicit, acelasi tipar ca durata
+                      si ca typeKey (Faza 6). Sectiunile de suport sunt gasite
+                      dupa slotKey (warmup/skill/skill2), nu generic dupa
+                      pozitie - Logarea Skill ramane legata de exact aceste 2
+                      sloturi fixe (skillDeschis/skillDeschis2, skillLogSlot
+                      1/2), neschimbata. */}
+                  {(() => {
+                    const warmupSection = supportingSectionsV.find(s => s.slotKey === 'warmup')
+                    const warmupMovements = (warmupSection?.movements || []).map(m => m.name)
+                    const warmupVisible = wodZiData?.warmup_visible !== false || isAdmin || isCoach
+                    if (!warmupVisible || warmupMovements.length === 0) return null
+                    return (
+                      <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                          {t.homeWodWarmupTitle}
+                          {wodZiData?.warmup_visible === false && (isAdmin || isCoach) && (
+                            <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
+                          )}
+                        </div>
+                        {warmupMovements.map((m, mi) => (
+                          <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                        ))}
                       </div>
-                      {wodZiData.warmup.map((m, mi) => (
-                        <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
-                      ))}
-                    </div>
-                  )}
-                  {(wodZiData.skill_visible !== false || isAdmin || isCoach) && (
-                    <SkillHomeSection
-                      titleLabel={t.homeWodSkillTitle}
-                      skillMovements={wodZiData.skill} skillName={wodZiData.skill_name}
-                      skillType={wodZiData.skill_type} skillFormatConfig={wodZiData.skill_format_config}
-                      logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
-                      onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                      userProfile={userProfile} hiddenFromMembers={wodZiData.skill_visible === false && (isAdmin || isCoach)} t={t} />
-                  )}
-                  {(wodZiData.skill2_visible !== false || isAdmin || isCoach) && (
-                    <SkillHomeSection
-                      titleLabel={t.homeWodSkill2Title}
-                      skillMovements={wodZiData.skill2} skillName={wodZiData.skill2_name}
-                      skillType={wodZiData.skill2_type} skillFormatConfig={wodZiData.skill2_format_config}
-                      logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
-                      onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                      userProfile={userProfile} hiddenFromMembers={wodZiData.skill2_visible === false && (isAdmin || isCoach)} t={t} />
-                  )}
-                  {VARIANTE_CONFIG.map((v, i) => {
-                    const miscari = wodZiData[v.key] || []
-                    const notaVarianta = wodZiData[v.notesKey] || ''
+                    )
+                  })()}
+                  {(() => {
+                    const skillSection = supportingSectionsV.find(s => s.slotKey === 'skill')
+                    if (!(wodZiData?.skill_visible !== false || isAdmin || isCoach)) return null
+                    return (
+                      <SkillHomeSection
+                        titleLabel={t.homeWodSkillTitle}
+                        skillMovements={(skillSection?.movements || []).map(m => m.name)} skillName={skillSection?.title}
+                        skillType={skillSection?.format} skillFormatConfig={skillSection?.formatConfig}
+                        logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
+                        onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill_visible === false && (isAdmin || isCoach)} t={t} />
+                    )
+                  })()}
+                  {(() => {
+                    const skill2Section = supportingSectionsV.find(s => s.slotKey === 'skill2')
+                    if (!(wodZiData?.skill2_visible !== false || isAdmin || isCoach)) return null
+                    return (
+                      <SkillHomeSection
+                        titleLabel={t.homeWodSkill2Title}
+                        skillMovements={(skill2Section?.movements || []).map(m => m.name)} skillName={skill2Section?.title}
+                        skillType={skill2Section?.format} skillFormatConfig={skill2Section?.formatConfig}
+                        logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
+                        onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill2_visible === false && (isAdmin || isCoach)} t={t} />
+                    )
+                  })()}
+                  {metconVariantsForDisplay(primarySectionV).map((v, i) => {
+                    const miscari = v.movements
+                    const notaVarianta = v.notes
                     return (
                       <div key={i} onClick={() => {
                         const dejaSelectata = variantaAleasa === i
@@ -6691,12 +6781,12 @@ function App() {
                           <>
                             <div style={{ background: '#f0f0f0', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{wodZiData.type}</span>
-                                <span style={{ fontSize: '12px', color: '#888' }}>{formatWodDurata(wodZiData.duration)}</span>
+                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{primarySectionV?.format}</span>
+                                <span style={{ fontSize: '12px', color: '#888' }}>{formatWodDurata(wodZiData?.duration)}</span>
                               </div>
-                              {wodZiData.name && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>"{wodZiData.name}"</div>}
-                              {describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
-                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                              {workoutForDisplay?.title && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>"{workoutForDisplay.title}"</div>}
+                              {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
+                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                               )}
                             </div>
                             {miscari.length > 0 && (
@@ -6725,7 +6815,7 @@ function App() {
                   </button>
                 </div>
               )}
-              {wodDeschis && !wodZiData && (
+              {wodDeschis && !workoutForDisplay && (
                 <div style={{ marginTop: '12px', borderTop: '1px solid #f0f0f0', paddingTop: '12px', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
                   {isAdmin ? t.homeWodAdminHint : t.homeWodMemberHint}
                 </div>
@@ -7687,7 +7777,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => fetchWodZi(dataAcasaRef.current)} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>

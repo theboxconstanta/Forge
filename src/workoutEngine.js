@@ -182,6 +182,40 @@ export function mapV2WorkoutRow(workout, sectionRows) {
   }
 }
 
+// Ordinea canonica RX -> Intermediate -> Beginner -> OnRamp, aceeasi
+// folosita azi de VARIANTE_CONFIG (App.jsx, Member View).
+const LEGACY_LEVEL_ORDER = ['rx', 'intermediate', 'beginner', 'on_ramp']
+
+/** Faza 7 - reface cele 4 "variante de afisat" (RX + 3 niveluri de scalare)
+ * dintr-o sectiune PRIMARA a modelului de domeniu, in ordinea canonica de
+ * mai sus. Pura, fara stilizare (culoare/bg raman in App.jsx, treaba UI-ului,
+ * nu a stratului de date).
+ *
+ * De ce nu e `section.scalingVersions` suficient de unul singur: RX e
+ * BAZA sectiunii (section.movements + section.description), nu apare in
+ * scalingVersions (la fel ca in `wods` - movements_rx e coloana de baza,
+ * nu o "variantA"). Greutatea prescrisa pe gen nu e deloc in
+ * scalingVersions - traieste separat, in section.metadata.legacyWeights
+ * (decizie de mapare din Faza 4, pastrata identic aici, nu schimbata). */
+export function metconScalingVariantsForDisplay(section) {
+  if (!section) return []
+  const weights = section.metadata?.legacyWeights || {}
+  return LEGACY_LEVEL_ORDER.map((level) => {
+    const w = weights[level] || {}
+    if (level === 'rx') {
+      return {
+        level, movements: (section.movements || []).map((m) => m.name), notes: section.description || '',
+        weightMale: w.male || null, weightFemale: w.female || null,
+      }
+    }
+    const sv = (section.scalingVersions || []).find((x) => x.level === level)
+    return {
+      level, movements: (sv?.movements || []).map((m) => m.name), notes: sv?.notes || '',
+      weightMale: w.male || null, weightFemale: w.female || null,
+    }
+  })
+}
+
 // ============================================================
 // Incarcare (async, I/O) - foloseste functiile PURE de mai sus. Nimic din
 // aplicatie nu apeleaza inca aceste functii (Faza 4 e pregatire, nu

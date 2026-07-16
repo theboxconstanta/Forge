@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapLegacyWodToWorkout, mapV2WorkoutRow, mapV2SectionRow } from './workoutEngine'
+import { mapLegacyWodToWorkout, mapV2WorkoutRow, mapV2SectionRow, metconScalingVariantsForDisplay } from './workoutEngine'
 
 // Fixture-uri REALE, extrase direct din productie (WOD "NED", 2026-07-03,
 // CrossFit C15) - nu date inventate. wodFixture e randul `wods` brut;
@@ -221,5 +221,63 @@ describe('comparatie legacy vs Workout Engine V2 - acelasi WOD real (NED, 2026-0
     expect(legacy.sections).toHaveLength(v2.sections.length)
 
     expect(normalizeForComparison(legacy)).toEqual(normalizeForComparison(v2))
+  })
+})
+
+describe('metconScalingVariantsForDisplay (Faza 7)', () => {
+  it('null pt o sectiune null (nu arunca)', () => {
+    expect(metconScalingVariantsForDisplay(null)).toEqual([])
+  })
+
+  it('ordine canonica RX -> Intermediate -> Beginner -> OnRamp, chiar daca scalingVersions vine intr-o alta ordine', () => {
+    const section = mapLegacyWodToWorkout(wodFixture).sections[0]
+    const levels = metconScalingVariantsForDisplay(section).map((v) => v.level)
+    expect(levels).toEqual(['rx', 'intermediate', 'beginner', 'on_ramp'])
+  })
+
+  it('RX vine din section.movements + section.description (baza sectiunii), NU din scalingVersions', () => {
+    const section = mapLegacyWodToWorkout(wodFixture).sections[0]
+    const [rx] = metconScalingVariantsForDisplay(section)
+    expect(rx.movements).toEqual(wodFixture.movements_rx)
+  })
+
+  it('Intermediate/Beginner/OnRamp vin din scalingVersions, potrivite dupa level', () => {
+    const section = mapLegacyWodToWorkout(wodFixture).sections[0]
+    const [, intermediate, beginner, onRamp] = metconScalingVariantsForDisplay(section)
+    expect(intermediate.movements).toEqual(wodFixture.movements_intermediate)
+    expect(beginner.movements).toEqual(wodFixture.movements_beginner)
+    expect(onRamp.movements).toEqual(wodFixture.movements_onramp)
+  })
+
+  it('greutatea prescrisa pe gen vine din metadata.legacyWeights, nu din scalingVersions (care n-o contine deloc)', () => {
+    const wodWithWeights = {
+      ...wodFixture,
+      rx_weight_male: '61kg', rx_weight_female: '43kg',
+      intermediate_weight_male: '52kg', intermediate_weight_female: '34kg',
+    }
+    const section = mapLegacyWodToWorkout(wodWithWeights).sections[0]
+    const [rx, intermediate] = metconScalingVariantsForDisplay(section)
+    expect(rx.weightMale).toBe('61kg')
+    expect(rx.weightFemale).toBe('43kg')
+    expect(intermediate.weightMale).toBe('52kg')
+    expect(intermediate.weightFemale).toBe('34kg')
+  })
+
+  it('nota fiecarei variante: RX din section.description (notes_rx), restul din scalingVersions[i].notes', () => {
+    const wodWithNotes = { ...wodFixture, notes_rx: 'Scale la nevoie', notes_beginner: 'Foloseste banda' }
+    const section = mapLegacyWodToWorkout(wodWithNotes).sections[0]
+    const [rx, , beginner] = metconScalingVariantsForDisplay(section)
+    expect(rx.notes).toBe('Scale la nevoie')
+    expect(beginner.notes).toBe('Foloseste banda')
+  })
+
+  it('un nivel fara continut real (nici miscari, nici notite) intoarce movements gol si notes gol, nu undefined', () => {
+    const section = mapLegacyWodToWorkout(wodFixture).sections[0]
+    // wodFixture n-are variante lipsa in acest test (NED are toate 3) -
+    // simulam explicit o sectiune fara nicio scalingVersion.
+    const bareSection = { ...section, scalingVersions: [] }
+    const [, intermediate] = metconScalingVariantsForDisplay(bareSection)
+    expect(intermediate.movements).toEqual([])
+    expect(intermediate.notes).toBe('')
   })
 })
