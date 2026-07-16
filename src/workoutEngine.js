@@ -63,14 +63,24 @@ function legacyScalingVersion(level, movements, notes) {
  * de sectiune separate) - semnaleaza clar "randul asta nu exista ca atare
  * in DB, e derivat". `slotKey` (Faza 5B) e cheia naturala pe ROL semantic
  * (nu pe pozitie) - id-ul sintetic o foloseste direct, fara `order`, ca sa
- * ramana stabil chiar daca pozitia sectiunii se schimba. */
-function legacySectionFromArray(wodId, type, slotKey, order, movementsArr, title, format, formatConfig) {
+ * ramana stabil chiar daca pozitia sectiunii se schimba.
+ *
+ * `loggingMode` - vezi apelantul (mapLegacyWodToWorkout) pt valoarea reala
+ * pe ROL (warmup: 'none', skill/skill2: 'optional'). Fost hardcodat 'none'
+ * pt toate sectiunile din acest constructor (bug real, gasit in Faza 7) -
+ * Member View a avut mereu un buton functional de logare Skill/Skill2
+ * ("Log skill work"), dar mapare-a intoarcea 'none' pt ele, la fel ca
+ * Warm-up (care n-are niciun buton) - nimic nu citea inca acest camp
+ * pana la Faza 7, deci eroarea a fost inofensiva pana acum, dar afecta si
+ * randurile deja sincronizate in Workout Engine V2 (corectate separat,
+ * o singura data, printr-un UPDATE pe productie). */
+function legacySectionFromArray(wodId, type, slotKey, order, movementsArr, title, format, formatConfig, loggingMode = 'none') {
   return {
     id: `legacy:${wodId}:${slotKey}`,
     type, slotKey, title: title ?? null, description: null, order,
     format: format ?? null, formatConfig: formatConfig ?? {},
     movements: (movementsArr || []).map(legacyMovementText),
-    scalingVersions: [], loggingMode: 'none', scoreType: null,
+    scalingVersions: [], loggingMode, scoreType: null,
     duration: null, benchmarkMetadata: { name: null, isBenchmark: false, isHero: false },
     metadata: {},
   }
@@ -122,13 +132,13 @@ export function mapLegacyWodToWorkout(wod) {
   const sections = []
   let order = 0
   if (wod.warmup && wod.warmup.length) {
-    sections.push(legacySectionFromArray(wod.id, 'warmup', 'warmup', order++, wod.warmup))
+    sections.push(legacySectionFromArray(wod.id, 'warmup', 'warmup', order++, wod.warmup, null, null, null, 'none'))
   }
   if (wod.skill && wod.skill.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config))
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config, 'optional'))
   }
   if (wod.skill2 && wod.skill2.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config))
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config, 'optional'))
   }
   sections.push(legacyMetconSection(wod, order++))
 

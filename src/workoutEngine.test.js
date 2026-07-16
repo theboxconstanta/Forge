@@ -177,6 +177,20 @@ describe('mapLegacyWodToWorkout', () => {
     const w = mapLegacyWodToWorkout(wodFixture)
     expect(w.sections[0].id).toBe(`legacy:${wodFixture.id}:metcon`)
   })
+
+  it('Faza 7: loggingMode pe ROL - metcon "required", skill/skill2 "optional" (au buton de logare in Member View), warmup "none" (n-are)', () => {
+    const withAll = {
+      ...wodFixture,
+      warmup: ['400m Run'],
+      skill: ['Practice handstand holds'], skill_name: 'Skill', skill_type: 'Not For Time',
+      skill2: ['Practice pistol squats'], skill2_name: 'Skill 2', skill2_type: 'Not For Time',
+    }
+    const w = mapLegacyWodToWorkout(withAll)
+    expect(w.sections.find((s) => s.slotKey === 'warmup').loggingMode).toBe('none')
+    expect(w.sections.find((s) => s.slotKey === 'skill').loggingMode).toBe('optional')
+    expect(w.sections.find((s) => s.slotKey === 'skill2').loggingMode).toBe('optional')
+    expect(w.sections.find((s) => s.slotKey === 'metcon').loggingMode).toBe('required')
+  })
 })
 
 describe('mapV2WorkoutRow / mapV2SectionRow', () => {
