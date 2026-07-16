@@ -2781,11 +2781,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   }
 
   const stergeWod = async (id) => {
-    await supabase.from('wods').delete().eq('id', id)
-    // Faza 5A - sincronizeaza si stergerea (best effort, fire-and-forget,
-    // acelasi tipar ca saveWod/saveWodSection) - cascadeaza automat catre
-    // workout_sections (FK on delete cascade, Faza 1).
-    deleteWorkoutEngineV2ByLegacyWodId(id)
+    // Fix: workouts.legacy_wod_id -> wods.id n-are ON DELETE CASCADE (doar
+    // workout_sections cascadeaza DIN workouts, Faza 1) - stergerea trebuie
+    // sa inceapa cu copilul (workouts), altfel wods.delete() esueaza mereu
+    // cu incalcare de FK cand exista deja un rand Workout Engine V2
+    // sincronizat (cazul obisnuit, de la Faza 5A incoace - dual-write
+    // ruleaza la fiecare salvare). Asteptat explicit, nu mai e
+    // fire-and-forget - trebuie sa se termine INAINTE sa incercam sa stergem
+    // wods. Eroarea de la wods.delete() e acum verificata explicit (inainte
+    // era ignorata silentios, iar toast-ul de succes aparea indiferent daca
+    // stergerea reala reusise sau nu).
+    await deleteWorkoutEngineV2ByLegacyWodId(id)
+    const { error } = await supabase.from('wods').delete().eq('id', id)
+    if (error) { showToast(t.toastGenericError); console.error(error); return }
     if (id === editWodId) cancelEditWod()
     showToast(t.toastWodDeletedAdmin); await fetchWods(); onWodChanged?.()
   }
