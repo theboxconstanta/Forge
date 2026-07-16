@@ -20,6 +20,7 @@ import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
+import { syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId } from './workoutEngine'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
@@ -2552,11 +2553,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     // poate coincide cu un WOD deja existent chiar daca formularul n-a fost
     // deschis explicit prin "editeaza" (editWodId ramane null in cazul asta);
     // fara upsert, insert-ul ar esua cu eroare de duplicat pe wods_date_key.
-    const { error } = editWodId
-      ? await supabase.from('wods').update(payload).eq('id', editWodId)
-      : await supabase.from('wods').upsert(payload, { onConflict: 'gym_id,date' })
+    // .select().single() (nou, Faza 5A) - randul salvat e necesar pt
+    // sincronizarea Workout Engine V2 mai jos (are nevoie de `id`, printre
+    // altele) - nu schimba ce se scrie, doar ce se intoarce.
+    const { data, error } = editWodId
+      ? await supabase.from('wods').update(payload).eq('id', editWodId).select().single()
+      : await supabase.from('wods').upsert(payload, { onConflict: 'gym_id,date' }).select().single()
     if (error) { showToast(t.toastGenericError); console.error(error) }
     else {
+      // Faza 5A (Workout Engine V2, dual-write) - "best effort", NU asteptat
+      // (fire-and-forget) si NU poate strica salvarea de mai sus (deja
+      // reusita) - wods ramane sursa de adevar, o eroare aici doar se
+      // logheaza (vizibila in Sentry), fara sa afecteze coach-ul.
+      syncWorkoutEngineV2FromLegacyWod(data)
       showToast(editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin)
       await fetchWods(); onWodChanged?.()
       setEditWodId(null); setDataWod(todayLocalStr())
@@ -2575,9 +2584,14 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const saveWodSection = async (sectionFields, sectionLabel) => {
     if (!dataWod) { showToast(t.toastPickDate); return }
     setSavingWod(true)
-    let error
+    let error, savedRow
     if (editWodId) {
-      ;({ error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId))
+      // .select().single() (nou, Faza 5A) - update-ul e partial (doar
+      // campurile sectiunii), dar sincronizarea Workout Engine V2 are nevoie
+      // de RANDUL INTREG (toate sectiunile, nu doar cea salvata acum) - un
+      // singur round-trip in plus (PostgREST intoarce randul actualizat
+      // direct din update), nu o interogare separata.
+      ;({ data: savedRow, error } = await supabase.from('wods').update(sectionFields).eq('id', editWodId).select().single())
     } else {
       // Acelasi upsert pe conflict de data ca la saveWod (nu insert simplu) -
       // data implicita e azi, care poate coincide cu un WOD deja existent
@@ -2588,10 +2602,15 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       // oglindesc deja randul real din DB cand data se potriveste.
       const { data, error: upsertErr } = await supabase.from('wods').upsert(buildWodPayload(sectionFields), { onConflict: 'gym_id,date' }).select().single()
       error = upsertErr
+      savedRow = data
       if (!error && data) setEditWodId(data.id)
     }
     if (error) { showToast(t.toastGenericError); console.error(error) }
-    else { showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.() }
+    else {
+      // Faza 5A - vezi saveWod mai sus (acelasi tipar: best effort, fire-and-forget).
+      syncWorkoutEngineV2FromLegacyWod(savedRow)
+      showToast(t.toastSectionSaved(sectionLabel)); await fetchWods(); onWodChanged?.()
+    }
     setSavingWod(false)
   }
 
@@ -2684,6 +2703,10 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
 
   const stergeWod = async (id) => {
     await supabase.from('wods').delete().eq('id', id)
+    // Faza 5A - sincronizeaza si stergerea (best effort, fire-and-forget,
+    // acelasi tipar ca saveWod/saveWodSection) - cascadeaza automat catre
+    // workout_sections (FK on delete cascade, Faza 1).
+    deleteWorkoutEngineV2ByLegacyWodId(id)
     if (id === editWodId) cancelEditWod()
     showToast(t.toastWodDeletedAdmin); await fetchWods(); onWodChanged?.()
   }
