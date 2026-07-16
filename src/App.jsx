@@ -37,6 +37,7 @@ import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
   sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy,
 } from './wodSections'
+import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -905,6 +906,38 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
 // existente (FormatConfigEditor/CautareMiscare/MiscareQuickAdd/SortableList)
 // in loc sa le reimplementeze - vezi discutia de arhitectura din aceeasi
 // sesiune (Faza 6).
+// Workout Intelligence, WI-1 - traduce un semnal de revizuire (reason din
+// deriveReviewFlags, workoutIntelligence.js) in text afisabil. Pur, fara
+// stare - `t` vine din catalogul de traduceri, acelasi tipar ca restul UI.
+function reviewFlagLabel(flag, t) {
+  switch (flag.reason) {
+    case 'unknown_movement': return t.wiReviewUnknownMovement(flag.detail)
+    case 'ambiguous_format': return t.wiReviewAmbiguousFormat
+    case 'missing_weight': return t.wiReviewMissingWeight
+    case 'missing_distance': return t.wiReviewMissingDistance(flag.detail)
+    case 'unresolved_benchmark': return t.wiReviewUnresolvedBenchmark
+    default: return t.wiReviewNeedsReview
+  }
+}
+
+// Semnale de revizuire (WI-1) - inline, subtile, ne-blocante: un rand mic,
+// amber, cu cate o linie per semnal. Randat DOAR daca sectiunea are
+// reviewFlags (populat exclusiv la sectiunile venite dintr-un draft AI -
+// vezi analyzeWorkout - sectiunile create/editate manual nu au acest camp
+// deloc). Niciun buton, niciun blocaj - coach-ul editeaza campul normal,
+// exact ca inainte, semnalul ramane doar ca indiciu vizual pana la
+// urmatoarea analiza (WI-2 decide politica de reclick).
+function ReviewFlagsList({ flags, t }) {
+  if (!flags || flags.length === 0) return null
+  return (
+    <div style={{ background: '#FEF6E7', border: '1px solid #F5DFA8', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px' }}>
+      {flags.map((f, i) => (
+        <div key={i} style={{ fontSize: '11px', color: '#8A6116', padding: '1px 0' }}>🔎 {reviewFlagLabel(f, t)}</div>
+      ))}
+    </div>
+  )
+}
+
 function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, onMove, onMakePrimary, onSave, savingWod, t }) {
   // `patch` poate fi un obiect simplu SAU o functie `(variantaCurenta) =>
   // patch` - vezi comentariul din updateSection (App()) pentru motiv (doi
@@ -926,6 +959,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
           <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
             {section.title.trim() || typeLabel}
             {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '700' }}>★ {t.wodSectionPrimaryBadge}</span>}
+            {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '700' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -937,6 +971,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
       </div>
       {section.open && (
         <div style={{ marginTop: '10px' }}>
+          <ReviewFlagsList flags={section.reviewFlags} t={t} />
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
             <select value={section.typeKey}
               onChange={e => onChange({ typeKey: e.target.value, format: e.target.value === 'warmup' && !section.isPrimary ? null : (section.format || 'Weightlifting') })}
@@ -2656,13 +2691,17 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     return ramasCeva ? { ...s, variants } : s
   })
 
-  // Pasul 2B din Workout Intelligence Engine - apeleaza Edge Function-ul
-  // analyze-workout (deja deployat, raspunde deocamdata cu JSON MOCK, vezi
-  // supabase/functions/analyze-workout). Acelasi tipar de autentificare ca
-  // adminStergeClient (singurul alt loc care apeleaza o Edge Function direct
-  // din client) - sesiunea curenta, fara nicio logica de auth custom. Doar
-  // console.log pe raspuns - NU populeaza niciun camp din formular, NU
-  // salveaza nimic (ramane pt un pas ulterior).
+  // Workout Intelligence, WI-1 ("Paste-to-Draft") - apeleaza Edge
+  // Function-ul analyze-workout (real, gpt-5-mini) si populeaza AUTOMAT
+  // editorul nativ de Workout Sections (Faza 6) cu draftul primit -
+  // acelasi tipar de autentificare ca adminStergeClient. sectionsFromAiAnalysis/
+  // deriveReviewFlags (workoutIntelligence.js) sunt PURE, testate separat -
+  // aici doar le apelam si atasam rezultatul pe fiecare sectiune mapata
+  // (`reviewFlags`), citit de SectionCard/PrimarySectionBody pt semnalele
+  // simple, inline, ne-blocante (fara sistem de incredere - vezi comentariul
+  // din workoutIntelligence.js). Placeholder deliberat pt reclick (WI-2 va
+  // decide politica reala): daca formularul are deja continut, il
+  // suprascrie fara confirmare.
   const analyzeWorkout = async () => {
     if (!aiParseText.trim() || aiAnalyzing) return
     setAiAnalyzing(true)
@@ -2675,7 +2714,15 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json.error) throw new Error(json.error || t.toastGenericError)
-      console.log(json)
+      const mapped = sectionsFromAiAnalysis(json)
+      if (mapped.length === 0) { showToast(t.toastAnalyzeWorkoutEmpty); setAiAnalyzing(false); return }
+      const flags = deriveReviewFlags(json)
+      // open: true - draftul trebuie sa fie "imediat gata de revizuire"
+      // (cerinta WI-1), nu ascuns dupa carduri colapsate pe care coach-ul
+      // trebuie sa le deschida manual una cate una.
+      setWodSections(mapped.map((s, i) => ({ ...s, open: true, reviewFlags: flags.filter(f => f.sectionIndex === i) })))
+      setEditWodId(null)
+      showToast(t.toastAnalyzeWorkoutSuccess)
     } catch (e) {
       console.error('analyzeWorkout failed:', e)
       showToast(t.toastAnalyzeWorkoutError)

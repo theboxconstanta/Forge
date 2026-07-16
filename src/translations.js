@@ -597,6 +597,8 @@ export const TRANSLATIONS = {
     adminTabSetari: 'Setări',
     toastGenericError: '❌ Eroare!',
     toastAnalyzeWorkoutError: '❌ Nu am putut analiza antrenamentul. Încearcă din nou.',
+    toastAnalyzeWorkoutSuccess: '✓ Draft generat - verifică și salvează',
+    toastAnalyzeWorkoutEmpty: 'Nu am putut identifica niciun antrenament în text.',
     toastCoachAdded: '✓ Coach adăugat',
     toastCoachRemoved: '✓ Coach scos',
     toastSettingsSaved: '✓ Setări salvate!',
@@ -806,6 +808,15 @@ export const TRANSLATIONS = {
       ? 'Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - niciuna nu e marcată acum.'
       : `Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - ${n} sunt marcate acum.`,
     wodSectionsErrorTooMany: (n) => `Prea multe sectiuni suplimentare (${n}) - Member View-ul actual poate arăta cel mult 3, pe lângă sectiunea principală. Șterge sau reorganizează sectiunile ca să poți salva.`,
+
+    // Workout Intelligence, WI-1 - semnale simple de revizuire pe un draft generat de AI
+    wiReviewBadge: (n) => `🔎 ${n} de verificat`,
+    wiReviewUnknownMovement: (detail) => `Mișcare nerecunoscută: "${detail}"`,
+    wiReviewAmbiguousFormat: 'Formatul nu a fost determinat cu certitudine',
+    wiReviewMissingWeight: 'Greutate lipsă',
+    wiReviewMissingDistance: (detail) => `Distanță/calorii lipsă: "${detail}"`,
+    wiReviewUnresolvedBenchmark: 'Pare un WOD de referință cunoscut, dar numele exact n-a putut fi determinat',
+    wiReviewNeedsReview: 'De verificat manual',
 
     // Admin - tab Planuri
     adminPlansNewTitle: '+ Plan nou',
@@ -1428,6 +1439,8 @@ export const TRANSLATIONS = {
     adminTabSetari: 'Settings',
     toastGenericError: '❌ Error!',
     toastAnalyzeWorkoutError: '❌ Unable to analyze workout. Please try again.',
+    toastAnalyzeWorkoutSuccess: '✓ Draft generated - review and save',
+    toastAnalyzeWorkoutEmpty: 'Could not identify any workout in that text.',
     toastCoachAdded: '✓ Coach added',
     toastCoachRemoved: '✓ Coach removed',
     toastSettingsSaved: '✓ Settings saved!',
@@ -1637,6 +1650,15 @@ export const TRANSLATIONS = {
       ? 'Exactly one section must be marked as the primary (scored) workout - none is marked right now.'
       : `Exactly one section must be marked as the primary (scored) workout - ${n} are marked right now.`,
     wodSectionsErrorTooMany: (n) => `Too many additional sections (${n}) - the current Member View can show at most 3 alongside the primary section. Remove or reorganize sections to save.`,
+
+    // Workout Intelligence, WI-1 - simple review signals on an AI-generated draft
+    wiReviewBadge: (n) => `🔎 ${n} to review`,
+    wiReviewUnknownMovement: (detail) => `Unrecognized movement: "${detail}"`,
+    wiReviewAmbiguousFormat: 'Format could not be determined confidently',
+    wiReviewMissingWeight: 'Missing weight',
+    wiReviewMissingDistance: (detail) => `Missing distance/calories: "${detail}"`,
+    wiReviewUnresolvedBenchmark: 'Looks like a known benchmark WOD, but the exact name could not be determined',
+    wiReviewNeedsReview: 'Needs manual review',
 
     // Admin - tab Planuri
     adminPlansNewTitle: '+ New plan',
