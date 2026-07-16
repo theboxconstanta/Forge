@@ -4257,7 +4257,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
 // Sectiune Skill Work pe Acasa (SKILL sau SKILL 2 - aceeasi randare, doar
 // alte date) - extrasa ca sa nu duplicam ~50 de linii JSX identice pentru
 // cele 2 sloturi.
-function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, skillFormatConfig, logZiSkill, isOpen, onToggle, onLogClick, userProfile, hiddenFromMembers, t }) {
+function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, skillFormatConfig, logZiSkill, isOpen, onToggle, onLogClick, userProfile, hiddenFromMembers, loggable = true, t }) {
   const areDate = (skillMovements || []).length > 0 || skillName || skillFormatConfig
   if (!areDate) return null
   return (
@@ -4325,10 +4325,12 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
               ))
             })()}
           </div>
-          <button onClick={onLogClick}
-            style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-            {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
-          </button>
+          {loggable && (
+            <button onClick={onLogClick}
+              style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
+            </button>
+          )}
         </>
       )}
     </div>
@@ -5379,8 +5381,15 @@ function App() {
       }
       resultCurat = resultCurat.trim() || null
     }
+    // Faza 8 - acelasi principiu ca la saveWodLog: leaga logul de sectiunea
+    // skill/skill2 din Workout Engine V2 doar cand exista deja un rand V2
+    // real (wodZiWorkoutV2), gasita dupa slotKey (identic cu cum Member View
+    // gaseste sectiunea de afisat, vezi workoutForDisplay/supportingSectionsV).
+    const skillSectionIdV2 = wodZiWorkoutV2
+      ? (supportingSectionsV.find(s => s.slotKey === (esteSlot2 ? 'skill2' : 'skill'))?.id || null) : null
     const { error } = await supabase.from('skill_logs').upsert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData.id, slot: skillLogSlot,
+      workout_section_id: skillSectionIdV2,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
       // Acelasi motiv ca la wod_logs mai sus - Skill Work e mereu legat de un
@@ -5845,8 +5854,16 @@ function App() {
     // wod_id era deja cel corect. Doar la WOD-uri oficiale - o "Logare
     // Noua" libera ramane "azi, acum", ca inainte (vezi dateWithCurrentTime).
     const loggedAt = (variantaAleasa !== null && wodZiData?.date) ? dateWithCurrentTime(wodZiData.date) : undefined
+    // Faza 8 - leaga logul de sectiunea primara din Workout Engine V2, DOAR
+    // cand exista deja un rand V2 real (wodZiWorkoutV2, nu fallback-ul legacy
+    // sintetizat de mapLegacyWodToWorkout, care are id-uri text "legacy:...",
+    // nu uuid-uri reale). O "Logare Noua" libera (variantaAleasa === null)
+    // nu se leaga de nicio sectiune, la fel ca wod_id mai sus.
+    const sectionIdV2 = (variantaAleasa !== null && wodZiWorkoutV2)
+      ? (primarySectionV?.id || null) : null
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
+      workout_section_id: sectionIdV2,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
@@ -6746,7 +6763,8 @@ function App() {
                         skillType={skillSection?.format} skillFormatConfig={skillSection?.formatConfig}
                         logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
                         onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill_visible === false && (isAdmin || isCoach)} t={t} />
+                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill_visible === false && (isAdmin || isCoach)}
+                        loggable={skillSection?.loggingMode !== 'none'} t={t} />
                     )
                   })()}
                   {(() => {
@@ -6759,7 +6777,8 @@ function App() {
                         skillType={skill2Section?.format} skillFormatConfig={skill2Section?.formatConfig}
                         logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
                         onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
-                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill2_visible === false && (isAdmin || isCoach)} t={t} />
+                        userProfile={userProfile} hiddenFromMembers={wodZiData?.skill2_visible === false && (isAdmin || isCoach)}
+                        loggable={skill2Section?.loggingMode !== 'none'} t={t} />
                     )
                   })()}
                   {metconVariantsForDisplay(primarySectionV).map((v, i) => {
