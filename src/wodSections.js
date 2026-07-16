@@ -89,6 +89,26 @@ export const DEFAULT_NEW_WOD_SECTIONS = () => [
 // real sau vizibilitate explicit dezactivata (altfel formularul ar arata
 // carduri goale "fantoma" pt sloturi niciodata folosite) - sectiunea primara
 // e mereu prezenta (orice WOD salvat are un workout de baza).
+//
+// DATORIE DE MIGRATIE CUNOSCUTA (acceptata deliberat, Faza 6, discutata cu
+// userul dupa livrarea Fazei 6): typeKey pt sectiunile non-primare e
+// HARDCODAT aici ('warmup'/'skill'), NU citit din `wods` (care n-are nicio
+// coloana pt asta) - un tip custom ales de coach (ex. 'cooldown') salvat
+// corect in workout_sections.section_type_id la primul save e "uitat" la
+// urmatoarea editare, fiindca formularul se re-hidrateaza din randul legacy,
+// nu din V2. Impact ASTAZI: zero - nimic nu citeste inca section_type_id din
+// V2 (Member View citeste doar coloanele `wods`). Decizie: NU se repara
+// izolat (ar insemna fie sa umflam schema `wods` pt un model pe cale de
+// disparitie, fie sa mutam prematur doar o felie din read-path-ul spre V2).
+//
+// CRITERIU DE ACCEPTARE EXPLICIT pt urmatoarea migratie a read-path-ului spre
+// Workout Engine V2 (editor si/sau Member View - orice faza care incepe sa
+// citeasca native din workout_sections in loc sa reconstruiasca din `wods`):
+// tipurile de sectiune TREBUIE hidratate din Workout Engine V2
+// (workout_sections.section_type_id), NICIODATA reconstruite din coloanele
+// legacy `wods`. Aceasta functie (sectionsFromLegacyWod) ramane calea de
+// fallback DOAR pt WOD-uri fara randuri V2 inca - nu trebuie sa devina si ea
+// sursa de tip odata ce V2 exista pt un WOD dat.
 export const sectionsFromLegacyWod = (w, opts = {}) => {
   if (!w) return DEFAULT_NEW_WOD_SECTIONS()
   const open = !!opts.open
