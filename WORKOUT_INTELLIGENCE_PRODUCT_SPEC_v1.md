@@ -1,9 +1,14 @@
 # Workout Intelligence — Product Specification v1
 
-Status: Phase 0 (Product & Architecture Discovery). No code, no schema, no
-deployment — this is a design document only. Built on top of Workout
-Engine V2 (Phases 0–8, closed 2026-07-16), which is now Forge's primary
-architecture.
+**Status: APPROVED as the v1 product vision (2026-07-16).** Phase 0
+(Product & Architecture Discovery) is closed. No code, no schema, no
+deployment has happened under this initiative — this remains a design
+document. Built on top of Workout Engine V2 (Phases 0–8, closed
+2026-07-16), which is now Forge's primary architecture. The
+Transcription-Assistant-vs-Programming-Advisor distinction below is
+confirmed as the framing to carry through the entire roadmap, not just
+this document — Programming Advisor is the real long-term product;
+Transcription Assistant is only its entry point.
 
 ---
 
@@ -47,6 +52,12 @@ Job 2 (the actual moat) awkward to add later.
 
 ## Design Principles
 
+0. **Workout Intelligence exists to make coaches better, not to replace
+   them.** Every capability we ship should increase a coach's confidence,
+   speed, or programming quality while leaving the final decision entirely
+   in human hands. This is the north star every other principle below is
+   in service of — when a proposed feature is unclear, this is the test
+   it has to pass.
 1. **The coach is the editor of record. The AI is a draft generator.**
    Nothing the AI produces is final until a human looks at it in the same
    editor they'd use to write it by hand.
@@ -314,3 +325,80 @@ Intelligence is buildable *now* and wasn't before:
    long-term above, but worth revisiting once V1's paste-based flow has
    real usage data — it might turn out to be the more-used entry point
    than pasted text ever was.
+
+---
+
+## V1 (Transcription Assistant) — Proposed Implementation Phases
+
+Design only — no code has been written yet. This breakdown exists so V1
+gets the same discipline every Workout Engine V2 phase had: small,
+reversible, independently-testable increments, each with its own live
+validation before the next begins.
+
+**Two architectural facts driving this breakdown**, surfaced now so they
+don't get discovered mid-implementation:
+
+- The AI's `sections` output (rich objects: `{name, canonicalName, reps,
+  weight, distance, ...}` per movement) and the Native Section Editor's
+  local form state (Phase 6 — movements as plain text lines, e.g. inside
+  a newline-separated `text`/`variants[key].movements` string) are
+  **different shapes**. Wiring the AI response into the editor isn't a
+  copy — it requires composing structured movement objects back into the
+  same text-line format the editor and `legacyPayloadFromSections`
+  already expect. This is real, new, pure-function work, not "connect A
+  to B."
+- No confidence/uncertainty concept exists anywhere today — not in the
+  edge function's schema, not in the domain model, not in the UI. V1 has
+  to either derive it heuristically from signals the schema already has
+  (`canonicalName: null`, missing weight, a fallback/default format —
+  no edge function changes needed) or have the AI explicitly report its
+  own confidence (a scoped edge-function/prompt change). Recommendation:
+  start heuristic-only for WI-2 — faster, no prompt re-tuning risk —
+  and revisit explicit AI-reported confidence only if heuristics prove
+  too coarse in practice.
+
+**WI-1 — AI Draft → Editor Mapping.**
+Build a pure `sectionsFromAiAnalysis(analysis)` function (same pattern as
+`sectionsFromLegacyWod`), composing the AI's structured movements into the
+editor's text-line shape, and wire `analyzeWorkout()`'s success handler to
+call `setWodSections(...)` with it instead of `console.log`. No confidence
+UI, no re-analysis protection yet — deliberately deferred. Unit-tested
+against representative fixtures (AMRAP, For Time, Complex, chained,
+benchmark). Validated live: paste real workouts locally, confirm the
+editor populates plausibly, confirm save/publish behaves exactly as
+before. This phase alone is independently shippable — a coach could use
+"paste → auto-filled draft → manual review" even before confidence
+markers exist.
+
+**WI-2 — Confidence Signal Design.**
+Decide and implement the heuristic-derivation approach above. Build a
+pure `deriveConfidenceFlags(analysis)` alongside WI-1's mapping — its own
+testable data structure, still no UI. Unit-tested against the same
+fixtures, including deliberately ambiguous/incomplete ones.
+
+**WI-3 — Confidence UI (Review Layer).**
+Surface WI-2's flags as small, non-blocking in-card markers in the
+existing section components — purely presentational, no new data flow.
+Open design decision to resolve in this phase: does a marker clear the
+moment a coach edits that field (editing *is* the review), or persist
+until save regardless? Leaning toward the former, but this is a real
+decision, not a default.
+
+**WI-4 — Re-analysis Safety.**
+Decide and implement what happens if "Analizează" is clicked again on a
+form that already has content (AI-populated or hand-typed). This is a
+destructive action distinct from "never block publish" (principle #5) —
+it blocks nothing about publishing, only protects against silently
+discarding a coach's already-started draft, the same way any other
+destructive action in this app gets a confirmation step.
+
+**WI-5 — Live Validation + Rollout.**
+Full validation pass across format diversity (AMRAP, For Time, Complex,
+Chained AMRAP, benchmark recognition, ambiguous/incomplete source text),
+local dev then production, with direct DB confirmation of published
+results — same rigor as every Workout Engine V2 phase, including cleaning
+up any test data from the shared database before closing the phase.
+
+No phase here has been started or approved for implementation. Next step
+is your review of this breakdown — adjust, reorder, or approve before any
+code is written.
