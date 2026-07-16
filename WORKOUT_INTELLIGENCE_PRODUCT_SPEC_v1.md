@@ -330,13 +330,21 @@ Intelligence is buildable *now* and wasn't before:
 
 ## V1 (Transcription Assistant) — Proposed Implementation Phases
 
-Design only — no code has been written yet. This breakdown exists so V1
-gets the same discipline every Workout Engine V2 phase had: small,
-reversible, independently-testable increments, each with its own live
-validation before the next begins.
+*Revised 2026-07-16: WI-1 now delivers the complete first user-facing
+experience in one phase, not a mapping-only slice — per direction that
+the "wow moment" (paste → analyze → populated, review-ready draft) must
+land as a single, whole experience, not spread across several releases a
+coach would never see the point of individually.*
 
-**Two architectural facts driving this breakdown**, surfaced now so they
-don't get discovered mid-implementation:
+Design only — no code has been written yet. This breakdown still keeps
+the discipline every Workout Engine V2 phase had (independently
+validated, reversible increments) — it's just that the *first* increment
+is now sized to be the whole coach-facing moment, with the smaller,
+purely-internal concerns (re-analysis safety, full rollout validation)
+following it as their own phases.
+
+**Two architectural facts driving WI-1**, surfaced now so they don't get
+discovered mid-implementation:
 
 - The AI's `sections` output (rich objects: `{name, canonicalName, reps,
   weight, distance, ...}` per movement) and the Native Section Editor's
@@ -347,57 +355,64 @@ don't get discovered mid-implementation:
   same text-line format the editor and `legacyPayloadFromSections`
   already expect. This is real, new, pure-function work, not "connect A
   to B."
-- No confidence/uncertainty concept exists anywhere today — not in the
-  edge function's schema, not in the domain model, not in the UI. V1 has
-  to either derive it heuristically from signals the schema already has
-  (`canonicalName: null`, missing weight, a fallback/default format —
-  no edge function changes needed) or have the AI explicitly report its
-  own confidence (a scoped edge-function/prompt change). Recommendation:
-  start heuristic-only for WI-2 — faster, no prompt re-tuning risk —
-  and revisit explicit AI-reported confidence only if heuristics prove
-  too coarse in practice.
+- No review-signal concept exists anywhere today — not in the edge
+  function's schema, not in the domain model, not in the UI. Per
+  direction, this stays deliberately simple for V1: no confidence scores,
+  no graduated levels, just a small fixed set of flag *reasons* (unknown
+  movement, ambiguous format, missing weight, missing distance,
+  unresolved benchmark, and a catch-all for anything else the parser
+  couldn't determine) — derived heuristically from signals the schema
+  already returns (`canonicalName: null`, missing weight/distance
+  fields, a fallback/default format, `isBenchmark` inconclusive). No
+  edge-function or prompt changes needed for this.
 
-**WI-1 — AI Draft → Editor Mapping.**
-Build a pure `sectionsFromAiAnalysis(analysis)` function (same pattern as
-`sectionsFromLegacyWod`), composing the AI's structured movements into the
-editor's text-line shape, and wire `analyzeWorkout()`'s success handler to
-call `setWodSections(...)` with it instead of `console.log`. No confidence
-UI, no re-analysis protection yet — deliberately deferred. Unit-tested
-against representative fixtures (AMRAP, For Time, Complex, chained,
-benchmark). Validated live: paste real workouts locally, confirm the
-editor populates plausibly, confirm save/publish behaves exactly as
-before. This phase alone is independently shippable — a coach could use
-"paste → auto-filled draft → manual review" even before confidence
-markers exist.
+**WI-1 — Paste-to-Draft: the complete coach experience.**
+Everything a coach needs for the full "wow moment," as one phase:
 
-**WI-2 — Confidence Signal Design.**
-Decide and implement the heuristic-derivation approach above. Build a
-pure `deriveConfidenceFlags(analysis)` alongside WI-1's mapping — its own
-testable data structure, still no UI. Unit-tested against the same
-fixtures, including deliberately ambiguous/incomplete ones.
+1. **AI Draft → Editor Mapping.** A pure `sectionsFromAiAnalysis(analysis)`
+   function (same pattern as `sectionsFromLegacyWod`), composing the AI's
+   structured movements into the editor's text-line shape.
+   `analyzeWorkout()`'s success handler calls `setWodSections(...)` with
+   it instead of `console.log` — the Native Section Editor is populated
+   automatically, no extra click, no intermediate screen.
+2. **Lightweight review signals.** A pure `deriveReviewFlags(analysis)`
+   function producing the small fixed set of flag reasons above, surfaced
+   as simple, non-blocking, inline markers directly on the affected
+   fields in the existing section components — no separate panel, no
+   summary screen, no scoring. A coach's eye should land on exactly the
+   handful of things worth a second look within a couple of seconds of
+   the draft appearing.
+3. **Minimal re-analysis behavior** (just enough to be safe, not the
+   full policy): clicking "Analizează" again while a draft already exists
+   overwrites it — acceptable for this phase given real usage will start
+   as a single coach reviewing their own drafts — but this is explicitly
+   a placeholder, not a decided policy; WI-2 below is where the real
+   safeguard gets designed and built.
 
-**WI-3 — Confidence UI (Review Layer).**
-Surface WI-2's flags as small, non-blocking in-card markers in the
-existing section components — purely presentational, no new data flow.
-Open design decision to resolve in this phase: does a marker clear the
-moment a coach edits that field (editing *is* the review), or persist
-until save regardless? Leaning toward the former, but this is a real
-decision, not a default.
+**Acceptance bar for WI-1** (the concrete "done" test, not just a vibe):
+a coach pastes a realistic workout, clicks Analizează, and within a few
+seconds has a draft that is **approximately 95% complete and immediately
+ready for review** — correct format, correct sections, movements
+recognized, scaling drafted, with only the genuinely uncertain handful of
+fields flagged. Validated with a representative fixture set (AMRAP, For
+Time, Complex, Chained AMRAP, a recognized benchmark, and at least one
+deliberately messy/ambiguous input) both as unit tests for the two pure
+functions and as a live, real-editor pass in local dev before this phase
+is considered done.
 
-**WI-4 — Re-analysis Safety.**
-Decide and implement what happens if "Analizează" is clicked again on a
-form that already has content (AI-populated or hand-typed). This is a
-destructive action distinct from "never block publish" (principle #5) —
-it blocks nothing about publishing, only protects against silently
-discarding a coach's already-started draft, the same way any other
-destructive action in this app gets a confirmation step.
+**WI-2 — Re-analysis Safety.**
+Decide and implement the real policy for re-clicking "Analizează" over an
+already-edited draft (replacing WI-1's placeholder overwrite-always
+behavior). This protects "nothing is AI-owned forever" (principle #4) —
+a destructive action distinct from "never block publish" (principle #5),
+since it blocks nothing about publishing, only protects against silently
+discarding a coach's already-started edits.
 
-**WI-5 — Live Validation + Rollout.**
-Full validation pass across format diversity (AMRAP, For Time, Complex,
-Chained AMRAP, benchmark recognition, ambiguous/incomplete source text),
-local dev then production, with direct DB confirmation of published
-results — same rigor as every Workout Engine V2 phase, including cleaning
-up any test data from the shared database before closing the phase.
+**WI-3 — Live Validation + Rollout.**
+Full validation pass across format diversity, local dev then production,
+with direct DB confirmation of published results — same rigor as every
+Workout Engine V2 phase, including cleaning up any test data from the
+shared database before closing the phase.
 
 No phase here has been started or approved for implementation. Next step
 is your review of this breakdown — adjust, reorder, or approve before any
