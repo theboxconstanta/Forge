@@ -137,6 +137,48 @@ describe('composeSection - family sets', () => {
     const s = section({ format: 'Death By', formatConfig: { startReps: 2, incrementReps: 2, intervalSec: 60 }, movements: ['Burpees'] })
     expect(composeSection(s, 'rx').scoreNote).toBe('death-by-escalating')
   })
+
+  // Teste de regresie adaugate dupa refactorul care a eliminat toate
+  // ramurile `formatId === 'X'` (detectie generica dupa campuri de config
+  // deja existente - vezi comentariile din archetypeTextForSets). Fixeaza
+  // comportamentul EXACT identic cu inainte de refactor pentru formatele
+  // care nu mai aveau teste explicite (Tabata/Intervals/Death By Weight),
+  // plus titlul complet "DEATH BY" (inainte doar scoreNote era testat).
+  it('Death By: titlul e "DEATH BY", detectat din startReps+incrementReps (nu din formatId)', () => {
+    const s = section({ format: 'Death By', formatConfig: { startReps: 2, incrementReps: 2, intervalSec: 60 }, movements: ['Burpees'] })
+    expect(composeSection(s, 'rx').primary.text).toBe('DEATH BY')
+  })
+
+  it('Death By Weight: acelasi titlu "DEATH BY" si scoreNote, detectate din startWeight+incrementWeight', () => {
+    const s = section({ format: 'Death By Weight', formatConfig: { startWeight: 40, incrementWeight: 5, intervalSec: 60 }, movements: ['Deadlift'] })
+    const out = composeSection(s, 'rx')
+    expect(out.primary.text).toBe('DEATH BY')
+    expect(out.scoreNote).toBe('death-by-escalating')
+  })
+
+  it('Tabata/Intervals: fallback generic (formatId.toUpperCase()) produce acelasi text ca inainte de refactor', () => {
+    const tabata = section({ format: 'Tabata', formatConfig: { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Lowest Reps' }, movements: ['Burpees'] })
+    const intervals = section({ format: 'Intervals', formatConfig: { rounds: 5, workSec: 40, restSec: 20, scoringMode: 'Total Reps' }, movements: ['Wall Balls'] })
+    expect(composeSection(tabata, 'rx').primary.text).toBe('TABATA')
+    expect(composeSection(intervals, 'rx').primary.text).toBe('INTERVALS')
+  })
+})
+
+describe('composeSection - Partner WOD (regresie dupa eliminarea ramurilor formatId)', () => {
+  it('baseFormat AMRAP: "AMRAP N", detectat din cfg.baseFormat (nu din formatId==="Partner WOD")', () => {
+    const s = section({ format: 'Partner WOD', formatConfig: { splitType: 'You go/I go', baseFormat: 'AMRAP', durationSec: 1200 }, movements: ['Wall Balls', 'Row'] })
+    expect(composeSection(s, 'rx').primary.text).toBe('AMRAP 20')
+  })
+
+  it('baseFormat For Time cu rounds: "N ROUNDS FOR TIME", detectat din cfg.rounds', () => {
+    const s = section({ format: 'Partner WOD', formatConfig: { splitType: 'Shared reps', baseFormat: 'For Time', rounds: 4 }, movements: ['Run 400m'] })
+    expect(composeSection(s, 'rx').primary.text).toBe('4 ROUNDS FOR TIME')
+  })
+
+  it('baseFormat For Time fara rounds: "FOR TIME"', () => {
+    const s = section({ format: 'Partner WOD', formatConfig: { splitType: 'Synchro', baseFormat: 'For Time' }, movements: ['Row 1000m'] })
+    expect(composeSection(s, 'rx').primary.text).toBe('FOR TIME')
+  })
 })
 
 describe('composeSection - family nft', () => {

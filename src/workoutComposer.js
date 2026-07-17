@@ -74,42 +74,68 @@ function minutesLabel(sec) {
   return sec % 60 === 0 ? String(sec / 60) : secToTime(sec)
 }
 
+// O schema "creste in fiecare runda" (Ascending AMRAP/Death By/Death By
+// Weight) e deja reprezentata STRUCTURAL, prin PREZENTA acestor 2 perechi de
+// campuri in config - niciun format fara aceasta conventie de escaladare nu
+// le are pe amandoua. Citeste direct campurile (nu numele formatului) - un
+// format nou cu aceeasi conventie (startX/incrementX) e recunoscut automat,
+// fara nicio schimbare aici. Inlocuieste vechea dependenta de `fmt.ascending`
+// (catalog flag folosit azi doar la Ascending AMRAP, nu si la Death By, desi
+// ambele au STRUCTURAL aceeasi forma) - flag-ul ramane in workoutFormats.js
+// (folosit real in App.jsx/FormatLogger.jsx pt calculul rundelor la logare),
+// dar Composer-ul nu mai depinde de el.
+function hasEscalatingScheme(config) {
+  const cfg = config || {}
+  return (cfg.startReps != null && cfg.incrementReps != null) || (cfg.startWeight != null && cfg.incrementWeight != null)
+}
+
+// Niciun `formatId === 'X'` mai jos - fiecare ramura citeste un camp de
+// config deja existent, cu acelasi inteles peste toate formatele care il
+// poarta (vezi comentariul din dreptul fiecarei ramuri pentru DE CE campul
+// ales e sursa corecta, nu o coincidenta):
+// - `cfg.baseFormat === 'AMRAP'` - Partner WOD e SINGURUL format 'scored'
+//   care are un camp `baseFormat`, deci verificarea lui nu prinde niciodata
+//   alt format din greseala.
+// - `cfg.rounds` - RFT (obligatoriu), For Time (opțional, populat DOAR la
+//   structure 'Repeated Rounds' - conventie deja documentata la campul din
+//   catalog) si Partner WOD (opțional, populat DOAR la baseFormat 'For
+//   Time') folosesc TOATE acelasi camp, cu acelasi inteles ("numarul de
+//   runde prescrise") - simpla lui PREZENTA e deja semnalul, fara sa mai
+//   trebuiasca stiut care format il poarta.
 function archetypeTextForScored(formatId, config) {
   const fmt = getFormat(formatId)
   const cfg = config || {}
-  if (fmt.scoreMode === 'amrap') {
+  const isAmrap = fmt.scoreMode === 'amrap' || cfg.baseFormat === 'AMRAP'
+  if (isAmrap) {
     const dur = minutesLabel(cfg.durationSec ?? cfg.totalDurationSec)
     return dur != null ? `AMRAP ${dur}` : 'AMRAP'
   }
   if (fmt.scoreMode === 'single_value') return 'MAX EFFORT'
-  // 'fortime_or_amrap': runde repetate (RFT, "For Time" cu structure
-  // 'Repeated Rounds', Partner WOD For Time cu runde) -> "N ROUNDS FOR TIME".
-  // Orice alt caz (secventa unica - For Time/Chipper/Ladder/Partner WOD For
-  // Time fara runde) -> "FOR TIME", fara sa repete un numar care oricum
-  // apare deja ca `scheme` la nivel de bloc (vezi hoistScheme).
-  if (formatId === 'Partner WOD' && cfg.baseFormat === 'AMRAP') {
-    const dur = minutesLabel(cfg.durationSec)
-    return dur != null ? `AMRAP ${dur}` : 'AMRAP'
-  }
-  const repeatedRounds = formatId === 'RFT'
-    || (formatId === 'For Time' && cfg.structure === 'Repeated Rounds')
-    || (formatId === 'Partner WOD' && cfg.baseFormat === 'For Time' && cfg.rounds)
-  if (repeatedRounds && cfg.rounds) return `${cfg.rounds} ROUNDS FOR TIME`
+  if (cfg.rounds) return `${cfg.rounds} ROUNDS FOR TIME`
   return 'FOR TIME'
 }
 
+// Idem - niciun `formatId === 'X'` mai jos:
+// - `cfg.totalRounds` - doar EMOM are acest camp (Tabata/Intervals au
+//   `rounds`, nu `totalRounds`) - prezenta lui identifica exact forma "runda
+//   fixa la fiecare interval", indiferent de numele formatului.
+// - `hasEscalatingScheme` - vezi mai sus, aceeasi sursa ca la scoreNote.
+// - fallback-ul generic (`formatId.toUpperCase()`) acopera Tabata/Intervals
+//   FARA sa le distinga explicit intre ele - numele lor DEJA e cuvantul
+//   corect de whiteboard ("TABATA"/"INTERVALS"), la fel ca "AMRAP"/"EMOM" -
+//   nu exista NICIUN camp care sa le deosebeasca structural azi (config
+//   identic: rounds+workSec+restSec+scoringMode), deci nu exista nimic de
+//   citit generic - fallback-ul e deja raspunsul corect, nu o aproximare.
 function archetypeTextForSets(formatId, config, strippedMovements) {
   const fmt = getFormat(formatId)
   const cfg = config || {}
   if (fmt.rowMode === 'interval') {
-    if (formatId === 'EMOM') {
+    if (cfg.totalRounds != null) {
       const totalSec = estimateTotalDurationSec(formatId, cfg)
       const dur = minutesLabel(totalSec)
       return dur != null ? `EMOM ${dur}` : 'EMOM'
     }
-    if (formatId === 'Tabata') return 'TABATA'
-    if (formatId === 'Intervals') return 'INTERVALS'
-    if (formatId === 'Death By' || formatId === 'Death By Weight') return 'DEATH BY'
+    if (hasEscalatingScheme(cfg)) return 'DEATH BY'
     return (formatId || '').toUpperCase()
   }
   // rowMode 'round' - azi doar 'Complex'. "6 SETS" (din config.rounds), NU
@@ -136,8 +162,9 @@ function composeScored(section, fmt, config, movements, identity) {
   const primaryText = archetypeTextForScored(section.format, config)
   // Ascending AMRAP/Death By (vezi mai jos, family 'sets') au o conventie de
   // scor care nu reiese din titlu (runde de marime CRESCATOARE, nu fixa) -
-  // exceptia ingusta din Core Principle (scoreNote).
-  const scoreNote = fmt.ascending ? 'ascending-rounds' : null
+  // exceptia ingusta din Core Principle (scoreNote). hasEscalatingScheme
+  // citeste direct campurile de config (nu formatId) - vezi comentariul ei.
+  const scoreNote = hasEscalatingScheme(config) ? 'ascending-rounds' : null
   return { identity, primary: { text: primaryText }, blocks: [block], scoreNote }
 }
 
@@ -153,7 +180,7 @@ function composeSets(section, fmt, config, movements, identity) {
   // linie de miscare n-ar adauga nimic, doar ar dubla titlul ("Back Squat" /
   // "Back Squat", gasit live la validare pe "Clean The Floor"/"GET UP").
   const finalBlock = (stripped.length === 1 && stripped[0] === primaryText) ? { ...block, movements: [] } : block
-  const scoreNote = (section.format === 'Death By' || section.format === 'Death By Weight') ? 'death-by-escalating' : null
+  const scoreNote = hasEscalatingScheme(config) ? 'death-by-escalating' : null
   return { identity, primary: { text: primaryText }, blocks: [finalBlock], scoreNote }
 }
 
