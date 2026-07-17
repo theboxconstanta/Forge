@@ -45,6 +45,17 @@ function toEquipmentItem(e: any) {
   return { name: e?.name ?? "", quantityHint: e?.quantityHint ?? null };
 }
 
+function toStage(st: any) {
+  // movements e text simplu (vezi openaiSchema.ts, STAGE_DEF) - nu trece
+  // prin toMovement.
+  return {
+    kind: st?.kind === "interval" ? "interval" : "amrap",
+    durationSeconds: st?.durationSeconds ?? null,
+    intervalSeconds: st?.intervalSeconds ?? null,
+    movements: Array.isArray(st?.movements) ? st.movements.filter((m: any) => typeof m === "string" && m.trim()) : [],
+  };
+}
+
 function toFormatConfig(fc: any) {
   return {
     timeCapMinutes: fc?.timeCapMinutes ?? null,
@@ -54,6 +65,7 @@ function toFormatConfig(fc: any) {
     restSeconds: fc?.restSeconds ?? null,
     startReps: fc?.startReps ?? null,
     incrementReps: fc?.incrementReps ?? null,
+    stages: Array.isArray(fc?.stages) ? fc.stages.map(toStage) : [],
   };
 }
 

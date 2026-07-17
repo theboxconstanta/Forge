@@ -31,7 +31,7 @@ function toMovementShape(m) {
 
 const section = (overrides = {}) => ({
   type: 'metcon', title: null, description: null, order: 0,
-  format: 'AMRAP', formatConfig: { timeCapMinutes: 20, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null },
+  format: 'AMRAP', formatConfig: { timeCapMinutes: 20, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null, stages: null },
   movements: [toMovementShape(movement())],
   equipment: [],
   scalingVersions: [],
@@ -154,9 +154,67 @@ describe('sectionFromAiSection - primary section', () => {
     expect(s.variants.onramp.movements).toEqual(['10 Air Squats'])
   })
 
-  it('does not synthesize formatConfig fields the AI schema has no source for (Chained AMRAP)', () => {
-    const s = sectionFromAiSection(section({ format: 'Chained AMRAP', formatConfig: { timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null } }), true)
+  // Schema AI-ului are acum un camp dedicat pt stages (WI-1 roadmap item 5)
+  // - dar cand raspunsul chiar n-are etape populate (stages: null/absent),
+  // ramane tot nesintetizat, nu inventam o structura goala.
+  it('does not synthesize formatConfig.stages when the AI genuinely has none', () => {
+    const s = sectionFromAiSection(section({ format: 'Chained AMRAP', formatConfig: { timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null, stages: null } }), true)
     expect(s.format).toBe('Chained AMRAP')
+    expect(s.formatConfig.stages).toBeUndefined()
+  })
+
+  // Gasit la explorarea WI-1 (07-17): fara acest camp, AI-ul aduna miscarile
+  // din TOATE etapele intr-o singura lista aplatizata ("Max Deadlifts"
+  // aparea de 2 ori, o data per etapa AMRAP 2). formatConfig.stages
+  // pastreaza fiecare etapa separata, cu propriile ei miscari. Miscarile per
+  // etapa sunt text deja compus (nu obiecte structurate - vezi openaiSchema.ts,
+  // STAGE_DEF: o schema cu miscari structurate imbricate in stages a picat
+  // la Structured Outputs, limita de adancime a nesting-ului).
+  it('translates AI stages into the editor StageListField shape (Jack\'s Triangle style)', () => {
+    const s = sectionFromAiSection(section({
+      format: 'Chained AMRAP',
+      formatConfig: {
+        timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        stages: [
+          { kind: 'amrap', durationSeconds: 120, intervalSeconds: null, movements: ['Max Deadlifts @ 100/70kg'] },
+          { kind: 'amrap', durationSeconds: 1140, intervalSeconds: null, movements: ['4 Strict Pull-ups', '8 Wall Balls @ 9/6kg'] },
+          { kind: 'amrap', durationSeconds: 120, intervalSeconds: null, movements: ['Max Deadlifts @ 100/70kg'] },
+        ],
+      },
+    }), true)
+    expect(s.format).toBe('Chained AMRAP')
+    expect(s.formatConfig.stages).toHaveLength(3)
+    expect(s.formatConfig.stages[0]).toEqual({ kind: 'amrap', durationSec: 120, intervalSec: null, movements: ['Max Deadlifts @ 100/70kg'] })
+    expect(s.formatConfig.stages[1].movements).toEqual(['4 Strict Pull-ups', '8 Wall Balls @ 9/6kg'])
+    // etapele identice (start/final deadlifts) raman SEPARATE, nu unite -
+    // fiecare cu propriile ei miscari, nu doar prima+ultima combinate.
+    expect(s.formatConfig.stages[2]).toEqual(s.formatConfig.stages[0])
+  })
+
+  it('translates an interval-kind stage, keeping intervalSec', () => {
+    const s = sectionFromAiSection(section({
+      format: 'Chained AMRAP',
+      formatConfig: {
+        timeCapMinutes: null, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        stages: [{ kind: 'interval', durationSeconds: 600, intervalSeconds: 60, movements: ['12 Cal Row'] }],
+      },
+    }), true)
+    expect(s.formatConfig.stages[0]).toEqual({ kind: 'interval', durationSec: 600, intervalSec: 60, movements: ['12 Cal Row'] })
+  })
+
+  it('drops blank/non-string stage movement entries defensively', () => {
+    const s = sectionFromAiSection(section({
+      format: 'Chained AMRAP',
+      formatConfig: {
+        timeCapMinutes: null, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        stages: [{ kind: 'amrap', durationSeconds: 120, intervalSeconds: null, movements: ['Max Deadlifts', '', '   '] }],
+      },
+    }), true)
+    expect(s.formatConfig.stages[0].movements).toEqual(['Max Deadlifts'])
+  })
+
+  it('treats an empty stages array the same as no stages (still flagged, not synthesized)', () => {
+    const s = sectionFromAiSection(section({ format: 'Chained AMRAP', formatConfig: { timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null, stages: [] } }), true)
     expect(s.formatConfig.stages).toBeUndefined()
   })
 
@@ -444,9 +502,23 @@ describe('deriveReviewFlags (WI-1: 6 fixed reasons, no confidence scoring)', () 
   })
 
   it('flags a format with required config fields the AI schema cannot supply (Chained AMRAP -> stages)', () => {
-    const s = section({ format: 'Chained AMRAP', formatConfig: { timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null } })
+    const s = section({ format: 'Chained AMRAP', formatConfig: { timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null, stages: null } })
     const flags = deriveReviewFlags(analysis([s]))
     expect(flags.some(f => f.reason === 'needs_review' && f.detail.includes('stages'))).toBe(true)
+  })
+
+  it('does not flag Chained AMRAP once the AI populates real stages', () => {
+    const s = section({
+      format: 'Chained AMRAP',
+      formatConfig: {
+        timeCapMinutes: 23, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        stages: [
+          { kind: 'amrap', durationSeconds: 120, intervalSeconds: null, movements: ['Max Deadlifts @ 100/70kg'] },
+        ],
+      },
+    })
+    const flags = deriveReviewFlags(analysis([s]))
+    expect(flags.some(f => f.reason === 'needs_review' && f.detail.includes('stages'))).toBe(false)
   })
 
   it('does not flag a fully-covered format (AMRAP with an explicit time cap)', () => {

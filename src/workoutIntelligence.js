@@ -94,6 +94,29 @@ const FORMAT_CONFIG_TRANSLATORS = {
   'Complex': (c) => ({ rounds: c.rounds }),
   'AMRAP with Buy-In': (c) => ({ totalDurationSec: min2sec(c.timeCapMinutes) }),
   'Not For Time': () => ({}),
+  // Spre deosebire de restul traducatoarelor, `stages` NU vine dintr-un
+  // camp generic reinterpretat - schema AI-ului are acum (WI-1 roadmap item
+  // 5) un camp dedicat formatConfig.stages (vezi openaiSchema.ts/
+  // transform.ts), populat DOAR pt "Chained AMRAP". Traducem 1:1 in forma
+  // asteptata de StageListField (FormatConfigEditor.jsx): kind/durationSec/
+  // intervalSec/movements. Miscarile per etapa sunt DEJA text compus (AI-ul
+  // le scrie direct ca string-uri, nu obiecte structurate - o prima schema
+  // cu miscari structurate imbricate in stages a picat la Structured
+  // Outputs, limita de adancime a nesting-ului), deci NU trec prin
+  // composeMovementLine ca variants.rx.movements. null explicit (nu [])
+  // cand AI-ul n-a populat etapele - altfel un array gol ar trece
+  // nedetectat pe langa missingRequiredConfigFields (nu e nici undefined,
+  // nici null) si sectiunea n-ar mai primi semnalul de revizuire.
+  'Chained AMRAP': (c) => ({
+    stages: c.stages && c.stages.length > 0
+      ? c.stages.map(st => ({
+        kind: st.kind === 'interval' ? 'interval' : 'amrap',
+        durationSec: st.durationSeconds ?? null,
+        intervalSec: st.intervalSeconds ?? null,
+        movements: (st.movements || []).filter(m => typeof m === 'string' && m.trim()),
+      }))
+      : null,
+  }),
   // Pass-through deliberat - spre deosebire de toate celelalte, formatConfig
   // de aici NU vine direct din raspunsul brut al AI-ului (schema generica
   // n-are camp pt buyIn/cashOut/mainFormat), ci e construit chiar de

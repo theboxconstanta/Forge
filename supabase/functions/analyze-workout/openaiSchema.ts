@@ -82,6 +82,34 @@ const MOVEMENT_DEF = {
   ],
 }
 
+// O etapa a unui "Chained AMRAP" (ex. "AMRAP 2 STRAIGHT INTO AMRAP 19
+// STRAIGHT INTO AMRAP 2") - fiecare etapa isi are propriile miscari,
+// separat de lista aplatizata `movements` a sectiunii (care, fara acest
+// camp, aduna toate miscarile din toate etapele intr-o singura lista fara
+// granite, gasit la explorarea WI-1, 07-17). `kind` distinge cele 2 forme
+// care chiar apar inlantuite in WOD-uri reale de conditionare (vezi
+// workoutFormats.js, 'Chained AMRAP'.config.stages) - runde+reps partiale
+// dintr-o lista de miscari, sau randuri de reps/greutate per interval fix.
+// `movements` e text simplu, deja compus ("4 Strict Pull-ups", "Max
+// Deadlifts @ 100/70kg") - DELIBERAT nu $ref catre $defs/movement structurat.
+// O prima incercare cu miscari structurate (imbricare completa: sectiune ->
+// formatConfig -> stages -> movement) a picat cu eroare de la Structured
+// Outputs (strict mode are o limita de adancime a nesting-ului) - editorul
+// oricum are nevoie de text compus pt StageListField (acelasi shape ca
+// MovementListField), nu de obiecte structurate, deci nimic nu se pierde
+// din ce chiar foloseste UI-ul.
+const STAGE_DEF = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    kind: { type: 'string', enum: ['amrap', 'interval'] },
+    durationSeconds: { type: ['number', 'null'] },
+    intervalSeconds: { type: ['number', 'null'] },
+    movements: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['kind', 'durationSeconds', 'intervalSeconds', 'movements'],
+}
+
 const FORMAT_CONFIG_DEF = {
   type: 'object',
   additionalProperties: false,
@@ -93,10 +121,17 @@ const FORMAT_CONFIG_DEF = {
     restSeconds: { type: ['number', 'null'] },
     startReps: { type: ['number', 'null'] },
     incrementReps: { type: ['number', 'null'] },
+    // Array GOL (nu null - Structured Outputs strict mode nu accepta
+    // type:['array','null'] combinat cu `items`, gasit direct la deploy,
+    // eroare "invalid_json_schema") pt orice format in afara de 'Chained
+    // AMRAP' - vezi STAGE_DEF. Acelasi tipar ca toate celelalte campuri de
+    // tip array din schema asta (ex. movements de mai sus) - niciodata
+    // nullable la nivel de tip, gol cand nu se aplica.
+    stages: { type: 'array', items: { $ref: '#/$defs/stage' } },
   },
   required: [
     'timeCapMinutes', 'rounds', 'intervalSeconds', 'workSeconds',
-    'restSeconds', 'startReps', 'incrementReps',
+    'restSeconds', 'startReps', 'incrementReps', 'stages',
   ],
 }
 
@@ -206,6 +241,7 @@ export const WORKOUT_ANALYSIS_JSON_SCHEMA = {
   $defs: {
     movement: MOVEMENT_DEF,
     equipmentItem: EQUIPMENT_ITEM_DEF,
+    stage: STAGE_DEF,
     formatConfig: FORMAT_CONFIG_DEF,
     benchmarkMetadata: BENCHMARK_METADATA_DEF,
     sectionScalingVersion: SECTION_SCALING_VERSION_DEF,
