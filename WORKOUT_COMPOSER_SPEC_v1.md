@@ -115,8 +115,9 @@ to "what would a coach do":
 2. **Hoist shared structure.** Before composing individual movement
    lines, check whether the block's movements share a structural fact:
    an identical rep count across every movement, or a structured rep
-   sequence on the format's own config (`setsScheme` on Strength Sets,
-   `repsScheme` on Ladder). If found, that fact becomes the block's
+   sequence on the format's own config (`sharedRepScheme` — see §9 for
+   the naming/migration story behind this field). If found, that fact
+   becomes the block's
    `scheme` (rendered once, above the movement list) and is **stripped**
    from each individual movement line — this is the direct fix for
    "Double Unders (50-40-30-20-10) / Sit-ups (50-40-30-20-10)" becoming
@@ -239,54 +240,76 @@ catalog within a known family/field-type therefore requires **zero**
 new or modified React components — only the Composer's data-transform
 step changes, never the render step.
 
-## 9. An honest limitation, found while designing this — needs a decision
+## 9. An honest limitation, found while designing this — resolved as a naming/modeling decision, not just a data gap
 
 The worked example in §0 assumes "21-15-9" is available to hoist. Checked
-against the real data: it usually isn't, yet. `Strength Sets.config.
-setsScheme` is genuinely structured (an array of numbers) and hoists
-perfectly, always. But the well-known descending schemes this whole
-design is anchored on (Fran's 21-15-9, Annie's 50-40-30-20-10) are
-tagged format `'For Time'`, not `'Ladder'` — Workout Intelligence's own
-prompt deliberately steers the parser that way — and `'For Time'` has no
-rep-scheme field in `formatConfig` at all. Today, that breakdown exists
-**only** as free-text inside a movement's `notes` (e.g. `"Reps facute
-21-15-9 (45 total)"`), if it exists anywhere.
+against the real data: it usually isn't, yet — but the fix is a domain
+concept the catalog already has under the wrong name, not a new field
+invented for this purpose.
 
-The Composer will not parse that prose to reconstruct "21-15-9" —
-regex-scraping a human-written note is exactly the fragile,
-non-deterministic guessing this whole project (Workout Intelligence's
-"never invent" principle, applied consistently since WI-1) has been
-built to avoid, and it would only work for hand-authored fixtures, not
-real coach input. Three honest options, not a silent default:
+**What's actually in the catalog today**: three incompatible
+representations of "the target quantity for round N," none shared:
 
-1. **Graceful degradation for `'For Time'`-family formats without a
-   structured scheme**: hoist only when the identical-rep-count check in
-   §3 step 2 finds something (works when every movement shares one flat
-   total), otherwise show composed movement lines as today. Zero data
-   change, but "21-15-9" specifically won't appear as a heading for a
-   `'For Time'`-tagged benchmark unless its movements happen to share an
-   identical total reps count (Fran does: 45/45 — so a *coarser* hoist,
-   "45" not "21-15-9", is honestly achievable there; Annie's 150/150 the
-   same way).
-2. **A small, additive field**, not a new data model: give `'For Time'`/
-   `'RFT'`/`'Chipper'` the same `repsScheme` free-text field `'Ladder'`
-   already has (`REP_SCHEME_QUICK_OPTIONS` already exists and is already
-   wired into the admin editor for exactly this) — a coach or Workout
-   Intelligence's mapper fills it in when the scheme is known, the
-   Composer hoists it verbatim when present. This is the only way to
-   reliably get "21-15-9" specifically (not just the coarser shared
-   total) onto the heading for the majority of real benchmark workouts.
-3. **Leave it exactly as free text**, surfaced verbatim as a secondary
-   caption under the primary heading rather than parsed — honest about
-   not being structured, still visible to the athlete.
+1. `Ladder.repsScheme` — free text (`type: 'text'`), e.g. `"21-15-9"`.
+   Weakly typed, and named after the one format it was born on.
+2. `Strength Sets.setsScheme` — a genuinely structured array of numbers
+   (`type: 'repsSchemeList'`), e.g. `[5,5,5,3,3,3,1,1,1]`. The *better*
+   shape, but named after Strength Sets specifically.
+3. `Ascending AMRAP.startReps`/`incrementReps` and
+   `Death By.startReps`/`incrementReps` — a *generative* rule (start +
+   per-round increment), open-ended. **Deliberately not unified with the
+   other two** — a ladder/couplet is a fixed, finite, shared sequence the
+   whole class does together (known in advance); Death By is open-ended
+   escalation to individual failure. Superficially similar, semantically
+   different — merging them would be overreach, not correctness.
 
-Recommendation: **option 2**. It's the smallest possible change (one
-field, on formats that already have a sibling format with the identical
-field), it's the only option that actually delivers the §0 worked
-example as written, and it keeps the Composer itself free of any
-text-parsing logic. But this is a real, load-bearing decision about
-whether "no new data model" tolerates one small additive field — not
-mine to make silently.
+The well-known descending schemes this design is anchored on (Fran's
+21-15-9, Annie's 50-40-30-20-10) are tagged format `'For Time'` —
+Workout Intelligence's own prompt deliberately steers away from
+`'Ladder'` for exactly these — and `'For Time'` has none of the above.
+Today that breakdown exists only as free text inside a movement's
+`notes`. The Composer will not parse that prose to reconstruct
+structure — regex-scraping a human-written note is exactly the fragile,
+non-deterministic guessing the "never invent" principle (established
+since WI-1) exists to prevent.
+
+**The right fix is not "extend `repsScheme`."** Doing that would
+propagate the *weaker* of the two existing shapes (free text, not the
+array type that already works on Strength Sets) under a name
+(`repsScheme`) that only makes domain sense on Ladder — a coach reading
+`formatConfig.repsScheme` on a `For Time` section has no reason to
+recognize it as anything but a leftover implementation detail once it's
+shared across formats that aren't ladders at all.
+
+**Correct abstraction**: a new, generic, domain-honest name —
+**`sharedRepScheme`** — for "the shared target quantity for round N,
+applied uniformly to every movement in that round." Type: the array
+shape `Strength Sets.setsScheme` already proved (`repsSchemeList`), not
+free text. The name deliberately mirrors the Composer's own "hoist
+*shared* structure" step (§3), so the data concept and the algorithm
+consuming it share vocabulary.
+
+**Migration posture — proportionate, not a blanket rename**:
+
+- `Ladder.repsScheme` → migrate to `sharedRepScheme`. This field was
+  already going to need a text→array migration to fix the type problem
+  in isolation; renaming in the same pass costs nothing extra. Verify
+  actual Ladder usage in production before executing — not assumed here.
+- `Strength Sets.setsScheme` → **not** renamed. It's a more established
+  format; forcing a migration purely for naming purity isn't worth the
+  risk. Instead, the Composer's hoisting logic (§3 step 2) recognizes
+  `setsScheme` as a known alias of the same concept — one narrow,
+  explicitly-bounded exception to "never key off field name" (§7),
+  justified by migration pragmatism, not a permanent architectural
+  muddle.
+- `For Time`/`RFT`/`Chipper` → get `sharedRepScheme` directly. No legacy
+  naming, correct from the start.
+
+This is still the smallest change that makes the §0 worked example real
+— it just corrects *which* existing shape gets extended (the array, not
+the text field) and under *what name* (a new domain-correct one, not
+Ladder's borrowed one) before any formats beyond Strength Sets start
+depending on it.
 
 ## Language stays out of the Composer
 
