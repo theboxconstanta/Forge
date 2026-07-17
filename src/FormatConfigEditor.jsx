@@ -103,16 +103,39 @@ function MovementTextField({ label, value, onChange, placeholder }) {
 
 // Schema de reps per set (ex: [5,3,1]) - un rand per set, fiecare cu propria
 // tinta de reps; numarul de seturi = lungimea listei (nu un camp separat).
-function RepsSchemeListField({ label, value, onChange }) {
+// quickOptions (opt.) - scheme clasice ("21-15-9" etc, vezi
+// REP_SCHEME_QUICK_OPTIONS in workoutFormats.js) afisate ca chip-uri care
+// INLOCUIESC lista curenta cu secventa aleasa dintr-un click - migrat aici
+// din TextField cand Ladder.repsScheme (text liber) a devenit
+// sharedRepScheme (array structurat, WI Composer 2026-07-17), ca sa nu
+// piarda coach-ii comoditatea de dinainte.
+function RepsSchemeListField({ label, value, onChange, quickOptions }) {
   const [draft, setDraft] = useState('')
   const items = value || []
   const add = () => {
     const n = parseInt(draft)
     if (!isNaN(n) && n > 0) { onChange([...items, n]); setDraft('') }
   }
+  const pickQuickOption = (opt) => {
+    const parsed = opt.split('-').map(s => parseInt(s)).filter(n => !isNaN(n) && n > 0)
+    if (parsed.length > 0) onChange(parsed)
+  }
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
+      {quickOptions && quickOptions.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+          {quickOptions.map(opt => {
+            const isActive = items.join('-') === opt
+            return (
+              <div key={opt} onClick={() => pickQuickOption(opt)}
+                style={{ padding: '5px 10px', borderRadius: '20px', border: isActive ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: isActive ? '#f0f0f0' : '#fafafa', color: isActive ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: isActive ? '700' : '400', cursor: 'pointer' }}>
+                {opt}
+              </div>
+            )
+          })}
+        </div>
+      )}
       {items.map((reps, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <div style={{ flex: 1, fontSize: '13px', padding: '8px 12px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>Set {i + 1}: {reps} reps</div>
@@ -275,7 +298,7 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <IntervalListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
         )
         if (field.type === 'repsSchemeList') return (
-          <RepsSchemeListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} />
+          <RepsSchemeListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />
         )
         if (field.type === 'stageList') return (
           <StageListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} t={t} />

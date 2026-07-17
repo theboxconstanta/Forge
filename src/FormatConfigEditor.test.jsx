@@ -43,11 +43,21 @@ describe('FormatConfigEditor', () => {
     expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ totalRounds: 10 }))
   })
 
-  it('Ladder afișează chip-uri quick-select pentru scheme de reps și le poate alege', () => {
+  it('Ladder afișează chip-uri quick-select pentru schema comună de reps și le poate alege (array structurat)', () => {
     const onConfigChange = vi.fn()
     render(<FormatConfigEditor formatId="Ladder" onFormatChange={() => {}} config={{}} onConfigChange={onConfigChange} t={tRo} />)
     fireEvent.click(screen.getByText('21-15-9'))
-    expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ repsScheme: '21-15-9' }))
+    expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ sharedRepScheme: [21, 15, 9] }))
+  })
+
+  it('For Time/RFT/Chipper primesc aceleași chip-uri quick-select pentru sharedRepScheme', () => {
+    for (const formatId of ['For Time', 'RFT', 'Chipper']) {
+      const onConfigChange = vi.fn()
+      render(<FormatConfigEditor formatId={formatId} onFormatChange={() => {}} config={{}} onConfigChange={onConfigChange} t={tRo} />)
+      fireEvent.click(screen.getAllByText('50-40-30-20-10')[0])
+      expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ sharedRepScheme: [50, 40, 30, 20, 10] }))
+      cleanup()
+    }
   })
 
   it('Strength Sets: adăugarea unei ținte de reps construiește schema per set', () => {

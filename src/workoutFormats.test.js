@@ -399,9 +399,20 @@ describe('computeSetsScore', () => {
 })
 
 describe('REP_SCHEME_QUICK_OPTIONS', () => {
-  it('include schemele clasice și e atașat câmpului repsScheme al Ladder', () => {
+  it('include schemele clasice și e atașat câmpului sharedRepScheme (Ladder, For Time, RFT, Chipper)', () => {
     expect(REP_SCHEME_QUICK_OPTIONS).toContain('21-15-9')
-    expect(WORKOUT_FORMATS['Ladder'].config.repsScheme.quickOptions).toBe(REP_SCHEME_QUICK_OPTIONS)
+    for (const formatId of ['Ladder', 'For Time', 'RFT', 'Chipper']) {
+      expect(WORKOUT_FORMATS[formatId].config.sharedRepScheme.quickOptions).toBe(REP_SCHEME_QUICK_OPTIONS)
+      expect(WORKOUT_FORMATS[formatId].config.sharedRepScheme.type).toBe('repsSchemeList')
+    }
+  })
+
+  // WI Composer (2026-07-17): sharedRepScheme e conceptul generic - Strength
+  // Sets pastreaza numele istoric (setsScheme) dar acelasi TIP structurat,
+  // deliberat NEredenumit (migrare doar de dragul numelui, cost nejustificat
+  // pt un format deja stabilit).
+  it('Strength Sets.setsScheme ramane acelasi tip structurat, doar sub numele istoric', () => {
+    expect(WORKOUT_FORMATS['Strength Sets'].config.setsScheme.type).toBe('repsSchemeList')
   })
 })
 
@@ -411,9 +422,13 @@ describe('describeFormatConfig', () => {
   it('RFT: rundele setate de admin apar în descriere (bug raportat - nu se vedeau nicăieri)', () => {
     expect(describeFormatConfig('RFT', { rounds: 5, timeCapSec: 1200 }, tRo)).toBe('Număr runde: 5 · Time cap (opțional): 20:00')
   })
-  it('Ladder: tipul de ladder și schema de reps apar în descriere', () => {
-    expect(describeFormatConfig('Ladder', { ladderType: 'Ascending', repsScheme: '21-15-9' }, tRo)).toContain('Ascending')
-    expect(describeFormatConfig('Ladder', { ladderType: 'Ascending', repsScheme: '21-15-9' }, tRo)).toContain('21-15-9')
+  it('Ladder: tipul de ladder și schema comună de reps (array) apar în descriere', () => {
+    const cfg = { ladderType: 'Ascending', sharedRepScheme: [21, 15, 9] }
+    expect(describeFormatConfig('Ladder', cfg, tRo)).toContain('Ascending')
+    expect(describeFormatConfig('Ladder', cfg, tRo)).toContain('21-15-9')
+  })
+  it('For Time: schema comună de reps apare în descriere, la fel ca la Ladder', () => {
+    expect(describeFormatConfig('For Time', { sharedRepScheme: [50, 40, 30, 20, 10] }, tRo)).toContain('50-40-30-20-10')
   })
   it('Partner WOD: split și format de bază apar', () => {
     const desc = describeFormatConfig('Partner WOD', { splitType: 'You go/I go', baseFormat: 'AMRAP' }, tRo)

@@ -78,6 +78,12 @@ export const WORKOUT_FORMATS = {
       // 'RFT'.rounds pt motiv.
       rounds: { type: 'number', required: false, labelKey: 'fmtRoundsCount' },
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
+      // Schema comuna de reps pe runda (ex. 21-15-9) - vezi comentariul de la
+      // 'Ladder'.sharedRepScheme mai jos pentru istoricul deciziei. Cele mai
+      // cunoscute benchmark-uri cu scheme descrescatoare (Fran, Annie) sunt
+      // taggate 'For Time', nu 'Ladder' (vezi prompt.ts) - fara acest camp,
+      // Workout Composer n-ar avea de unde sa afiseze "21-15-9" ca titlu.
+      sharedRepScheme: { type: 'repsSchemeList', required: false, labelKey: 'fmtSharedRepScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
     },
   },
   // rounds: numarul prescris de runde e mereu cunoscut dinainte (config), nu
@@ -93,6 +99,7 @@ export const WORKOUT_FORMATS = {
     config: {
       rounds: { type: 'number', required: true, labelKey: 'fmtRoundsCount' },
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
+      sharedRepScheme: { type: 'repsSchemeList', required: false, labelKey: 'fmtSharedRepScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
     },
   },
   // O secventa de miscari distincte facute o singura data ("chip away" prin
@@ -107,7 +114,10 @@ export const WORKOUT_FORMATS = {
   // problema deja rezolvata acolo, fara cod nou.
   'Chipper': {
     family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
-    config: { timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' } },
+    config: {
+      timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
+      sharedRepScheme: { type: 'repsSchemeList', required: false, labelKey: 'fmtSharedRepScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
+    },
   },
   'Ladder': {
     // La fel ca "For Time": o schema 21-15-9 e tot o secventa, nu runde
@@ -115,9 +125,13 @@ export const WORKOUT_FORMATS = {
     // repetarile facute la fiecare treapta a scarii.
     family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
     config: {
+      // Migrat de la text liber ("21-15-9") la array structurat (Workout
+      // Composer, 2026-07-17) - acelasi concept generic ca For Time/RFT/
+      // Chipper.sharedRepScheme mai sus, acum sub un singur nume/tip in tot
+      // catalogul in loc de un camp "repsScheme" specific doar Ladder-ului.
       // quickOptions: scheme clasice reutilizate des (21-15-9 etc), afisate ca
-      // chip-uri peste inputul de text liber - vezi FormatConfigEditor.
-      repsScheme: { type: 'text', required: false, labelKey: 'fmtRepsScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
+      // chip-uri - vezi FormatConfigEditor (RepsSchemeListField).
+      sharedRepScheme: { type: 'repsSchemeList', required: false, labelKey: 'fmtSharedRepScheme', quickOptions: REP_SCHEME_QUICK_OPTIONS },
       ladderType: { type: 'select', options: ['Ascending', 'Descending', 'Asc-Desc'], required: true, labelKey: 'fmtLadderType' },
       timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
     },
@@ -209,6 +223,12 @@ export const WORKOUT_FORMATS = {
   // setsScheme: lista de tinte de reps, un numar per set (ex [5,5,5,5,5] sau
   // [5,3,3,1,1]) - fiecare set poate avea o tinta diferita de reps, nu doar o
   // schema uniforma de tip "5x5". Numarul de seturi = lungimea listei.
+  // NEredenumit 'sharedRepScheme' (spre deosebire de Ladder/For Time/RFT/
+  // Chipper mai jos/sus) - Strength Sets e un format mult mai stabilit, o
+  // migrare doar de dragul numelui n-a meritat riscul (WI Composer, decizie
+  // 2026-07-17). Aceeasi forma (`repsSchemeList`), acelasi concept - orice
+  // cod generic care umbla dupa TIPUL campului (nu numele lui) trateaza
+  // `setsScheme` ca alias al lui `sharedRepScheme`.
   'Strength Sets': {
     family: 'sets', rowMode: 'movement', prEligible: true,
     config: {
