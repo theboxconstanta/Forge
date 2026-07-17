@@ -328,6 +328,18 @@ export const TRANSLATIONS = {
     fmtBuyInSection: 'Buy-In',
     fmtMainWorkSection: 'Main Work',
     fmtCashOutSection: 'Cash-Out',
+    // Workout Composer (WORKOUT_COMPOSER_SPEC_v1.md) - fraza reala a
+    // tranzitiilor/scoreNote-urilor traduse aici, NU in workoutComposer.js
+    // (care ramane strict "language stays out of the Composer" - blocurile
+    // poarta coduri inchise, nu propozitii). Etichetele de tranzitie sunt
+    // identice RO/EN (jargon CrossFit universal, la fel ca AMRAP/EMOM), dar
+    // scoreNote-urile sunt propozitii reale de coaching, traduse separat.
+    composerThenLabel: 'THEN',
+    composerStraightIntoLabel: 'STRAIGHT INTO',
+    composerRestLabel: (timp) => `REST ${timp}`,
+    composerScoreNoteAscendingRounds: 'Repetările cresc în fiecare rundă.',
+    composerScoreNoteDeathByEscalating: 'Continuă până nu mai reușești să termini intervalul.',
+    composerScoreNoteChainedTotalReps: 'Scor: suma repetărilor din toate etapele.',
     logWodNoteLabel: 'NOTE',
     logWodNotePlaceholder: 'Cum te-ai simțit?',
     logWodSaving: 'Se salvează...',
@@ -1173,6 +1185,12 @@ export const TRANSLATIONS = {
     fmtBuyInSection: 'Buy-In',
     fmtMainWorkSection: 'Main Work',
     fmtCashOutSection: 'Cash-Out',
+    composerThenLabel: 'THEN',
+    composerStraightIntoLabel: 'STRAIGHT INTO',
+    composerRestLabel: (time) => `REST ${time}`,
+    composerScoreNoteAscendingRounds: 'Reps increase every round.',
+    composerScoreNoteDeathByEscalating: 'Continue until you can no longer finish the interval.',
+    composerScoreNoteChainedTotalReps: 'Score: total reps across all stages.',
     logWodNoteLabel: 'NOTES',
     logWodNotePlaceholder: 'How did you feel?',
     logWodSaving: 'Saving...',
