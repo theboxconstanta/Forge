@@ -53,6 +53,32 @@ for attention with the main work. Every rule below is in service of
 producing exactly this, generically, for every format — not just this
 one example.
 
+## Core principle (app-wide, not just this document)
+
+**A movement row contains only movement-specific facts: the movement's
+own name, reps, weight, distance, calories. Nothing else is ever allowed
+in it.** Every structural fact — what format this is, how movements
+relate to each other, what framing a block of work has, how it's scored
+— is communicated exclusively through headings, block roles, ordering,
+and grouping. Never through prose glued onto a movement row.
+
+Concretely, a composed movement row must never contain: an internal
+format name ("For Time," "Buy-In"), a relationship phrase ("paired
+with," "as part of"), a role prefix ("Buy-In: …," "Cash-out: …"), or a
+restatement in words of something the row's own numbers already say. If
+a fact doesn't fit "this movement, this many reps, this load," it either
+becomes a block-level heading/label (if it's structural) or belongs in
+Notes (if it's coaching context, per the existing `note` field already
+in the data model — no new field needed, just correct rendering
+discipline: Notes never blends into the primary composed view).
+
+One narrow, explicit exception: a `scoreNote` (§2/§3), only when the
+workout's scoring convention genuinely isn't implied by its heading —
+telling an athlete *how to log what they just did* isn't "explaining the
+workout," and removing that entirely would leave real ambiguity (a
+Chained AMRAP's "total reps across all stages" scoring convention isn't
+always self-evident) with no fallback at all.
+
 ## 1. Responsibility within the architecture
 
 One job: **`WorkoutSection → ComposedWorkout`**, a pure, stateless
@@ -310,6 +336,37 @@ This is still the smallest change that makes the §0 worked example real
 the text field) and under *what name* (a new domain-correct one, not
 Ladder's borrowed one) before any formats beyond Strength Sets start
 depending on it.
+
+## 10. Real tensions in the "pure visual composition" philosophy — not fatal, but not free either
+
+Raised directly, not smoothed over, because the philosophy is now being
+declared an app-wide standard:
+
+- **Audience fluency isn't uniform.** "Reads like BTWB/the Games" assumes
+  visual vocabulary a coach has and a brand-new member may not — and
+  Forge explicitly supports that newer population (the OnRamp scaling
+  tier already exists for exactly this reason). Resolution: don't soften
+  the layout with explanatory prose for everyone to accommodate the few
+  who need it — that degrades the product for the majority the whiteboard
+  aesthetic is *for*. The scaling-variant system (simpler *movements* at
+  OnRamp) plus in-person coaching is where beginner support belongs, not
+  the Composer.
+- **A whiteboard is a big static surface; a phone is small and scrolls.**
+  "2–3 seconds" is a much easier promise for a photographed whiteboard
+  than for a WOD spanning several screen-heights read mid-workout,
+  breathing hard. Not a Composer flaw — a real constraint the future
+  Renderer has to take seriously (typographic hierarchy, minimal chrome,
+  probably an explicit budget on vertical space before a composed
+  workout counts as a layout failure), flagged now so it isn't
+  discovered as a surprise later.
+- **"Zero explanatory text" needed one bounded exception, not a full
+  exemption.** See the Core Principle section above — `scoreNote` stays,
+  narrowly, because *how to log this* is functionally different from
+  *explaining the workout*, and removing it entirely leaves real,
+  unresolved scoring ambiguity on composite formats.
+- **The flagship "21-15-9" example is still gated on §9's unresolved
+  migration.** Not achievable for a `For Time`-tagged benchmark today.
+  Restated here so it doesn't quietly get assumed solved.
 
 ## Language stays out of the Composer
 
