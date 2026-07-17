@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeMovementLine, sectionFromAiSection, sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
+import { composeMovementLine, sectionFromAiSection, sectionsFromAiAnalysis, deriveReviewFlags, normalizeTitle } from './workoutIntelligence'
 
 // Fixture-uri construite manual, CONSTRUITE STRICT dupa forma schemei
 // Structured Outputs a edge function-ului (supabase/functions/analyze-workout/
@@ -81,6 +81,47 @@ describe('composeMovementLine', () => {
   })
 })
 
+describe('normalizeTitle', () => {
+  it('passes through a normal short title unchanged', () => {
+    expect(normalizeTitle('Fran')).toBe('Fran')
+    expect(normalizeTitle('AB Complex')).toBe('AB Complex')
+  })
+
+  it('returns empty for null/blank input', () => {
+    expect(normalizeTitle(null)).toBe('')
+    expect(normalizeTitle('   ')).toBe('')
+  })
+
+  // Gasit live (WI-1, explorare 07-17): un paste stil Instagram cu text
+  // decorativ literat a fost preluat ca titlu neschimbat.
+  it('collapses letter-spaced decorative text back into real words', () => {
+    expect(normalizeTitle('F O R   T I M E')).toBe('FOR TIME')
+  })
+
+  it('does not touch a short title that happens to contain single-letter words', () => {
+    // 2 single-letter tokens intr-un bloc - sub pragul de 3, nu se colapseaza
+    expect(normalizeTitle('A B Complex')).toBe('A B Complex')
+  })
+
+  it('discards a title that is implausibly long', () => {
+    const long = 'AMRAP 2: Max Deadlifts (100/70kg) STRAIGHT INTO... AMRAP 19: 4 Strict Pull-ups 8 Wall Balls (9/6kg) 12 Cal Row 16 Air Squats'
+    expect(normalizeTitle(long)).toBe('')
+  })
+
+  // Gasit live (WI-1, explorare 07-17): modelul a intors ocazional titlul ca
+  // un ecou aproape complet al descrierii sectiunii.
+  it('discards a title that is just an echo of the section description', () => {
+    const description = 'Three AMRAP stages performed straight into each other. No rest between stages.'
+    const echoedTitle = 'Three AMRAP stages performed straight into each other.'
+    expect(normalizeTitle(echoedTitle, description)).toBe('')
+  })
+
+  it('keeps a short title that is coincidentally a substring of the description', () => {
+    const description = 'For time: 21-15-9 Thrusters and Pull-ups, the classic Fran rep scheme.'
+    expect(normalizeTitle('Fran', description)).toBe('Fran')
+  })
+})
+
 describe('sectionFromAiSection - primary section', () => {
   it('maps a simple AMRAP into the editor shape, RX movements as an array', () => {
     const s = sectionFromAiSection(section(), true)
@@ -127,6 +168,19 @@ describe('sectionFromAiSection - primary section', () => {
   it('uses the recognized benchmark name as the WOD name', () => {
     const s = sectionFromAiSection(section({ benchmarkMetadata: { name: 'Fran', isBenchmark: true, isHero: false } }), true)
     expect(s.name).toBe('Fran')
+  })
+
+  it('normalizes a decorative AI title before it reaches the editor', () => {
+    const s = sectionFromAiSection(section({ title: 'F O R   T I M E' }), true)
+    expect(s.title).toBe('FOR TIME')
+  })
+
+  it('drops a title that is just an echo of the description', () => {
+    const s = sectionFromAiSection(section({
+      title: 'Three AMRAP stages performed straight into each other.',
+      description: 'Three AMRAP stages performed straight into each other. No rest between stages.',
+    }), true)
+    expect(s.title).toBe('')
   })
 })
 

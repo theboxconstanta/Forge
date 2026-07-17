@@ -159,6 +159,47 @@ function buildVariants(aiSection) {
   return variants
 }
 
+// Titlul brut al AI-ului nu e validat inainte sa ajunga in editor - gasit la
+// explorarea WI-1 (07-17): modelul intoarce ocazional text decorativ literat
+// ("F O R   T I M E", dintr-un paste stil Instagram) sau, mai rar, un ecou
+// aproape complet al textului sursa, ambele nefolositoare ca titlu de
+// sectiune. MAX_TITLE_LENGTH si pragul de "ecou" sunt praguri deliberat
+// conservatoare - scopul e sa scapam de cazurile clar degenerate, nu sa
+// "curatam" un titlu neobisnuit dar real (in caz de dubiu, se renunta la
+// titlu, nu se ghiceste o varianta curatata).
+const MAX_TITLE_LENGTH = 80
+const ECHO_MIN_LENGTH = 30
+
+// Colapseaza text "literat" (o litera pe cuvant, spatiu unic intre litere,
+// spatiu dublu+ intre cuvinte reale) inapoi la cuvinte normale - "F O R   T
+// I M E" -> "FOR TIME". Un titlu scurt normal (ex. "AB Complex") nu e atins,
+// fiindca nu TOATE token-urile dintr-un bloc sunt de o litera.
+function collapseLetterSpacing(title) {
+  return title
+    .split(/\s{2,}/)
+    .map(chunk => {
+      const tokens = chunk.split(' ').filter(Boolean)
+      const allSingleLetters = tokens.length >= 3 && tokens.every(tok => tok.length === 1)
+      return allSingleLetters ? tokens.join('') : chunk
+    })
+    .join(' ')
+}
+
+/** Normalizeaza titlul brut al unei sectiuni AI - vezi comentariul de mai
+ * sus. Intoarce '' (niciodata textul brut) cand titlul e clar degenerat. */
+export function normalizeTitle(rawTitle, description) {
+  const trimmed = (rawTitle || '').trim()
+  if (!trimmed) return ''
+
+  const collapsed = collapseLetterSpacing(trimmed)
+  if (collapsed.length > MAX_TITLE_LENGTH) return ''
+
+  const desc = (description || '').trim().toLowerCase()
+  if (collapsed.length >= ECHO_MIN_LENGTH && desc && desc.includes(collapsed.toLowerCase())) return ''
+
+  return collapsed
+}
+
 /** Mapare PURA: o sectiune WorkoutAnalysis.sections[i] -> o sectiune a
  * editorului nativ (acelasi shape ca createSection()). */
 export function sectionFromAiSection(aiSection, isPrimary) {
@@ -172,7 +213,7 @@ export function sectionFromAiSection(aiSection, isPrimary) {
   const section = {
     ...base,
     id: newSectionId(),
-    title: aiSection.title || '',
+    title: normalizeTitle(aiSection.title, aiSection.description),
     format,
     formatConfig,
   }
