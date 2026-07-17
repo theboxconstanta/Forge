@@ -114,7 +114,23 @@ describe('composeSection - family sets', () => {
     const out = composeSection(s, 'rx')
     expect(out.primary.text).toBe('Back Squat')
     expect(out.blocks[0].scheme).toBe('5-5-5-3-3-3-1-1-1')
-    expect(out.blocks[0].movements).toEqual(['Back Squat'])
+    // Miscarea unica omisa din bloc - deja spusa de titlu, gasit live la
+    // validare ("Clean The Floor"/"GET UP" randau numele miscarii de 2 ori).
+    expect(out.blocks[0].movements).toEqual([])
+  })
+
+  it('Build to Heavy/1RM: aceeasi omisiune - miscarea unica identica titlului nu se repeta in bloc', () => {
+    const s = section({ format: 'Build to Heavy/1RM', formatConfig: {}, movements: ['Build to a 3-rep-max front squats'] })
+    const out = composeSection(s, 'rx')
+    expect(out.primary.text).toBe('Build to a 3-rep-max front squats')
+    expect(out.blocks[0].movements).toEqual([])
+  })
+
+  it('Weightlifting cu mai multe miscari: NU se omite nimic (titlul nu mai e identic cu o singura miscare)', () => {
+    const s = section({ format: 'Weightlifting', formatConfig: {}, movements: ['Snatch', 'Overhead Squat'] })
+    const out = composeSection(s, 'rx')
+    expect(out.primary.text).toBe('Snatch & Overhead Squat')
+    expect(out.blocks[0].movements).toEqual(['Snatch', 'Overhead Squat'])
   })
 
   it('Death By primeste scoreNote (runde de marime crescatoare)', () => {

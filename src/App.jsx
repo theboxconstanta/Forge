@@ -38,6 +38,8 @@ import {
   sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
+import { composeSection } from './workoutComposer'
+import { ComposedWorkoutView } from './ComposedWorkoutView'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -803,6 +805,25 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
 // Faza 6 - corpul sectiunii PRIMARE (format+durata+nume+cele 4 variante de
 // scalare) - identic cu vechiul card "Workout of the Day", doar ca citeste/
 // scrie din `section` in loc de starea individuala de dinainte de Faza 6.
+// Workout Composer (WORKOUT_COMPOSER_SPEC_v1.md) - previzualizare live, in
+// editorul de admin, a felului in care sectiunea primara se va citi pentru
+// sportiv (composeSection + ComposedWorkoutView, ambele deja testate izolat).
+// Doar varianta RX (referinta) - nu un selector complet de variante, care ar
+// fi UI nou neinclus in contractul deja validat. Prima expunere reala catre
+// utilizator a Composer-ului, deliberat DOAR in Admin (nu inca pe Acasa/
+// Jurnal/Clasament) - validare pe WOD-uri reale, din toate familiile, inainte
+// sa devina noua fundatie de randare (decizia userului).
+function ComposedWorkoutPreview({ section, t }) {
+  const composed = composeSection(section, 'rx')
+  if (!composed || composed.blocks.length === 0) return null
+  return (
+    <div style={{ background: '#F7F7F5', border: '1px solid #eee', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+      <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t.adminWodComposedPreviewLabel}</div>
+      <ComposedWorkoutView composed={composed} t={t} />
+    </div>
+  )
+}
+
 function PrimarySectionBody({ section, onChange, updateVariant, t }) {
   return (
     <div>
@@ -835,6 +856,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
       )}
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+      <ComposedWorkoutPreview section={section} t={t} />
       {VARIANT_LEVELS.map(v => {
         const sv = section.variants[v.key]
         return (

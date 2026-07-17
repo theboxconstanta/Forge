@@ -147,8 +147,14 @@ function composeScored(section, fmt, config, movements, identity) {
 function composeSets(section, fmt, config, movements, identity) {
   const { block, stripped } = singleBlock(movements, fmt, config)
   const primaryText = archetypeTextForSets(section.format, config, stripped)
+  // Omite ce deja spune titlul (spec §3 pasul 5): la rowMode 'movement' fara
+  // alt cuvant de arhetip, primary.text E chiar numele miscarii (ex. "Back
+  // Squat") - daca blocul are exact ACEEASI miscare, unica, randarea ei si ca
+  // linie de miscare n-ar adauga nimic, doar ar dubla titlul ("Back Squat" /
+  // "Back Squat", gasit live la validare pe "Clean The Floor"/"GET UP").
+  const finalBlock = (stripped.length === 1 && stripped[0] === primaryText) ? { ...block, movements: [] } : block
   const scoreNote = (section.format === 'Death By' || section.format === 'Death By Weight') ? 'death-by-escalating' : null
-  return { identity, primary: { text: primaryText }, blocks: [block], scoreNote }
+  return { identity, primary: { text: primaryText }, blocks: [finalBlock], scoreNote }
 }
 
 // --- family: 'nft' (Not For Time) - un singur bloc, fara scor -------------
