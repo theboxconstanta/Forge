@@ -200,9 +200,56 @@ export function normalizeTitle(rawTitle, description) {
   return collapsed
 }
 
+// Nume de benchmark/hero WOD-uri foarte cunoscute, pt backfill DETERMINIST
+// cand AI-ul insusi nu reuseste sa recunoasca numele. Oglindeste STRICT
+// cheile din supabase/functions/analyze-workout/benchmarks.ts (BENCHMARKS) -
+// duplicata deliberat, nu importata (edge function si app nu impart module
+// in acest cod, acelasi tipar ca movementCatalog.ts). Doar NUMELE, nu
+// definitiile complete de miscari/format - matchBenchmark() din
+// benchmarks.ts ramane STRICT (doar cand tot textul lipit e practic doar
+// numele) tocmai ca sa nu inlocuiasca tacit o varianta reala, posibil
+// modificata, scrisa de coach cu template-ul canonic. Aici completam DOAR
+// benchmarkMetadata.name/isBenchmark - niciodata miscari/format/orice
+// altceva din raspunsul AI-ului.
+const KNOWN_BENCHMARK_NAMES = {
+  fran: { name: 'Fran', isHero: false }, grace: { name: 'Grace', isHero: false },
+  helen: { name: 'Helen', isHero: false }, annie: { name: 'Annie', isHero: false },
+  karen: { name: 'Karen', isHero: false }, nancy: { name: 'Nancy', isHero: false },
+  dt: { name: 'DT', isHero: true }, murph: { name: 'Murph', isHero: true },
+  cindy: { name: 'Cindy', isHero: false }, fightgonebad: { name: 'Fight Gone Bad', isHero: false },
+}
+
+function detectKnownBenchmarkFromSourceText(sourceText) {
+  const firstLine = (sourceText || '').split('\n')[0].trim()
+  if (!firstLine || firstLine.length > 30) return null
+  const key = firstLine.toLowerCase().replace(/[^a-z]/g, '')
+  return KNOWN_BENCHMARK_NAMES[key] || null
+}
+
+// Gasit la explorarea WI-1 (07-17): acelasi input ("Cindy" + textul complet
+// al antrenamentului) a dat benchmarkMetadata.name corect intors la un apel
+// si null la un apel repetat identic - non-determinism dovedit al AI-ului pt
+// acest camp, nu un bug de mapare. matchBenchmark() (benchmarks.ts) nu se
+// aplica aici - e STRICT limitat la cazul "textul lipit e practic doar
+// numele", nu si la "numele apare pe primul rand, urmat de restul
+// antrenamentului" (cazul obisnuit stil BTWB). Backfill-ul de aici e
+// deliberat ingust: verifica DOAR prima linie a textului sursa impotriva
+// unei liste mici de nume cunoscute, si NU suprascrie niciodata un nume deja
+// intors de AI - pur aditiv, nu poate reintroduce riscul pe care
+// matchBenchmark() il evita (inlocuirea tacita a unei variante reale scrise
+// de coach).
+function backfillBenchmarkMetadata(aiSection, sourceText) {
+  const existing = aiSection.benchmarkMetadata
+  if (existing?.name) return existing
+  const detected = detectKnownBenchmarkFromSourceText(sourceText)
+  if (!detected) return existing
+  return { ...(existing || {}), name: detected.name, isBenchmark: true, isHero: detected.isHero }
+}
+
 /** Mapare PURA: o sectiune WorkoutAnalysis.sections[i] -> o sectiune a
- * editorului nativ (acelasi shape ca createSection()). */
-export function sectionFromAiSection(aiSection, isPrimary) {
+ * editorului nativ (acelasi shape ca createSection()). `sourceText` (opt.) -
+ * textul brut lipit de coach, folosit DOAR pt backfill-ul de mai sus. */
+export function sectionFromAiSection(aiSection, isPrimary, sourceText) {
   const formatKnown = !!aiSection.format && !!WORKOUT_FORMATS[aiSection.format]
   const format = formatKnown ? aiSection.format : (isPrimary ? 'AMRAP' : null)
   const translator = format ? FORMAT_CONFIG_TRANSLATORS[format] : null
@@ -219,7 +266,7 @@ export function sectionFromAiSection(aiSection, isPrimary) {
   }
 
   if (isPrimary) {
-    section.name = aiSection.benchmarkMetadata?.name || ''
+    section.name = backfillBenchmarkMetadata(aiSection, sourceText)?.name || ''
     section.durationMin = aiSection.durationMinutes != null ? String(Math.floor(aiSection.durationMinutes)) : base.durationMin
     section.durationSec = '0'
     section.variants = buildVariants(aiSection)
@@ -260,7 +307,7 @@ export function sectionsFromAiAnalysis(analysis) {
   const aiSections = analysis?.sections || []
   if (aiSections.length === 0) return []
   const primaryIdx = pickPrimaryIndex(aiSections)
-  return aiSections.map((s, i) => sectionFromAiSection(s, i === primaryIdx))
+  return aiSections.map((s, i) => sectionFromAiSection(s, i === primaryIdx, analysis?.sourceText))
 }
 
 // --- semnale de revizuire (WI-1: simple, fara scor de incredere) -----------
@@ -276,6 +323,7 @@ const isCardioMovement = (m) => CARDIO_MISCARI.some(c => c.toLowerCase() === (m.
  * mapata corespunzatoare (acelasi index) ca `section.reviewFlags`. */
 export function deriveReviewFlags(analysis) {
   const aiSections = analysis?.sections || []
+  const sourceText = analysis?.sourceText
   const primaryIdx = pickPrimaryIndex(aiSections)
   const flags = []
   const push = (sectionIndex, reason, detail) => flags.push({ sectionIndex, reason, detail })
@@ -319,7 +367,8 @@ export function deriveReviewFlags(analysis) {
       if (rxW.conflicting) push(i, 'needs_review', 'conflicting weights across movements')
     }
 
-    if (s.benchmarkMetadata?.isBenchmark && !s.benchmarkMetadata?.name) push(i, 'unresolved_benchmark', null)
+    const benchmarkMetadata = backfillBenchmarkMetadata(s, sourceText)
+    if (benchmarkMetadata?.isBenchmark && !benchmarkMetadata?.name) push(i, 'unresolved_benchmark', null)
 
     for (const sv of s.scalingVersions || []) {
       if (!AI_LEVEL_TO_EDITOR_KEY[sv.level] || !KNOWN_SCALING_KEYS.includes(AI_LEVEL_TO_EDITOR_KEY[sv.level])) {

@@ -41,7 +41,7 @@ const section = (overrides = {}) => ({
   ...overrides,
 })
 
-const analysis = (sections) => ({ title: null, sections })
+const analysis = (sections, sourceText) => ({ title: null, sections, sourceText })
 
 describe('composeMovementLine', () => {
   it('composes reps + name + weight', () => {
@@ -170,6 +170,36 @@ describe('sectionFromAiSection - primary section', () => {
     expect(s.name).toBe('Fran')
   })
 
+  // Gasit live (WI-1, explorare 07-17): acelasi input ("Cindy" + textul
+  // complet) a dat benchmarkMetadata.name corect la un apel si null la un
+  // apel repetat identic - non-determinism dovedit al AI-ului.
+  it('backfills a known benchmark name from the first line of the source text when the AI did not recognize it', () => {
+    const s = sectionFromAiSection(
+      section({ benchmarkMetadata: { name: null, isBenchmark: false, isHero: false } }),
+      true,
+      'Cindy\nAMRAP 20 Minutes\n5 Pull-ups\n10 Push-ups\n15 Air Squats',
+    )
+    expect(s.name).toBe('Cindy')
+  })
+
+  it('never overrides a name the AI already returned, even if the source text differs', () => {
+    const s = sectionFromAiSection(
+      section({ benchmarkMetadata: { name: 'Custom WOD Name', isBenchmark: false, isHero: false } }),
+      true,
+      'Cindy\nAMRAP 20 Minutes',
+    )
+    expect(s.name).toBe('Custom WOD Name')
+  })
+
+  it('does not backfill when the known name only appears incidentally, not on the first line', () => {
+    const s = sectionFromAiSection(
+      section({ benchmarkMetadata: { name: null, isBenchmark: false, isHero: false } }),
+      true,
+      'For time, similar pacing to Cindy:\n21-15-9 Thrusters and Pull-ups',
+    )
+    expect(s.name).toBe('')
+  })
+
   it('normalizes a decorative AI title before it reaches the editor', () => {
     const s = sectionFromAiSection(section({ title: 'F O R   T I M E' }), true)
     expect(s.title).toBe('FOR TIME')
@@ -235,6 +265,13 @@ describe('sectionsFromAiAnalysis', () => {
     expect(sections.filter(s => s.isPrimary)).toHaveLength(1)
     expect(sections[2].isPrimary).toBe(true)
     expect(sections[1].isPrimary).toBe(false)
+  })
+
+  it('wires analysis.sourceText through to the primary section name backfill end-to-end', () => {
+    const s = section({ benchmarkMetadata: { name: null, isBenchmark: false, isHero: false } })
+    const sourceText = 'Cindy\nAMRAP 20 Minutes\n5 Pull-ups\n10 Push-ups\n15 Air Squats'
+    const sections = sectionsFromAiAnalysis(analysis([s], sourceText))
+    expect(sections[0].name).toBe('Cindy')
   })
 })
 
@@ -321,6 +358,19 @@ describe('deriveReviewFlags (WI-1: 6 fixed reasons, no confidence scoring)', () 
     const s = section({ benchmarkMetadata: { name: 'Fran', isBenchmark: true, isHero: false } })
     const flags = deriveReviewFlags(analysis([s]))
     expect(flags.some(f => f.reason === 'unresolved_benchmark')).toBe(false)
+  })
+
+  it('does not flag unresolved_benchmark when the source text deterministically resolves a known name', () => {
+    const s = section({ benchmarkMetadata: { name: null, isBenchmark: true, isHero: false } })
+    const sourceText = 'Murph\nFor time:\n1 mile Run\n100 Pull-ups\n200 Push-ups\n300 Air Squats\n1 mile Run'
+    const flags = deriveReviewFlags(analysis([s], sourceText))
+    expect(flags.some(f => f.reason === 'unresolved_benchmark')).toBe(false)
+  })
+
+  it('still flags unresolved_benchmark for a name outside the known list', () => {
+    const s = section({ benchmarkMetadata: { name: null, isBenchmark: true, isHero: false } })
+    const flags = deriveReviewFlags(analysis([s], 'Some Obscure Local Gym Benchmark'))
+    expect(flags.some(f => f.reason === 'unresolved_benchmark')).toBe(true)
   })
 
   it('flags a format with required config fields the AI schema cannot supply (Chained AMRAP -> stages)', () => {
