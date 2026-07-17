@@ -4,296 +4,305 @@ Status: architecture only. No React components, no rendering implementation.
 Workout Engine V2 and Workout Intelligence are both frozen inputs here —
 this document changes neither.
 
-Guiding principle, restated because everything below answers to it:
-**the athlete should understand the workout from a single glance.** Any
-rule that doesn't serve that gets cut, not kept "for completeness."
+Success criterion, and the only one that matters: **an athlete should
+understand any workout in 2–3 seconds, without reading explanatory text.**
+If the athlete has to mentally reconstruct the workout from movement
+descriptions, the design has failed, regardless of how clean the code
+behind it is.
 
-## 0. Where this sits, and what it isn't
+## 0. The worked example this whole document answers to
 
-Two closed milestones feed this one without being touched by it:
+Given:
 
-- **Workout Engine V2** — the persisted model (`Workout` → `WorkoutSection`,
-  each with `format`/`formatConfig`/`movements`/`scoreType`/etc.) stays
-  exactly as it is. The Composer reads it, never changes its shape.
-- **Workout Intelligence** — the AI pipeline that turns a coach's pasted
-  text *into* that persisted model. The Composer is its conceptual
-  inverse: the parser goes text → structure, the Composer goes
-  structure → human-readable text. Same "parser describes, UI decides
-  how to display" principle from the Workout Intelligence spec, applied
-  on the output side now instead of the input side.
+```
+50 Cal Row
+Then
+21-15-9
+Thrusters
+Pull-ups
+Cash-out:
+50 Cal Row
+```
 
-This codebase already has one rendering step in this space:
-`describeFormatConfig()` (`workoutFormats.js`), which walks a format's
-catalog config schema generically to produce a compact "Label: value ·
-Label: value" summary for places like the Home card, Jurnal, and
-Leaderboard. The Composer does **not** replace it — those call sites keep
-using it unchanged. The Composer is a new, additive, higher-fidelity
-sibling: where `describeFormatConfig` answers "what are the settings,"
-the Composer answers "how would a coach actually say this out loud."
-Both share the same underlying philosophy (walk the catalog's own field
-declarations generically, never hardcode per format) — the Composer
-extends that philosophy toward whiteboard-quality phrasing instead of a
-settings dump.
+**Today**, this persists as three `WorkoutSection`-shaped pieces (or, after
+the Buy-In/Cash-Out merge, one section whose `formatConfig` holds
+`buyIn`/`cashOut`/`mainFormat`) and renders as individual movement cards —
+technically correct, cognitively flat. There's no visual signal that "50
+Cal Row" appears twice for a *reason*, no signal that Thrusters and
+Pull-ups share a rep scheme, no signal that the buy-in and cash-out are
+framing rather than the point.
 
-**Renderer is a separate, later thing.** The Composer's output is plain,
-renderer-agnostic data. Painting that data to pixels (React components,
-typography, colors) is explicitly out of scope here, per the request —
-a future initiative consumes the Composer's output, it isn't designed yet.
+**The Composer's job** is to turn that into something that reads like:
+
+```
+BUY-IN
+50 Cal Row
+
+21-15-9
+Thrusters
+Pull-ups
+
+CASH-OUT
+50 Cal Row
+```
+
+— large, unmistakable "21-15-9" as the thing the eye lands on first; the
+two movements underneath it with no repeated rep count; buy-in and
+cash-out visually present but clearly secondary framing, not competing
+for attention with the main work. Every rule below is in service of
+producing exactly this, generically, for every format — not just this
+one example.
 
 ## 1. Responsibility within the architecture
 
 One job: **`WorkoutSection → ComposedWorkout`**, a pure, stateless
 transform. Given a section exactly as Workout Engine V2 already persists
-it (format, formatConfig, movements, scoreType, benchmarkMetadata,
-participation, etc.), produce a small, ordered, renderer-agnostic
-description of how that section reads.
+it, produce a small, ordered, coach-native description of how that
+section reads — the way a human would actually write it on a whiteboard,
+not a rendering of the database record.
 
-Explicitly **not** the Composer's responsibility, the same way these were
-carved out of Segment's scope: logging, scoring computation, PR detection,
-editing UI, AI extraction/parsing, persistence, or any decision about
-fonts/colors/pixels. If a rule would require any of those, it doesn't
-belong in the Composer.
+Not the Composer's job: logging, scoring computation, PR detection,
+editing UI, AI extraction, persistence, or any pixel/typography decision.
+If a rule needs any of those, it doesn't belong here.
 
 ## 2. Inputs and outputs
 
-**Input**: one `WorkoutSection`, in its current, unmodified V2 shape,
-plus which scaling variant to compose for (RX/Intermediate/Beginner/
-OnRamp — see §5). No new fields, no schema change. The Composer must work
-with what already exists, because the mandate is explicitly "don't
-redesign V2."
+**Input**: one `WorkoutSection` in its current, unmodified V2 shape,
+plus which scaling variant to compose (RX/Intermediate/Beginner/OnRamp).
+No schema change required to use the Composer — see §9 for the one place
+where a *small, additive, already-precedented* field would meaningfully
+improve output quality, called out explicitly rather than assumed.
 
-**Output**: a `ComposedWorkout` — an ordered list of **presentation
-blocks**, each a plain data object from a small, closed vocabulary of
-`kind`s. Not a string, not JSX. This is the actual generic contract: any
-future consumer (a whiteboard-style card, a shareable image generator, a
-print view, a voice announcer reading the WOD aloud) consumes the *same*
-small block vocabulary, never format-specific data.
-
-Illustrative shape (informal, not a formal schema — this round is
-philosophy, not implementation):
+**Output**: a `ComposedWorkout` — ordered content **blocks**, each
+carrying a semantic `role` (not a raw string), plus **transitions**
+between blocks. Never a string, never JSX — a small closed vocabulary any
+future consumer (React card, share-image generator, print view, voice
+announcer) can consume identically.
 
 ```
 ComposedWorkout = {
-  identity: { name: string | null },              // benchmark/coach-given name, only if it exists
-  blocks: PresentationBlock[],                     // see kinds below
+  identity: { name: string | null },        // benchmark/coach-given name, only if present
+  primary: { text: string },                 // "21-15-9" / "AMRAP 15" / "5 ROUNDS" / "EMOM 20" - see §3, §7
+  blocks: ContentBlock[],
 }
 
-PresentationBlock =
-  | { kind: 'heading', emphasis: 'primary', text: string }         // "AMRAP 20:00", "5 Rounds For Time", "21-15-9"
-  | { kind: 'participation', emphasis: 'secondary', text: string } // "With a partner, splitting reps"
-  | { kind: 'movementList', emphasis: 'primary', items: string[] } // composed movement lines, unchanged order
-  | { kind: 'connector', emphasis: 'tertiary', text: string }      // "STRAIGHT INTO"
-  | { kind: 'bookend', emphasis: 'tertiary', label: string, items: string[] } // "Buy-in", "Cash-out"
-  | { kind: 'scoreNote', emphasis: 'quiet', text: string }         // "Score: total reps across all rounds"
+ContentBlock = {
+  role: 'buy-in' | 'cash-out' | 'main' | 'stage' | 'per-round-addon',
+  weight: 'primary' | 'secondary',           // visual hierarchy, see §6 - not a font size
+  scheme: string | null,                      // "21-15-9", "5-5-5-3-3-3-1-1-1", null if nothing to hoist (see §9)
+  movements: string[],                        // composeMovementLine() output, reps already stripped when hoisted into `scheme`
+  transitionBefore: 'then' | 'straight-into' | 'rest' | null,  // null for the first block
+  restSeconds: number | null,                 // only when transitionBefore === 'rest'
+}
 ```
 
-`emphasis` is a *relative weight tag*, not a font size — it's how the
-Composer expresses visual hierarchy (§4) without knowing anything about
-typography.
+`weight` is the same relative-emphasis idea as before, simplified to two
+levels because that's what actually reads clearly on a whiteboard:
+buy-in/cash-out/per-round-addons are `secondary`, the main/stage work is
+`primary`. Nothing here is a font size — see §8.
 
-## 3. Composition rules
+## 3. The composition pipeline
 
-A small ordered pipeline, run once per section per variant:
+Five steps, run once per section per variant, each one a concrete answer
+to "what would a coach do":
 
-1. **Classify the archetype.** Not by format name (23+ values) — by the
-   catalog's existing `family` + `scoreMode`/`rowMode` tags, which every
-   format already carries today (`workoutFormats.js`). A handful of
-   archetypes cover everything: `single-pass` (once through a movement
-   list), `repeat-block` (N rounds, optionally with a rep sequence),
-   `timed-block` (AMRAP/EMOM/interval-shaped), `composite-block`
-   (chained stages or buy-in/main/cash-out — sections whose `formatConfig`
-   carries `stages` or `buyIn`/`cashOut`), `open-block` (Not-For-Time /
-   Max Effort, no real scheme to state). This mirrors the same
-   archetype-vs-format reduction from the Segment discussion, but derived
-   at render time from data that already exists, not from a schema
-   change.
-2. **Compose the heading.** The single most important line — what a
-   coach writes *first* on a whiteboard: "AMRAP 20:00," "5 Rounds For
-   Time," "21-15-9." One phrasing template per archetype, filled from
-   whichever `formatConfig` fields that archetype declares (duration,
-   rounds, rep sequence) — never a per-format template.
-3. **Compose the movement list.** Reuses the existing, already-proven
-   `composeMovementLine()` (Workout Intelligence) verbatim — the Composer
-   does not reinvent movement-line phrasing, it consumes it.
-4. **Compose structural connectors**, only for `composite-block`: a
-   connector between stages with zero rest ("STRAIGHT INTO"), or bookend
-   labels for buy-in/cash-out — driven by the same structural fields
-   (`stages`, `buyIn`/`cashOut`) already read in step 1, not by a second
-   per-format check.
-5. **Compose the score note**, only when it adds clarity beyond what the
-   heading already communicates (an AMRAP's heading already implies
-   "rounds + reps," it doesn't need a redundant footer; a chained
-   composite genuinely benefits from "Score: total reps across all
-   stages," since that's not obvious from the heading alone).
+1. **Classify the archetype and find the primary format text.** Not from
+   the format's internal name — from its structural shape (§7). For a
+   composite (buy-in/cash-out, chained), the primary text comes from the
+   *main* block's own shape (`mainFormat`), never from the outer format
+   label. A coach never says "this is a Buy-In/Cash-Out" — they say
+   "twenty-one fifteen nine," and that's what becomes `primary.text`.
+2. **Hoist shared structure.** Before composing individual movement
+   lines, check whether the block's movements share a structural fact:
+   an identical rep count across every movement, or a structured rep
+   sequence on the format's own config (`setsScheme` on Strength Sets,
+   `repsScheme` on Ladder). If found, that fact becomes the block's
+   `scheme` (rendered once, above the movement list) and is **stripped**
+   from each individual movement line — this is the direct fix for
+   "Double Unders (50-40-30-20-10) / Sit-ups (50-40-30-20-10)" becoming
+   "50-40-30-20-10 / Double Unders / Sit-ups." If no shared structure is
+   found, `scheme` stays `null` and movements render as composed lines,
+   exactly as today — no guessing, ever (see §9 for the honest limit of
+   what's detectable today).
+3. **Compose movement lines** for whatever wasn't hoisted, reusing
+   `composeMovementLine()` (Workout Intelligence) verbatim.
+4. **Attach transitions**, only between blocks, never within one: `then`
+   for a normal-rest handoff (buy-in → main), `straight-into` for
+   zero-rest chaining, `rest` (with `restSeconds`) when the workout
+   explicitly prescribes rest between stages. Phrased at render time as
+   "THEN" / "STRAIGHT INTO" / "REST 2:00."
+5. **Omit anything the layout already says.** This is a filter, not an
+   addition: if a structural fact is already unambiguous from the
+   `scheme`/`primary` text as it will be typeset, no block or label
+   restates it in words. "50-40-30-20-10" is visually self-evident as a
+   descending scheme — the word "Descending Ladder" never appears
+   anywhere in the output. The same filter suppresses a `scoreNote`
+   whenever the `primary` text already implies it (an AMRAP heading
+   already implies "rounds + reps," it gets no redundant footer).
 
-Governing rule for all five steps: **the Composer never re-derives or
-guesses information the data model didn't already commit to a field.**
-If a field is missing, the corresponding block is simply omitted — never
-filled with a guess. This is the same "populate what's known, never
-invent" discipline Workout Intelligence already established, applied to
-the output side.
+## 4. Grouping rules
 
-## 4. Visual hierarchy
+- Movements sharing one `scheme` are always one block, never split —
+  they're read as one cohesive unit.
+- Buy-in and cash-out are their own blocks, `role: 'buy-in'` /
+  `role: 'cash-out'`, `weight: 'secondary'` — visually present, never
+  competing with the main block for attention.
+- A per-round add-on ("after each round: 5 shoulder press @ 80%") is its
+  own block, `role: 'per-round-addon'`, `weight: 'secondary'` — never
+  folded into a movement's free-text description, where it would be
+  invisible to the layout and forced back into prose the athlete has to
+  parse.
+- Chained stages stay **separate** blocks (`role: 'stage'`), connected by
+  `straight-into` transitions — never re-merged into one flat list. This
+  is a direct guarantee against reintroducing the exact flattening bug
+  the Chained AMRAP fix already solved on the input side; the Composer
+  must not undo that on the output side.
+- Multiple `WorkoutSection`s (warmup → strength → metcon) stay out of
+  scope — the Composer composes the inside of *one* section; V2's
+  section boundaries are untouched.
+- Scaling variants are alternate **movement fillings of the same
+  skeleton** — `primary`, `scheme`, transitions, and block roles don't
+  change between RX and Beginner, only `movements` does.
 
-Expressed as block order + `emphasis`, not pixels:
+## 5. Ordering rules
 
-1. **Identity** (`primary`, highest) — the workout's name, shown only
-   when one exists. Never synthesized.
-2. **Heading** (`primary`) — the scheme. Always present. The thing a
-   coach reads first and the thing that, alone, should already convey
-   "what kind of effort is this."
-3. **Movement list** (`primary`) — the actual work. Usually the largest
-   block on screen, but conceptually subordinate to the heading — you
-   read the shape before the specifics.
-4. **Connectors/bookends** (`tertiary`) — structural context (stage
-   breaks, buy-in/cash-out labels). De-emphasized relative to the
-   movement list they frame; they're scaffolding, not the point.
-5. **Participation note** (`secondary`) — placed right after the
-   heading, before the movement list (see §6), because it changes *how*
-   you read the movements, not an afterthought.
-6. **Score note** (`quiet`, lowest) — last, smallest, and often absent
-   entirely per §3's rule 5.
+- Identity, then `primary`, then blocks in the workout's own authored
+  order (buy-in before main before cash-out; stage 1 before stage 2), a
+  per-round-addon block placed immediately after the block it modifies.
+- Movements within a block: exact stored order, always — never
+  alphabetized, never reordered by load. A coach wrote
+  thrusters-then-pull-ups on purpose.
+- Nothing is ever reordered by "importance" — authored order **is** the
+  correct order, by definition.
 
-## 5. Grouping rules
+## 6. Visual hierarchy
 
-- Movements belonging to one scheme are **always** one `movementList`
-  block — never split across blocks, matching how a coach actually reads
-  a round of work as one cohesive unit.
-- A composite/chained section's stages are **separate** blocks connected
-  by `connector`/`bookend` blocks, not merged into one flat list — this
-  is the direct fix for the exact bug (flattened, duplicated Chained
-  AMRAP movements) that motivated the Workout Intelligence roadmap's
-  stage support; the Composer must not reintroduce that flattening on
-  the output side after WI-1 fixed it on the input side.
-- Buy-in/cash-out bookends are grouped *with* the main work as one
-  visual unit, but visually subordinate (`tertiary`) — they frame the
-  WOD, they aren't the WOD.
-- Multiple `WorkoutSection`s within one `Workout` (warmup → strength →
-  metcon) are **not** the Composer's concern — V2's own section
-  boundaries are untouched; the Composer composes the inside of *one*
-  section at a time. Composing how sections relate to each other is a
-  different, later problem, out of scope here by design ("I don't want
-  to redesign Workout Engine V2").
-- Scaling variants (RX/Intermediate/Beginner/OnRamp) are **alternate
-  fillings of the same skeleton**, not separate composed structures: the
-  heading/connectors/archetype are variant-independent (the *shape*
-  doesn't change between RX and Beginner), only the `movementList`
-  content differs per variant. `compose(section, variantKey)` is a
-  simple, stateless call per variant — the skeleton reuse falls out
-  naturally rather than being a special case the caller has to manage.
+Two weights, because a whiteboard doesn't have five:
 
-## 6. Ordering rules
+1. **`primary`** — the thing the eye lands on first: the identity name
+   (if any) and the `primary` text ("21-15-9," "AMRAP 15," "5 ROUNDS,"
+   "EMOM 20"), plus the main/stage movement blocks.
+2. **`secondary`** — everything that frames the main work without being
+   it: buy-in, cash-out, per-round add-ons, transition labels. Present,
+   legible, unmistakably subordinate.
 
-- Identity, then heading, then participation note, then movement
-  list(s)/connectors in the workout's own written order, then score note
-  last.
-- Stages/bookends are **never reordered** — buy-in first, main, cash-out
-  last; stage 1 before stage 2 before stage 3 — always exactly the order
-  the workout is structured in. The Composer has no "importance"
-  heuristic that overrides authored order.
-- Movements within a block: **exact stored order, always.** No
-  alphabetizing, no reordering by load or movement pattern. A coach wrote
-  thrusters-then-pull-ups on purpose; silently reordering would be a
-  real, confusing regression, not a neutral cleanup.
+No third tier for "metadata" or "scoring notes" — §3 step 5 means most of
+what would have needed one is omitted outright. If something can't be
+omitted and doesn't fit `primary`/`secondary`, that's a signal the
+composition rules are missing something, not a reason to add a tier.
 
-## 7. How it stays generic across every V2 format
+## 7. How it stays generic across every format
 
-This is the actual mechanism, not just an aspiration:
+The mechanism, concretely:
 
-- **Key off `family`, never off the format name.** The catalog already
-  tags every one of the 23+ formats with one of five families
-  (`scored`/`sets`/`mixed`/`nft`/`chained`) plus finer-grained
-  `scoreMode`/`rowMode` values (`amrap`/`fortime_or_amrap`/
-  `single_value`, `interval`/`movement`/`round`) — all of this already
-  exists in `workoutFormats.js` today, added for the editor, reusable
-  as-is for archetype classification. A new format added to an existing
-  family+scoreMode combination is composed correctly with **zero**
-  Composer changes, the same payoff the Segment discussion aimed for,
-  achieved here without touching the data model at all.
-- **Walk config fields by declared type, not by name.** The catalog's
-  per-format `config` schema already declares each field's `type`
-  (`duration`, `movementList`, `stageList`, `repsSchemeList`, `select`) —
-  the same declarations `FormatConfigEditor.jsx` already reads generically
-  to build its inputs. The Composer has one phrasing rule *per field
-  type*, reused by every format that declares a field of that type. A
-  format gaining a new field of an already-known type needs no Composer
-  change.
-- **Honest boundary**: `family` alone is coarse — `'mixed'` currently
-  covers both `'Buy-In/Cash-Out'` (a true 3-stage bookend structure) and
-  `'AMRAP with Buy-In'` (a single continuous AMRAP with a preamble),
-  which read differently on a whiteboard. Archetype classification needs
-  `family` *plus* a look at which structural fields are actually present
-  (`stages`? both `buyIn` and `cashOut`?) — still a small, closed check,
-  still driven by fields the catalog already declares, just not a naive
-  one-to-one `family → archetype` lookup. Worth stating plainly rather
-  than glossing over.
+- **The primary heading is a structural fact, never the format's
+  internal name.** "AMRAP," "For Time," "EMOM," "5 Rounds" come from
+  `family` + `scoreMode`/`rowMode` + the relevant duration/rounds field —
+  the same tags the catalog already carries for every format today. The
+  literal strings "Buy-In/Cash-Out," "Strength Sets," "Complex," or any
+  `type`/section-type label **never** appear as the primary heading —
+  those are internal taxonomy, not something an athlete has a mental
+  model for. A Complex's heading is "6 SETS" (from its own `rounds`
+  config), not the word "Complex." A Strength Sets section's heading is
+  the movement name plus its hoisted `setsScheme` ("BACK SQUAT" /
+  "5-5-5-3-3-3-1-1-1"), not the words "Strength Sets."
+- **Composite formats derive their heading from the *main* block, not
+  the outer label.** `family: 'mixed'` sections (Buy-In/Cash-Out, AMRAP
+  with Buy-In) never surface their own name as `primary` — the main
+  block's own `mainFormat` (or scoreMode) supplies it, exactly per the
+  worked example in §0.
+- **Field-type-driven, not format-name-driven**, same as before: one
+  hoisting/phrasing rule per config field *type* (`repsSchemeList`,
+  `duration`, `stageList`), reused by every format that declares a field
+  of that type. A new format in a known family, or a new field of a
+  known type, needs zero Composer changes.
+- **Honest boundary, restated**: `family` alone is coarse (`'mixed'`
+  covers structurally different shapes) — archetype classification needs
+  `family` plus a look at which structural fields are actually present.
+  Still small, still closed, still field-driven.
 
-## 8. Evolving without format-specific rendering logic
+## 8. How React consumes the composed output
 
-- New format, existing family + scoreMode: zero changes (§7).
-- New config field, existing declared type: zero changes (§7) — picked
-  up automatically by the type-keyed phrasing rule.
-- A genuinely new archetype (a structural shape never seen before):
-  exactly one new archetype-detection rule plus one new heading-phrasing
-  template, additive, touching nothing existing — the same
-  "one contained addition, not a cross-cutting ripple" property the
-  Segment design aimed for, achieved here purely at the presentation
-  layer.
-- **Testing collapses the same way coverage does**: validate with one
-  representative fixture per *family* (five, not twenty-three), plus a
-  couple of live checks per family against real formats — mirroring how
-  `describeFormatConfig` and the Workout Intelligence mapper are already
-  tested in this codebase, not a new testing philosophy.
+Still architecture, not implementation, but concretely: React never
+branches on `format`. It branches on `block.role` and `block.weight` —
+a fixed, small set (five roles, two weights) instead of twenty-three
+formats. One generic block-rendering component reads `scheme` (if
+present, typeset large, above the movement list) and `movements` (a
+plain list below it); one generic transition component reads
+`transitionBefore` and phrases/styles it by its three possible values;
+the top-level component reads `identity`/`primary` and lays out `blocks`
+in order. No component ever imports or checks a format id. This is the
+concrete payoff of §7: the *number of React components* is bounded by
+the block vocabulary (small, closed, already fully enumerated above),
+not by the format catalog (23+ and growing). Extending the format
+catalog within a known family/field-type therefore requires **zero**
+new or modified React components — only the Composer's data-transform
+step changes, never the render step.
 
-## Language is a rendering-time concern, not the Composer's
+## 9. An honest limitation, found while designing this — needs a decision
 
-This codebase is bilingual (RO/EN, `translations.js`, the `t.xxx`
-pattern used everywhere). The Composer's blocks should carry **structured
-facts** (archetype, duration, rounds, rep sequence), not pre-baked
-English or Romanian sentences — phrasing into an actual language string
-happens at a thin, separate step that takes a `ComposedWorkout` plus a
-`t` translations object, the same separation of data and display strings
-already used throughout the rest of the app. This keeps the Composer
-itself language-agnostic and keeps translation additions from ever
-requiring a Composer change.
+The worked example in §0 assumes "21-15-9" is available to hoist. Checked
+against the real data: it usually isn't, yet. `Strength Sets.config.
+setsScheme` is genuinely structured (an array of numbers) and hoists
+perfectly, always. But the well-known descending schemes this whole
+design is anchored on (Fran's 21-15-9, Annie's 50-40-30-20-10) are
+tagged format `'For Time'`, not `'Ladder'` — Workout Intelligence's own
+prompt deliberately steers the parser that way — and `'For Time'` has no
+rep-scheme field in `formatConfig` at all. Today, that breakdown exists
+**only** as free-text inside a movement's `notes` (e.g. `"Reps facute
+21-15-9 (45 total)"`), if it exists anywhere.
 
-## Illustrative examples (composition only, no visual design)
+The Composer will not parse that prose to reconstruct "21-15-9" —
+regex-scraping a human-written note is exactly the fragile,
+non-deterministic guessing this whole project (Workout Intelligence's
+"never invent" principle, applied consistently since WI-1) has been
+built to avoid, and it would only work for hand-authored fixtures, not
+real coach input. Three honest options, not a silent default:
 
-**AMRAP** ("AMRAP 20 minutes: 5 Pull-ups, 10 Push-ups, 15 Air Squats"):
-heading `"AMRAP 20:00"` → movementList `["5 Pull-ups", "10 Push-ups", "15 Air Squats"]`.
-Reads in one glance: what kind of effort, for how long, doing what.
+1. **Graceful degradation for `'For Time'`-family formats without a
+   structured scheme**: hoist only when the identical-rep-count check in
+   §3 step 2 finds something (works when every movement shares one flat
+   total), otherwise show composed movement lines as today. Zero data
+   change, but "21-15-9" specifically won't appear as a heading for a
+   `'For Time'`-tagged benchmark unless its movements happen to share an
+   identical total reps count (Fran does: 45/45 — so a *coarser* hoist,
+   "45" not "21-15-9", is honestly achievable there; Annie's 150/150 the
+   same way).
+2. **A small, additive field**, not a new data model: give `'For Time'`/
+   `'RFT'`/`'Chipper'` the same `repsScheme` free-text field `'Ladder'`
+   already has (`REP_SCHEME_QUICK_OPTIONS` already exists and is already
+   wired into the admin editor for exactly this) — a coach or Workout
+   Intelligence's mapper fills it in when the scheme is known, the
+   Composer hoists it verbatim when present. This is the only way to
+   reliably get "21-15-9" specifically (not just the coarser shared
+   total) onto the heading for the majority of real benchmark workouts.
+3. **Leave it exactly as free text**, surfaced verbatim as a secondary
+   caption under the primary heading rather than parsed — honest about
+   not being structured, still visible to the athlete.
 
-**Descending ladder / Fran-style** (21-15-9 Thrusters/Pull-ups):
-heading `"21-15-9"` → movementList `["Thrusters @ 43/30kg", "Pull-ups"]`.
-No separate "rep scheme" footer — it's already in the heading, exactly
-how a coach would actually write it.
+Recommendation: **option 2**. It's the smallest possible change (one
+field, on formats that already have a sibling format with the identical
+field), it's the only option that actually delivers the §0 worked
+example as written, and it keeps the Composer itself free of any
+text-parsing logic. But this is a real, load-bearing decision about
+whether "no new data model" tolerates one small additive field — not
+mine to make silently.
 
-**Chained AMRAP** ("Jack's Triangle"): identity `null` → heading
-`"Chained AMRAP"` → block 1 (heading `"AMRAP 2:00"`, movementList
-`["Max Deadlifts @ 100/70kg"]`) → connector `"STRAIGHT INTO"` → block 2
-(heading `"AMRAP 19:00"`, movementList of 4 items) → connector
-`"STRAIGHT INTO"` → block 3 (identical to block 1, kept separate, not
-merged) → scoreNote `"Score: total reps across all 3 rounds"`.
+## Language stays out of the Composer
 
-**Buy-In/Cash-Out**: bookend `"Buy-in"` (movementList `["50 Cal Row"]`,
-tertiary) → heading `"21-15-9"` (primary) → movementList (primary) →
-bookend `"Cash-out"` (movementList `["50 Cal Row"]`, tertiary). The main
-set visually dominates; the bookends read as framing, matching how a
-coach would actually emphasize it out loud.
-
-**Partner WOD**: participation `"With a partner, splitting reps as you like"`
-placed right after the heading, before the movement list — because it
-changes how the reader interprets everything that follows.
+Blocks carry structured facts (`role`, `scheme`, `restSeconds`), not
+pre-baked sentences. Phrasing into RO/EN text ("THEN," "CASH-OUT," "REST
+2:00") happens at a thin, separate step taking a `ComposedWorkout` plus
+the existing `t.xxx` translations object — the same data/display-string
+separation already used throughout the app. The Composer itself never
+imports a translation.
 
 ## Deliberately deferred, not decided here
 
-- The actual React/typography layer (the "Renderer" proper) — a
-  separate, later initiative, consuming `ComposedWorkout` as its input.
-- Cross-section composition (how warmup/strength/metcon read together as
-  one class) — out of scope, V2's section boundaries are untouched.
-- Print/share/voice-specific output shaping — same `ComposedWorkout`,
-  different future consumers; not designed yet.
-- The exact phrasing template library (one per archetype × field-type
-  combination, in both RO and EN) — this spec defines the *mechanism*
-  (§3, §7, "language is rendering-time"), not the full template catalog;
-  that's implementation, deliberately not done in this pass.
+- The actual React/typography Renderer (§8 defines the *contract* it
+  consumes, not its implementation).
+- Cross-section composition (warmup+strength+metcon read together).
+- Print/share/voice-specific shaping.
+- The full phrasing template library (RO+EN, one per archetype/field
+  type) — this pass defines the mechanism, not the catalog.
+- The §9 decision — needs your call before any implementation begins.
