@@ -275,6 +275,76 @@ describe('sectionsFromAiAnalysis', () => {
   })
 })
 
+// Gasit la explorarea WI-1 (07-17): un paste "Buy-in: X / 21-15-9 Y / Cash-
+// out: Z" dadea 3 sectiuni separate (2 dintre ele etichetate gresit format
+// "Buy-In/Cash-Out", fara config real populat) in loc de o singura sectiune
+// structurata - catalogul (workoutFormats.js) are deja formatul, doar
+// traducerea din raspunsul AI-ului lipsea.
+describe('Buy-In/Cash-Out auto-merge (WI-1 roadmap item 4)', () => {
+  const buyInSection = () => section({
+    type: 'metcon', title: 'Buy-in', description: 'Buy-in: 50 Cal Row',
+    format: null, loggingMode: 'none',
+    movements: [toMovementShape(movement({ name: 'Row', canonicalName: 'Row', reps: null, calories: 50 }))],
+  })
+  const mainSection = () => section({
+    type: 'metcon', title: null, description: '21-15-9 reps for time',
+    format: 'For Time',
+    formatConfig: { timeCapMinutes: 12, rounds: null, intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null },
+    loggingMode: 'required',
+    movements: [
+      toMovementShape(movement({ name: 'Thrusters', reps: 21, weightMale: 43, weightFemale: 30, weightUnit: 'kg' })),
+      toMovementShape(movement({ name: 'Pull-ups', canonicalName: 'Pull-up', reps: 21, weightMale: null })),
+    ],
+  })
+  const cashOutSection = () => section({
+    type: 'metcon', title: 'Cash-out', description: 'Cash-out: 50 Cal Row',
+    format: null, loggingMode: 'none',
+    movements: [toMovementShape(movement({ name: 'Row', canonicalName: 'Row', reps: null, calories: 50 }))],
+  })
+
+  it('merges a buy-in/main/cash-out triple into one Buy-In/Cash-Out section', () => {
+    const sections = sectionsFromAiAnalysis(analysis([buyInSection(), mainSection(), cashOutSection()]))
+    expect(sections).toHaveLength(1)
+    expect(sections[0].format).toBe('Buy-In/Cash-Out')
+    expect(sections[0].formatConfig.mainFormat).toBe('For Time')
+    expect(sections[0].formatConfig.buyIn).toEqual(['Row 50 cal'])
+    expect(sections[0].formatConfig.cashOut).toEqual(['Row 50 cal'])
+    // miscarile sectiunii main raman in variants.rx, separat de buyIn/cashOut
+    expect(sections[0].variants.rx.movements).toHaveLength(2)
+    expect(sections[0].isPrimary).toBe(true)
+  })
+
+  it('flags the merged section for manual review', () => {
+    const flags = deriveReviewFlags(analysis([buyInSection(), mainSection(), cashOutSection()]))
+    expect(flags.some(f => f.sectionIndex === 0 && f.reason === 'needs_review' && f.detail.includes('merged'))).toBe(true)
+  })
+
+  it('does not merge a normal Warm-up + Strength + Metcon class', () => {
+    const warmup = section({ type: 'warmup', title: 'Warm-up', description: '400m run', format: null, loggingMode: 'none' })
+    const strength = section({ type: 'skill', title: 'Strength', format: 'Strength Sets', loggingMode: 'optional' })
+    const metcon = section({ type: 'metcon', title: 'Metcon', format: 'For Time', loggingMode: 'required' })
+    const sections = sectionsFromAiAnalysis(analysis([warmup, strength, metcon]))
+    expect(sections).toHaveLength(3)
+  })
+
+  it('does not merge when only a buy-in is present, no cash-out', () => {
+    const sections = sectionsFromAiAnalysis(analysis([buyInSection(), mainSection()]))
+    expect(sections).toHaveLength(2)
+  })
+
+  it('leaves the main format unmapped (flagged, not guessed) when it is outside AMRAP/For Time', () => {
+    const emomMain = section({
+      type: 'metcon', format: 'EMOM',
+      formatConfig: { timeCapMinutes: null, rounds: 12, intervalSeconds: 60, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null },
+      loggingMode: 'required',
+    })
+    const sections = sectionsFromAiAnalysis(analysis([buyInSection(), emomMain, cashOutSection()]))
+    expect(sections[0].formatConfig.mainFormat).toBeUndefined()
+    const flags = deriveReviewFlags(analysis([buyInSection(), emomMain, cashOutSection()]))
+    expect(flags.some(f => f.sectionIndex === 0 && f.reason === 'needs_review' && f.detail.includes('config: mainFormat'))).toBe(true)
+  })
+})
+
 describe('deriveReviewFlags (WI-1: 6 fixed reasons, no confidence scoring)', () => {
   it('flags an unresolved movement (canonicalName null)', () => {
     const s = section({ movements: [toMovementShape(movement({ name: 'Some Weird Move', canonicalName: null }))] })

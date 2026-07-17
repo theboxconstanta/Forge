@@ -94,6 +94,12 @@ const FORMAT_CONFIG_TRANSLATORS = {
   'Complex': (c) => ({ rounds: c.rounds }),
   'AMRAP with Buy-In': (c) => ({ totalDurationSec: min2sec(c.timeCapMinutes) }),
   'Not For Time': () => ({}),
+  // Pass-through deliberat - spre deosebire de toate celelalte, formatConfig
+  // de aici NU vine direct din raspunsul brut al AI-ului (schema generica
+  // n-are camp pt buyIn/cashOut/mainFormat), ci e construit chiar de
+  // applyBuyInCashOutMerge() mai jos, deja in forma exacta ceruta de catalog
+  // (workoutFormats.js).
+  'Buy-In/Cash-Out': (c) => ({ buyIn: c.buyIn, cashOut: c.cashOut, mainFormat: c.mainFormat, mainDurationSec: c.mainDurationSec }),
 }
 
 // Campurile obligatorii ale formatului ales care au ramas nepopulate dupa
@@ -300,12 +306,71 @@ function pickPrimaryIndex(sections) {
   return sections.length > 0 ? sections.length - 1 : -1
 }
 
+const BUY_IN_PATTERN = /buy[\s-]?in/i
+const CASH_OUT_PATTERN = /cash[\s-]?out/i
+const mentions = (pattern, s) => pattern.test(s.title || '') || pattern.test(s.description || '')
+
+// Catalogul (workoutFormats.js, 'Buy-In/Cash-Out'.config.mainFormat) accepta
+// STRICT 'AMRAP'/'For Time' - orice alt format al sectiunii principale
+// ramane nemapat (semnal de revizuire, nu o presupunere).
+const MAIN_FORMAT_MAP = { AMRAP: 'AMRAP', 'For Time': 'For Time', RFT: 'For Time', Chipper: 'For Time' }
+
+/** O sectiune 'main' isi pastreaza toate campurile (loggingMode/scoreType/
+ * benchmarkMetadata/movements etc.) - doar format+formatConfig devin cele
+ * ale sectiunii combinate Buy-In/Cash-Out. */
+function mergeBuyInCashOutTriple(buyIn, main, cashOut) {
+  return {
+    ...main,
+    format: 'Buy-In/Cash-Out',
+    formatConfig: {
+      buyIn: (buyIn.movements || []).map(composeMovementLine).filter(Boolean),
+      cashOut: (cashOut.movements || []).map(composeMovementLine).filter(Boolean),
+      mainFormat: MAIN_FORMAT_MAP[main.format] || null,
+      mainDurationSec: main.formatConfig?.timeCapMinutes != null ? Math.round(main.formatConfig.timeCapMinutes * 60) : null,
+    },
+  }
+}
+
+/** Detecteaza tiparul Buy-in/Main/Cash-out - AI-ul emite azi 3 sectiuni
+ * separate (fara alt semnal decat titlul/descrierea) in loc de o singura
+ * sectiune structurata "Buy-In/Cash-Out" (format deja existent in catalog,
+ * doar netradus pana acum din raspunsul AI-ului) - gasit la explorarea WI-1
+ * (07-17). Potrivire deliberat conservatoare: EXACT 3 sectiuni consecutive,
+ * prima si a treia mentionand explicit "buy-in"/"cash-out" in titlu sau
+ * descriere, cea din mijloc NEmentionandu-le (evita sa prinda o clasa
+ * normala Warm-up+Strength+Metcon, care nu foloseste niciodata aceste
+ * cuvinte). Nu prinde varianta cu un singur bookend (doar buy-in, fara
+ * cash-out, sau invers) - limitare deliberata, extindem cand apare un caz
+ * real. Fiecare imbinare primeste un semnal `needs_review` explicit -
+ * coach-ul vede ca s-a intamplat si poate desface manual daca e o
+ * potrivire gresita. */
+function applyBuyInCashOutMerge(rawSections) {
+  const sections = []
+  const mergeNotes = []
+  let i = 0
+  while (i < rawSections.length) {
+    const [a, b, c] = rawSections.slice(i, i + 3)
+    const isTriple = a && b && c && mentions(BUY_IN_PATTERN, a) && mentions(CASH_OUT_PATTERN, c) &&
+      !mentions(BUY_IN_PATTERN, b) && !mentions(CASH_OUT_PATTERN, b)
+    if (isTriple) {
+      sections.push(mergeBuyInCashOutTriple(a, b, c))
+      mergeNotes.push({ sectionIndex: sections.length - 1, detail: 'buy-in/cash-out merged automatically from 3 sections' })
+      i += 3
+    } else {
+      sections.push(rawSections[i])
+      i += 1
+    }
+  }
+  return { sections, mergeNotes }
+}
+
 /** Punctul unic de intrare - WorkoutAnalysis -> lista de sectiuni a
  * editorului, in aceeasi ordine ca AI-ul (care reflecta deja ordinea din
  * textul original). */
 export function sectionsFromAiAnalysis(analysis) {
-  const aiSections = analysis?.sections || []
-  if (aiSections.length === 0) return []
+  const rawSections = analysis?.sections || []
+  if (rawSections.length === 0) return []
+  const { sections: aiSections } = applyBuyInCashOutMerge(rawSections)
   const primaryIdx = pickPrimaryIndex(aiSections)
   return aiSections.map((s, i) => sectionFromAiSection(s, i === primaryIdx, analysis?.sourceText))
 }
@@ -322,11 +387,14 @@ const isCardioMovement = (m) => CARDIO_MISCARI.some(c => c.toLowerCase() === (m.
  * `{ sectionIndex, reason, detail }` - App.jsx il ataseaza pe sectiunea
  * mapata corespunzatoare (acelasi index) ca `section.reviewFlags`. */
 export function deriveReviewFlags(analysis) {
-  const aiSections = analysis?.sections || []
+  const rawSections = analysis?.sections || []
   const sourceText = analysis?.sourceText
+  const { sections: aiSections, mergeNotes } = applyBuyInCashOutMerge(rawSections)
   const primaryIdx = pickPrimaryIndex(aiSections)
   const flags = []
   const push = (sectionIndex, reason, detail) => flags.push({ sectionIndex, reason, detail })
+
+  for (const note of mergeNotes) push(note.sectionIndex, 'needs_review', note.detail)
 
   aiSections.forEach((s, i) => {
     const allMovementLists = [s.movements || [], ...(s.scalingVersions || []).map(sv => sv.movements || [])]
