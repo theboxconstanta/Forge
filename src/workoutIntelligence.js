@@ -289,7 +289,21 @@ export function deriveReviewFlags(analysis) {
       }
     }
 
-    if (!s.format || !WORKOUT_FORMATS[s.format] || s.format === 'Unrecognized') {
+    // O sectiune non-primara de tip EXACT 'warmup' fara format nu e un semnal
+    // de review - App.jsx (isPlainText) are un card dedicat de text liber
+    // pentru exact acest caz (typeKey === 'warmup' && format == null),
+    // acelasi UI ca WARM-UP-ul dinainte de Faza 6. Potrivire STRICT egala
+    // (nu case-insensitive) fiindca `type` e text liber in schema AI-ului
+    // (SECTION_TYPE_HINTS e doar ghidare de prompt, nu enum impus) - orice
+    // alta ortografie ('Warm-Up', 'Warmup') NU va fi recunoscuta de
+    // isPlainText nici in editor, deci merita in continuare semnalul (coach-
+    // ul chiar are ceva de verificat: sectiunea nu se va afisa ca text liber).
+    // Gasit la explorarea WI-1 (07-17): flag-ul aparea pe orice warm-up fara
+    // format, desi asta e starea corecta/asteptata, nu o lipsa reala.
+    const isPlainTextWarmup = i !== primaryIdx && s.type === 'warmup' && !s.format
+    if (isPlainTextWarmup) {
+      // fara flag - vezi comentariul de mai sus
+    } else if (!s.format || !WORKOUT_FORMATS[s.format] || s.format === 'Unrecognized') {
       push(i, 'ambiguous_format', s.format || null)
     } else {
       const translator = FORMAT_CONFIG_TRANSLATORS[s.format]

@@ -269,6 +269,36 @@ describe('deriveReviewFlags (WI-1: 6 fixed reasons, no confidence scoring)', () 
     expect(flags.some(f => f.reason === 'ambiguous_format')).toBe(true)
   })
 
+  // Gasit la explorarea WI-1 (07-17): o paste normala Warm-up+Strength+Metcon
+  // aducea un ambiguous_format si pe Warm-up, desi typeKey 'warmup' + format
+  // null e starea CORECTA (editorul are un card dedicat de text liber pt
+  // exact acest caz, vezi App.jsx isPlainText) - nu ceva de revizuit.
+  it('does not flag a non-primary warmup section with no format', () => {
+    const warmup = section({ type: 'warmup', format: null, loggingMode: 'none' })
+    const metcon = section({ type: 'metcon', format: 'For Time', loggingMode: 'required' })
+    const flags = deriveReviewFlags(analysis([warmup, metcon]))
+    expect(flags.some(f => f.sectionIndex === 0 && f.reason === 'ambiguous_format')).toBe(false)
+  })
+
+  // Domeniul ramane ingust deliberat - orice alt tip non-primar fara format
+  // (cooldown, mobility, coach_notes etc.) TOT primeste semnalul, fiindca
+  // editorul nu are un card de text liber si pt acelea (doar 'warmup').
+  it('still flags a non-primary, non-warmup section with no format', () => {
+    const cooldown = section({ type: 'cooldown', format: null, loggingMode: 'none' })
+    const metcon = section({ type: 'metcon', format: 'For Time', loggingMode: 'required' })
+    const flags = deriveReviewFlags(analysis([cooldown, metcon]))
+    expect(flags.some(f => f.sectionIndex === 0 && f.reason === 'ambiguous_format')).toBe(true)
+  })
+
+  // Potrivire STRICT egala pe `type` - o alta ortografie nu e recunoscuta
+  // nici de editor (isPlainText), deci tot merita semnalul.
+  it('still flags a warmup-like section whose type is not the exact string "warmup"', () => {
+    const warmup = section({ type: 'Warm-Up', format: null, loggingMode: 'none' })
+    const metcon = section({ type: 'metcon', format: 'For Time', loggingMode: 'required' })
+    const flags = deriveReviewFlags(analysis([warmup, metcon]))
+    expect(flags.some(f => f.sectionIndex === 0 && f.reason === 'ambiguous_format')).toBe(true)
+  })
+
   it('flags a weight-scored section with no weighted movement', () => {
     const s = section({ format: 'Weightlifting', scoreType: 'Weight', movements: [toMovementShape(movement({ weightMale: null }))] })
     const flags = deriveReviewFlags(analysis([s]))
