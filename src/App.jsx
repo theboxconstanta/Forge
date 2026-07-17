@@ -2720,8 +2720,15 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       // open: true - draftul trebuie sa fie "imediat gata de revizuire"
       // (cerinta WI-1), nu ascuns dupa carduri colapsate pe care coach-ul
       // trebuie sa le deschida manual una cate una.
+      // editWodId ramane neatins deliberat - reflecta deja corect daca data
+      // selectata (dataWod) are un WOD salvat (mentinut continuu de sync-ul
+      // silentios de mai jos). Nulling-ul lui aici, fara sa schimbam si
+      // dataWod, incalca invariantul pe care se bazeaza acel sync - efectul
+      // il "repara" imediat, resincronizand WOD-ul vechi peste draftul
+      // proaspat (bug gasit 07-17 in explorarea WI-1). Coach-ul care vrea
+      // un WOD nou trebuie sa schimbe data sau sa apese "anuleaza" inainte
+      // de analiza, nu sa se bazeze pe un reset implicit aici.
       setWodSections(mapped.map((s, i) => ({ ...s, open: true, reviewFlags: flags.filter(f => f.sectionIndex === i) })))
-      setEditWodId(null)
       showToast(t.toastAnalyzeWorkoutSuccess)
     } catch (e) {
       console.error('analyzeWorkout failed:', e)
