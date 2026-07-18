@@ -4913,6 +4913,24 @@ function App() {
     }
   }, [userProfile?.language])
 
+  // Bufferul editabil al ecranului Profil trebuie resincronizat cand se
+  // schimba IDENTITATEA profilului (login/logout cu alt cont), nu la orice
+  // update al lui userProfile - de-aia cheia e userProfile?.id, nu obiectul
+  // intreg (weight_unit/avatar/language se actualizeaza pe userProfile fara
+  // sa schimbe id-ul, si n-ar trebui sa suprascrie o editare de nume in curs).
+  // Inainte de acest efect, campurile erau populate DOAR imperativ la click-ul
+  // pe avatar (setScreen('profile')) - daca userul B se loga imediat dupa ce
+  // userul A ramasese pe ecranul Profil (screen local nereset la logout),
+  // formularul arata in continuare numele lui A sub emailul lui B, iar
+  // Salveaza suprascria profilul lui B cu numele lui A. Bug real, reprodus
+  // live (07-18): owner -> logout -> login ca alt membru, fara refresh.
+  useEffect(() => {
+    setProfileFirstName(userProfile?.first_name || '')
+    setProfileLastName(userProfile?.last_name || '')
+    setProfileGender(userProfile?.gender || '')
+    setProfileBirthDate(userProfile?.birth_date || '')
+  }, [userProfile?.id])
+
   const registerPushSubscription = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     try {
@@ -5752,6 +5770,11 @@ function App() {
     // de la contul anterior, pana ce fetchUserProfile() apuca sa corecteze.
     setGymBlocked(false)
     setRegistrationIncomplete(false)
+    // userProfile ramane altfel cu datele contului vechi pana se rezolva
+    // fetchUserProfile() a noului cont - null aici garanteaza ca ecranul
+    // Profil (si orice alt loc care citeste userProfile direct) nu poate
+    // arata nici macar tranzitoriu numele/genul/etc. contului anterior.
+    setUserProfile(null)
   }
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
@@ -6599,11 +6622,7 @@ function App() {
                     <div style={{ fontSize: '20px', fontWeight: '900', color: '#0E0E0E', lineHeight: 1 }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
-                  <div onClick={() => {
-                    setProfileFirstName(userProfile?.first_name || ''); setProfileLastName(userProfile?.last_name || '')
-                    setProfileGender(userProfile?.gender || ''); setProfileBirthDate(userProfile?.birth_date || '')
-                    setPrevScreen('home'); setScreen('profile')
-                  }}
+                  <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
                     style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
                     {avatarUploading ? (
                       <span style={{ fontSize: '10px', color: '#ABE73C', animation: 'spin 1s linear infinite' }}>⏳</span>

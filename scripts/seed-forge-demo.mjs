@@ -294,7 +294,9 @@ async function main() {
         const seconds = Math.floor(Math.random() * 60);
         logRows.push({
           member_id: a.id, wod_id: wodIdByDate[date], gym_id: gymId,
-          variant_level: Math.random() < 0.6 ? 'rx' : 'intermediate',
+          // App's Leaderboard query filters variant_level against these exact-cased values
+          // (App.jsx fetchClasament: .in('variant_level', ['OnRamp','Beginner','Intermediate','RX'])).
+          variant_level: Math.random() < 0.6 ? 'RX' : 'Intermediate',
           result: null, time_result: `${minutes}:${String(seconds).padStart(2, '0')}`,
           notes: null, logged_at: new Date(`${date}T19:30:00Z`).toISOString(),
         });
