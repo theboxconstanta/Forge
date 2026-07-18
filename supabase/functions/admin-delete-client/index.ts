@@ -9,7 +9,31 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+// Decide daca `caller` (deja confirmat admin undeva) poate sterge `target`.
+// Pura / fara I/O ca sa poata fi testata fara un backend Supabase live - vezi
+// index.test.ts. Exista DOAR pentru ca acest endpoint ruleaza pe service_role
+// si ocoleste RLS - altfel verificarea de gym_id ar fi facuta deja de RLS,
+// ca la "subscriptions_admin_delete" si echivalentele ei.
+export function authorizeClientDeletion({ callerAdminRow, target, targetAdminRow }: {
+  callerAdminRow: { id: string; gym_id: string } | null;
+  target: { id: string; email: string; gym_id: string | null } | null;
+  targetAdminRow: { id: string } | null;
+}): { ok: true } | { ok: false; status: number; error: string } {
+  if (!callerAdminRow) {
+    return { ok: false, status: 403, error: "Doar administratorii pot șterge clienți" };
+  }
+  // Acelasi raspuns pentru "nu exista" si "e in alta sala" - altfel raspunsul
+  // ar confirma unui admin ca un client_id apartine altei sali (07-18, P0-003).
+  if (!target || target.gym_id !== callerAdminRow.gym_id) {
+    return { ok: false, status: 404, error: "Client inexistent" };
+  }
+  if (targetAdminRow) {
+    return { ok: false, status: 400, error: "Nu poți șterge un cont de administrator" };
+  }
+  return { ok: true };
+}
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
@@ -32,22 +56,23 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: callerAdminRow } = await admin.from("admins").select("id").eq("id", caller.id).maybeSingle();
-    if (!callerAdminRow) {
-      return new Response(JSON.stringify({ error: "Doar administratorii pot șterge clienți" }), { status: 403, headers: CORS });
+    const { data: callerAdminRow } = await admin.from("admins").select("id, gym_id").eq("id", caller.id).maybeSingle();
+
+    let target: { id: string; email: string; gym_id: string | null } | null = null;
+    let targetAdminRow: { id: string } | null = null;
+    if (callerAdminRow) {
+      ({ data: target } = await admin.from("profiles").select("id, email, gym_id").eq("id", client_id).maybeSingle());
+      if (target) {
+        ({ data: targetAdminRow } = await admin.from("admins").select("id").eq("id", client_id).maybeSingle());
+      }
     }
 
-    const { data: target } = await admin.from("profiles").select("id, email").eq("id", client_id).maybeSingle();
-    if (!target) {
-      return new Response(JSON.stringify({ error: "Client inexistent" }), { status: 404, headers: CORS });
+    const authz = authorizeClientDeletion({ callerAdminRow, target, targetAdminRow });
+    if (!authz.ok) {
+      return new Response(JSON.stringify({ error: authz.error }), { status: authz.status, headers: CORS });
     }
 
-    const { data: targetAdminRow } = await admin.from("admins").select("id").eq("id", client_id).maybeSingle();
-    if (targetAdminRow) {
-      return new Response(JSON.stringify({ error: "Nu poți șterge un cont de administrator" }), { status: 400, headers: CORS });
-    }
-
-    const email = (target.email || "").toLowerCase();
+    const email = (target!.email || "").toLowerCase();
 
     // Sterge toate urmele membrului din tabelele care nu au ON DELETE CASCADE
     // catre profiles/auth.users, inainte sa stergem contul propriu-zis.
@@ -78,4 +103,11 @@ Deno.serve(async (req) => {
     console.error("admin-delete-client error:", err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS });
   }
-});
+}
+
+// import.meta.main e false cand fisierul e importat (de index.test.ts) si
+// true cand Supabase Edge Runtime il ruleaza direct - fara asta, importul
+// din test ar porni un al doilea listener HTTP real.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
