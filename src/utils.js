@@ -141,3 +141,36 @@ export function formatWodDurata(durataStr) {
 }
 
 export const NIVEL_DOT_COLORS = { RX: '#E8591A', Intermediate: '#F0B429', Beginner: '#2FA84F', OnRamp: '#2F6FED' }
+
+// Mapeaza codurile de eroare OFICIALE Supabase Auth (@supabase/auth-js
+// error-codes.ts - error.code, nu potrivire fragila pe error.message) la
+// mesaje traduse, pentru fluxul de resetare parola. Coduri necunoscute cad
+// pe error.message brut (in engleza, netradus) - mai bine decat sa ascunda
+// eroarea complet. Vezi si RESET_LINK_ERROR_CODES mai jos, pentru distinctia
+// "linkul de recuperare e invalid/expirat" (ecran separat) fata de restul.
+export function authErrorMessage(error, t) {
+  if (!error) return ''
+  const byCode = {
+    over_email_send_rate_limit: t.authErrorRateLimit,
+    over_request_rate_limit: t.authErrorRateLimit,
+    email_address_invalid: t.authErrorInvalidEmail,
+    weak_password: t.resetErrorWeakPassword,
+    same_password: t.resetErrorSamePassword,
+    session_expired: t.resetErrorSessionExpired,
+    session_not_found: t.resetErrorSessionExpired,
+    refresh_token_not_found: t.resetErrorSessionExpired,
+  }
+  return (error.code && byCode[error.code]) || error.message || ''
+}
+
+// Coduri intoarse de supabase.auth.initialize() cand URL-ul de la care a
+// pornit sesiunea contine un link de recuperare parola invalid/deja
+// folosit/expirat - Supabase redirectioneaza server-side cu
+// #error=access_denied&error_code=otp_expired&... (verificat live, 07-18),
+// nu cu un access_token fals - _getSessionFromURL() (auth-js) transforma
+// asta intr-o eroare intoarsa de initialize(), mecanismul SDK oficial
+// pentru acest caz (nicio detectie custom pe timeout). Aplicatia nu are
+// alt flux care ar genera aceste coduri la incarcare (fara magic links,
+// fara OAuth) - orice eroare de initializare cu unul din codurile astea
+// inseamna sigur un link de recuperare esuat.
+export const RESET_LINK_ERROR_CODES = new Set(['otp_expired', 'flow_state_not_found', 'flow_state_expired'])

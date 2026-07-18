@@ -13,7 +13,7 @@ import { supabase } from './supabase'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
-  localeFor,
+  localeFor, authErrorMessage, RESET_LINK_ERROR_CODES,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
 import { getT } from './translations'
@@ -4691,6 +4691,12 @@ function App() {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [gymSignupCodeInput, setGymSignupCodeInput] = useState('')
   const [resetMode, setResetMode] = useState(false)
+  // Setat doar cand supabase.auth.initialize() intoarce o eroare cu un cod
+  // din RESET_LINK_ERROR_CODES (vezi useEffect-ul de bootstrap si utils.js) -
+  // distinge "link de recuperare invalid/expirat" (acest mesaj) de "link
+  // valid, utilizatorul e pe formularul de parola noua" (resetMode fara
+  // resetLinkError).
+  const [resetLinkError, setResetLinkError] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -4862,11 +4868,31 @@ function App() {
   const recalcFeedUnreadRef = useRef(null)
 
   useEffect(() => {
+    // initialize() e memoizat (initializePromise) - createClient() il porneste
+    // deja automat la constructie, deci apelul de aici doar citeste rezultatul
+    // acelei initializari, nu reporneste nimic. E singurul mecanism SDK oficial
+    // pentru a afla daca URL-ul de start continea un link de recuperare parola
+    // invalid/expirat/deja folosit (Supabase redirectioneaza server-side cu
+    // #error=access_denied&error_code=otp_expired, nu cu un access_token fals -
+    // vezi RESET_LINK_ERROR_CODES in utils.js). getSession() de mai jos asteapta
+    // oricum aceeasi initializePromise inainte sa rezolve, deci ordinea e sigura.
+    supabase.auth.initialize().then(({ error }) => {
+      // AuthImplicitGrantRedirectError (aruncata de _getSessionFromURL pt.
+      // exact acest caz) NU pune codul pe error.code (ramane undefined) - il
+      // pune pe error.details.code. Acelasi lucru il face si codul intern al
+      // SDK-ului (_initialize(), cateva linii mai sus in auth-js) cand verifica
+      // identity_already_exists etc. Verificat live (07-18): error.code
+      // nedefinit, error.details.code === 'otp_expired'.
+      const code = error?.details?.code || error?.code
+      if (error && RESET_LINK_ERROR_CODES.has(code)) {
+        setResetMode(true); setResetLinkError(authErrorMessage({ code, message: error.message }, t))
+      }
+    })
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null); setAuthLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') { setResetMode(true); return }
+      if (event === 'PASSWORD_RECOVERY') { setResetLinkError(''); setResetMode(true); return }
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -5633,16 +5659,28 @@ function App() {
     if (newPassword.length < 6) { setAuthError(t.resetPasswordTooShort); return }
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) setAuthError(error.message)
+    if (error) setAuthError(authErrorMessage(error, t))
     else { setResetMode(false); setNewPassword(''); setNewPasswordConfirm('') }
     setAuthSubmitting(false)
+  }
+
+  // Iesire explicita din resetMode (link valid dar userul renunta, sau a
+  // terminat de vazut mesajul de link invalid) - signOut() e necesar doar
+  // pentru primul caz: initialize()/PASSWORD_RECOVERY lasa clientul cu o
+  // sesiune de recuperare activa in storage, pe care n-o vrem agatata daca
+  // userul nu isi schimba parola (nu e cazul pentru linkul invalid, unde n-a
+  // existat niciodata o sesiune, dar signOut() pe un client fara sesiune e
+  // un no-op sigur, nu o eroare).
+  const handleExitResetMode = async () => {
+    await supabase.auth.signOut()
+    setResetMode(false); setResetLinkError(''); setNewPassword(''); setNewPasswordConfirm(''); setAuthError('')
   }
 
   const handleForgotPassword = async () => {
     if (!authEmail) { setAuthError(t.authEnterEmailFirst); return }
     setAuthSubmitting(true); setAuthError('')
     const { error } = await supabase.auth.resetPasswordForEmail(authEmail, { redirectTo: window.location.origin })
-    if (error) setAuthError(error.message)
+    if (error) setAuthError(authErrorMessage(error, t))
     else setAuthError(t.authResetEmailSent)
     setAuthSubmitting(false)
   }
@@ -6317,29 +6355,49 @@ function App() {
     <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', boxShadow: '0 60px 0 0 #0E0E0E' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
       <div style={{ width: '100%', background: '#0E0E0E', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.resetTitle}</div>
-          <div style={{ fontSize: '13px', color: '#888' }}>{t.resetSubtitle}</div>
-        </div>
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetNewPasswordLabel}</div>
-          <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.resetNewPasswordPlaceholder}
-            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
-        </div>
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetConfirmPasswordLabel}</div>
-          <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder={t.resetConfirmPasswordPlaceholder}
-            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
-        </div>
-        {authError && (
-          <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
-            {authError}
+        {resetLinkError ? (
+          <div style={{ textAlign: 'center' }}>
+            <Lock size={40} color="#ff7070" strokeWidth={1.5} style={{ marginBottom: '12px' }} />
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>{t.resetLinkInvalidTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>{t.resetLinkInvalidMessage}</div>
+            <button onClick={handleExitResetMode}
+              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'system-ui' }}>
+              {t.resetLinkInvalidCta}
+            </button>
           </div>
+        ) : (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.resetTitle}</div>
+              <div style={{ fontSize: '13px', color: '#888' }}>{t.resetSubtitle}</div>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetNewPasswordLabel}</div>
+              <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.resetNewPasswordPlaceholder}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetConfirmPasswordLabel}</div>
+              <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder={t.resetConfirmPasswordPlaceholder}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+            </div>
+            {authError && (
+              <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
+                {authError}
+              </div>
+            )}
+            <button onClick={handleSetNewPassword} disabled={authSubmitting}
+              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+              {authSubmitting ? t.resetSavingButton : t.resetSaveButton}
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+              <span onClick={authSubmitting ? undefined : handleExitResetMode}
+                style={{ fontSize: '13px', color: '#888', cursor: authSubmitting ? 'not-allowed' : 'pointer' }}>
+                {t.resetBackToLogin}
+              </span>
+            </div>
+          </>
         )}
-        <button onClick={handleSetNewPassword} disabled={authSubmitting}
-          style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
-          {authSubmitting ? t.resetSavingButton : t.resetSaveButton}
-        </button>
       </div>
     </div>
   )
@@ -6486,7 +6544,8 @@ function App() {
                 style={{ width: '16px', height: '16px', accentColor: '#0E0E0E', cursor: 'pointer' }} />
               <span style={{ fontSize: '13px', color: '#aaa' }}>{t.authRememberMe}</span>
             </label>
-            <span onClick={handleForgotPassword} style={{ fontSize: '13px', color: '#ABE73C', cursor: 'pointer', fontWeight: '500' }}>
+            <span onClick={authSubmitting ? undefined : handleForgotPassword}
+              style={{ fontSize: '13px', color: '#ABE73C', cursor: authSubmitting ? 'not-allowed' : 'pointer', fontWeight: '500', opacity: authSubmitting ? 0.6 : 1 }}>
               {t.authForgotPassword}
             </span>
           </div>

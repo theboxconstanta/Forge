@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
+  authErrorMessage, RESET_LINK_ERROR_CODES,
 } from './utils'
 
 afterEach(() => {
@@ -213,5 +214,53 @@ describe('dateWithCurrentTime', () => {
     expect(rezultat.getDate()).toBe(13)
     expect(rezultat.getHours()).toBe(14)
     expect(rezultat.getMinutes()).toBe(22)
+  })
+})
+
+describe('authErrorMessage', () => {
+  const t = {
+    authErrorRateLimit: 'RATE_LIMIT',
+    authErrorInvalidEmail: 'INVALID_EMAIL',
+    resetErrorWeakPassword: 'WEAK_PW',
+    resetErrorSamePassword: 'SAME_PW',
+    resetErrorSessionExpired: 'SESSION_EXPIRED',
+  }
+
+  it('intoarce string gol pentru eroare null/undefined', () => {
+    expect(authErrorMessage(null, t)).toBe('')
+    expect(authErrorMessage(undefined, t)).toBe('')
+  })
+
+  it('mapeaza over_email_send_rate_limit si over_request_rate_limit la acelasi mesaj tradus', () => {
+    expect(authErrorMessage({ code: 'over_email_send_rate_limit', message: 'raw' }, t)).toBe('RATE_LIMIT')
+    expect(authErrorMessage({ code: 'over_request_rate_limit', message: 'raw' }, t)).toBe('RATE_LIMIT')
+  })
+
+  it('mapeaza email_address_invalid, weak_password, same_password', () => {
+    expect(authErrorMessage({ code: 'email_address_invalid', message: 'raw' }, t)).toBe('INVALID_EMAIL')
+    expect(authErrorMessage({ code: 'weak_password', message: 'raw' }, t)).toBe('WEAK_PW')
+    expect(authErrorMessage({ code: 'same_password', message: 'raw' }, t)).toBe('SAME_PW')
+  })
+
+  it('mapeaza session_expired, session_not_found si refresh_token_not_found la acelasi mesaj (sesiunea de recuperare a expirat cat userul era pe ecran)', () => {
+    expect(authErrorMessage({ code: 'session_expired', message: 'raw' }, t)).toBe('SESSION_EXPIRED')
+    expect(authErrorMessage({ code: 'session_not_found', message: 'raw' }, t)).toBe('SESSION_EXPIRED')
+    expect(authErrorMessage({ code: 'refresh_token_not_found', message: 'raw' }, t)).toBe('SESSION_EXPIRED')
+  })
+
+  it('cade pe error.message brut pentru un cod necunoscut/absent, nu ascunde eroarea', () => {
+    expect(authErrorMessage({ code: 'some_future_code', message: 'Raw Supabase message' }, t)).toBe('Raw Supabase message')
+    expect(authErrorMessage({ message: 'No code at all' }, t)).toBe('No code at all')
+  })
+})
+
+describe('RESET_LINK_ERROR_CODES', () => {
+  it('contine otp_expired - codul confirmat live pt un link de recuperare expirat/invalid/refolosit', () => {
+    expect(RESET_LINK_ERROR_CODES.has('otp_expired')).toBe(true)
+  })
+
+  it('nu contine coduri nelegate de recuperare parola (ex. weak_password) - n-ar trebui sa arate ecranul de link invalid', () => {
+    expect(RESET_LINK_ERROR_CODES.has('weak_password')).toBe(false)
+    expect(RESET_LINK_ERROR_CODES.has('invalid_credentials')).toBe(false)
   })
 })
