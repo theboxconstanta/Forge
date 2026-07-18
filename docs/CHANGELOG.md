@@ -4,6 +4,9 @@
 
 ---
 
+## 2026-07-18 — Isolated demo environment shipped
+Built a fully separate Supabase project (`forge-demo`) + Vercel deployment for external product/UX review, seeded with realistic fictional gym data. Schema-only `supabase db dump` from production applied to the new project; discovered and fixed a real gap in that process — `on_auth_user_created` lives in the `auth` schema and isn't captured by a `--schema public` dump, so it had to be recreated by hand (see `PROJECT_STATE.md` §6). Production was never written to (link + dump only, read-only). See `scripts/seed-forge-demo*.mjs` for the reusable seed script.
+
 ## 2026-07-18 — Documentation workflow adopted
 Set up `/docs` (`PROJECT_STATE.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `CHANGELOG.md`, `DECISIONS.md`) as the standing, lightweight documentation practice — updated only at meaningful milestones/decisions going forward, not every commit.
 

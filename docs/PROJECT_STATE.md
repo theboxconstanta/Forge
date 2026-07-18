@@ -52,9 +52,7 @@ See `ROADMAP.md` for the full list and ordering.
 
 ## 4. Current task in progress
 
-**Goal**: prepare an isolated demo environment of Forge (separate Supabase project + separate Vercel deployment, seeded with realistic fake data) so the user can hand it to ChatGPT for an external product/UX review.
-
-**Status**: paused, blocked on Docker Desktop installation (needed for a schema-only `supabase db dump` from production). A new, fully isolated Supabase project (`forge-demo`) already exists. See `RESTART_CHECKPOINT.md` (repo root) for the exact resume sequence and pending steps — that file is a one-off resume checkpoint, not part of this standing `/docs` set, and can be deleted once the task completes.
+None — the isolated demo environment (previous entry here) shipped 2026-07-18. See §6 and `CHANGELOG.md`.
 
 ---
 
@@ -68,3 +66,15 @@ Update the relevant file(s) in `/docs` — not necessarily all five — whenever
 - **`DECISIONS.md`** — append when a decision is made that future work should not silently relitigate, especially anything that looks "obviously improvable" but was deliberately chosen otherwise.
 
 Do not update these after routine commits or small bug fixes — only at the granularity of "another engineer would want to know this happened."
+
+---
+
+## 6. Demo environment (forge-demo)
+
+A fully isolated demo instance exists for external product/UX review (e.g. handing to ChatGPT), shipped 2026-07-18:
+
+- **Supabase project**: `forge-demo` (ref `lxdpknfiyqzpqxtsotys`) — separate project from production (`sdfkvfbvgpuspnnnwqwk`), same schema (structure-only dump, zero prod data ever copied over).
+- **Vercel project**: `forge-demo` (team `forgewod`), deployed from a one-off scratch copy of the repo (not git-connected) — live at `https://forge-demo-five.vercel.app`.
+- **Seed data**: `scripts/seed-forge-demo.mjs` (+ `scripts/seed-forge-demo-repair.mjs`, a one-time backfill for a missing `on_auth_user_created` trigger that a schema-only dump doesn't carry over from the `auth` schema — re-run that trigger-creation step first if the demo project is ever rebuilt from scratch). One gym ("Forge Demo Box"), 10 demo accounts (owner/coach/8 athletes, all `@forgedemo.test`), 21 days of WODs/classes/bookings, PRs, logs, feed activity.
+- **Edge Functions**: all 5 deployed to forge-demo with no OpenAI/Brevo/VAPID secrets set (by design) — `analyze-workout`/notification functions exist but no-op safely rather than call real external services.
+- Demo credentials are not stored in this repo or in `/docs` — ask the user if they need to be resurfaced.
