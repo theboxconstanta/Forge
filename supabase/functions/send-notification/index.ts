@@ -1,6 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push";
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@forge.ro";
@@ -14,6 +17,38 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Decide daca `caller` poate declansa o notificare de tipul `type` catre
+// `target`. Pura / fara I/O ca sa poata fi testata fara un backend Supabase
+// live - vezi index.test.ts. Exista DOAR pentru ca functia asta ruleaza pe
+// service_role si, inainte de acest fix, nu facea NICIO verificare de
+// autorizare - orice utilizator autentificat putea trimite orice tip de
+// notificare catre orice membru, din orice sala (07-19, P0-004).
+export function authorizeNotification({ type, callerAdminRow, callerCoachRow, callerProfile, target }: {
+  type: string;
+  callerAdminRow: { gym_id: string } | null;
+  callerCoachRow: { gym_id: string } | null;
+  callerProfile: { gym_id: string | null } | null;
+  target: { gym_id: string | null } | null;
+}): { ok: true } | { ok: false; status: number; error: string } {
+  if (!target || !target.gym_id) {
+    return { ok: false, status: 403, error: "Nu ai voie să trimiți această notificare" };
+  }
+  if (callerAdminRow && callerAdminRow.gym_id === target.gym_id) {
+    return { ok: true };
+  }
+  if (callerCoachRow && callerCoachRow.gym_id === target.gym_id) {
+    return { ok: true };
+  }
+  // Singurul caz in care un membru obisnuit (nici admin, nici coach)
+  // declanseaza o notificare pentru ALT membru: auto-book de pe waitlist
+  // dupa ce membrul isi anuleaza propria rezervare (App.jsx,
+  // checkAndBookFromWaitlist) - ambii sunt garantat in aceeasi sala.
+  if (type === "waitlist_booked" && callerProfile?.gym_id != null && callerProfile.gym_id === target.gym_id) {
+    return { ok: true };
+  }
+  return { ok: false, status: 403, error: "Nu ai voie să trimiți această notificare" };
+}
 
 function getContent(type: string, planName: string, endDate: string) {
   const dateFmt = endDate
@@ -108,19 +143,40 @@ async function sendEmail(to: string, subject: string, html: string) {
   return { ok: res.ok, status: res.status, body };
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Lipsește autentificarea" }), { status: 401, headers: CORS });
+    }
+
     const { member_email, type, plan_name, end_date } = await req.json();
     if (!member_email || !type) {
       return new Response(JSON.stringify({ error: "Missing member_email or type" }), { status: 400, headers: CORS });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: { user: caller }, error: callerErr } = await anonClient.auth.getUser(token);
+    if (callerErr || !caller) {
+      return new Response(JSON.stringify({ error: "Token invalid" }), { status: 401, headers: CORS });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const [{ data: callerAdminRow }, { data: callerCoachRow }, { data: callerProfile }, { data: target }] = await Promise.all([
+      supabase.from("admins").select("gym_id").eq("id", caller.id).maybeSingle(),
+      supabase.from("coaches").select("gym_id").eq("id", caller.id).maybeSingle(),
+      supabase.from("profiles").select("gym_id").eq("id", caller.id).maybeSingle(),
+      supabase.from("profiles").select("gym_id").ilike("email", member_email).maybeSingle(),
+    ]);
+
+    const authz = authorizeNotification({ type, callerAdminRow, callerCoachRow, callerProfile, target });
+    if (!authz.ok) {
+      return new Response(JSON.stringify({ error: authz.error }), { status: authz.status, headers: CORS });
+    }
 
     const { title, body, html } = getContent(type, plan_name || "", end_date || "");
 
@@ -153,4 +209,11 @@ Deno.serve(async (req) => {
     console.error("Error:", err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS });
   }
-});
+}
+
+// import.meta.main e false cand fisierul e importat (de index.test.ts) si
+// true cand Supabase Edge Runtime il ruleaza direct - fara asta, importul
+// din test ar porni un al doilea listener HTTP real.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
