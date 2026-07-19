@@ -86,8 +86,30 @@ async function notify(
   if (!res.ok) console.error("Brevo error for", email, await res.text());
 }
 
-Deno.serve(async () => {
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+// Decide daca bearer token-ul primit este chiar service_role key-ul
+// proiectului - singurul apelant de incredere pentru acest job (un
+// scheduler, nu un utilizator din aplicatie). Pura / fara I/O ca sa poata
+// fi testata fara un backend Supabase live - vezi index.test.ts. Exista
+// DOAR pentru ca functia asta ruleaza pe service_role si, inainte de acest
+// fix, nu facea NICIO verificare - era complet publica pe internet
+// (verify_jwt=false), fara nicio autentificare (07-19, P0-005). verify_jwt
+// = true (config.toml) opreste deja apelurile fara niciun JWT valid, dar
+// NU garanteaza ca doar service_role poate chema functia - orice JWT valid
+// (inclusiv contul unui membru obisnuit) trece de acel gate. Verificarea
+// de mai jos e a doua bariera, cea care conteaza efectiv aici.
+export function isAuthorizedScheduler(token: string | null, serviceRoleKey: string): boolean {
+  return !!token && token === serviceRoleKey;
+}
+
+async function handleRequest(req: Request): Promise<Response> {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "") || null;
+  if (!isAuthorizedScheduler(token, serviceRoleKey)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
 
   const today = new Date().toISOString().split("T")[0];
   const in3days = addDays(today, 3);
@@ -116,4 +138,11 @@ Deno.serve(async () => {
     JSON.stringify({ checked: today, exp3: exp3?.length ?? 0, exp1: exp1?.length ?? 0 }),
     { headers: { "Content-Type": "application/json" } }
   );
-});
+}
+
+// import.meta.main e false cand fisierul e importat (de index.test.ts) si
+// true cand Supabase Edge Runtime il ruleaza direct - fara asta, importul
+// din test ar porni un al doilea listener HTTP real.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
