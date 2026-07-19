@@ -415,7 +415,7 @@ enabled = true
 
 [functions.check-subscriptions]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/check-subscriptions/deno.json"
 entrypoint = "./functions/check-subscriptions/index.ts"
 

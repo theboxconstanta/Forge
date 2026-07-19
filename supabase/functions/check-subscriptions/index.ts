@@ -86,30 +86,42 @@ async function notify(
   if (!res.ok) console.error("Brevo error for", email, await res.text());
 }
 
-// Decide daca bearer token-ul primit este chiar service_role key-ul
+// Decide daca apikey-ul primit este chiar secret key-ul "default" al
 // proiectului - singurul apelant de incredere pentru acest job (un
 // scheduler, nu un utilizator din aplicatie). Pura / fara I/O ca sa poata
 // fi testata fara un backend Supabase live - vezi index.test.ts. Exista
 // DOAR pentru ca functia asta ruleaza pe service_role si, inainte de acest
 // fix, nu facea NICIO verificare - era complet publica pe internet
-// (verify_jwt=false), fara nicio autentificare (07-19, P0-005). verify_jwt
-// = true (config.toml) opreste deja apelurile fara niciun JWT valid, dar
-// NU garanteaza ca doar service_role poate chema functia - orice JWT valid
-// (inclusiv contul unui membru obisnuit) trece de acel gate. Verificarea
-// de mai jos e a doua bariera, cea care conteaza efectiv aici.
-export function isAuthorizedScheduler(token: string | null, serviceRoleKey: string): boolean {
-  return !!token && token === serviceRoleKey;
+// (verify_jwt=false), fara nicio autentificare (07-19, P0-005). Prima
+// varianta a fix-ului (verify_jwt=true + comparatie pe headerul
+// Authorization cu SUPABASE_SERVICE_ROLE_KEY legacy) s-a dovedit
+// incompatibila cu noul model de API keys al proiectului - verify_jwt
+// intelege doar JWT-uri legacy, nu si noile secret keys. Varianta de mai
+// jos urmeaza "Option 1" din ghidul oficial de migrare Supabase:
+// verify_jwt=false, header apikey, SUPABASE_SECRET_KEYS (dictionar JSON
+// dupa nume - singura cheie existenta azi in proiect e "default").
+// Esueaza inchis (fail closed) la orice problema: header lipsa/gol, JSON
+// invalid, sau cheia "default" absenta din dictionar.
+export function isAuthorizedScheduler(apikeyHeader: string | null, secretKeysJson: string | undefined): boolean {
+  if (!apikeyHeader || !secretKeysJson) return false;
+  let secretKeys: Record<string, string>;
+  try {
+    secretKeys = JSON.parse(secretKeysJson);
+  } catch {
+    return false;
+  }
+  const expected = secretKeys?.["default"];
+  if (!expected) return false;
+  return apikeyHeader === expected;
 }
 
 async function handleRequest(req: Request): Promise<Response> {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "") || null;
-  if (!isAuthorizedScheduler(token, serviceRoleKey)) {
+  const apikeyHeader = req.headers.get("apikey") || null;
+  if (!isAuthorizedScheduler(apikeyHeader, Deno.env.get("SUPABASE_SECRET_KEYS"))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
 
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   const today = new Date().toISOString().split("T")[0];
   const in3days = addDays(today, 3);

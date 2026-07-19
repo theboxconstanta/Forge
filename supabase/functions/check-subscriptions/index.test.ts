@@ -1,29 +1,44 @@
 import { assertEquals } from "@std/assert";
 import { isAuthorizedScheduler } from "./index.ts";
 
-const REAL_KEY = "this-is-the-real-service-role-key";
+const REAL_SECRET = "sb_secret_this-is-the-real-default-key";
+const SECRET_KEYS_JSON = JSON.stringify({ default: REAL_SECRET });
 
-Deno.test("matching bearer token is authorized", () => {
-  assertEquals(isAuthorizedScheduler(REAL_KEY, REAL_KEY), true);
+Deno.test("matching apikey against the default secret key is authorized", () => {
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, SECRET_KEYS_JSON), true);
 });
 
-Deno.test("wrong bearer token is rejected", () => {
-  assertEquals(isAuthorizedScheduler("some-other-token", REAL_KEY), false);
+Deno.test("wrong apikey is rejected", () => {
+  assertEquals(isAuthorizedScheduler("some-other-key", SECRET_KEYS_JSON), false);
 });
 
-Deno.test("missing token (null) is rejected", () => {
-  assertEquals(isAuthorizedScheduler(null, REAL_KEY), false);
+Deno.test("missing apikey header (null) is rejected", () => {
+  assertEquals(isAuthorizedScheduler(null, SECRET_KEYS_JSON), false);
 });
 
-Deno.test("empty string token is rejected", () => {
-  assertEquals(isAuthorizedScheduler("", REAL_KEY), false);
+Deno.test("empty string apikey is rejected", () => {
+  assertEquals(isAuthorizedScheduler("", SECRET_KEYS_JSON), false);
 });
 
-Deno.test("a valid but non-service-role JWT (e.g. a regular member's own session token) is rejected", () => {
-  // Regression guard for the actual vulnerability being fixed: verify_jwt=true
-  // alone only proves "some valid Supabase JWT" was presented - it does not
-  // prove the caller is the service_role. Any other real, well-formed JWT
-  // must still be rejected by this check.
-  const memberToken = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.fake-signature";
-  assertEquals(isAuthorizedScheduler(memberToken, REAL_KEY), false);
+Deno.test("missing SUPABASE_SECRET_KEYS env var (undefined) is rejected - fails closed", () => {
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, undefined), false);
+});
+
+Deno.test("malformed JSON in SUPABASE_SECRET_KEYS is rejected, not thrown - fails closed", () => {
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, "{not valid json"), false);
+});
+
+Deno.test("valid JSON but no 'default' key present is rejected", () => {
+  const noDefault = JSON.stringify({ billing: "sb_secret_something-else" });
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, noDefault), false);
+});
+
+Deno.test("multiple named keys present - only 'default' is checked, a different named key's value does not match", () => {
+  const multi = JSON.stringify({ default: REAL_SECRET, billing: "sb_secret_billing-key-value" });
+  assertEquals(isAuthorizedScheduler("sb_secret_billing-key-value", multi), false);
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, multi), true);
+});
+
+Deno.test("empty object JSON (no keys at all) is rejected", () => {
+  assertEquals(isAuthorizedScheduler(REAL_SECRET, "{}"), false);
 });
