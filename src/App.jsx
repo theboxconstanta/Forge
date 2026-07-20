@@ -2140,7 +2140,9 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [planSelectat, setPlanSelectat] = useState('')
   const [dataStartAbonament, setDataStartAbonament] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [pretPlatit, setPretPlatit] = useState('')
+  const [metodaPlata, setMetodaPlata] = useState('')
   const [savingAbonament, setSavingAbonament] = useState(false)
+  const [metodaActivare, setMetodaActivare] = useState({})
 
   const [numePlan, setNumePlan] = useState('')
   const [sedintePlan, setSedintePlan] = useState('')
@@ -2513,15 +2515,17 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     setDeletingClient(false)
   }
 
-  const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
+  const adminActiveazaAboQueued = async (aboQueued, memberEmail, method) => {
     const duration = aboQueued.subscription_plans?.duration_months || 1
     const endStr = addMonthsClamped(new Date(), duration)
     const { error } = await supabase.rpc('activate_queued_subscription', {
       p_subscription_id: aboQueued.id,
       p_end_date: endStr,
+      p_method: method || null,
     })
     if (error) { showToast(t.toastActivateError); console.error(error); return }
     showToast(t.toastSubscriptionActivated)
+    setMetodaActivare(prev => { const next = { ...prev }; delete next[aboQueued.id]; return next })
     await fetchAbonamente()
   }
 
@@ -2896,6 +2900,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       p_end_date: endDateStr,
       p_amount_paid: validAmountPaid,
       p_currency: 'RON',
+      p_method: validAmountPaid ? (metodaPlata || null) : null,
     })
 
     if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
@@ -2904,11 +2909,11 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       await fetchAbonamente()
       if (result?.queued) {
         showToast(t.toastSubscriptionQueued)
-        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit(''); setMetodaPlata('')
       } else {
         showToast(t.toastSubscriptionAdded)
         setDataStartAbonament(azStr)
-        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
+        setEmailAbonament(''); setNumeAbonament(''); setPretPlatit(''); setMetodaPlata('')
         sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
         notifyMember(emailNorm)
       }
@@ -3151,7 +3156,17 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                           {t.adminClientsAutoActivateNote}
                         </div>
                         {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{aboQueued.notes}</div>}
-                        <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email) }}
+                        {aboQueued.notes && (
+                          <select value={metodaActivare[aboQueued.id] || ''} onClick={e => e.stopPropagation()}
+                            onChange={e => setMetodaActivare(prev => ({ ...prev, [aboQueued.id]: e.target.value }))}
+                            style={{ width: '100%', padding: '6px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginBottom: '6px' }}>
+                            <option value="">{t.metodaPlataPlaceholder}</option>
+                            <option value="cash">{t.metodaPlataCash}</option>
+                            <option value="card">{t.metodaPlataCard}</option>
+                            <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
+                          </select>
+                        )}
+                        <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email, metodaActivare[aboQueued.id]) }}
                           style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                           <Zap size={13} /> {t.adminClientsActivateNow}
                         </button>
@@ -3267,6 +3282,18 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                 </div>
               )
             })()}
+            {pretPlatit && (
+              <>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.metodaPlataLabel}</div>
+                <select value={metodaPlata} onChange={e => setMetodaPlata(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }}>
+                  <option value="">{t.metodaPlataPlaceholder}</option>
+                  <option value="cash">{t.metodaPlataCash}</option>
+                  <option value="card">{t.metodaPlataCard}</option>
+                  <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
+                </select>
+              </>
+            )}
             <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
               {savingAbonament ? t.adminSubsSaving : t.adminSubsAddButton}
             </button>
@@ -3342,8 +3369,18 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{q.subscription_plans?.name}</div>
                               {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.adminSubsSessionsTotal(q.sessions_total)}</div>}
                               {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
+                              {q.notes && (
+                                <select value={metodaActivare[q.id] || ''} onClick={e => e.stopPropagation()}
+                                  onChange={e => setMetodaActivare(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                  style={{ width: '100%', padding: '5px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginTop: '4px' }}>
+                                  <option value="">{t.metodaPlataPlaceholder}</option>
+                                  <option value="cash">{t.metodaPlataCash}</option>
+                                  <option value="card">{t.metodaPlataCard}</option>
+                                  <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
+                                </select>
+                              )}
                               <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                                <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email) }}
+                                <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email, metodaActivare[q.id]) }}
                                   style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Zap size={12} /> {t.adminSubsActivateNow}</button>
                                 <button onClick={e => { e.stopPropagation(); stergeAbonament(q.id) }}
                                   style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>

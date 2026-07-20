@@ -737,6 +737,11 @@ export const TRANSLATIONS = {
     adminSubsScheduledBadge: 'PROGRAMAT',
     adminSubsSessionsTotal: (total) => `Ședințe: ${total}`,
     adminSubsActivateNow: 'Activează acum',
+    metodaPlataLabel: 'Metodă de plată',
+    metodaPlataPlaceholder: 'Selectează metoda',
+    metodaPlataCash: 'Cash',
+    metodaPlataCard: 'Card',
+    metodaPlataTransferBancar: 'Transfer bancar',
 
     // Admin - tab Clase
     adminClassNewTitle: '+ Clasă nouă',
@@ -1595,6 +1600,11 @@ export const TRANSLATIONS = {
     adminSubsScheduledBadge: 'SCHEDULED',
     adminSubsSessionsTotal: (total) => `Sessions: ${total}`,
     adminSubsActivateNow: 'Activate now',
+    metodaPlataLabel: 'Payment method',
+    metodaPlataPlaceholder: 'Select method',
+    metodaPlataCash: 'Cash',
+    metodaPlataCard: 'Card',
+    metodaPlataTransferBancar: 'Bank transfer',
 
     // Admin - tab Clase
     adminClassNewTitle: '+ New class',

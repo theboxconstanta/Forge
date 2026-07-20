@@ -2,7 +2,7 @@
 
 > Important product and architecture decisions, with the reasoning behind them. Read this before proposing to change something that looks frozen or "obviously" improvable — the reasoning here is usually the answer to "why didn't they just...".
 >
-> Last updated: 2026-07-18.
+> Last updated: 2026-07-20.
 
 ---
 
@@ -77,3 +77,37 @@
 **Why**: local dev and production already share one live database — seeding realistic fake members/subscriptions/payments into it would have polluted real CrossFit C15 data visible to real staff/members, and handing an Owner/Admin login connected to that data to an external third-party service is a real security/privacy exposure. Explicitly the user's own call after being presented the trade-off, not assumed unilaterally.
 
 **Also decided during the same task**: a raw `pg_dump`/`psql` workaround (to get a schema-only copy without installing Docker Desktop) was declined even though it was technically feasible, because an automated safety check flagged the specific combination (touching the production connection right after, in service of a public-facing demo) as risky — the official, Docker-Desktop-dependent path was chosen instead. General principle worth keeping: when a safety check flags a workaround as risky in a context involving real user data and external/public exposure, stop and ask rather than find a different technical path around it.
+
+---
+
+## Financial Domain: Order/Payment/Refund replace notes-based revenue tracking (2026-07-20)
+
+**Decision**: revenue is no longer reconstructed by regex-parsing `subscriptions.notes` (e.g. `"Plătit: 379 RON"`). A structured `orders`/`payments` model was introduced — every Subscription has exactly one Order (its commercial terms, price server-derived from `subscription_plans.price`, never client-supplied); Payments are append-only records of money movement (`direction` charge/refund, `status`), always attached to an Order, never to a Subscription directly. All writes go through SECURITY DEFINER RPCs; direct client writes to `orders`/`payments` are blocked at both the RLS and grant layer.
+
+**Why**: the same category of error as encoding workout structure into free text and parsing it back out (see Workout Composer decisions, above) — structured facts must be stored as structured facts. The regex approach could not represent multiple payments, partial payments, refunds, or non-subscription revenue without a second redesign.
+
+**Full reasoning, adversarial review, and the complete ADR set (ADR-001 through ADR-013)**: `docs/2026-07-20_Financial_Domain_Architecture_Working_Session.md` — frozen, do not edit; append future amendments the same way its own §9/§10 do.
+
+**Revisit when**: a real production defect is found, or a new business requirement (a second purchasable domain, multi-item checkout, a real payment-provider integration) passes a fresh architecture review. ADR-009 already names the specific extension points for each of these — do not design them speculatively ahead of need.
+
+---
+
+## Financial Domain: self-service Order creation widened, Payment registration never is (2026-07-20)
+
+**Decision**: `create_order_for_subscription`'s authorization was widened from admin-only to admin-OR-the-subscription's-own-owner, so a member self-activating their own queued subscription produces an Order like every other path. `register_payment` was explicitly left admin-only and will not be widened without a fresh architecture review.
+
+**Why the asymmetry**: `create_order_for_subscription`'s amount is always server-derived from `subscription_plans.price` — no money-movement claim is involved, just a bookkeeping record of the subscription's own already-fixed price. `register_payment`'s amount is a caller-attested claim that real money changed hands — self-service access there would let a member declare their own subscription paid without an admin ever seeing real money, a fraud vector, not a narrow risk. The invariant actually being protected is "every Subscription has an Order" (explicit in the original architecture review); a Subscription without a Payment (`status='pending'`) was already an explicitly sanctioned state, so leaving `register_payment` untouched closes the real gap without taking on the payment-attestation risk.
+
+**Revisit when**: a legitimate need for member-initiated payment registration is identified — treat as a new architecture review, not an incremental widening.
+
+---
+
+## Financial Domain: Payment.method completes an existing design, does not introduce a new one (2026-07-20)
+
+**Decision**: `payments.method` (present since the original schema, never constrained, never populated by any code path) gained a closed CHECK-constrained vocabulary: `cash`, `card`, `bank_transfer`, `comp` — explicitly no `'other'` escape hatch. `provider`/`provider_reference` (also present since the original schema, with a `UNIQUE` idempotency guard already in place for future webhook delivery) remain reserved and unpopulated.
+
+**Why**: an architecture review found the schema already contained the abstraction needed (`method`/`provider`/`provider_reference`, `provider`/`provider_reference` explicitly named as a future extension point in ADR-009) — the review's conclusion was to complete the existing design rather than propose a new one. `'comp'` stays valid at the database level (an existing internal business rule in `register_payment` depends on it) but is deliberately excluded from the admin-facing picker — it's an internal concept, not a public payment channel. Apple Pay/Google Pay are modeled as `method='card'` with a `provider`, not as distinct channels, since from the gym's perspective both settle as card money.
+
+**Why no `'other'`**: an unrecognized future payment channel should require a deliberate architecture-review decision to add to the vocabulary, not a silent catch-all that quietly accumulates unclassified data.
+
+**Revisit when**: a real payment-provider integration is proposed (this is what activates `provider`/`provider_reference`), or a genuinely new payment channel needs to be added.

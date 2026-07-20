@@ -2,7 +2,7 @@
 
 > System architecture and component responsibilities. Updated only at meaningful architectural milestones — see `/docs/CHANGELOG.md` for when each section last changed, and `/docs/DECISIONS.md` for the reasoning behind frozen choices.
 >
-> Last updated: 2026-07-18.
+> Last updated: 2026-07-20.
 
 ---
 
@@ -64,26 +64,30 @@ Currently wired into **only** the Admin WOD editor's live preview (`ComposedWork
 ### 3.5 Segment domain model — SPECIFIED, POSTPONED
 A fuller compositional replacement for the enumerative format catalog (`Workout → WorkoutSection → Segment tree → Movements`), fully designed in `SEGMENT_MODEL_SPEC_v1.md`, then explicitly postponed. See `/docs/DECISIONS.md` for the full reasoning and revisit triggers.
 
-### 3.6 Multi-tenancy — FROZEN (closed 2026-07-14)
+### 3.6 Financial Domain — FROZEN (closed 2026-07-20)
+`orders` + `payments` tables replace regex-parsing `subscriptions.notes` (e.g. `"Plătit: 379 RON"`) as the source of truth for revenue. Model: `Subscription → Order (1:1, every Subscription has one, even comp/pending) → Payment(s) (0..n, direction charge/refund, method/provider/provider_reference) → Reporting`. All writes go through SECURITY DEFINER RPCs — `create_subscription`, `activate_queued_subscription`, `delete_queued_subscription`, `end_subscription` (subscription lifecycle, admin-only except `activate_queued_subscription` which also accepts the subscription's own owner), `create_order_for_subscription` (admin-or-owner), `register_payment`/`refund_payment` (admin-only, never self-service — a caller-attested money-movement claim is a fraud vector self-service Order creation is not, since Order amounts are always server-derived from `subscription_plans.price`). `payments.method` is a closed, CHECK-constrained vocabulary (`cash`/`card`/`bank_transfer`/`comp` — no `'other'`; Apple/Google Pay are `method='card'` with a `provider`, not distinct channels); `provider`/`provider_reference` exist (with a `UNIQUE` idempotency guard for future webhook delivery) but are reserved, unpopulated — no real payment-provider integration exists yet. `payments` is append-only by design (no UPDATE/DELETE policy for any role); refunds are new `direction='refund'` rows, never mutations. Migrated in 5 phases (schema → core RPCs → subscription-lifecycle RPCs → application cutover → reporting migration) plus one post-closure extension (payment methods) — see `/docs/DECISIONS.md` and `docs/2026-07-20_Financial_Domain_Architecture_Working_Session.md` (the frozen ADR record, ADR-001 through ADR-013) for the full reasoning.
+
+### 3.7 Multi-tenancy — FROZEN (closed 2026-07-14)
 Every one of 19 public tables carries `gym_id`; 64 RLS policies scoped to it. One gym per account. Owner signup requires a platform-admin-issued registration code; member signup requires a separate per-gym access code. A "Platform" Admin tab (platform-admin only) lists all gyms with activate/deactivate — today's entire payment-enforcement mechanism (no billing integration yet).
 
-### 3.7 Authentication — STABLE
+### 3.8 Authentication — STABLE
 Supabase Auth, email + password. `profiles.gym_id` scopes a user to their gym. `admins`/`coaches` tables plus a platform-admin flag gate the Admin panel and its sub-tabs (Coach role: WOD + Classes only).
 
-### 3.8 Database structure
+### 3.9 Database structure
 
-19 public tables, all `gym_id`-scoped, RLS on every one:
+21 public tables, all `gym_id`-scoped, RLS on every one:
 - **Identity/tenancy**: `gyms`, `profiles`, `admins`, `coaches`, `gym_signup_codes`
 - **Membership/billing**: `subscription_plans`, `subscriptions`
+- **Financial Domain**: `orders`, `payments` (see §3.6)
 - **Scheduling**: `classes`, `bookings`, `class_waitlist`, `class_reminders`, `class_reminder_log`
 - **Workouts (legacy + V2)**: `wods` (legacy, still dual-write target), `workouts`, `workout_sections`, `workout_section_types`, `workout_scaling_levels` (unused by any consumer)
 - **Logging/results**: `wod_logs`, `skill_logs`, `personal_records`, `custom_hero_wods`
 - **Social**: `feed_posts`, `feed_reactions`, `feed_comments`
 - **Infra**: `app_settings`, `push_subscriptions`
 
-**Important**: `supabase/migrations/*.sql` does **not** reliably reflect the live schema/RLS state — some changes were applied directly without a committed migration. Always confirm live (`pg_policies`), never assume from migration files alone.
+**Important**: `supabase/migrations/*.sql` does **not** reliably reflect the live schema/RLS state — some changes were applied directly without a committed migration. Always confirm live (`pg_policies`), never assume from migration files alone. **Exception**: the Financial Domain (`orders`/`payments` and all related RPCs, §3.6) was built entirely through committed, verified migrations (`supabase/migrations/20260720*_financial_*.sql`, 27 files) — that subsystem's migration history is complete and authoritative.
 
-### 3.9 Supabase Edge Functions (Deno)
+### 3.10 Supabase Edge Functions (Deno)
 
 | Function | Purpose |
 |---|---|
@@ -117,8 +121,8 @@ Required frontend env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (anon key).
 | `src/utils.js` | Small pure helpers (time, date, weight conversion) |
 | `src/components.jsx` | Shared UI atoms |
 | `src/supabase.js` | Supabase client init |
-| `supabase/functions/*` | Edge Functions, see §3.9 |
-| `supabase/migrations/*` | 71 SQL migrations (incomplete history — see §3.8) |
+| `supabase/functions/*` | Edge Functions, see §3.10 |
+| `supabase/migrations/*` | 98 SQL migrations — 71 pre-Financial-Domain (incomplete history) + 27 complete, verified Financial Domain migrations (see §3.9) |
 
 Every module above (except `App.jsx`/`supabase.js`) has a co-located `*.test.js(x)` file.
 
