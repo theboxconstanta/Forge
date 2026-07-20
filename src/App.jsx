@@ -2156,6 +2156,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [sortClienti, setSortClienti] = useState('toti')
   const [memberIdsCuRezervariViitoare, setMemberIdsCuRezervariViitoare] = useState(new Set())
   const [cancelWindowSetting, setCancelWindowSetting] = useState(2)
+  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState(false)
+  const [savingOnlinePayments, setSavingOnlinePayments] = useState(false)
   const [gymJoinCode, setGymJoinCode] = useState('')
   const [regeneratingCode, setRegeneratingCode] = useState(false)
   const [gymNameCurrent, setGymNameCurrent] = useState('')
@@ -2325,6 +2327,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     if (data) {
       const cwh = data.find(s => s.key === 'cancel_window_hours')
       if (cwh) setCancelWindowSetting(parseFloat(cwh.value) || 0)
+      const ope = data.find(s => s.key === 'online_payments_enabled')
+      setOnlinePaymentsEnabled(ope?.value === 'true')
     }
     const { data: code } = await supabase.rpc('get_my_gym_join_code')
     if (code) setGymJoinCode(code)
@@ -2396,6 +2400,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     await supabase.from('app_settings').upsert({ gym_id: gymId, key: 'cancel_window_hours', value: String(cancelWindowSetting), updated_at: new Date().toISOString() }, { onConflict: 'gym_id,key' })
     showToast(t.toastSettingsSaved)
     setSavingSettings(false)
+  }
+
+  // Comuta instant (nu asteapta butonul "Salveaza setari" de mai sus) - e un
+  // singur boolean, nu o valoare care se ajusteaza inainte de confirmare, si
+  // e gandit ca un intrerupator de siguranta: trebuie sa se activeze/dezactiveze
+  // fara sa depinda de alt camp din acelasi formular.
+  const toggleOnlinePayments = async () => {
+    setSavingOnlinePayments(true)
+    const next = !onlinePaymentsEnabled
+    const { error } = await supabase.from('app_settings')
+      .upsert({ gym_id: gymId, key: 'online_payments_enabled', value: String(next), updated_at: new Date().toISOString() }, { onConflict: 'gym_id,key' })
+    if (!error) { setOnlinePaymentsEnabled(next); showToast(t.toastSettingsSaved) }
+    setSavingOnlinePayments(false)
   }
 
   const adjustMemberSessions = async (memberId, delta) => {
@@ -3785,6 +3802,19 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
             style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
             {savingSettings ? t.adminSettingsSaving : t.adminSettingsSaveButton}
           </button>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={16} /> {t.adminOnlinePaymentsTitle}</div>
+            <button onClick={toggleOnlinePayments} disabled={savingOnlinePayments}
+              style={{ width: '48px', height: '28px', borderRadius: '14px', border: 'none', background: onlinePaymentsEnabled ? '#ABE73C' : '#e0e0e0', cursor: savingOnlinePayments ? 'not-allowed' : 'pointer', position: 'relative', flexShrink: 0, opacity: savingOnlinePayments ? 0.6 : 1 }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: onlinePaymentsEnabled ? '23px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminOnlinePaymentsSubtitle}</div>
+          <div style={{ fontSize: '11px', color: '#0E0E0E', background: onlinePaymentsEnabled ? '#F0FBE3' : '#f0f0f0', padding: '8px 12px', borderRadius: '8px' }}>
+            {onlinePaymentsEnabled ? t.adminOnlinePaymentsEnabled : t.adminOnlinePaymentsDisabled}
+          </div>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymNameLabel}</div>
