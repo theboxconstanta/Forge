@@ -5255,6 +5255,17 @@ function App() {
     } else if (data && !ownerBootstrapping) {
       setGymBlocked(false)
       setRegistrationIncomplete(true)
+    } else if (!data && !ownerBootstrapping) {
+      // Sesiune locala inca valida (JWT neexpirat) dar contul a fost sters
+      // (ex. admin-delete-client) - fara asta, `data === null` cadea in
+      // ramura de mai jos (gandita pentru fereastra tranzitorie de owner
+      // bootstrapping, nu pentru "contul nu mai exista"), lasand
+      // gymBlocked/registrationIncomplete false si aratand gresit paywall-ul
+      // de abonament (P0-005). Nicio actualizare de stare dupa signOut() -
+      // return imediat, restul functiei (waiver/onboarding) foloseste `data`
+      // care oricum e null aici.
+      await supabase.auth.signOut()
+      return
     } else {
       setGymBlocked(false)
       setRegistrationIncomplete(false)
