@@ -111,3 +111,41 @@
 **Why no `'other'`**: an unrecognized future payment channel should require a deliberate architecture-review decision to add to the vocabulary, not a silent catch-all that quietly accumulates unclassified data.
 
 **Revisit when**: a real payment-provider integration is proposed (this is what activates `provider`/`provider_reference`), or a genuinely new payment channel needs to be added.
+
+---
+
+## Online Payments (Stripe): commercial intent exists before payment, not after webhook confirmation (2026-07-20)
+
+**Decision**: for the Stripe Checkout initiative, the Order (and its Subscription) is created when the member starts checkout, not deferred until the webhook confirms payment. The webhook's job is to confirm an already-existing Order, not to originate one.
+
+**Why**: the alternative ("deferred/atomic-on-webhook" — create nothing until the webhook fires) was the initial recommendation, proposed specifically because it would have structurally closed a security gap in `activate_queued_subscription`'s self-service path. That recommendation was explicitly rejected: closing the gap by removing the Order lifecycle was the wrong trade — the fix belongs in activation rules (see the paid-Order guard decision below), not in avoiding commercial-intent records existing before money moves. A member starting checkout is a real, meaningful business event worth recording even if payment never completes.
+
+**Consequence**: `create_subscription`'s self-service path (Phase 5a) creates a queued Subscription + pending Order immediately, before any Stripe interaction. `queued=true` now carries two related-but-distinct real-world meanings — an admin-scheduled future renewal, or a member's Stripe-pending purchase intent — disambiguated for free by whether the subscription has an Order (self-service always creates one immediately; admin-scheduled queuing does not), with no schema change needed.
+
+**Revisit when**: Phase 5b–5f (Checkout Session creation, webhook receiver) surface a concrete reason this ordering doesn't hold up in practice.
+
+---
+
+## Online Payments (Stripe), Phase 5a: activate_queued_subscription gains a paid-Order activation guard (2026-07-20)
+
+**Decision**: any non-admin caller (the subscription's own owner, or `service_role`) is blocked from activating a queued subscription whose Order exists and is not `status = 'paid'`. Admin retains an unconditional override. Subscriptions with no Order at all (the pre-existing admin-scheduled-renewal path) are completely unaffected — the guard only evaluates when there's an Order to check.
+
+**Why**: this is the actual fix for the security gap the rejected deferred-webhook model would have closed structurally instead. Without it, a member could call `activate_queued_subscription` directly on their own Stripe-pending subscription and self-activate before ever paying — the RPC had no concept of "payment must precede activation." Applying the guard to `service_role` too (not just the member path) is deliberate defense-in-depth: even if a future webhook handler ever called activation before registering payment by mistake, the database rejects the premature activation rather than trusting the caller's own sequencing.
+
+**Consequence**: `register_payment` must bring an Order to `status='paid'` before `activate_queued_subscription` can succeed for any non-admin caller — the two RPCs are now sequence-dependent for self-service/webhook activation, by design.
+
+**Revisit when**: a legitimate need for activation-before-full-payment is identified (e.g. a deposit/partial-payment product policy) — treat as a new architecture review, the guard is intentionally binary (`paid` or not) today.
+
+---
+
+## Pre-existing defect found during Phase 5a validation: subscriptions_restrict_member_update() blocked service_role entirely (2026-07-20)
+
+**Not a new Stripe feature** — a gap in an unrelated, pre-existing trigger (part of the waitlist auto-booking system, added 2026-07-01/07-04) that Phase 5a's mandated validation happened to surface, because it was the first work to ever attempt a `service_role`-authorized write to `subscriptions`.
+
+**The defect**: `subscriptions_restrict_member_update()`'s bypass condition (`is_coach_or_admin()` OR the row's `member_email` matches `auth.jwt() ->> 'email'`) has no case that is ever true for `service_role` — `auth.uid()` is null under that role (so `is_coach_or_admin()` is false), and a real Supabase service-role JWT carries no per-request `email` claim. Confirmed by isolated repro: a `service_role` no-op update (`SET is_active = is_active`) was rejected with the trigger's waitlist-specific error message. This would have silently broken the Stripe webhook's activation step in production — payment registered and Order marked `paid`, but the Subscription never actually activated — despite the Phase 5a RPC-level authorization being correct.
+
+**Decision**: extend the trigger's existing bypass condition with one additional clause, `OR (auth.jwt() ->> 'role') = 'service_role'` — matching the same trust model already used consistently across the four Phase 5a RPCs (service_role is only ever reachable from the verified webhook context, never arbitrary user input).
+
+**Why minimal, not a rewrite**: the trigger's actual purpose (preventing one authenticated member from tampering with another member's subscription via a direct table update, while still allowing the legitimate waitlist auto-book `sessions_used +1` path) is unrelated to Stripe and was left completely untouched. Re-verified explicitly post-fix: non-owner `sessions_used +1` still allowed, non-owner still blocked from any other column change or any other increment amount, row owner still fully unrestricted — zero behavior change for any caller class except the newly-added `service_role` path.
+
+**Revisit when**: never, absent a new defect — this is a narrow, closed fix, not an open design question.
