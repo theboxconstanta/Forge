@@ -4596,6 +4596,10 @@ function App() {
   const [refreshZiTrigger, setRefreshZiTrigger] = useState(0)
   const [rezervariIncarcate, setRezervariIncarcate] = useState(false)
   const [cancelWindowHours, setCancelWindowHours] = useState(2)
+  const [onlinePaymentsAvailable, setOnlinePaymentsAvailable] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutOrderId, setCheckoutOrderId] = useState(null)
+  const [checkoutStatus, setCheckoutStatus] = useState(null) // null | 'waiting' | 'confirmed' | 'timeout'
   const homeCalScrollRef = useRef(null)
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
@@ -5595,8 +5599,71 @@ function App() {
     if (data) {
       const cwh = data.find(s => s.key === 'cancel_window_hours')
       if (cwh) setCancelWindowHours(parseFloat(cwh.value) || 0)
+      const ope = data.find(s => s.key === 'online_payments_enabled')
+      setOnlinePaymentsAvailable(ope?.value === 'true')
     }
   }
+
+  // Creeaza o Stripe Checkout Session pentru planul curent al membrului si
+  // redirectioneaza catre ea. Nu se apeleaza direct create_subscription de
+  // aici - Edge Function-ul face intreaga verificare (flag activ, fereastra
+  // de reutilizare a unei Comenzi in asteptare, etc.) - vezi
+  // supabase/functions/create-checkout-session.
+  const startCheckout = async (planId) => {
+    if (!planId || checkoutLoading) return
+    setCheckoutLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ subscription_plan_id: planId }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.url) {
+        showToast(body.error || t.toastCheckoutError)
+        setCheckoutLoading(false)
+        return
+      }
+      window.location.href = body.url
+    } catch (e) {
+      console.error('startCheckout:', e)
+      showToast(t.toastCheckoutError)
+      setCheckoutLoading(false)
+    }
+  }
+
+  // Ecranul de asteptare dupa revenirea de la Stripe - CITESTE DOAR statusul
+  // Comenzii, nu scrie niciodata in orders/subscriptions (webhook-ul e
+  // singura cale de activare reala - Sectiunea 10/12, reviewul Faza 5c).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const orderId = params.get('checkout')
+    if (!orderId) return
+    window.history.replaceState({}, '', window.location.pathname)
+    setCheckoutOrderId(orderId)
+    setCheckoutStatus('waiting')
+
+    let cancelled = false
+    const startedAt = Date.now()
+    const poll = async () => {
+      if (cancelled) return
+      const { data } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle()
+      if (cancelled) return
+      if (data?.status === 'paid') {
+        setCheckoutStatus('confirmed')
+        fetchAbonamentMeu()
+        return
+      }
+      if (Date.now() - startedAt > 60000) {
+        setCheckoutStatus('timeout')
+        return
+      }
+      setTimeout(poll, 3000)
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [])
 
   const fetchRezervari = async () => {
     const { data } = await supabase.from('bookings').select('class_id').eq('member_id', user.id)
@@ -6669,6 +6736,12 @@ function App() {
                     ? t.paywallSessionsExhaustedText
                     : t.paywallExpiredText}
             </div>
+            {onlinePaymentsAvailable && abonamentReal?.plan_id && abonamentInceput && (
+              <button onClick={() => startCheckout(abonamentReal.plan_id)} disabled={checkoutLoading}
+                style={{ width: '100%', padding: '13px', background: checkoutLoading ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: checkoutLoading ? 'not-allowed' : 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <CreditCard size={16} /> {checkoutLoading ? t.renewNowLoading : t.renewNowButton}
+              </button>
+            )}
             <button onClick={() => fetchAbonamentMeu()} style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
               {t.paywallReload}
             </button>
@@ -6678,6 +6751,35 @@ function App() {
             <button onClick={handleLogout} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#aaa', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>
               {t.paywallLogout}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ecran de asteptare dupa revenirea de la Stripe Checkout - CITESTE
+          DOAR statusul Comenzii (niciodata nu scrie), pana webhook-ul
+          confirma plata sau expira timeout-ul (Sectiunea 10, reviewul Faza 5c) */}
+      {checkoutStatus && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
+            <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
+              {checkoutStatus === 'confirmed' ? <CheckCircle2 size={48} color="#2F6600" strokeWidth={1.5} /> : <RotateCw size={48} color="#0E0E0E" strokeWidth={1.5} />}
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
+              {checkoutStatus === 'waiting' ? t.checkoutWaitingTitle
+                : checkoutStatus === 'confirmed' ? t.checkoutConfirmedTitle
+                : t.checkoutTimeoutTitle}
+            </div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
+              {checkoutStatus === 'waiting' ? t.checkoutWaitingText
+                : checkoutStatus === 'confirmed' ? t.checkoutConfirmedText
+                : t.checkoutTimeoutText}
+            </div>
+            {checkoutStatus !== 'waiting' && (
+              <button onClick={() => { setCheckoutStatus(null); setCheckoutOrderId(null); setScreen('abonament') }}
+                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                {t.checkoutCloseButton}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -7107,6 +7209,12 @@ function App() {
                     ? t.subAllSessionsUsed
                     : t.subContactCoachRenew}
               </div>
+              {onlinePaymentsAvailable && abonamentReal?.plan_id && abonamentInceput && (
+                <button onClick={() => startCheckout(abonamentReal.plan_id)} disabled={checkoutLoading}
+                  style={{ width: '100%', padding: '12px', background: checkoutLoading ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: checkoutLoading ? 'not-allowed' : 'pointer', marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <CreditCard size={15} /> {checkoutLoading ? t.renewNowLoading : t.renewNowButton}
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #0E0E0E' }}>
