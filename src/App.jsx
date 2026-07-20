@@ -185,20 +185,19 @@ async function activateQueuedSubscription(memberEmail) {
   if (!queued) return null
 
   const duration = queued.subscription_plans?.duration_months || 1
-  const startDate = new Date()
-  const startStr = todayLocalStr()
-  const endStr = addMonthsClamped(startDate, duration)
+  const endStr = addMonthsClamped(new Date(), duration)
 
-  // dezactiveaza abonamentul vechi INAINTE de a activa cel nou
-  await supabase.from('subscriptions')
-    .update({ is_active: false })
-    .ilike('member_email', memberEmail)
-    .eq('is_active', true)
-
-  const { error } = await supabase.from('subscriptions').update({
-    is_active: true, queued: false,
-    start_date: startStr, end_date: endStr, sessions_used: 0,
-  }).eq('id', queued.id)
+  // activate_queued_subscription (Financial Domain, Phase 1 Extension)
+  // accepts admin OR the subscription's own owner - this is the
+  // member-triggered self-service call. Order/Payment creation is
+  // best-effort here (skipped for a non-admin caller by the RPC's own
+  // design - see its migration comment) since create_order_for_
+  // subscription/register_payment remain admin-only; the subscription
+  // itself still activates in full either way.
+  const { error } = await supabase.rpc('activate_queued_subscription', {
+    p_subscription_id: queued.id,
+    p_end_date: endStr,
+  })
   if (error) { console.error('activateQueuedSubscription error:', error); return null }
 
   return queued.id
@@ -2372,15 +2371,20 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       .lte('created_at', lunaEnd + 'T23:59:59')
       .or('is_active.eq.true,queued.eq.true')
 
-    const { data: aboLuna } = await supabase.from('subscriptions')
-      .select('notes')
+    // venituriLuna: Financial Domain sursa de adevar (orders/payments, nu
+    // subscriptions.notes) - ancorat pe payments.created_at (cand banii au
+    // fost efectiv incasati), nu pe subscriptions.created_at/orders.created_at
+    // (cand a fost creat abonamentul/comanda) - venitul e un eveniment
+    // financiar, nu unul comercial. Doar incasari brute reusite
+    // (direction=charge, status=succeeded); rambursarile nu se scad aici.
+    const { data: paymentsLuna } = await supabase.from('payments')
+      .select('amount')
+      .eq('gym_id', gymId)
+      .eq('direction', 'charge')
+      .eq('status', 'succeeded')
       .gte('created_at', lunaStart + 'T00:00:00')
       .lte('created_at', lunaEnd + 'T23:59:59')
-      .or('is_active.eq.true,queued.eq.true')
-    const venituriLuna = (aboLuna || []).reduce((sum, a) => {
-      const m = (a.notes || '').match(/Plătit:\s*([\d.,]+)\s*RON/)
-      return sum + (m ? parseFloat(m[1].replace(',', '.')) : 0)
-    }, 0)
+    const venituriLuna = (paymentsLuna || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 
     setRapoarteData({ membriActivi, aboVandute: aboVandute || 0, venituriLuna })
   }
@@ -2510,15 +2514,13 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail) => {
-    const startDate = new Date()
-    const startStr = todayLocalStr()
     const duration = aboQueued.subscription_plans?.duration_months || 1
-    const endStr = addMonthsClamped(startDate, duration)
-    await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', memberEmail).eq('is_active', true).neq('id', aboQueued.id)
-    const { error } = await supabase.from('subscriptions').update({
-      is_active: true, queued: false, start_date: startStr, end_date: endStr, sessions_used: 0,
-    }).eq('id', aboQueued.id)
-    if (error) { showToast(t.toastActivateError); return }
+    const endStr = addMonthsClamped(new Date(), duration)
+    const { error } = await supabase.rpc('activate_queued_subscription', {
+      p_subscription_id: aboQueued.id,
+      p_end_date: endStr,
+    })
+    if (error) { showToast(t.toastActivateError); console.error(error); return }
     showToast(t.toastSubscriptionActivated)
     await fetchAbonamente()
   }
@@ -2880,60 +2882,31 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     const emailNorm = emailAbonament.toLowerCase().trim()
     const plan = planuri.find(p => p.id === planSelectat)
     const azStr = todayLocalStr()
+    // pastrat neschimbat fata de logica veche - doar mutat sa ruleze
+    // necondiționat, pentru ca decizia queued/activ e acum luata server-side
+    // in create_subscription (Financial Domain, Phase 1 Extension)
+    const endDateStr = addMonthsClamped(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
+    const amountPaid = pretPlatit ? parseFloat(pretPlatit) : null
+    const validAmountPaid = (amountPaid != null && !isNaN(amountPaid)) ? amountPaid : null
 
-    // verifica daca membrul are deja abonament valid (deja inceput, neexpirat, cu sedinte ramase)
-    const { data: existingActive } = await supabase.from('subscriptions')
-      .select('id, sessions_used, sessions_total, end_date, start_date')
-      .ilike('member_email', emailNorm).eq('is_active', true).eq('queued', false)
-      .lte('start_date', azStr)
-      .gte('end_date', azStr)
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    const { data, error } = await supabase.rpc('create_subscription', {
+      p_member_email: emailNorm,
+      p_plan_id: planSelectat,
+      p_start_date: dataStartAbonament,
+      p_end_date: endDateStr,
+      p_amount_paid: validAmountPaid,
+      p_currency: 'RON',
+    })
 
-    const hasValidActive = existingActive && (
-      existingActive.sessions_total == null ||
-      Math.max(0, existingActive.sessions_total - (existingActive.sessions_used || 0)) > 0
-    )
-
-    if (hasValidActive) {
-      // salveaza ca programat — va activa automat cand cel curent se termina
-      const { error } = await supabase.from('subscriptions').insert({
-        gym_id: gymId,
-        member_email: emailNorm,
-        plan_id: planSelectat,
-        sessions_total: plan?.sessions || null,
-        sessions_used: 0,
-        start_date: azStr,
-        end_date: azStr,
-        is_active: false,
-        queued: true,
-        notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
-      })
-      if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
-      else {
+    if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
+    else {
+      const result = data?.[0]
+      await fetchAbonamente()
+      if (result?.queued) {
         showToast(t.toastSubscriptionQueued)
-        await fetchAbonamente()
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
-      }
-    } else {
-      // nu are abonament valid — activeaza imediat
-      await supabase.from('subscriptions').update({ is_active: false }).ilike('member_email', emailNorm).eq('is_active', true)
-      const endDateStr = addMonthsClamped(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
-      const { error } = await supabase.from('subscriptions').insert({
-        gym_id: gymId,
-        member_email: emailNorm,
-        plan_id: planSelectat,
-        sessions_total: plan?.sessions || null,
-        sessions_used: 0,
-        start_date: dataStartAbonament,
-        end_date: endDateStr,
-        is_active: true,
-        queued: false,
-        notes: pretPlatit ? `Plătit: ${pretPlatit} RON` : null,
-      })
-      if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error) }
-      else {
+      } else {
         showToast(t.toastSubscriptionAdded)
-        await fetchAbonamente()
         setDataStartAbonament(azStr)
         setEmailAbonament(''); setNumeAbonament(''); setPretPlatit('')
         sendNotification('subscription_added', emailNorm, plan?.name, endDateStr)
@@ -2963,7 +2936,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const stergeAbonament = async (id) => {
     const abo = abonamente.find(a => a.id === id)
     if (abo?.queued) {
-      await supabase.from('subscriptions').delete().eq('id', id)
+      const { error: deleteError } = await supabase.rpc('delete_queued_subscription', { p_subscription_id: id })
+      if (deleteError) console.error('stergeAbonament (queued):', deleteError)
       showToast(t.toastQueuedSubscriptionDeleted)
       await fetchAbonamente(); fetchRapoarte()
       return
@@ -2987,7 +2961,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
         }
       }
     }
-    await supabase.from('subscriptions').update({ is_active: false }).eq('id', id)
+    const { error: endError } = await supabase.rpc('end_subscription', { p_subscription_id: id })
+    if (endError) console.error('stergeAbonament (active):', endError)
     showToast(t.toastSubscriptionCancelled)
     setRezervariClasa({})
     await fetchAbonamente(); fetchRapoarte()
