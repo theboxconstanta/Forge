@@ -14,7 +14,7 @@
 4. **Lift the `validateSectionsForLegacy` gate** (today caps a WOD at 1 primary + 3 non-primary sections) — blocked on fixing the section-`typeKey` persistence debt first (see `/docs/ARCHITECTURE.md` known gotchas / the Workout Engine V2 phase history).
 5. **"Programming Advisor"** — the long-term Workout Intelligence vision: reasoning across a gym's structured training history (movement rotation, energy-system balance, benchmark cadence), not just parsing a pasted workout. The real differentiator vs. competitors (SugarWOD/PushPress/Wodify/BTWB) per the original product spec.
 6. **Self-serve gym signup** — gym activation is still 100% manual via the Platform Admin tab. (Member-initiated **subscription renewal payment** is done — Stripe Checkout, closed M6, 2026-07-21 — this item is narrower than it used to read.)
-7. **Membership Catalog / Plan Selection (Admin → Plans)** — member-facing browsing/selection of a gym's subscription plans. New, not yet started; tracked as its own milestone, separate from and not blocking the closed Online Payments (M6) work.
+7. **M8: Membership Catalog / First Purchase (Admin → Plans)** — member-facing browsing/selection of a gym's subscription plans, and a self-service first-time purchase path (today, a brand-new member with zero subscription history has no way to buy one — "Renew Now" only renews an existing plan, by design since M4). Confirmed 2026-07-21: not a regression, an intentional, already-documented limitation deferred to this new milestone. Not yet started; entirely separate from and does not reopen the closed M6/M7/P0-006 work.
 8. **JS bundle code-splitting** — currently ~914KB minified / 242KB gzip in one chunk.
 
 ## Recently closed (see `/docs/CHANGELOG.md` for full detail)

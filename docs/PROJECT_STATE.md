@@ -111,7 +111,7 @@ Only implemented components are listed.
 | Client-side privilege flags not reset on logout | Identified, reviewed, not exploitable | Low | No | UI hygiene, not a security gap (RLS is the real boundary) |
 | Composer rollout to Home/Journal/Leaderboard | Specified and validated, not yet wired in | Product polish, not architecture | No | Composer itself is closed as an initiative |
 | Workout Intelligence WI-2 (re-analysis safety policy) | Placeholder only | Not started | No | — |
-| Membership Catalog / Plan Selection (Admin → Plans, member-facing plan browsing/selection) | Not started | New, separate milestone | No | Explicitly out of scope for M6/M7 — do not fold into Online Payments' closed scope |
+| M8: Membership Catalog / First Purchase (Admin → Plans, plan browsing + first-time self-service purchase) | Not started | New, separate milestone | No | A brand-new member with no subscription history has no self-service purchase path today — confirmed intentional, not a regression, 2026-07-21. Explicitly out of scope for M6/M7/P0-006 — do not fold into Online Payments' closed scope |
 
 No workstream currently has a named individual owner in this document — assign based on who picks up each item.
 
@@ -196,6 +196,7 @@ No workstream currently has a named individual owner in this document — assign
 | Forensic/scientific-evidence review (INCIDENT-001) | Every conclusion in the incident investigation, classified by evidentiary strength | **Completed** — explicitly concluded root cause **NOT established**; **requires revisit** once new evidence (Dashboard check or a clean confound-free test) is available |
 | M6 milestone close-out (Stripe Checkout → webhook → activation, all 13 original criteria) | Real live payment against production Stripe account, isolated sandbox gym; genuine duplicate-webhook-delivery idempotency test | **CLOSED, 2026-07-21** — all 13 criteria PASS with direct evidence; no action required. Full report: `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md` |
 | P0-006 milestone close-out (Remove Member, all 13 regression checks) | Real data validation, including the two subscription-lifecycle checks previously blocked on "no real subscription ever exercised" | **CLOSED, 2026-07-21** — all 13 checks PASS; no action required |
+| Join Gym regression (`handle_new_user()` via a real signup) | Real signup through the app's own Join screen | **CLOSED, 2026-07-21** — first attempt surfaced a genuine bug (422 shown for a post-success signUp() retry race in `handleRegister()`'s member-join branch); fixed (commit `b3b2dbd`, mirrors the owner-signup branch's existing `if (!user)` guard) and re-verified via 3 separate real signups, all clean. The resulting "no self-service first purchase for a brand-new member" behavior is a confirmed intentional limitation, deferred to the new M8 milestone, not a defect |
 
 ---
 
