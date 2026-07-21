@@ -2,7 +2,7 @@
 
 > System architecture and component responsibilities. Updated only at meaningful architectural milestones — see `/docs/CHANGELOG.md` for when each section last changed, and `/docs/DECISIONS.md` for the reasoning behind frozen choices.
 >
-> Last updated: 2026-07-20.
+> Last updated: 2026-07-21.
 
 ---
 
@@ -67,7 +67,7 @@ A fuller compositional replacement for the enumerative format catalog (`Workout 
 ### 3.6 Financial Domain — FROZEN (closed 2026-07-20)
 `orders` + `payments` tables replace regex-parsing `subscriptions.notes` (e.g. `"Plătit: 379 RON"`) as the source of truth for revenue. Model: `Subscription → Order (1:1, every Subscription has one, even comp/pending) → Payment(s) (0..n, direction charge/refund, method/provider/provider_reference) → Reporting`. All writes go through SECURITY DEFINER RPCs — `create_subscription`, `activate_queued_subscription`, `delete_queued_subscription`, `end_subscription` (subscription lifecycle, admin-only except `activate_queued_subscription` which also accepts the subscription's own owner), `create_order_for_subscription` (admin-or-owner), `register_payment`/`refund_payment` (admin-only, never self-service — a caller-attested money-movement claim is a fraud vector self-service Order creation is not, since Order amounts are always server-derived from `subscription_plans.price`). `payments.method` is a closed, CHECK-constrained vocabulary (`cash`/`card`/`bank_transfer`/`comp` — no `'other'`; Apple/Google Pay are `method='card'` with a `provider`, not distinct channels); `provider`/`provider_reference` exist (with a `UNIQUE` idempotency guard for future webhook delivery) but are reserved, unpopulated — no real payment-provider integration exists yet. `payments` is append-only by design (no UPDATE/DELETE policy for any role); refunds are new `direction='refund'` rows, never mutations. Migrated in 5 phases (schema → core RPCs → subscription-lifecycle RPCs → application cutover → reporting migration) plus one post-closure extension (payment methods) — see `/docs/DECISIONS.md` and `docs/2026-07-20_Financial_Domain_Architecture_Working_Session.md` (the frozen ADR record, ADR-001 through ADR-013) for the full reasoning.
 
-### 3.6a Online Payments (Stripe) — ACTIVE, Phase 5a shipped (2026-07-20)
+### 3.6a Online Payments (Stripe) — LIVE in production, validated end-to-end (2026-07-21)
 
 Building on the frozen Financial Domain (§3.6), not reopening it. Goal: a member-initiated "Renew Now" Stripe Checkout flow where the commercial intent (Order) is created **before** payment, and the webhook only confirms it — not the deferred/create-on-webhook model originally proposed, which was explicitly rejected in favor of strengthening activation rules instead (see `/docs/DECISIONS.md`).
 
@@ -82,9 +82,11 @@ Building on the frozen Financial Domain (§3.6), not reopening it. Goal: a membe
 - **Idempotency**: the same webhook event (same `provider_reference`) delivered twice via `register_payment`, followed by `activate_queued_subscription` called twice, produces exactly one Payment row, one Order transition to `paid`, and one active Subscription — verified via a rolled-back DB-level test suite.
 - **Concurrency**: two genuinely parallel sessions (real lock-forced overlap, not sequential calls — confirmed via `clock_timestamp()` showing the second call blocked for the full duration and resumed within ~15ms of the first's commit) calling `register_payment` with the same `provider_reference`, and separately calling `activate_queued_subscription` on the same subscription, both end in exactly one Payment/Order/active-Subscription each. Worth stating precisely: the second `activate_queued_subscription` call isn't rejected by a guard, it serializes behind the first's row lock and reapplies the same idempotent end state — outcome-safe, not literally exactly-once execution.
 
-**Phases 5b-5e (shipped 2026-07-21)**: Stripe account (test mode) configured; `create-checkout-session` Edge Function (hosted Checkout, inline `price_data`, deterministic Idempotency-Key, reuse-window logic for pending Orders, structural test-mode/`TEST_MODE_GYM_ID` guard); `stripe-webhook` Edge Function (`--no-verify-jwt`, raw-body signature verification via `constructEventAsync`, re-validates the Order server-side before acting, idempotent on duplicate delivery); frontend "Renew Now" button + waiting-state screen (`App.jsx`); `online_payments_enabled` per-gym `app_settings` flag gating the entry point.
+**Phases 5b-5e (shipped 2026-07-21)**: `create-checkout-session` Edge Function (hosted Checkout, inline `price_data`, deterministic Idempotency-Key, reuse-window logic for pending Orders); `stripe-webhook` Edge Function (`--no-verify-jwt`, raw-body signature verification via `constructEventAsync`, re-validates the Order server-side before acting, idempotent on duplicate delivery); frontend "Renew Now" button + waiting-state screen (`App.jsx`); `online_payments_enabled` per-gym `app_settings` flag gating the entry point.
 
-**M6 status**: the Checkout→webhook→activation flow itself has not yet been exercised end-to-end with a real Stripe payment — M6 validation instead surfaced and closed two unrelated production defects found while preparing for it (P0-005, P0-006 — see §3.8/§3.11 and `/docs/DECISIONS.md`). Phase 5f (go-live) and the original Stripe-flow validation remain outstanding.
+**Stripe configuration**: the integration runs against the company's real production Stripe account (confirmed intentional, not test mode — see `/docs/DECISIONS.md`). `isGymAllowedForKey()`/`TEST_MODE_GYM_ID` exist to sandbox a `sk_test_...` key to one gym, but this guard has **no effect at all under a live key** — every gym with `online_payments_enabled = true` is equally exposed to real charges; that flag alone is what currently gates each gym's access to this flow.
+
+**M6 status: CLOSED (2026-07-21)**. All 13 original success criteria (authenticated click → `create-checkout-session` → one Order → Stripe Checkout → payment → webhook delivery → signature verified → processed exactly once → one Payment → RPC activation → Order paid → Subscription active → UI reflects it) verified with a real, live Stripe payment against an isolated sandbox gym (CrossFit Tester), including a genuine duplicate-webhook-delivery replay proving idempotency. Full evidence: `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
 
 ### 3.7 Multi-tenancy — FROZEN (closed 2026-07-14)
 Every one of 19 public tables carries `gym_id`; 64 RLS policies scoped to it. One gym per account. Owner signup requires a platform-admin-issued registration code; member signup requires a separate per-gym access code. A "Platform" Admin tab (platform-admin only) lists all gyms with activate/deactivate — today's entire payment-enforcement mechanism (no billing integration yet).
@@ -102,6 +104,8 @@ Officially: **User** (`auth.users` + `profiles`, global identity) and **Membersh
 A dedicated **"No Gym" application state** (`noGymMembership` in `App.jsx`) renders when a profile exists with `gym_id = NULL` outside the owner-bootstrap window — this same condition also covers a genuinely-interrupted owner bootstrap (no data signal distinguishes the two today; documented, not resolved).
 
 **Delete User** (true identity deletion) remains unbuilt, deliberately postponed — see `/docs/DECISIONS.md`.
+
+**P0-006 status: CLOSED (2026-07-21)**. All 13 original regression checks verified with real data, including the two that required an actual subscription lifecycle (expired/exhausted subscription still shows the Renew screen; a completed purchase restores access) — both exercised for real as part of the M6 live-payment validation (§3.6a). Full evidence: `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
 
 ### 3.9 Database structure
 

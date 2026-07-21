@@ -2,7 +2,7 @@
 
 > Product roadmap and upcoming milestones. Not a commitment or sequencing guarantee — reflects what's known to be next vs. deferred as of the last update. See `/docs/DECISIONS.md` for why postponed items were postponed.
 >
-> Last updated: 2026-07-18.
+> Last updated: 2026-07-21.
 
 ---
 
@@ -13,8 +13,14 @@
 3. **Migrate Journal/Leaderboard/log-editing** to read Workout Engine V2 natively instead of the legacy `wods` join.
 4. **Lift the `validateSectionsForLegacy` gate** (today caps a WOD at 1 primary + 3 non-primary sections) — blocked on fixing the section-`typeKey` persistence debt first (see `/docs/ARCHITECTURE.md` known gotchas / the Workout Engine V2 phase history).
 5. **"Programming Advisor"** — the long-term Workout Intelligence vision: reasoning across a gym's structured training history (movement rotation, energy-system balance, benchmark cadence), not just parsing a pasted workout. The real differentiator vs. competitors (SugarWOD/PushPress/Wodify/BTWB) per the original product spec.
-6. **Self-serve gym signup + real payment/billing integration** (Stripe or similar) — today gym activation is 100% manual via the Platform Admin tab.
-7. **JS bundle code-splitting** — currently ~914KB minified / 242KB gzip in one chunk.
+6. **Self-serve gym signup** — gym activation is still 100% manual via the Platform Admin tab. (Member-initiated **subscription renewal payment** is done — Stripe Checkout, closed M6, 2026-07-21 — this item is narrower than it used to read.)
+7. **Membership Catalog / Plan Selection (Admin → Plans)** — member-facing browsing/selection of a gym's subscription plans. New, not yet started; tracked as its own milestone, separate from and not blocking the closed Online Payments (M6) work.
+8. **JS bundle code-splitting** — currently ~914KB minified / 242KB gzip in one chunk.
+
+## Recently closed (see `/docs/CHANGELOG.md` for full detail)
+
+- **Online Payments (Stripe), M6** — member-initiated "Renew Now" → Checkout → webhook → automatic Subscription activation. Closed 2026-07-21 against the company's real production Stripe account, validated with one real end-to-end payment. `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
+- **P0-006 (Remove Member / Identity vs. Membership)** — closed 2026-07-21.
 
 ---
 

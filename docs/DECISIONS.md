@@ -181,3 +181,31 @@
 **Delete User** (true identity deletion — for platform-admin-initiated account removal, distinct from a gym ending someone's membership) remains explicitly out of scope, not designed here.
 
 **Revisit when**: Forge needs genuine multi-gym membership (a person belonging to two gyms simultaneously) — that's the trigger for the full Identity V2 migration this decision explicitly declined to build now.
+
+---
+
+## M6: the configured Stripe key is the company's real production account, confirmed intentional (2026-07-21)
+
+**Decision**: `STRIPE_SECRET_KEY` is, and remains, a live (`sk_live_...`) key against the company's actual Stripe account. This is not a mistake to correct — explicitly confirmed by the product owner after investigation. `ARCHITECTURE.md`'s prior "test mode configured" statement was incorrect and has been removed.
+
+**Why the confusion happened**: the code (`isGymAllowedForKey()`, M2) and the original docs were written *assuming* test mode would be used for initial validation — a reasonable intent at the time, but never actually checked against the deployed secret's real value, since Supabase secrets are write-only and git history can't record what was pasted in. Direct introspection this session (a temporary, single-purpose diagnostic Edge Function, deployed and deleted immediately) was the only way to establish the actual fact.
+
+**Known limitation, accepted as-is**: `isGymAllowedForKey()`/`TEST_MODE_GYM_ID` provide zero isolation under a live key (the function returns `true` unconditionally whenever the key isn't `sk_test_...`). `online_payments_enabled` per gym is the only real gate today. This is not being changed — the guard was reviewed and is being kept as defense-in-depth for if a test key is ever used again, not removed as dead code.
+
+**Also confirmed, not part of this decision but material context**: this Stripe account has pre-existing, unrelated real business activity (completed Checkout Sessions with non-Forge `client_reference_id` values, found during event-log inspection). Nothing about Forge's integration reads or writes anything belonging to that activity — noted here so a future reader doesn't mistake shared-account event-log noise for a Forge bug.
+
+**Revisit when**: Forge gets its own dedicated Stripe account or a Restricted API key scoped only to what this integration needs (proposed in the production readiness report, non-blocking).
+
+---
+
+## M6: stale Stripe Idempotency-Key on an abandoned Order caused a false "still broken" signal (2026-07-21)
+
+**Decision/fix**: deleted the one pending test Order (`bcd4afc3-...`, CrossFit Tester) whose first-ever Checkout attempt happened during the narrow window before the Stripe account's payment capabilities were active. No code change — the fix was data-level, matching the Financial Domain's own "abandon, never mutate" rule for stale Orders.
+
+**Why**: `create-checkout-session` derives its Stripe Idempotency-Key deterministically from the Order id (`checkout_session:<orderId>`), and reuses the same pending Order (and thus the same key) for every retry within the 24h reuse window. The very first attempt for this Order was made while the account had no active payment capability and failed; Stripe cached that failure against the key. Every subsequent click replayed the cached failure verbatim, even after the account's capabilities became active and a fresh request (proven via a controlled A/B test — identical payload, only the idempotency key changed) succeeded immediately.
+
+**Verified, not assumed**: reproduced the exact stale key against the live account (got the same cached error back), then the exact same payload with a fresh key (succeeded) — isolating the idempotency key as the sole variable.
+
+**Scope check performed**: confirmed system-wide that no other pending Order or queued subscription was created during that same window — the two other pending Orders found (CrossFit C15, dated 2026-07-20) predate `STRIPE_SECRET_KEY` even being set, so they were never submitted to Stripe and carry no idempotency-key risk. This was an isolated, one-Order incident.
+
+**Revisit when**: if this class of issue recurs, consider a shorter or configurable reuse window for Orders whose only Checkout attempt ever failed (as opposed to abandoned-but-healthy ones) — proposed as a non-blocking future improvement, not built now.
