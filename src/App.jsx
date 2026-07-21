@@ -2509,12 +2509,12 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     showToast(delta > 0 ? t.toastSessionAdded : t.toastSessionRemoved)
   }
 
-  const adminStergeClient = async (client) => {
+  const adminEliminaMembru = async (client) => {
     if (deleteClientEmailInput.trim().toLowerCase() !== client.email?.toLowerCase()) return
     setDeletingClient(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${EDGE_BASE}/admin-delete-client`, {
+      const res = await fetch(`${EDGE_BASE}/admin-remove-member`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ client_id: client.id }),
@@ -2739,7 +2739,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   // Workout Intelligence, WI-1 ("Paste-to-Draft") - apeleaza Edge
   // Function-ul analyze-workout (real, gpt-5-mini) si populeaza AUTOMAT
   // editorul nativ de Workout Sections (Faza 6) cu draftul primit -
-  // acelasi tipar de autentificare ca adminStergeClient. sectionsFromAiAnalysis/
+  // acelasi tipar de autentificare ca adminEliminaMembru. sectionsFromAiAnalysis/
   // deriveReviewFlags (workoutIntelligence.js) sunt PURE, testate separat -
   // aici doar le apelam si atasam rezultatul pe fiecare sectiune mapata
   // (`reviewFlags`), citit de SectionCard/PrimarySectionBody pt semnalele
@@ -3212,7 +3212,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                               {t.adminClientsCancel}
                             </button>
                             <button disabled={deletingClient || deleteClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
-                              onClick={() => adminStergeClient(c)}
+                              onClick={() => adminEliminaMembru(c)}
                               style={{ flex: 1, padding: '8px', background: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#E24B4A' : '#f0b8b8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
                               {deletingClient ? t.adminClientsDeleting : t.adminClientsDeletePermanently}
                             </button>
@@ -4617,7 +4617,7 @@ function App() {
   // acest ecran, userul trece nedetectat prin onboarding normal si ajunge
   // la paywall-ul de abonament ca un membru obisnuit, cu un mesaj complet
   // fara legatura cu problema reala. Bug real gasit live (07-14).
-  const [registrationIncomplete, setRegistrationIncomplete] = useState(false)
+  const [noGymMembership, setNoGymMembership] = useState(false)
   // Inainte de login nu exista userProfile din care sa citim limba - localStorage
   // (aceeasi convenție ca forge_remember_email) tine limba intre sesiuni pe acest
   // device; dupa login, se sincronizeaza cu profiles.language (sursa de adevar
@@ -5250,25 +5250,32 @@ function App() {
     if (data?.gym_id) {
       const { data: gymRow } = await supabase.from('gyms').select('id, name, primary_color').eq('id', data.gym_id).maybeSingle()
       setGymBlocked(!gymRow)
-      setRegistrationIncomplete(false)
+      setNoGymMembership(false)
       if (gymRow) setMyGym({ name: gymRow.name, primaryColor: gymRow.primary_color || CURRENT_GYM.primaryColor })
     } else if (data && !ownerBootstrapping) {
+      // Profil existent, fara gym_id, in afara ferestrei de owner bootstrapping -
+      // acoperă atât "sala nu a fost niciodata finalizata" cat si "membrul a
+      // fost eliminat dintr-o sala" (adminEliminaMembru / admin-remove-member,
+      // P0-006: relatia se incheie prin gym_id = null, profilul si contul
+      // raman). Cele doua cauze nu pot fi distinse azi doar din gym_id = null -
+      // stare dedicata "No Gym", separata deliberat de ecranul vechi de
+      // inregistrare neterminata (P0-006).
       setGymBlocked(false)
-      setRegistrationIncomplete(true)
+      setNoGymMembership(true)
     } else if (!data && !ownerBootstrapping) {
       // Sesiune locala inca valida (JWT neexpirat) dar contul a fost sters
-      // (ex. admin-delete-client) - fara asta, `data === null` cadea in
-      // ramura de mai jos (gandita pentru fereastra tranzitorie de owner
+      // (ex. Delete User, cand va exista) - fara asta, `data === null` cadea
+      // in ramura de mai jos (gandita pentru fereastra tranzitorie de owner
       // bootstrapping, nu pentru "contul nu mai exista"), lasand
-      // gymBlocked/registrationIncomplete false si aratand gresit paywall-ul
-      // de abonament (P0-005). Nicio actualizare de stare dupa signOut() -
+      // gymBlocked/noGymMembership false si aratand gresit paywall-ul de
+      // abonament (P0-005). Nicio actualizare de stare dupa signOut() -
       // return imediat, restul functiei (waiver/onboarding) foloseste `data`
       // care oricum e null aici.
       await supabase.auth.signOut()
       return
     } else {
       setGymBlocked(false)
-      setRegistrationIncomplete(false)
+      setNoGymMembership(false)
     }
     const currentYear = new Date().getFullYear()
     const waiverInLS = localStorage.getItem(`waiver_${user?.id}_${currentYear}`) === '1'
@@ -5927,7 +5934,7 @@ function App() {
     // putea arata pentru o fractiune de secunda ecranul de blocare ramas
     // de la contul anterior, pana ce fetchUserProfile() apuca sa corecteze.
     setGymBlocked(false)
-    setRegistrationIncomplete(false)
+    setNoGymMembership(false)
     // userProfile ramane altfel cu datele contului vechi pana se rezolva
     // fetchUserProfile() a noului cont - null aici garanteaza ca ecranul
     // Profil (si orice alt loc care citeste userProfile direct) nu poate
@@ -6715,12 +6722,12 @@ function App() {
         </div>
       )}
 
-      {registrationIncomplete && (
+      {noGymMembership && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.registrationIncompleteTitle}</div>
-            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.registrationIncompleteText}</div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.noGymMembershipTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.noGymMembershipText}</div>
             <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               {t.paywallLogout}
             </button>
