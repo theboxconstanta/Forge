@@ -5923,10 +5923,17 @@ function App() {
       // in handle_new_user() - asta e doar UX.
       const codeOk = await supabase.rpc('verify_gym_join_code', { p_gym_id: selectedGym.id, p_code: joinCodeInput.trim() })
       if (!codeOk.data) { setAuthError(t.authGymCodeInvalid); setAuthSubmitting(false); return }
-      const { error } = await supabase.auth.signUp({
-        email: authEmail, password: authPassword, options: { data: { gym_join_code: joinCodeInput.trim() } },
-      })
-      if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+      // Acelasi tipar ca la fluxul de owner de mai sus: daca sesiunea din
+      // prima incercare e deja activa (reincercare inainte ca
+      // onAuthStateChange sa apuce sa actualizeze ecranul), nu mai chemam
+      // signUp() a doua oara - ar esua cu "user already registered", desi
+      // contul chiar exista deja din prima incercare reusita.
+      if (!user) {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail, password: authPassword, options: { data: { gym_join_code: joinCodeInput.trim() } },
+        })
+        if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
+      }
     }
     setAuthSubmitting(false)
   }
