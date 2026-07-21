@@ -4600,6 +4600,9 @@ function App() {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutOrderId, setCheckoutOrderId] = useState(null)
   const [checkoutStatus, setCheckoutStatus] = useState(null) // null | 'waiting' | 'confirmed' | 'timeout'
+  const [noGymJoinCode, setNoGymJoinCode] = useState('')
+  const [joiningGym, setJoiningGym] = useState(false)
+  const [noGymJoinError, setNoGymJoinError] = useState('')
   const homeCalScrollRef = useRef(null)
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
@@ -5941,6 +5944,26 @@ function App() {
     // arata nici macar tranzitoriu numele/genul/etc. contului anterior.
     setUserProfile(null)
   }
+
+  // Reintrare intr-o sala pentru un cont existent, fara sa fie nevoie de un
+  // al doilea cont - vezi join_gym_with_code() (P0-006 follow-up). Nu
+  // seteaza gym_id local direct - re-apeleaza fetchUserProfile(), care
+  // citeste starea reala din profiles si scoate singur ecranul No Gym
+  // odata ce gym_id nu mai e null.
+  const handleJoinGymWithCode = async () => {
+    if (!noGymJoinCode.trim()) { setNoGymJoinError(t.authGymCodeRequired); return }
+    setJoiningGym(true); setNoGymJoinError('')
+    const { error } = await supabase.rpc('join_gym_with_code', { p_code: noGymJoinCode.trim() })
+    if (error) {
+      setNoGymJoinError(error.message === 'invalid gym join code' ? t.authGymCodeInvalid : t.noGymJoinAlreadyMember)
+      setJoiningGym(false)
+      return
+    }
+    setNoGymJoinCode('')
+    await fetchUserProfile()
+    setJoiningGym(false)
+  }
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
@@ -6728,7 +6751,17 @@ function App() {
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.noGymMembershipTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.noGymMembershipText}</div>
-            <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            <input value={noGymJoinCode} onChange={e => { setNoGymJoinCode(e.target.value.toUpperCase()); setNoGymJoinError('') }}
+              placeholder={t.authGymCodePlaceholder}
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#fafafa', letterSpacing: '1px', textAlign: 'center', marginBottom: '10px' }} />
+            {noGymJoinError && (
+              <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{noGymJoinError}</div>
+            )}
+            <button onClick={handleJoinGymWithCode} disabled={joiningGym}
+              style={{ width: '100%', padding: '13px', background: joiningGym ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: joiningGym ? 'not-allowed' : 'pointer', marginBottom: '10px' }}>
+              {joiningGym ? t.noGymJoining : t.noGymJoinButton}
+            </button>
+            <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               {t.paywallLogout}
             </button>
           </div>
