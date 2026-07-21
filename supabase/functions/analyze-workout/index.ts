@@ -5,7 +5,7 @@
 // (vezi workout-analysis-schema.ts, contractul canonic) catre client, care
 // deocamdata doar il afiseaza in consola (App.jsx, analyzeWorkout()).
 // Autorizarea (doar admin/coach) e neschimbata fata de Pasul 2A - citeste
-// `admins`/`coaches`, acelasi tipar ca admin-delete-client.
+// `admins`/`coaches`, acelasi tipar ca admin-remove-member.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { WORKOUT_ANALYSIS_JSON_SCHEMA } from "./openaiSchema.ts";
 import { SYSTEM_PROMPT } from "./prompt.ts";
