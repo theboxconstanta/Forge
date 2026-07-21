@@ -149,3 +149,35 @@
 **Why minimal, not a rewrite**: the trigger's actual purpose (preventing one authenticated member from tampering with another member's subscription via a direct table update, while still allowing the legitimate waitlist auto-book `sessions_used +1` path) is unrelated to Stripe and was left completely untouched. Re-verified explicitly post-fix: non-owner `sessions_used +1` still allowed, non-owner still blocked from any other column change or any other increment amount, row owner still fully unrestricted — zero behavior change for any caller class except the newly-added `service_role` path.
 
 **Revisit when**: never, absent a new defect — this is a narrow, closed fix, not an open design question.
+
+---
+
+## P0-005: a deleted user's session is force-signed-out client-side, not left to expire silently (2026-07-21)
+
+**Decision**: `fetchUserProfile()` distinguishes "no profile row returned because the account was deleted" from "no profile row because `gym_id` isn't set yet" (the owner-bootstrap transient window) — the first case now calls `supabase.auth.signOut()` immediately rather than falling through to whatever screen the rest of the app happens to render next.
+
+**Why**: found live during M6 validation — a deleted client's still-unexpired browser session fell through to the ordinary subscription paywall ("no active subscription"), a misleading dead end rather than a clear signed-out state. Root cause: Supabase doesn't invalidate an already-issued JWT when the underlying account is deleted (only future refreshes fail) — the app has to detect this itself.
+
+**Known limitation, not resolved**: the same code branch also covers a genuinely-interrupted owner bootstrap (browser closed mid-signup, `gym_id` still null on return) — no data signal distinguishes the two causes today. Not fixed here; would need a new column or flag, out of scope for a targeted bug fix.
+
+**Revisit when**: the two causes need to be told apart in the UI (different messaging), or Delete User (below) is built and needs its own detection path.
+
+---
+
+## P0-006: Remove Member replaces Delete Client — identity, financial, and training history survive; only the gym relationship ends (2026-07-21)
+
+**Decision**: a gym admin's "remove this person" action never deletes `auth.users` or `profiles`, never touches `orders`/`payments`, and never touches `wod_logs`/`personal_records`/`custom_hero_wods`/`feed_posts`/`feed_reactions`/`feed_comments`. It clears `profiles.gym_id` (the sole membership signal — no new Membership table introduced), ends any active subscription through `end_subscription` (never a raw table write), and deletes only genuinely operational/transient data (`bookings`, `class_waitlist`, `class_reminders`, `push_subscriptions`).
+
+**Why**: the previous `admin-delete-client` deleted `profiles` and called `auth.admin.deleteUser()` — for any client with an Order (true for anyone who ever self-service-activated, real since Phase 2), this silently collided with `orders.client_id`'s `RESTRICT` FK and either failed outright or, in at least one confirmed case, partially succeeded (deleted `profiles`, `auth.users` left orphaned) — see the P0-005/legacy-orphan finding below. The product intent was also wrong on top of the technical breakage: a gym owner ending someone's membership should never be the same operation as deleting their identity.
+
+**User vs. Membership stays conceptually distinct without a schema split**: officially, User (global identity) and Membership (the gym relationship) are different concepts — but no Membership table was introduced, no RLS rewrite, no auth redesign. `profiles.gym_id = NULL` *is* "no membership," a decision explicitly scoped to avoid the larger Identity-V2 migration investigated and declined during this same review (multi-membership support, a true Membership table) — postponed until Forge actually needs it, not built speculatively ahead of demand.
+
+**A pre-existing, unrelated trigger blocker was found and fixed narrowly**: `prevent_gym_id_change()` (shared across 24 tables, 2026-07-14) unconditionally blocked any change to `gym_id` once set, including clearing it — this made the above impossible to execute at the database level. Per explicit decision, the shared trigger/function was left completely untouched (verified: byte-identical, still protects the other 24 tables); `profiles` alone got its own trigger (`prevent_profiles_gym_id_change`) permitting exactly `<a gym> → NULL`. Every forbidden transition (`Gym A → Gym B`, on `profiles` or any other table) remains blocked exactly as before.
+
+**Validated with real data, not just rolled-back tests**: a live test member was assigned to a gym, removed via the actual operation, and confirmed via the exact RLS-scoped query the Admin → Clients screen uses — visible before, zero rows after. Identity, `auth.users`, and a real historical `wod_logs` entry all survived. Login and the resulting "No Gym" screen were independently confirmed by a real authenticated session (not simulated).
+
+**A separate, unrelated legacy defect was found and repaired, not folded into this decision**: one `auth.users` row (`lucianrosca@hotmail.com`, created 2026-06-24 — weeks before Remove Member existed) had no matching `profiles` row at all, from the *old* `admin-delete-client`'s partial-failure mode. Repaired as a one-time data fix (profile row recreated, matching what `handle_new_user()` itself produces, `gym_id` left `NULL` since no historical data existed to indicate an original gym) — not a code change, and not evidence of a P0-006 regression.
+
+**Delete User** (true identity deletion — for platform-admin-initiated account removal, distinct from a gym ending someone's membership) remains explicitly out of scope, not designed here.
+
+**Revisit when**: Forge needs genuine multi-gym membership (a person belonging to two gyms simultaneously) — that's the trigger for the full Identity V2 migration this decision explicitly declined to build now.
