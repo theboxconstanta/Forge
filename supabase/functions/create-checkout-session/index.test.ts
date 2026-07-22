@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { decideOrderReuse, isGymAllowedForKey, buildCheckoutSessionParams, handleRequest } from "./index.ts";
+import { decideOrderReuse, isGymAllowedForKey, resolveAppBaseUrl, buildCheckoutSessionParams, handleRequest } from "./index.ts";
 
 const planA = "11111111-1111-1111-1111-111111111111";
 const planB = "22222222-2222-2222-2222-222222222222";
@@ -106,7 +106,89 @@ Deno.test("isGymAllowedForKey: test-mode key with no TEST_MODE_GYM_ID configured
   assertEquals(isGymAllowedForKey({ stripeSecretKey: "sk_test_abc", gymId: gymA, testModeGymId: "" }), false);
 });
 
-// 11. Checkout Session params: client_reference_id and metadata both carry
+// 11a. Origin header matches the allowlist -> used as-is
+Deno.test("resolveAppBaseUrl: allowlisted Origin header is used", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: "http://localhost:5173",
+    refererHeader: null,
+    allowedOrigins: ["http://localhost:5173", "https://forge.example"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "http://localhost:5173");
+});
+
+// 11b. Origin absent, Referer present and allowlisted (as an origin, ignoring
+// path/query) -> Referer's origin is used
+Deno.test("resolveAppBaseUrl: allowlisted Referer origin is used when Origin is absent", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: null,
+    refererHeader: "http://localhost:4173/some/page?x=1",
+    allowedOrigins: ["http://localhost:4173", "https://forge.example"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "http://localhost:4173");
+});
+
+// 11c. Origin present but NOT allowlisted -> never trusted, even if a valid
+// Referer would have matched (Origin takes precedence when present at all,
+// per the approved order: Origin, then Referer, then fallback - an
+// unmatched Origin does not "fall through" to Referer)
+Deno.test("resolveAppBaseUrl: non-allowlisted Origin does not fall back to Referer", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: "https://evil.example",
+    refererHeader: "http://localhost:5173/",
+    allowedOrigins: ["http://localhost:5173", "https://forge.example"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "https://forge.example");
+});
+
+// 11d. Neither header present -> fallback (APP_BASE_URL)
+Deno.test("resolveAppBaseUrl: no Origin or Referer falls back to APP_BASE_URL", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: null,
+    refererHeader: null,
+    allowedOrigins: ["http://localhost:5173"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "https://forge.example");
+});
+
+// 11e. Referer is malformed/unparseable -> falls back, never throws
+Deno.test("resolveAppBaseUrl: malformed Referer is ignored, not thrown", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: null,
+    refererHeader: "not a url",
+    allowedOrigins: ["http://localhost:5173"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "https://forge.example");
+});
+
+// 11f. Referer present but its origin is not allowlisted -> fallback
+Deno.test("resolveAppBaseUrl: non-allowlisted Referer origin falls back", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: null,
+    refererHeader: "https://evil.example/",
+    allowedOrigins: ["http://localhost:5173"],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "https://forge.example");
+});
+
+// 11g. Empty allowlist (ALLOWED_APP_ORIGINS unset) -> always falls back,
+// same as pre-fix behavior
+Deno.test("resolveAppBaseUrl: empty allowlist always falls back", () => {
+  const result = resolveAppBaseUrl({
+    originHeader: "http://localhost:5173",
+    refererHeader: "http://localhost:5173/",
+    allowedOrigins: [],
+    fallback: "https://forge.example",
+  });
+  assertEquals(result, "https://forge.example");
+});
+
+// 12. Checkout Session params: client_reference_id and metadata both carry
 // the Order id (defense-in-depth per the Faza 5c security model review)
 Deno.test("buildCheckoutSessionParams: order id present in both client_reference_id and metadata", () => {
   const params = buildCheckoutSessionParams({
@@ -122,7 +204,7 @@ Deno.test("buildCheckoutSessionParams: order id present in both client_reference
   assertEquals(params.success_url, `https://forge.example/subscription?checkout=${orderId}`);
 });
 
-// 12. Missing JWT -> handleRequest itself returns 401 before any I/O (no
+// 13. Missing JWT -> handleRequest itself returns 401 before any I/O (no
 // network call happens before the token check, same pattern as
 // send-notification's equivalent test).
 Deno.test("request with no Authorization header is rejected with 401 before any I/O", async () => {

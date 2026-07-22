@@ -96,9 +96,16 @@ export const TRANSLATIONS = {
     paywallStartsOnText: (date) => `Abonamentul tău începe pe ${date}. Revino atunci!`,
     paywallSessionsExhaustedText: 'Ai consumat toate ședințele din abonament. Contactează coachul pentru a achiziționa un abonament nou.',
     paywallExpiredText: 'Abonamentul tău a expirat. Contactează coachul pentru reînnoire.',
-    paywallReload: 'Reîncarcă',
     paywallViewSubscription: 'Vezi abonamentul →',
     paywallLogout: 'Deconectează-te',
+    // Membership Catalog (M8) - doar cand online_payments_enabled e activ
+    noMembershipTitle: 'Nu ai un abonament activ.',
+    noMembershipText: 'Alege un abonament pentru a începe.',
+    chooseMembershipButton: 'Alege un abonament',
+    catalogTitle: 'Abonamente disponibile',
+    catalogLoading: 'Se încarcă...',
+    catalogEmpty: 'Niciun abonament disponibil momentan. Contactează coachul.',
+    catalogSelectButton: 'Alege acest abonament',
 
     // Calendar picker
     calPickerGoToToday: 'Mergi la azi',
@@ -985,8 +992,15 @@ export const TRANSLATIONS = {
     paywallStartsOnText: (date) => `Your subscription starts on ${date}. Come back then!`,
     paywallSessionsExhaustedText: 'You’ve used all your subscription sessions. Contact your coach to purchase a new subscription.',
     paywallExpiredText: 'Your subscription has expired. Contact your coach to renew.',
-    paywallReload: 'Reload',
     paywallViewSubscription: 'View subscription →',
+    // Membership Catalog (M8) - only when online_payments_enabled is on
+    noMembershipTitle: 'You don’t have an active membership.',
+    noMembershipText: 'Choose a membership to get started.',
+    chooseMembershipButton: 'Choose Membership',
+    catalogTitle: 'Available Memberships',
+    catalogLoading: 'Loading...',
+    catalogEmpty: 'No memberships available right now. Contact your coach.',
+    catalogSelectButton: 'Choose this membership',
     paywallLogout: 'Sign out',
 
     // Calendar picker

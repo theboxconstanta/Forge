@@ -4598,6 +4598,20 @@ function App() {
   const [cancelWindowHours, setCancelWindowHours] = useState(2)
   const [onlinePaymentsAvailable, setOnlinePaymentsAvailable] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  // Catalogul self-service al membrului (M8) - stare + fetch mutate aici, in
+  // App(), dupa ce root-cause-ul real a fost gasit: erau declarate din
+  // greseala in Admin() (langa fetchPlanuri, prin proximitate vizuala, nu
+  // scop real) - doua componente functie complet separate la nivel de top,
+  // App() nu are nicio vizibilitate lexicala in interiorul lui Admin().
+  // ReferenceError la runtime era exact acest lucru, nu cache/HMR.
+  const [catalogPlans, setCatalogPlans] = useState([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const fetchCatalogPlans = async () => {
+    setCatalogLoading(true)
+    const { data } = await supabase.from('subscription_plans').select('*').eq('is_active', true).order('sessions', { ascending: true })
+    setCatalogPlans(data || [])
+    setCatalogLoading(false)
+  }
   const [checkoutOrderId, setCheckoutOrderId] = useState(null)
   const [checkoutStatus, setCheckoutStatus] = useState(null) // null | 'waiting' | 'confirmed' | 'timeout'
   const [noGymJoinCode, setNoGymJoinCode] = useState('')
@@ -4715,6 +4729,12 @@ function App() {
   const [freeLogText, setFreeLogText] = useState('')
   const [freeLogSaving, setFreeLogSaving] = useState(false)
   const [user, setUser] = useState(null)
+  // Oglinda mereu la zi a lui `user`, pentru closure-uri de viata lunga create
+  // o singura data (efecte cu deps []) inainte ca sesiunea sa se incarce -
+  // fetchAbonamentMeu apelat din interiorul unui asemenea closure vechi ar
+  // vedea altfel `user` permanent null si ar arunca la user.email.
+  const userRef = useRef(user)
+  useEffect(() => { userRef.current = user }, [user])
   const [authLoading, setAuthLoading] = useState(true)
   const [authScreen, setAuthScreen] = useState('login')
   const [authEmail, setAuthEmail] = useState(() => localStorage.getItem('forge_remember_email') || '')
@@ -5436,7 +5456,7 @@ function App() {
       const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`
       const { data, error } = await supabase.from('subscriptions')
         .select('*, subscription_plans(name, sessions)')
-        .ilike('member_email', user.email.trim())
+        .ilike('member_email', userRef.current.email.trim())
         .eq('is_active', true)
         .eq('queued', false)
         .lte('start_date', todayStr)
@@ -5451,11 +5471,11 @@ function App() {
       const isExpired = new Date(abo.end_date + 'T23:59:59') < new Date()
       const isExhausted = abo.sessions_total != null && (abo.sessions_used || 0) >= abo.sessions_total
       if (isExpired || isExhausted) {
-        const activatedId = await activateQueuedSubscription(user.email)
+        const activatedId = await activateQueuedSubscription(userRef.current.email)
         if (activatedId) abo = await fetchActive()
       }
     } else {
-      const activatedId = await activateQueuedSubscription(user.email)
+      const activatedId = await activateQueuedSubscription(userRef.current.email)
       if (activatedId) abo = await fetchActive()
     }
     setAbonamentReal(abo)
@@ -5657,9 +5677,20 @@ function App() {
   // Ecranul de asteptare dupa revenirea de la Stripe - CITESTE DOAR statusul
   // Comenzii, nu scrie niciodata in orders/subscriptions (webhook-ul e
   // singura cale de activare reala - Sectiunea 10/12, reviewul Faza 5c).
+  //
+  // orderIdFromUrlRef: capturat o singura data, stabil peste cele doua
+  // invocari ale efectului facute deliberat de React 18 StrictMode in dev
+  // (mount->cleanup->remount, pentru a verifica ca efectul supravietuieste
+  // corect unui remount). Cu citire directa din window.location.search de
+  // fiecare data, prima invocare stergea query string-ul via replaceState()
+  // inainte ca a doua sa mai apuce sa-l citeasca -> a doua gasea orderId
+  // null si iesea imediat, iar polling-ul primei invocari era deja anulat
+  // de cleanup - niciuna nu ajungea vreodata la 'confirmed'. Ref-ul e stabil
+  // peste ambele invocari (acelasi fiber), deci a doua (cea care ramane cu
+  // adevarat montata) primeste acelasi orderId corect.
+  const orderIdFromUrlRef = useRef(new URLSearchParams(window.location.search).get('checkout'))
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const orderId = params.get('checkout')
+    const orderId = orderIdFromUrlRef.current
     if (!orderId) return
     window.history.replaceState({}, '', window.location.pathname)
     setCheckoutOrderId(orderId)
@@ -6775,34 +6806,38 @@ function App() {
         </div>
       )}
 
-      {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && (
+      {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && screen !== 'catalog' && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
-              {!abonamentReal ? t.paywallNoSubscription
-                : !abonamentInceput ? t.subScheduled
+              {abonamentReal && !abonamentInceput ? t.subScheduled
+                : onlinePaymentsAvailable ? t.noMembershipTitle
+                : !abonamentReal ? t.paywallNoSubscription
                 : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
                 : t.paywallExpired}
             </div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '22px' }}>
-              {!abonamentReal
-                ? t.paywallNoSubscriptionText
-                : !abonamentInceput
-                  ? t.paywallStartsOnText(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
-                  : sedinteLimitate && sedinteRamase === 0
-                    ? t.paywallSessionsExhaustedText
-                    : t.paywallExpiredText}
+              {abonamentReal && !abonamentInceput
+                ? t.paywallStartsOnText(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
+                : onlinePaymentsAvailable
+                  ? t.noMembershipText
+                  : !abonamentReal
+                    ? t.paywallNoSubscriptionText
+                    : sedinteLimitate && sedinteRamase === 0
+                      ? t.paywallSessionsExhaustedText
+                      : t.paywallExpiredText}
             </div>
-            {onlinePaymentsAvailable && abonamentReal?.plan_id && abonamentInceput && (
-              <button onClick={() => startCheckout(abonamentReal.plan_id)} disabled={checkoutLoading}
-                style={{ width: '100%', padding: '13px', background: checkoutLoading ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: checkoutLoading ? 'not-allowed' : 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <CreditCard size={16} /> {checkoutLoading ? t.renewNowLoading : t.renewNowButton}
+            {/* Punct unic de cumparare (simplificare produs, M8 Phase 4): Renew
+                Now retras - "Alege un abonament" acopera si prima achizitie si
+                reinnoirea, backend-ul (create_subscription) decizand deja
+                intern care e cazul, fara nicio distinctie in UI. */}
+            {onlinePaymentsAvailable && !(abonamentReal && !abonamentInceput) && (
+              <button onClick={() => { fetchCatalogPlans(); setScreen('catalog') }}
+                style={{ width: '100%', padding: '13px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <CreditCard size={16} /> {t.chooseMembershipButton}
               </button>
             )}
-            <button onClick={() => fetchAbonamentMeu()} style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
-              {t.paywallReload}
-            </button>
             <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#555', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '10px' }}>
               {t.paywallViewSubscription}
             </button>
@@ -7247,8 +7282,14 @@ function App() {
           {!abonamentReal ? (
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><ClipboardList size={36} color="#0E0E0E" strokeWidth={1.5} /></div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{t.subNoActive}</div>
-              <div style={{ fontSize: '12px', color: '#888' }}>{t.subContactCoachAdd}</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{onlinePaymentsAvailable ? t.noMembershipTitle : t.subNoActive}</div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: onlinePaymentsAvailable ? '14px' : '0' }}>{onlinePaymentsAvailable ? t.noMembershipText : t.subContactCoachAdd}</div>
+              {onlinePaymentsAvailable && (
+                <button onClick={() => { fetchCatalogPlans(); setScreen('catalog') }}
+                  style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <CreditCard size={15} /> {t.chooseMembershipButton}
+                </button>
+              )}
             </div>
           ) : !abonamentActiv ? (
             <div style={{ background: !abonamentInceput ? '#f0f0f0' : '#FCEBEB', borderRadius: '14px', padding: '20px', marginBottom: '14px', textAlign: 'center' }}>
@@ -7257,20 +7298,25 @@ function App() {
               </div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? t.subScheduled
+                  : onlinePaymentsAvailable ? t.noMembershipTitle
                   : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
                   : t.subExpired}
               </div>
               <div style={{ fontSize: '12px', color: !abonamentInceput ? '#0E0E0E' : '#A32D2D' }}>
                 {!abonamentInceput
                   ? t.subStartsOn(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
-                  : sedinteLimitate && sedinteRamase === 0
-                    ? t.subAllSessionsUsed
-                    : t.subContactCoachRenew}
+                  : onlinePaymentsAvailable
+                    ? t.noMembershipText
+                    : sedinteLimitate && sedinteRamase === 0
+                      ? t.subAllSessionsUsed
+                      : t.subContactCoachRenew}
               </div>
-              {onlinePaymentsAvailable && abonamentReal?.plan_id && abonamentInceput && (
-                <button onClick={() => startCheckout(abonamentReal.plan_id)} disabled={checkoutLoading}
-                  style={{ width: '100%', padding: '12px', background: checkoutLoading ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: checkoutLoading ? 'not-allowed' : 'pointer', marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  <CreditCard size={15} /> {checkoutLoading ? t.renewNowLoading : t.renewNowButton}
+              {/* Punct unic de cumparare (M8 Phase 4): Renew Now retras -
+                  vezi comentariul identic de la paywall-ul modal de mai sus. */}
+              {onlinePaymentsAvailable && abonamentInceput && (
+                <button onClick={() => { fetchCatalogPlans(); setScreen('catalog') }}
+                  style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <CreditCard size={15} /> {t.chooseMembershipButton}
                 </button>
               )}
             </div>
@@ -7356,6 +7402,36 @@ function App() {
               </div>
             )
           })()}
+        </div>
+      )}
+
+      {/* Catalogul de abonamente - self-service, M8. Membru fara abonament
+          (screen setat exclusiv din CTA-ul "Alege un abonament" de mai sus)
+          alege un plan -> startCheckout() existent, neschimbat. */}
+      {screen === 'catalog' && (
+        <div style={{ padding: '20px', paddingBottom: '80px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.catalogTitle}</h1>
+          </div>
+          {catalogLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: '13px' }}>{t.catalogLoading}</div>
+          ) : catalogPlans.length === 0 ? (
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', color: '#888', fontSize: '13px' }}>{t.catalogEmpty}</div>
+          ) : (
+            catalogPlans.map(p => (
+              <button key={p.id} onClick={() => startCheckout(p.id)} disabled={checkoutLoading}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1 }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{p.name}</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>
+                  {p.sessions ? t.adminPlansSessionsCount(p.sessions) : t.adminPlansUnlimited} · {p.price != null ? t.adminPlansPriceSet(p.price) : t.adminPlansPriceUnset} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? t.adminPlansMonthSingular : t.adminPlansMonthPlural}
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CreditCard size={14} /> {checkoutLoading ? t.renewNowLoading : t.catalogSelectButton}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       )}
 

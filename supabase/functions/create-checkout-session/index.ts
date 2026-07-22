@@ -6,6 +6,8 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 const TEST_MODE_GYM_ID = Deno.env.get("TEST_MODE_GYM_ID") || "";
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") || "https://forge-delta-ivory.vercel.app";
+const ALLOWED_APP_ORIGINS = (Deno.env.get("ALLOWED_APP_ORIGINS") || "")
+  .split(",").map((o) => o.trim()).filter(Boolean);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +49,37 @@ export function isGymAllowedForKey({ stripeSecretKey, gymId, testModeGymId }: {
   const isTestKey = stripeSecretKey.startsWith("sk_test_");
   if (!isTestKey) return true;
   return !!testModeGymId && gymId === testModeGymId;
+}
+
+// Decizie pura: pe ce origine trimitem membrul dupa Stripe. Origin/Referer nu
+// sunt niciodata de incredere fara validare pe o lista alba - un caller
+// autentificat ar putea trimite orice header, iar un redirect nevalidat
+// dupa o plata reala e un vector de phishing (chiar daca nu afecteaza alti
+// utilizatori). "localhost" nu e un caz special in cod - e doar o valoare
+// posibila in ALLOWED_APP_ORIGINS, tratata identic cu domeniul de productie.
+export function resolveAppBaseUrl({ originHeader, refererHeader, allowedOrigins, fallback }: {
+  originHeader: string | null;
+  refererHeader: string | null;
+  allowedOrigins: string[];
+  fallback: string;
+}): string {
+  // Referer e rezerva doar cand Origin lipseste cu adevarat (null) - un Origin
+  // PREZENT dar in afara listei albe merge direct la fallback, nu incearca
+  // Referer ca a doua sansa (altfel un Origin fals ar putea fi ocolit trimitand
+  // si un Referer valid).
+  if (originHeader !== null) {
+    return allowedOrigins.includes(originHeader) ? originHeader : fallback;
+  }
+  if (refererHeader) {
+    let refererOrigin: string | null = null;
+    try {
+      refererOrigin = new URL(refererHeader).origin;
+    } catch {
+      refererOrigin = null;
+    }
+    if (refererOrigin && allowedOrigins.includes(refererOrigin)) return refererOrigin;
+  }
+  return fallback;
 }
 
 export function buildCheckoutSessionParams({ orderId, gymId, subscriptionId, planName, unitAmountCents, currency, memberEmail, successUrlBase, cancelUrlBase }: {
@@ -128,7 +161,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     ) || DEFAULT_PENDING_ORDER_EXPIRY_HOURS;
 
     const { data: plan, error: planErr } = await memberClient
-      .from("subscription_plans").select("id, name, price").eq("id", subscription_plan_id).eq("gym_id", profile.gym_id).maybeSingle();
+      .from("subscription_plans").select("id, name, price").eq("id", subscription_plan_id).eq("gym_id", profile.gym_id).eq("is_active", true).maybeSingle();
     if (planErr || !plan) {
       return new Response(JSON.stringify({ error: "Plan negăsit" }), { status: 404, headers: CORS });
     }
@@ -192,6 +225,19 @@ export async function handleRequest(req: Request): Promise<Response> {
       totalAmount = Number(order.total_amount || 0);
     }
 
+    // Intoarce membrul pe orice frontend a pornit checkout-ul (localhost in
+    // dev, domeniul de productie in prod) - Origin e verificat intai (setat
+    // automat de browser, nu poate fi manipulat din JS), Referer e rezerva
+    // pentru cazul rar in care Origin lipseste. Niciunul nu e de incredere
+    // fara ALLOWED_APP_ORIGINS; fara potrivire, ramane APP_BASE_URL de mai
+    // devreme, exact comportamentul dinainte de acest fix.
+    const resolvedAppBaseUrl = resolveAppBaseUrl({
+      originHeader: req.headers.get("origin"),
+      refererHeader: req.headers.get("referer"),
+      allowedOrigins: ALLOWED_APP_ORIGINS,
+      fallback: APP_BASE_URL,
+    });
+
     const params = buildCheckoutSessionParams({
       orderId,
       gymId: profile.gym_id,
@@ -200,8 +246,13 @@ export async function handleRequest(req: Request): Promise<Response> {
       unitAmountCents: Math.round(totalAmount * 100),
       currency: "ron",
       memberEmail: profile.email,
-      successUrlBase: `${APP_BASE_URL}/subscription`,
-      cancelUrlBase: `${APP_BASE_URL}/subscription`,
+      // "/subscription" nu e o ruta reala - aplicatia nu are router (ecranele
+      // sunt un state React `screen`, nu path-uri), si nu exista vercel.json
+      // cu un rewrite catre index.html pentru alte cai. "/" e singura cale
+      // care chiar serveste aplicatia; handler-ul ?checkout= (App.jsx) oricum
+      // citeste doar query string-ul, niciodata pathname-ul.
+      successUrlBase: resolvedAppBaseUrl,
+      cancelUrlBase: resolvedAppBaseUrl,
     });
 
     const stripe = new Stripe(STRIPE_SECRET_KEY);
