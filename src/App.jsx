@@ -6,6 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
+  Archive, Ban,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -2097,6 +2098,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [planuri, setPlanuri] = useState([])
   const [abonamente, setAbonamente] = useState([])
   const [aboExpandat, setAboExpandat] = useState({})
+  const [confirmCancelAbo, setConfirmCancelAbo] = useState(null)
+  const [confirmArchivePlan, setConfirmArchivePlan] = useState(null)
   const [_loadingClase, setLoadingClase] = useState(true)
   const [searchClienti, setSearchClienti] = useState('')
   const [rapoarteData, setRapoarteData] = useState(null)
@@ -2952,7 +2955,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
 
   const stergePlan = async (id) => {
     await supabase.from('subscription_plans').update({ is_active: false }).eq('id', id)
-    showToast(t.toastPlanDeleted); await fetchPlanuri()
+    showToast(t.toastPlanArchived); await fetchPlanuri()
   }
 
   const stergeAbonament = async (id) => {
@@ -3374,8 +3377,27 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                                 </div>
                               )}
                               {activ.notes && <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px' }}>{activ.notes}</div>}
-                              <button onClick={e => { e.stopPropagation(); stergeAbonament(activ.id) }}
-                                style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>{t.adminSubsDeleteButton}</button>
+                              {confirmCancelAbo === activ.id ? (
+                                <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px', background: '#FCEBEB', borderRadius: '10px', padding: '10px' }}>
+                                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>{t.adminSubsCancelConfirmTitle}</div>
+                                  <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px', whiteSpace: 'pre-line' }}>{t.adminSubsCancelConfirmBody}</div>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button onClick={() => setConfirmCancelAbo(null)}
+                                      style={{ flex: 1, padding: '7px', background: '#fff', color: '#0E0E0E', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                                      {t.adminSubsCancelConfirmKeepButton}
+                                    </button>
+                                    <button onClick={() => { setConfirmCancelAbo(null); stergeAbonament(activ.id) }}
+                                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                                      {t.adminSubsCancelConfirmConfirmButton}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button onClick={e => { e.stopPropagation(); setConfirmCancelAbo(activ.id) }}
+                                  style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Ban size={12} /> {t.adminSubsCancelButton}
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '8px 0' }}>{t.adminSubsNoActiveSubscription}</div>
@@ -3746,8 +3768,29 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                     {p.sessions ? t.adminPlansSessionsCount(p.sessions) : t.adminPlansUnlimited} · {p.price != null ? t.adminPlansPriceSet(p.price) : t.adminPlansPriceUnset} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? t.adminPlansMonthSingular : t.adminPlansMonthPlural}
                   </div>
                 </div>
-                <button onClick={() => stergePlan(p.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                {confirmArchivePlan !== p.id && (
+                  <button onClick={() => setConfirmArchivePlan(p.id)}
+                    style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Archive size={13} /> {t.adminPlansArchiveButton}
+                  </button>
+                )}
               </div>
+              {confirmArchivePlan === p.id && (
+                <div style={{ marginTop: '10px', background: '#FCEBEB', borderRadius: '10px', padding: '10px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>{t.adminPlansArchiveConfirmTitle}</div>
+                  <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>{t.adminPlansArchiveConfirmBody}</div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setConfirmArchivePlan(null)}
+                      style={{ flex: 1, padding: '7px', background: '#fff', color: '#0E0E0E', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                      {t.adminClientsCancel}
+                    </button>
+                    <button onClick={() => { setConfirmArchivePlan(null); stergePlan(p.id) }}
+                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                      <Archive size={13} /> {t.adminPlansArchiveButton}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </>
