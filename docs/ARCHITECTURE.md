@@ -2,7 +2,7 @@
 
 > System architecture and component responsibilities. Updated only at meaningful architectural milestones — see `/docs/CHANGELOG.md` for when each section last changed, and `/docs/DECISIONS.md` for the reasoning behind frozen choices.
 >
-> Last updated: 2026-07-21.
+> Last updated: 2026-07-24.
 
 ---
 
@@ -106,6 +106,16 @@ A dedicated **"No Gym" application state** (`noGymMembership` in `App.jsx`) rend
 **Delete User** (true identity deletion) remains unbuilt, deliberately postponed — see `/docs/DECISIONS.md`.
 
 **P0-006 status: CLOSED (2026-07-21)**. All 13 original regression checks verified with real data, including the two that required an actual subscription lifecycle (expired/exhausted subscription still shows the Renew screen; a completed purchase restores access) — both exercised for real as part of the M6 live-payment validation (§3.6a). Full evidence: `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
+
+### 3.8b Cross-client live sync — Postgres Changes default, Broadcast for visibility-removing events only (M13.X, closed 2026-07-24)
+
+Forge Core is consumed by multiple clients (this Member App, `forge-admin-web`) that must reflect each other's changes live, without a manual reload. The default, primary mechanism for this is Supabase Realtime `postgres_changes` — every consumer subscribes to the tables it depends on and re-fetches through its own existing RLS-protected query on any event; the event payload itself is never trusted or rendered.
+
+**The one case `postgres_changes` cannot cover**: a row leaving a subscriber's own RLS-visible set via the update itself — Realtime evaluates the subscriber's SELECT policy against the row *after* the change, so a row transitioning out (today: `profiles.gym_id → NULL`, i.e. Remove Member) fails that policy and the event is never delivered to anyone. Confirmed as Supabase's own documented authorization model, not a Forge bug (see `/docs/DECISIONS.md`).
+
+**The fix, scoped narrowly**: a minimal, gym-scoped, private Supabase Broadcast channel (`gym:<id>:visibility`), used *only* as an invalidation signal for this one transition — never authoritative, never read by client code. `notify_visibility_change()` (generic, `TG_ARGV`-driven like `prevent_gym_id_change()`) fires `realtime.send()` on exactly `profiles.gym_id → NULL`; a Realtime Authorization policy on `realtime.messages` scopes receipt to the departing gym's own members. `forge-admin-web`'s `useRealtimeSync` gained an optional `broadcastTopic` parameter (same channel as its `postgres_changes` subscriptions, not a second one); this app's `App.jsx` listens via one small, separate channel.
+
+No Platform Events, no event ledger, no generic cross-client notification system exists or is planned without a second real (non-hypothetical) use case surfacing first — see `/docs/DECISIONS.md` for the full architecture-review reasoning, including why an initial, more general recommendation was explicitly rejected.
 
 ### 3.9 Database structure
 

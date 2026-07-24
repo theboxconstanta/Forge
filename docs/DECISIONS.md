@@ -2,7 +2,7 @@
 
 > Important product and architecture decisions, with the reasoning behind them. Read this before proposing to change something that looks frozen or "obviously" improvable — the reasoning here is usually the answer to "why didn't they just...".
 >
-> Last updated: 2026-07-20.
+> Last updated: 2026-07-24.
 
 ---
 
@@ -209,3 +209,25 @@
 **Scope check performed**: confirmed system-wide that no other pending Order or queued subscription was created during that same window — the two other pending Orders found (CrossFit C15, dated 2026-07-20) predate `STRIPE_SECRET_KEY` even being set, so they were never submitted to Stripe and carry no idempotency-key risk. This was an isolated, one-Order incident.
 
 **Revisit when**: if this class of issue recurs, consider a shorter or configurable reuse window for Orders whose only Checkout attempt ever failed (as opposed to abandoned-but-healthy ones) — proposed as a non-blocking future improvement, not built now.
+
+---
+
+## M13.X: Broadcast, not Platform Events, for visibility-removing sync (2026-07-24)
+
+**Decision**: Postgres Changes remains Forge's default, primary synchronization mechanism for every client (Member App, Admin Web). A minimal, gym-scoped, private Supabase Broadcast channel is introduced **only** for visibility-removing events — a row leaving a subscriber's own RLS-visible set via the update itself (today: `profiles.gym_id → NULL`, i.e. Remove Member). Broadcast is used strictly as an invalidation signal — it carries no authoritative data, and every client always re-fetches through its existing, unchanged RLS-protected query on receipt. No Platform Events, no Event Store, no generic event ledger, no replacement of the existing Postgres Changes infrastructure anywhere.
+
+**The gap this closes**: Supabase Realtime's `postgres_changes` evaluates a subscriber's own RLS SELECT policy against the row **after** the change — a row whose `gym_id` transitions to `NULL` fails the departing gym's own policy, so the event is never delivered to anyone. Confirmed against Supabase's own documented authorization model and reproduced independently three times with a raw client bypassing all application code — this is an unavoidable platform limitation of the RLS-based `postgres_changes` model, not a Forge RLS, publication, or application bug.
+
+**Why Broadcast, not a generic Platform Events system**: an initial architecture pass recommended a general "Platform Events" abstraction (a reusable event/notification layer for any future cross-client signal). Explicitly challenged and re-evaluated against YAGNI/KISS and Forge's actual current maturity: exactly **one** real production use case exists today (Remove Member); every other visibility-removing scenario (Transfer Member, Remove Coach, Remove Admin) is hypothetical, not an implemented feature. Building generic infrastructure for zero additional real use cases was judged premature generalization. The narrower Broadcast design was chosen instead, with a clear, low-cost migration path to something more general if real requirements ever justify it — this reversal is the outcome of an explicit self-challenge review, not a walk-back under pressure.
+
+**Why Broadcast (the mechanism itself) works where Postgres Changes cannot**: Supabase's "Broadcast from Database" (`realtime.send()`) authorizes `private` topics via a separate RLS-style policy on `realtime.messages` (`realtime.topic() = ...`), decoupled from the source table's own RLS. Once a message is sent, it is not re-evaluated against the row that triggered it — this structurally avoids the "row already left my visible set" suppression problem.
+
+**Implementation** (`supabase/migrations/20260724070100_visibility_change_broadcast.sql`, `20260724080000_visibility_change_broadcast_error_isolation.sql`): a generic, reusable `notify_visibility_change()` trigger function (mirrors the existing `prevent_gym_id_change()` shared-function-via-`TG_ARGV` convention) attached to `profiles` for exactly the `gym_id → NULL` transition; a gym-scoped Realtime Authorization policy on `realtime.messages`. `forge-admin-web`'s `useRealtimeSync` gained an optional `broadcastTopic` parameter (reusing the same channel already opened for `postgres_changes`, not a second channel); the Member App (`App.jsx`) subscribes via one small, separate channel consistent with its other existing ad-hoc channels. A final engineering review (same day) found and fixed two issues before merge: the original trigger let a `realtime.send()` failure roll back the actual Remove Member mutation (fixed by isolating the broadcast call in its own exception block — a broadcast failure can now only ever cost a missed live-refresh, never a failed removal); and the `gym:<id>:visibility` topic string was duplicated across two Admin Web call sites (fixed by extracting a shared `gymVisibilityTopic()` helper).
+
+**Validated live in production**: all four sync directions (Admin Web → Admin PWA, Admin PWA → Admin Web, plus both same-client regression pairs), the `MemberDetails` single-row path, and a regression check confirming ordinary (non-visibility-removing) `profiles` changes still propagate via the unchanged, pre-existing `postgres_changes` path — all PASS, zero console errors, zero RLS/tenant-isolation/Financial-Domain regression.
+
+**Known, accepted limitation**: Broadcast is ephemeral — a client disconnected at the exact instant the event fires receives no catch-up message. Mitigated by the pre-existing fallback already relied upon before this fix: the client's next reload always shows correct data, since Broadcast is never the source of truth, only a nudge to re-fetch.
+
+**Revisit when**: a second, real (not hypothetical) visibility-removing use case is implemented — at that point, re-evaluate whether the reusable trigger-function/topic-naming pattern established here still scales cleanly, or whether the deferred Platform Events design is now justified by genuine repetition rather than speculation.
+
+**M13.X status: CLOSED (2026-07-24)**.
