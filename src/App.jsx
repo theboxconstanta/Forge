@@ -6679,11 +6679,22 @@ function App() {
     && new Date(abonamentReal.end_date + 'T23:59:59') >= new Date()
     && (!sedinteLimitate || (sedinteRamase + sedinteProgramateViitor) > 0)
 
-  // Polling 5s doar cand membrul nu are abonament activ (plasat dupa abonamentActiv pentru a evita TDZ)
+  // Polling 5s doar cand membrul nu are abonament activ (plasat dupa abonamentActiv pentru a evita TDZ).
+  // fetchUserProfile() e adaugat aici (nu doar fetchAbonamentMeu()) pentru ca
+  // acesta e exact singurul caz in care nici handler-ul de subscriptions, nici
+  // onVisible (vezi cele doua efecte care apeleaza fetchUserProfile) nu au un
+  // motiv sa ruleze: un membru eliminat FARA abonament activ in momentul
+  // eliminarii (deci fara eveniment de subscriptions) care nu paraseste sau
+  // reintra niciodata in tab (deci fara visibilitychange) - ramanea blocat
+  // exact pe acest ecran de paywall ("Niciun abonament activ"), la nesfarsit,
+  // in loc sa fie deconectat. Acest polling ruleaza deja neconditionat cat
+  // timp exact acest ecran e afisat (!abonamentActiv), deci e singurul loc
+  // care garanteaza ca ramura de eliminare live din fetchUserProfile() (vezi
+  // acolo) chiar apuca sa ruleze pentru acest caz, fara niciun mecanism nou.
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!user || isAdmin || !abonamentInitialized || abonamentActiv) return
-    const interval = setInterval(() => fetchAbonamentMeu(), 5000)
+    const interval = setInterval(() => { fetchAbonamentMeu(); fetchUserProfile() }, 5000)
     return () => clearInterval(interval)
   }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
 
