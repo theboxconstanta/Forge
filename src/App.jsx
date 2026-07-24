@@ -5283,6 +5283,29 @@ function App() {
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Forge Platform Architecture Decision (M13.X): a member being removed
+  // from the gym (profiles.gym_id -> null) can never reach the `profiles`
+  // postgres_changes handler above - Realtime evaluates every
+  // subscriber's RLS policy against the row AFTER the change, so a row
+  // leaving the admin's visible set fails that check and the event is
+  // never emitted, by Supabase's own documented model (see migration
+  // 20260724070100_visibility_change_broadcast.sql). This gym-scoped,
+  // private topic is the approved, minimal invalidation-only workaround -
+  // its payload is never read, it only bumps clientsReloadToken exactly
+  // like the profiles postgres_changes handler already does, so Admin >
+  // Clienti re-fetches through the same real, RLS-protected query either
+  // way. Separate effect (keyed on gym_id, not [user]) because the topic
+  // name itself needs gym_id, which isn't known yet when the channel
+  // above is created.
+  useEffect(() => {
+    const gymId = userProfile?.gym_id
+    if (!gymId) return
+    const visibilityChannel = supabase.channel(`gym:${gymId}:visibility`, { config: { private: true } })
+      .on('broadcast', { event: '*' }, () => { setClientsReloadToken(t => t + 1) })
+      .subscribe()
+    return () => { supabase.removeChannel(visibilityChannel) }
+  }, [userProfile?.gym_id])
+
   useEffect(() => {
     if (!user) return
     // Bug real din Sentry (JWT expired la [Feed] query error si altele) - pe
