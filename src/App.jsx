@@ -5056,6 +5056,16 @@ function App() {
       setOnboardingGender('')
       setOnboardingBirthDate('')
       setOnboardingWaiverAccepted(false)
+      // Acelasi mecanism ca mai sus, pentru acelasi motiv de fond (App() nu se
+      // remonteaza intre sesiuni pe acelasi tab) - gasit in auditul de
+      // regresie (07-24): un cont care tasta o parola noua in Profil fara sa
+      // apese Salveaza, apoi era deconectat (orice cale), lasa parola tastata
+      // in state. Un al doilea cont logat pe acelasi tab, daca ajungea in
+      // Profil si apasa Schimba parola FARA sa scrie nimic el insusi, isi
+      // seta propriul cont pe parola ramasa de la primul - preluare de cont
+      // reprodusa live (login cu parola "scursa" a reusit, HTTP 200).
+      setProfileNewPassword('')
+      setProfileNewPasswordConfirm('')
     }
   }, [user])
 
