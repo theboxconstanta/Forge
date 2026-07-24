@@ -4848,6 +4848,17 @@ function App() {
   const myGymIdRef = useRef(null)
   useEffect(() => { myGymIdRef.current = userProfile?.gym_id ?? null }, [userProfile])
   const [showOnboarding, setShowOnboarding] = useState(false)
+  // Citit de fetchUserProfile insusi (apelat repetat acum - polling 5s,
+  // onVisible, subscriptii, broadcast - vezi cele patru efecte care il
+  // apeleaza), pentru acelasi motiv ca myGymIdRef mai sus - fara ref,
+  // fetchUserProfile ar re-popula formularul de onboarding din datele
+  // (inca goale, neschimbate) de pe server la fiecare reapelare, stergand
+  // ce a scris userul intre timp. P0 regresie reala, gasita live: campurile
+  // se goleau la ~5-6s de la inceperea completarii, indiferent daca userul
+  // atingea campul de data sau doar astepta - pollingul, nu data picker-ul,
+  // era cauza.
+  const showOnboardingRef = useRef(false)
+  useEffect(() => { showOnboardingRef.current = showOnboarding }, [showOnboarding])
   const [showCalPicker, setShowCalPicker] = useState(false)
   const [calPickerYear, setCalPickerYear] = useState(new Date().getFullYear())
   const [calPickerMonth, setCalPickerMonth] = useState(new Date().getMonth())
@@ -5471,7 +5482,13 @@ function App() {
       waiverExpired = data?.waiver_accepted === false
     }
     const needsOnboarding = !data?.gender || waiverExpired
-    if (needsOnboarding && !waiverInLS) {
+    // !showOnboardingRef.current - doar prima data cand se detecteaza nevoia
+    // de onboarding, niciodata cat timp e deja deschis. fetchUserProfile()
+    // ruleaza acum repetat in timpul unei sesiuni (vezi comentariul de la
+    // showOnboardingRef); fara aceasta garda, fiecare reapelare re-populeaza
+    // campurile din datele (inca nesalvate) de pe server, stergand ce a
+    // scris userul intre timp - P0 regresie reala, gasita live.
+    if (needsOnboarding && !waiverInLS && !showOnboardingRef.current) {
       setOnboardingFirstName(data?.first_name || '')
       setOnboardingLastName(data?.last_name || '')
       setOnboardingGender(data?.gender || '')
