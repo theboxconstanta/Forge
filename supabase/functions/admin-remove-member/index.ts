@@ -57,6 +57,20 @@ async function handleRequest(req: Request): Promise<Response> {
   try {
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
+    // TEMPORARY diagnostic instrumentation (P1 investigation, 2026-07-24):
+    // the exact shape of what actually arrived, before any validation - not
+    // the token value itself. A JWT is 3 base64url segments separated by
+    // dots; this is a shape check only, not a signature/claims check (that's
+    // what auth.getUser() below does).
+    const tokenSegments = token.split(".");
+    console.log("admin-remove-member: auth header diagnostic", {
+      hasAuthHeader: authHeader.length > 0,
+      hasBearerPrefix: /^Bearer\s+/i.test(authHeader),
+      authHeaderLength: authHeader.length,
+      tokenLength: token.length,
+      tokenSegmentCount: tokenSegments.length,
+      looksLikeJwt: tokenSegments.length === 3 && tokenSegments.every((s) => s.length > 0),
+    });
     if (!token) {
       return new Response(JSON.stringify({ error: "Lipsește autentificarea" }), { status: 401, headers: CORS });
     }
@@ -72,8 +86,31 @@ async function handleRequest(req: Request): Promise<Response> {
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data: { user: caller }, error: callerErr } = await anonClient.auth.getUser(token);
     if (callerErr || !caller) {
-      console.error("admin-remove-member: caller token invalid:", callerErr?.message);
-      return new Response(JSON.stringify({ error: "Token invalid" }), { status: 401, headers: CORS });
+      // Full detail, not just .message - AuthError carries status/code/name
+      // that .message alone drops. Surfaced in the response body too (not
+      // just the function's own logs), since that's what's visible from the
+      // browser Network tab during a live repro.
+      const authErrDetail = {
+        message: callerErr?.message,
+        status: (callerErr as { status?: number } | null)?.status,
+        code: (callerErr as { code?: string } | null)?.code,
+        name: callerErr?.name,
+      };
+      console.error("admin-remove-member: caller token invalid:", authErrDetail);
+      return new Response(
+        JSON.stringify({
+          error: "Token invalid",
+          debug: {
+            authErr: authErrDetail,
+            hasAuthHeader: authHeader.length > 0,
+            hasBearerPrefix: /^Bearer\s+/i.test(authHeader),
+            tokenLength: token.length,
+            tokenSegmentCount: tokenSegments.length,
+            looksLikeJwt: tokenSegments.length === 3 && tokenSegments.every((s) => s.length > 0),
+          },
+        }),
+        { status: 401, headers: CORS },
+      );
     }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
