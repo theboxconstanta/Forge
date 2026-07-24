@@ -5034,6 +5034,31 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Reseteaza starea de onboarding la orice tranzitie catre "fara sesiune" -
+  // nu doar in handleLogout() (care oricum reseteaza userProfile/gymBlocked/
+  // noGymMembership "exact pentru acest motiv", per comentariul de acolo, dar
+  // a omis campurile de onboarding). Sesiunea se poate incheia si prin
+  // ramura de eliminare live sau prin ramura de cont sters din
+  // fetchUserProfile() - niciuna din ele nu trecea prin handleLogout().
+  // App() nu se remonteaza niciodata intre sesiuni pe acelasi tab (fara
+  // router) - fara acest efect, un al doilea cont logat pe acelasi tab dupa
+  // ce primul a fost deconectat mid-onboarding vedea (si putea salva fara sa
+  // observe) numele/genul/data nasterii primului cont. Regresie P0 reala,
+  // reprodusa live: introdusa chiar de showOnboardingRef de mai sus, care
+  // (corect) blocheaza rescrierea campurilor CAT TIMP onboarding-ul e activ,
+  // dar nu avea niciun mecanism care sa le goleasca la finalul sesiunii.
+  useEffect(() => {
+    if (!user) {
+      setShowOnboarding(false)
+      setOnboardingStep(1)
+      setOnboardingFirstName('')
+      setOnboardingLastName('')
+      setOnboardingGender('')
+      setOnboardingBirthDate('')
+      setOnboardingWaiverAccepted(false)
+    }
+  }, [user])
+
   useEffect(() => {
     if (user) {
       const d = new Date()
