@@ -5394,13 +5394,33 @@ function App() {
       // (acela e pt cine ajunge DEJA fara sala - ex. dupa un login nou -
       // unde ramane autentificat intentionat, ca sa se poata alatura cu un
       // cod fara un al doilea cont, P0-006).
+      //
+      // scope: 'local' - deconecteaza DOAR aceasta sesiune. signOut() fara
+      // scope e implicit 'global' si ar termina TOATE sesiunile contului
+      // (orice alt device/tab/app logat cu acelasi cont) - exact bug-ul de
+      // sesiune gasit si documentat separat (auth.getUser() -> session_not_found
+      // pe un cu totul alt client, declansat de un signOut() global nelegat).
+      //
+      // Redirectul catre Login nu trebuie sa depinda de reusita cererii de
+      // logout - supabase-js insusi trateaza deja un raspuns server
+      // "session_not_found"/404/401/403 ca non-fatal si tot goleste storage-ul
+      // local (vezi GoTrueClient._signOut), dar setUser(null) e pus explicit
+      // aici oricum, in afara try/catch-ului, ca sa nu depinda deloc de acel
+      // comportament intern sau de propagarea evenimentului SIGNED_OUT -
+      // userul nu trebuie sa ramana niciodata in aplicatie dupa ce a fost
+      // eliminat dintr-o sala, indiferent ce raspunde serverul de auth.
       setUserProfile(null)
       setMyGym(CURRENT_GYM)
       setGymBlocked(false)
       setNoGymMembership(false)
       setClientsReloadToken(0)
       setAdminSubsReloadToken(0)
-      await supabase.auth.signOut()
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch {
+        // Best-effort - proceed to the redirect below regardless.
+      }
+      setUser(null)
       return
     } else if (data && !ownerBootstrapping) {
       // Profil existent, fara gym_id, in afara ferestrei de owner bootstrapping,
