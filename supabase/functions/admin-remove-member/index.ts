@@ -35,19 +35,18 @@ export function authorizeMemberRemoval({ callerAdminRow, target, targetAdminRow 
   return { ok: true };
 }
 
-// TEMPORARY diagnostic instrumentation (P1 investigation, 2026-07-24): a
-// production "Failed to remove member from gym" report could not be
-// reproduced against the live function via direct calls or the real UI -
-// see docs. This surfaces exactly which step/statement failed and the raw
-// Postgres error fields (code/details/hint), both in the function's own
-// logs and (temporarily) in the response body, instead of only a bare
-// .message - the fastest way to capture ground truth from the next real
-// occurrence, whoever triggers it. Revert once the real failure is caught
-// and fixed: restore the plain `{ error: X.message }` bodies and remove the
-// step/pgDetail plumbing.
-function pgDetail(error: unknown) {
-  const e = error as { message?: string; code?: string; details?: string; hint?: string } | null;
-  return { message: e?.message ?? String(error), code: e?.code, details: e?.details, hint: e?.hint };
+// Full Postgres/Auth error detail for the function's own logs - .message
+// alone drops code/details/hint (Postgres) or status/code/name (AuthError),
+// which is exactly what made the P1 investigation (2026-07-24, see
+// docs/DECISIONS.md) slow before this existed. Server-side logs only -
+// never returned to the caller (see errorResponse below).
+function errDetail(error: unknown) {
+  const e = error as { message?: string; code?: string; details?: string; hint?: string; status?: number; name?: string } | null;
+  return { message: e?.message ?? String(error), code: e?.code, details: e?.details, hint: e?.hint, status: e?.status, name: e?.name };
+}
+
+function errorResponse(message: string, status: number) {
+  return new Response(JSON.stringify({ error: message }), { status, headers: CORS });
 }
 
 async function handleRequest(req: Request): Promise<Response> {
@@ -57,92 +56,52 @@ async function handleRequest(req: Request): Promise<Response> {
   try {
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
-    // TEMPORARY diagnostic instrumentation (P1 investigation, 2026-07-24):
-    // the exact shape of what actually arrived, before any validation - not
-    // the token value itself. A JWT is 3 base64url segments separated by
-    // dots; this is a shape check only, not a signature/claims check (that's
-    // what auth.getUser() below does).
-    const tokenSegments = token.split(".");
-    console.log("admin-remove-member: auth header diagnostic", {
-      hasAuthHeader: authHeader.length > 0,
-      hasBearerPrefix: /^Bearer\s+/i.test(authHeader),
-      authHeaderLength: authHeader.length,
-      tokenLength: token.length,
-      tokenSegmentCount: tokenSegments.length,
-      looksLikeJwt: tokenSegments.length === 3 && tokenSegments.every((s) => s.length > 0),
-    });
     if (!token) {
-      return new Response(JSON.stringify({ error: "Lipsește autentificarea" }), { status: 401, headers: CORS });
+      return errorResponse("Lipsește autentificarea", 401);
     }
 
     step = "parse_body";
     const { client_id } = await req.json();
     if (!client_id) {
-      return new Response(JSON.stringify({ error: "Lipsește client_id" }), { status: 400, headers: CORS });
+      return errorResponse("Lipsește client_id", 400);
     }
-    console.log("admin-remove-member: request received for client_id", client_id);
 
     step = "verify_caller_token";
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data: { user: caller }, error: callerErr } = await anonClient.auth.getUser(token);
     if (callerErr || !caller) {
-      // Full detail, not just .message - AuthError carries status/code/name
-      // that .message alone drops. Surfaced in the response body too (not
-      // just the function's own logs), since that's what's visible from the
-      // browser Network tab during a live repro.
-      const authErrDetail = {
-        message: callerErr?.message,
-        status: (callerErr as { status?: number } | null)?.status,
-        code: (callerErr as { code?: string } | null)?.code,
-        name: callerErr?.name,
-      };
-      console.error("admin-remove-member: caller token invalid:", authErrDetail);
-      return new Response(
-        JSON.stringify({
-          error: "Token invalid",
-          debug: {
-            authErr: authErrDetail,
-            hasAuthHeader: authHeader.length > 0,
-            hasBearerPrefix: /^Bearer\s+/i.test(authHeader),
-            tokenLength: token.length,
-            tokenSegmentCount: tokenSegments.length,
-            looksLikeJwt: tokenSegments.length === 3 && tokenSegments.every((s) => s.length > 0),
-          },
-        }),
-        { status: 401, headers: CORS },
-      );
+      console.error("admin-remove-member: caller token invalid:", errDetail(callerErr));
+      return errorResponse("Token invalid", 401);
     }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     step = "lookup_caller_admin_row";
     const { data: callerAdminRow, error: callerAdminErr } = await admin.from("admins").select("id, gym_id").eq("id", caller.id).maybeSingle();
-    if (callerAdminErr) console.error("admin-remove-member: callerAdminRow lookup error (non-fatal, treated as not-admin):", pgDetail(callerAdminErr));
+    if (callerAdminErr) console.error("admin-remove-member: callerAdminRow lookup error (non-fatal, treated as not-admin):", errDetail(callerAdminErr));
 
     let target: { id: string; email: string; gym_id: string | null } | null = null;
     let targetAdminRow: { id: string } | null = null;
     if (callerAdminRow) {
       step = "lookup_target_profile";
       const { data: targetData, error: targetErr } = await admin.from("profiles").select("id, email, gym_id").eq("id", client_id).maybeSingle();
-      if (targetErr) console.error("admin-remove-member: target profile lookup error (non-fatal, treated as not-found):", pgDetail(targetErr));
+      if (targetErr) console.error("admin-remove-member: target profile lookup error (non-fatal, treated as not-found):", errDetail(targetErr));
       target = targetData;
       if (target) {
         step = "lookup_target_admin_row";
         const { data: targetAdminData, error: targetAdminErr } = await admin.from("admins").select("id").eq("id", client_id).maybeSingle();
-        if (targetAdminErr) console.error("admin-remove-member: targetAdminRow lookup error (non-fatal, treated as not-admin):", pgDetail(targetAdminErr));
+        if (targetAdminErr) console.error("admin-remove-member: targetAdminRow lookup error (non-fatal, treated as not-admin):", errDetail(targetAdminErr));
         targetAdminRow = targetAdminData;
       }
     }
 
     const authz = authorizeMemberRemoval({ callerAdminRow, target, targetAdminRow });
     if (!authz.ok) {
-      console.log("admin-remove-member: authorization rejected:", authz.error, "caller", caller.id, "target", client_id);
-      return new Response(JSON.stringify({ error: authz.error }), { status: authz.status, headers: CORS });
+      return errorResponse(authz.error, authz.status);
     }
 
     const email = (target!.email || "").toLowerCase();
     const gymId = target!.gym_id!;
-    console.log("admin-remove-member: authorized. caller", caller.id, "target", client_id, "email", email, "gym", gymId);
 
     // Date operationale fara sens dupa ce relatia cu sala se incheie - sterse.
     // Istoricul de antrenament (wod_logs, personal_records, custom_hero_wods),
@@ -162,14 +121,9 @@ async function handleRequest(req: Request): Promise<Response> {
       { table: "push_subscriptions", error: pushRes.error },
     ].filter((r) => r.error);
     if (deleteFailures.length > 0) {
-      for (const f of deleteFailures) console.error(`admin-remove-member: ${f.table} delete failed:`, pgDetail(f.error));
-      const first = deleteFailures[0];
-      return new Response(
-        JSON.stringify({ error: pgDetail(first.error).message, step: `delete_${first.table}`, debug: pgDetail(first.error) }),
-        { status: 500, headers: CORS },
-      );
+      for (const f of deleteFailures) console.error(`admin-remove-member: ${f.table} delete failed:`, errDetail(f.error));
+      return errorResponse(errDetail(deleteFailures[0].error).message, 500);
     }
-    console.log("admin-remove-member: operational rows cleared for", client_id);
 
     // Orice abonament activ se incheie prin domeniul Subscription (RPC
     // end_subscription, cale service_role), niciodata printr-un update SQL
@@ -180,19 +134,17 @@ async function handleRequest(req: Request): Promise<Response> {
       .from("subscriptions").select("id")
       .eq("gym_id", gymId).ilike("member_email", email).eq("is_active", true);
     if (subsErr) {
-      console.error("admin-remove-member: active subscription lookup failed:", pgDetail(subsErr));
-      return new Response(JSON.stringify({ error: pgDetail(subsErr).message, step, debug: pgDetail(subsErr) }), { status: 500, headers: CORS });
+      console.error("admin-remove-member: active subscription lookup failed:", errDetail(subsErr));
+      return errorResponse(errDetail(subsErr).message, 500);
     }
-    console.log("admin-remove-member: active subscriptions found:", (activeSubs || []).length);
 
     for (const sub of activeSubs || []) {
       step = `end_subscription:${sub.id}`;
       const { error: endErr } = await admin.rpc("end_subscription", { p_subscription_id: sub.id });
       if (endErr) {
-        console.error("admin-remove-member: end_subscription failed for", sub.id, ":", pgDetail(endErr));
-        return new Response(JSON.stringify({ error: pgDetail(endErr).message, step, debug: pgDetail(endErr) }), { status: 500, headers: CORS });
+        console.error("admin-remove-member: end_subscription failed for", sub.id, ":", errDetail(endErr));
+        return errorResponse(errDetail(endErr).message, 500);
       }
-      console.log("admin-remove-member: ended subscription", sub.id);
     }
 
     // Relatia cu sala se incheie aici - identitatea (auth.users, profiles),
@@ -200,18 +152,14 @@ async function handleRequest(req: Request): Promise<Response> {
     step = "update_profile_gym_id_null";
     const { error: profileErr } = await admin.from("profiles").update({ gym_id: null }).eq("id", client_id);
     if (profileErr) {
-      console.error("admin-remove-member: profile update failed:", pgDetail(profileErr));
-      return new Response(JSON.stringify({ error: pgDetail(profileErr).message, step, debug: pgDetail(profileErr) }), { status: 500, headers: CORS });
+      console.error("admin-remove-member: profile update failed:", errDetail(profileErr));
+      return errorResponse(errDetail(profileErr).message, 500);
     }
-    console.log("admin-remove-member: profile updated, removal complete for", client_id);
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("admin-remove-member: unhandled exception at step", step, ":", err);
-    return new Response(
-      JSON.stringify({ error: String(err), step, debug: { message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } }),
-      { status: 500, headers: CORS },
-    );
+    return errorResponse(String(err), 500);
   }
 }
 
