@@ -4841,9 +4841,10 @@ function App() {
   const jurnalDateInputRef = useRef(null)
   const [userProfile, setUserProfile] = useState(null)
   const [myGym, setMyGym] = useState(CURRENT_GYM)
-  // Citit de subscriptia realtime pe `gyms` (efect cu deps [user], creat o
-  // singura data la login) - fara ref, acel closure ar ramane cu gym_id-ul
-  // de la momentul login-ului (null, userProfile inca nefetch-uit atunci).
+  // Citit de subscriptia realtime pe `gyms` si de fetchUserProfile insusi
+  // (efecte cu deps [user], create o singura data la login) - fara ref,
+  // acele closure-uri ar ramane cu gym_id-ul de la momentul login-ului
+  // (null, userProfile inca nefetch-uit atunci).
   const myGymIdRef = useRef(null)
   useEffect(() => { myGymIdRef.current = userProfile?.gym_id ?? null }, [userProfile])
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -5217,7 +5218,13 @@ function App() {
         fetchWaitlistMea(); fetchRezervari(); setRefreshZiTrigger(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
-        fetchAbonamentMeu(); setAdminSubsReloadToken(t => t + 1)
+        // Remove Member ends the member's own active subscription in the
+        // same operation that clears their profiles.gym_id - this delivers
+        // normally (the row's own gym_id/visibility never changes), unlike
+        // the profile change itself. Reused as the earliest available
+        // live signal to re-check fetchUserProfile()'s own gym_id - see the
+        // "live eviction" branch there.
+        fetchAbonamentMeu(); setAdminSubsReloadToken(t => t + 1); fetchUserProfile()
       })
       // Admin > Clienti se bazeaza doar pe RLS pt scoping (profiles_select_all),
       // fara subscriptie proprie pana acum - o eliminare de membru facuta din
@@ -5319,6 +5326,7 @@ function App() {
     const onVisible = async () => {
       if (document.visibilityState === 'visible') {
         await supabase.auth.getSession()
+        fetchUserProfile()
         fetchAbonamentMeu()
         fetchRezervari()
         fetchClaseDB()
@@ -5347,6 +5355,17 @@ function App() {
   }
 
   const fetchUserProfile = async () => {
+    // myGymIdRef, nu userProfile?.gym_id direct - fetchUserProfile e apelat si
+    // din closure-uri vechi (efecte cu deps [user], create o singura data la
+    // login: subscriptia realtime pe `subscriptions`, onVisible), care ar
+    // vedea userProfile permanent la valoarea din momentul login-ului (acelasi
+    // motiv pentru care myGymIdRef exista deja - vezi comentariul de la
+    // declararea lui). Capturat INAINTE de setUserProfile(data) de mai jos -
+    // singurul mod de a distinge, in ramura fara gym_id, "am ajuns aici deja
+    // fara sala" (login proaspat / bootstrap neterminat) de "aveam o sala
+    // acum o clipa, in aceeasi sesiune" (eliminat live cat timp aplicatia era
+    // deschisa).
+    const hadGymBefore = !!myGymIdRef.current
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     setUserProfile(data)
     // Blocare acces sala (neplata catre platforma) - gyms_select_public
@@ -5361,14 +5380,37 @@ function App() {
       setGymBlocked(!gymRow)
       setNoGymMembership(false)
       if (gymRow) setMyGym({ name: gymRow.name, primaryColor: gymRow.primary_color || CURRENT_GYM.primaryColor })
+    } else if (data && !ownerBootstrapping && hadGymBefore) {
+      // Eliminare live, cat timp sesiunea era deja activa (admin-remove-member):
+      // postgres_changes/Broadcast nu pot livra evenimentul profiles.gym_id ->
+      // NULL catre chiar sesiunea membrului eliminat - Realtime evalueaza
+      // politica RLS a abonatului fata de randul DUPA schimbare, iar acel rand
+      // nu-l mai priveste pe el (aceeasi limitare documentata in arhitectura
+      // M13.X pt admini, simetrica si aici). fetchUserProfile() singurul mod
+      // de a observa asta e la urmatorul refresh natural (schimbare de
+      // abonament / revenire in prim-plan a tab-ului, vezi cele doua
+      // useEffect care acum apeleaza si fetchUserProfile). Contextul de sala
+      // nu mai e valid - deconectare directa, nu ecranul "No Gym" de mai jos
+      // (acela e pt cine ajunge DEJA fara sala - ex. dupa un login nou -
+      // unde ramane autentificat intentionat, ca sa se poata alatura cu un
+      // cod fara un al doilea cont, P0-006).
+      setUserProfile(null)
+      setMyGym(CURRENT_GYM)
+      setGymBlocked(false)
+      setNoGymMembership(false)
+      setClientsReloadToken(0)
+      setAdminSubsReloadToken(0)
+      await supabase.auth.signOut()
+      return
     } else if (data && !ownerBootstrapping) {
-      // Profil existent, fara gym_id, in afara ferestrei de owner bootstrapping -
-      // acoperă atât "sala nu a fost niciodata finalizata" cat si "membrul a
-      // fost eliminat dintr-o sala" (adminEliminaMembru / admin-remove-member,
-      // P0-006: relatia se incheie prin gym_id = null, profilul si contul
-      // raman). Cele doua cauze nu pot fi distinse azi doar din gym_id = null -
-      // stare dedicata "No Gym", separata deliberat de ecranul vechi de
-      // inregistrare neterminata (P0-006).
+      // Profil existent, fara gym_id, in afara ferestrei de owner bootstrapping,
+      // deja asa la acest prim fetch al sesiunii (nu o tranzitie live - vezi
+      // ramura de mai sus) - acoperă atât "sala nu a fost niciodata finalizata"
+      // cat si "membrul a fost eliminat dintr-o sala inainte de acest login"
+      // (adminEliminaMembru / admin-remove-member, P0-006: relatia se incheie
+      // prin gym_id = null, profilul si contul raman). Cele doua cauze nu pot
+      // fi distinse azi doar din gym_id = null - stare dedicata "No Gym",
+      // separata deliberat de ecranul vechi de inregistrare neterminata (P0-006).
       setGymBlocked(false)
       setNoGymMembership(true)
     } else if (!data && !ownerBootstrapping) {
