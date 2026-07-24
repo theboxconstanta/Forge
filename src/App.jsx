@@ -5304,11 +5304,23 @@ function App() {
   // way. Separate effect (keyed on gym_id, not [user]) because the topic
   // name itself needs gym_id, which isn't known yet when the channel
   // above is created.
+  //
+  // fetchUserProfile() e apelat si aici (nu doar setClientsReloadToken),
+  // pentru propriul membru care tocmai a fost eliminat - verificat live
+  // (2026-07-24): desi autorizarea acestui canal privat se face pe baza
+  // my_gym_id() curent, ea se evalueaza o singura data, la subscribe, nu la
+  // fiecare mesaj primit - o subscriptie facuta CAT TIMP gym_id era inca
+  // valid (adica exact acest efect, la orice login normal) continua sa
+  // primeasca mesaje pe acelasi topic si DUPA ce gym_id devine null server-side.
+  // Asta face posibila deconectarea aproape instant (latenta WebSocket, nu
+  // 5s de polling) pentru cazul care altfel ar astepta pana la urmatorul tick
+  // al pollingului de mai jos (!abonamentActiv) - fara niciun topic/politica
+  // noua, refolosind exact infrastructura deja aprobata.
   useEffect(() => {
     const gymId = userProfile?.gym_id
     if (!gymId) return
     const visibilityChannel = supabase.channel(`gym:${gymId}:visibility`, { config: { private: true } })
-      .on('broadcast', { event: '*' }, () => { setClientsReloadToken(t => t + 1) })
+      .on('broadcast', { event: '*' }, () => { setClientsReloadToken(t => t + 1); fetchUserProfile() })
       .subscribe()
     return () => { supabase.removeChannel(visibilityChannel) }
   }, [userProfile?.gym_id])
