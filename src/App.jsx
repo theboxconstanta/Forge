@@ -2086,7 +2086,7 @@ function MiniSwitch({ checked, onChange }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang }) {
+function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
   const [paidUntilEdits, setPaidUntilEdits] = useState({})
@@ -2179,9 +2179,15 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     // lista in sine (nume/email, profiles_select_all e deja RLS-open oricui) e folosita si de
     // adminAdaugaInClasa/adminScoateDinClasa (cautare membru + notificari) din tab-ul Clase,
     // accesibil coach-ului. Fara asta, "Adauga manual" nu gasea pe nimeni pentru un coach.
-    fetchClase(); fetchWods(); fetchClienti(); fetchSectionTypes()
-    if (isAdmin) { fetchPlanuri(); fetchAbonamente(); fetchSettingsAdmin(); fetchCoaches() }
+    fetchClase(); fetchWods(); fetchSectionTypes()
+    if (isAdmin) { fetchPlanuri(); fetchSettingsAdmin(); fetchCoaches() }
   }, [])
+  // fetchClienti/fetchAbonamente reruleaza si la fetch-ul initial (token-urile
+  // pornesc la 0) si la orice schimbare live semnalata de canalul 'realtime-app'
+  // al App() prin clientsReloadToken/adminSubsReloadToken - vezi comentariul de
+  // acolo. Nu duplica fetch-ul de mai sus, il inlocuieste pentru aceste doua.
+  useEffect(() => { fetchClienti() }, [clientsReloadToken])
+  useEffect(() => { if (isAdmin) fetchAbonamente() }, [adminSubsReloadToken, isAdmin])
   useEffect(() => { if (adminTab === 'setari') fetchRapoarte() }, [adminTab])
   useEffect(() => { if (adminTab === 'platforma' && isPlatformAdmin) { fetchAllGymsPlatform(); fetchSignupCodes() } }, [adminTab])
 
@@ -4637,6 +4643,12 @@ function App() {
   const [claseDB, setClaseDB] = useState([])
   const [claseDBLoaded, setClaseDBLoaded] = useState(false)
   const [refreshZiTrigger, setRefreshZiTrigger] = useState(0)
+  // Semnale de reload pentru listele admin (Clienti/Abonamente) din Admin,
+  // umplute de canalul 'realtime-app' de mai jos - Admin e un component
+  // copil separat, cu fetchClienti/fetchAbonamente proprii, deci evenimentul
+  // trebuie transmis ca prop, nu apelat direct din closure-ul de aici.
+  const [clientsReloadToken, setClientsReloadToken] = useState(0)
+  const [adminSubsReloadToken, setAdminSubsReloadToken] = useState(0)
   const [rezervariIncarcate, setRezervariIncarcate] = useState(false)
   const [cancelWindowHours, setCancelWindowHours] = useState(2)
   const [onlinePaymentsAvailable, setOnlinePaymentsAvailable] = useState(false)
@@ -5205,7 +5217,15 @@ function App() {
         fetchWaitlistMea(); fetchRezervari(); setRefreshZiTrigger(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
-        fetchAbonamentMeu()
+        fetchAbonamentMeu(); setAdminSubsReloadToken(t => t + 1)
+      })
+      // Admin > Clienti se bazeaza doar pe RLS pt scoping (profiles_select_all),
+      // fara subscriptie proprie pana acum - o eliminare de membru facuta din
+      // Admin Web (sau o alta sesiune) nu ajungea niciodata aici fara reload
+      // manual. clientsReloadToken e citit de Admin ca prop, nu apelat direct,
+      // pt ca fetchClienti traieste in closure-ul lui Admin, nu al lui App.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        setClientsReloadToken(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wods' }, () => {
         fetchWodZi(dataAcasaRef.current)
@@ -8285,7 +8305,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
