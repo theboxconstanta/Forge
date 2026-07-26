@@ -5473,7 +5473,24 @@ function App() {
     // acum o clipa, in aceeasi sesiune" (eliminat live cat timp aplicatia era
     // deschisa).
     const hadGymBefore = !!myGymIdRef.current
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    // M1.5.2 - identitatea (nume, avatar, gen, data nasterii, unitate
+    // greutate, limba, email) vine acum din members (Member Domain), in timp
+    // ce gym_id/waiver_accepted/waiver_accepted_at raman pe profiles - fatele
+    // de relatie cu sala, per specificatia de ownership aprobata. Cele doua
+    // interogari sunt independente, deci in paralel; profiles ramane
+    // interogarea care decide existenta contului (vezi ramura `!data` de mai
+    // jos) - un members lipsa (drift, niciodata observat live) degradeaza
+    // gracios la campuri de identitate `undefined`, nu la userProfile null.
+    const [{ data: profileRow }, { data: memberRow }] = await Promise.all([
+      supabase.from('profiles').select('gym_id, waiver_accepted, waiver_accepted_at').eq('id', user.id).maybeSingle(),
+      supabase.from('members').select('id, email, full_name, avatar_url, created_at, gender, first_name, last_name, birth_date, weight_unit, language').eq('id', user.id).maybeSingle(),
+    ])
+    const data = profileRow ? {
+      ...memberRow,
+      gym_id: profileRow.gym_id,
+      waiver_accepted: profileRow.waiver_accepted,
+      waiver_accepted_at: profileRow.waiver_accepted_at,
+    } : null
     setUserProfile(data)
     // Blocare acces sala (neplata catre platforma) - gyms_select_public
     // filtreaza deja is_active=true, deci un fetch fara rezultat pt propriul
