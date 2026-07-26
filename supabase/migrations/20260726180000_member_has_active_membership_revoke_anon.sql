@@ -1,0 +1,26 @@
+-- Tighten member_has_active_membership_at_gym() EXECUTE grant.
+--
+-- Verified (PostgreSQL docs: Row Security Policies; CREATE FUNCTION
+-- reference) that SECURITY DEFINER changes only what a function's
+-- internals can see, never whether the calling role needs EXECUTE to
+-- invoke it at all - that check is unconditional, for every caller.
+--
+-- authenticated genuinely needs EXECUTE: it is the sole role named in
+-- "members_select_own_or_gym_mate ... FOR SELECT TO authenticated",
+-- the only policy that calls this function. Revoking it would break
+-- every real read of members.
+--
+-- anon does not: it is not named in any policy on members, so an anon
+-- query against members already returns zero rows unconditionally,
+-- regardless of this grant. anon can therefore never legitimately
+-- reach this function through the policy engine - its EXECUTE grant
+-- only ever enabled calling it directly via RPC, a narrow but real
+-- disclosure surface with no corresponding legitimate need.
+--
+-- service_role is left untouched, matching every other helper function
+-- in this schema (is_admin, is_coach_or_admin, my_gym_id,
+-- resolve_gym_join_code) and moot for security purposes regardless,
+-- since service_role bypasses RLS and could get the same answer by
+-- querying memberships directly.
+
+revoke execute on function member_has_active_membership_at_gym(uuid, uuid) from anon;
