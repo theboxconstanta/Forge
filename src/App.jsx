@@ -1831,35 +1831,60 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
   const fetchAll = async (showLoader = false) => {
     if (showLoader) setLoading(true)
     const { data: postsData } = await supabase.from('feed_posts')
-      .select('*, profiles(full_name, email, avatar_url)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(50)
     if (postsData) {
-      setPosts(postsData)
       const ids = postsData.map(p => p.id)
-      if (ids.length > 0) {
-        const [{ data: reactData }, { data: commData }] = await Promise.all([
-          supabase.from('feed_reactions').select('post_id, emoji, member_id').in('post_id', ids),
-          supabase.from('feed_comments').select('*, profiles(full_name, avatar_url)').in('post_id', ids).order('created_at', { ascending: true }),
-        ])
-        if (reactData) {
-          const rMap = {}
-          reactData.forEach(r => {
-            if (!rMap[r.post_id]) rMap[r.post_id] = {}
-            if (!rMap[r.post_id][r.emoji]) rMap[r.post_id][r.emoji] = { count: 0, iMine: false }
-            rMap[r.post_id][r.emoji].count++
-            if (r.member_id === user.id) rMap[r.post_id][r.emoji].iMine = true
-          })
-          setReactions(rMap)
+      const postAuthorIds = [...new Set(postsData.map(p => p.member_id))]
+      // feed_posts/feed_comments.member_id has no foreign key to `members`
+      // (only to the legacy `profiles`), so PostgREST's embedded-join
+      // syntax can't resolve against members - each author lookup here is
+      // a separate, explicitly batched query (never per-row) instead.
+      const [authorsRes, reactRes, commRes] = await Promise.all([
+        postAuthorIds.length > 0
+          ? supabase.from('members').select('id, full_name, email, avatar_url').in('id', postAuthorIds)
+          : Promise.resolve({ data: [] }),
+        ids.length > 0
+          ? supabase.from('feed_reactions').select('post_id, emoji, member_id').in('post_id', ids)
+          : Promise.resolve({ data: null }),
+        ids.length > 0
+          ? supabase.from('feed_comments').select('*').in('post_id', ids).order('created_at', { ascending: true })
+          : Promise.resolve({ data: null }),
+      ])
+      const authorsMap = {}
+      ;(authorsRes.data || []).forEach(a => { authorsMap[a.id] = a })
+      setPosts(postsData.map(p => ({ ...p, profiles: authorsMap[p.member_id] || null })))
+
+      const reactData = reactRes.data
+      const commData = commRes.data
+      if (reactData) {
+        const rMap = {}
+        reactData.forEach(r => {
+          if (!rMap[r.post_id]) rMap[r.post_id] = {}
+          if (!rMap[r.post_id][r.emoji]) rMap[r.post_id][r.emoji] = { count: 0, iMine: false }
+          rMap[r.post_id][r.emoji].count++
+          if (r.member_id === user.id) rMap[r.post_id][r.emoji].iMine = true
+        })
+        setReactions(rMap)
+      }
+      if (commData) {
+        // Comment author ids are only known once comments themselves have
+        // resolved, so this batch lookup can't be folded into the wave
+        // above - it's one additional query per fetchAll() call, not one
+        // per comment.
+        const commentAuthorIds = [...new Set(commData.map(c => c.member_id))]
+        let commentAuthorsMap = {}
+        if (commentAuthorIds.length > 0) {
+          const { data: commAuthorsData } = await supabase.from('members').select('id, full_name, avatar_url').in('id', commentAuthorIds)
+          if (commAuthorsData) commAuthorsData.forEach(a => { commentAuthorsMap[a.id] = a })
         }
-        if (commData) {
-          const cMap = {}
-          commData.forEach(c => {
-            if (!cMap[c.post_id]) cMap[c.post_id] = []
-            cMap[c.post_id].push(c)
-          })
-          setComments(cMap)
-        }
+        const cMap = {}
+        commData.forEach(c => {
+          if (!cMap[c.post_id]) cMap[c.post_id] = []
+          cMap[c.post_id].push({ ...c, profiles: commentAuthorsMap[c.member_id] || null })
+        })
+        setComments(cMap)
       }
     }
     if (showLoader) setLoading(false)
@@ -1867,7 +1892,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
 
   useEffect(() => {
     fetchAll(true)
-    supabase.from('profiles').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
+    supabase.from('members').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
       .then(({ data }) => { if (data) setMembriComunitate(data) })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
@@ -2275,8 +2300,32 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   }
 
   const fetchClienti = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true })
-    if (data) setClienti(data)
+    // Roster spans two Member Domain tables: memberships (status='active')
+    // is what makes a row "currently on this Gym's roster" - the direct
+    // equivalent of profiles.gym_id = my_gym_id() under RLS - while
+    // members supplies identity display fields. memberships is the
+    // driving query; members is a batched, deduplicated lookup against it.
+    const { data: membershipsData } = await supabase.from('memberships')
+      .select('member_id, waiver_accepted, waiver_accepted_at')
+      .eq('status', 'active')
+    if (!membershipsData) return
+    const memberIds = [...new Set(membershipsData.map(m => m.member_id))]
+    let membersMap = {}
+    if (memberIds.length > 0) {
+      const { data: membersData } = await supabase.from('members')
+        .select('id, email, full_name, avatar_url, first_name, last_name, birth_date, gender')
+        .in('id', memberIds)
+      if (membersData) membersData.forEach(m => { membersMap[m.id] = m })
+    }
+    const merged = membershipsData
+      .map(ms => {
+        const member = membersMap[ms.member_id]
+        if (!member) return null
+        return { ...member, waiver_accepted: ms.waiver_accepted, waiver_accepted_at: ms.waiver_accepted_at }
+      })
+      .filter(Boolean)
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+    setClienti(merged)
   }
 
   const fetchPlanuri = async () => {
@@ -2316,7 +2365,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
     }
     const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
-    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberIds)
+    const { data: profsData } = await supabase.from('members').select('id, full_name, email, avatar_url').in('id', [...new Set(memberIds)])
     const profsMap = {}
     ;(profsData || []).forEach(p => { profsMap[p.id] = p })
     const checkinMap = {}
@@ -5950,7 +5999,7 @@ function App() {
     const allIds = [...new Set(data.map(b => b.member_id))]
     let profilesMap = {}
     if (allIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', allIds)
+      const { data: profiles } = await supabase.from('members').select('id, full_name, avatar_url').in('id', allIds)
       if (profiles) profiles.forEach(p => { profilesMap[p.id] = p })
     }
     const result = {}
@@ -5979,7 +6028,7 @@ function App() {
     const { data: logs } = await q
     if (logs && logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, gender, avatar_url, weight_unit').in('id', ids)
+      const { data: profiles } = await supabase.from('members').select('id, full_name, email, gender, avatar_url, weight_unit').in('id', ids)
       const map = {}
       if (profiles) profiles.forEach(p => { map[p.id] = p })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
