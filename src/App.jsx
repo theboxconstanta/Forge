@@ -2203,6 +2203,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [postTransferCode, setPostTransferCode] = useState(null)
   const [issuingTransferCode, setIssuingTransferCode] = useState(false)
   const [revokingTransferCode, setRevokingTransferCode] = useState(false)
+  const [redeemCodeInput, setRedeemCodeInput] = useState('')
+  const [redeemingCode, setRedeemingCode] = useState(false)
   const [coachesList, setCoachesList] = useState([])
   const [coachSearch, setCoachSearch] = useState('')
 
@@ -2669,6 +2671,26 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const closePostTransferPanel = () => {
     setPostTransferPanel(null)
     setPostTransferCode(null)
+  }
+
+  const redeemTransferCode = async () => {
+    if (!redeemCodeInput.trim()) return
+    setRedeemingCode(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/redeem-transfer-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ code: redeemCodeInput.trim() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || t.errorRedeemingTransferCode)
+      setRedeemCodeInput('')
+      showToast(t.toastTransferCodeRedeemed)
+    } catch (e) {
+      showToast('❌ ' + e.message)
+    }
+    setRedeemingCode(false)
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail, method) => {
@@ -4043,6 +4065,17 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
           <button onClick={regenerateGymJoinCode} disabled={regeneratingCode}
             style={{ width: '100%', padding: '13px', background: regeneratingCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: regeneratingCode ? 'not-allowed' : 'pointer' }}>
             {t.adminGymCodeRegenerate}
+          </button>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminRedeemTransferCodeTitle}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.adminRedeemTransferCodeHint}</div>
+          <input value={redeemCodeInput} onChange={e => setRedeemCodeInput(e.target.value)}
+            placeholder={t.adminRedeemTransferCodePlaceholder}
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px', textTransform: 'uppercase' }} />
+          <button onClick={redeemTransferCode} disabled={redeemingCode || !redeemCodeInput.trim()}
+            style={{ width: '100%', padding: '13px', background: (redeemingCode || !redeemCodeInput.trim()) ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: (redeemingCode || !redeemCodeInput.trim()) ? 'not-allowed' : 'pointer' }}>
+            {redeemingCode ? t.adminRedeemTransferCodeSubmitting : t.adminRedeemTransferCodeButton}
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
