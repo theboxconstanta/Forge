@@ -64,17 +64,27 @@ async function main() {
   must(await sb.from('admins').insert({ id: ownerId, email: 'owner@forgedemo.test', gym_id: gymId }), 'insert admins');
   must(await sb.from('coaches').insert({ id: coachId, email: 'coach@forgedemo.test', gym_id: gymId }), 'insert coaches');
 
-  // profiles rows already exist (handle_new_user trigger); update gym_id (allowed null->value) + demo details
-  must(await sb.from('profiles').update({ gym_id: gymId, first_name: 'Olivia', last_name: 'Owner', full_name: 'Olivia Owner', gender: 'female', weight_unit: 'kg', language: 'en', waiver_accepted: true, waiver_accepted_at: new Date().toISOString() }).eq('id', ownerId), 'update owner profile');
-  must(await sb.from('profiles').update({ gym_id: gymId, first_name: 'Marcus', last_name: 'Coach', full_name: 'Marcus Coach', gender: 'male', weight_unit: 'kg', language: 'en', waiver_accepted: true, waiver_accepted_at: new Date().toISOString() }).eq('id', coachId), 'update coach profile');
+  // profiles rows already exist (handle_new_user trigger); members rows too
+  // (member_domain_sync_on_profile_insert_trg). Identity fields (Member
+  // Domain ownership) go to members; gym_id/waiver fields (Membership
+  // ownership) go to profiles - mirrors the same split saveOnboarding()/
+  // saveMyProfile() use in the app itself (M1.5.3).
+  const waiverNow = new Date().toISOString();
+  must(await sb.from('members').update({ first_name: 'Olivia', last_name: 'Owner', full_name: 'Olivia Owner', gender: 'female', weight_unit: 'kg', language: 'en' }).eq('id', ownerId), 'update owner member');
+  must(await sb.from('profiles').update({ gym_id: gymId, waiver_accepted: true, waiver_accepted_at: waiverNow }).eq('id', ownerId), 'update owner profile');
+  must(await sb.from('members').update({ first_name: 'Marcus', last_name: 'Coach', full_name: 'Marcus Coach', gender: 'male', weight_unit: 'kg', language: 'en' }).eq('id', coachId), 'update coach member');
+  must(await sb.from('profiles').update({ gym_id: gymId, waiver_accepted: true, waiver_accepted_at: waiverNow }).eq('id', coachId), 'update coach profile');
   for (const a of athletes) {
+    const birthDate = `199${Math.floor(Math.random() * 9)}-0${1 + Math.floor(Math.random() * 9)}-15`;
+    must(await sb.from('members').update({
+      first_name: a.first_name, last_name: a.last_name, full_name: a.full_name,
+      gender: a.gender, weight_unit: 'kg', language: 'en', birth_date: birthDate,
+    }).eq('id', a.id), `update member ${a.email}`);
     must(await sb.from('profiles').update({
-      gym_id: gymId, first_name: a.first_name, last_name: a.last_name, full_name: a.full_name,
-      gender: a.gender, weight_unit: 'kg', language: 'en', waiver_accepted: true, waiver_accepted_at: new Date().toISOString(),
-      birth_date: `199${Math.floor(Math.random() * 9)}-0${1 + Math.floor(Math.random() * 9)}-15`,
+      gym_id: gymId, waiver_accepted: true, waiver_accepted_at: waiverNow,
     }).eq('id', a.id), `update profile ${a.email}`);
   }
-  console.log('Gym, admins, coaches, profiles done.');
+  console.log('Gym, admins, coaches, profiles, members done.');
 
   // lookup tables (empty in a schema-only dump, must seed ourselves)
   const sectionTypesInput = [

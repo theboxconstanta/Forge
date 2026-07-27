@@ -38,16 +38,22 @@ async function main() {
     'henry@forgedemo.test': { first_name: 'Henry', last_name: 'Ibrahim', full_name: 'Henry Ibrahim', gender: 'male' },
   };
 
+  // Identity fields (Member Domain ownership) go to members; gym_id/waiver
+  // fields (Membership ownership) go to profiles - same split
+  // seed-forge-demo.mjs and the app's own Member Portal writes use (M1.5.3).
   const nowIso = new Date().toISOString();
   for (const u of demoUsers) {
     const d = details[u.email];
     must(await sb.from('profiles').upsert({
-      id: u.id, email: u.email, full_name: d.full_name, first_name: d.first_name, last_name: d.last_name,
-      gender: d.gender, gym_id: gymId, weight_unit: 'kg', language: 'en',
+      id: u.id, email: u.email, gym_id: gymId,
       waiver_accepted: true, waiver_accepted_at: nowIso,
     }, { onConflict: 'id' }), `upsert profile ${u.email}`);
+    must(await sb.from('members').upsert({
+      id: u.id, email: u.email, full_name: d.full_name, first_name: d.first_name, last_name: d.last_name,
+      gender: d.gender, weight_unit: 'kg', language: 'en',
+    }, { onConflict: 'id' }), `upsert member ${u.email}`);
   }
-  console.log('Profiles backfilled.');
+  console.log('Profiles and members backfilled.');
 
   const athleteEmails = ['alice', 'ben', 'chloe', 'daniel', 'elena', 'felix', 'grace', 'henry'].map((n) => `${n}@forgedemo.test`);
   const athletes = demoUsers.filter((u) => athleteEmails.includes(u.email));
