@@ -6342,6 +6342,11 @@ function App() {
       return
     }
     setNoGymJoinCode('')
+    // Recognition (M7.2 Sectiunea 10): pur informativ, nu conditioneaza
+    // nimic - join-ul de mai sus a reusit deja indiferent de rezultat.
+    // O eroare aici nu trebuie sa intrerupa fluxul de join.
+    const { data: recognized } = await supabase.rpc('member_transfer_recognition')
+    if (recognized) showToast(t.toastTransferRecognized)
     await fetchUserProfile()
     setJoiningGym(false)
   }
