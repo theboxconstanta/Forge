@@ -137,9 +137,10 @@ Canonical target architecture: `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md`
 
 ### 3.9 Database structure
 
-23 public tables, RLS on every one. All are `gym_id`-scoped **except** `members` — platform-scoped identity, deliberately independent of any Gym (see §3.8c):
+24 public tables, RLS on every one. All are `gym_id`-scoped **except** `members` — platform-scoped identity, deliberately independent of any Gym (see §3.8c):
 - **Identity/tenancy**: `gyms`, `profiles`, `admins`, `coaches`, `gym_signup_codes`
 - **Member Domain** (§3.8c): `members` (identity, no `gym_id` by design), `memberships` (the Gym-relationship anchor, `gym_id`-scoped)
+- **Gym Transfer** (§3.11): `transfer_codes` — origin-gym-scoped, RLS restricted to that gym's own admins, no INSERT/UPDATE policy at all (writes exist only through SECURITY DEFINER RPCs)
 - **Membership/billing**: `subscription_plans`, `subscriptions`
 - **Financial Domain**: `orders`, `payments` (see §3.6)
 - **Scheduling**: `classes`, `bookings`, `class_waitlist`, `class_reminders`, `class_reminder_log`
@@ -163,6 +164,22 @@ Canonical target architecture: `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md`
 Required secrets (names only): `OPENAI_API_KEY`, `OPENAI_MODEL`, `BREVO_API_KEY`, `FROM_EMAIL`, `FROM_NAME`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (+ auto-injected `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY`).
 
 Required frontend env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (anon key). Optional: `VITE_SENTRY_DSN`.
+
+**Note**: this table predates and was not updated by the M7 Gym Transfer work below or the earlier Financial Domain/Member Domain work — it does not list `admin-remove-member`, `create-checkout-session`, `stripe-webhook`, `admin-transfer-member`, or `redeem-transfer-code`, and still lists the retired `admin-delete-client`. See `/docs/PROJECT_STATE.md`'s own Edge Functions table for the current, accurate list; fixing this table is a pre-existing documentation gap, not caused by §3.11.
+
+### 3.11 Gym Transfer (M7) — FROZEN (closed 2026-07-27)
+
+Canonical documents (all frozen, ADR-only from here forward): `docs/architecture/M7_FREEZE_NOTICE.md` (governance), `M7_1_GYM_TRANSFER_PRODUCT_SPECIFICATION.md`, `M7_2_GYM_TRANSFER_TECHNICAL_ARCHITECTURE.md`, `M7_3_GYM_TRANSFER_IMPLEMENTATION_PLAN.md`, `M7_3_GYM_TRANSFER_EXECUTION_PLAN.md`. Full decision record: `/docs/DECISIONS.md`.
+
+**What it does**: when an admin ends a member's relationship with their gym specifically because the member is moving elsewhere, that ending is tagged `transferred` rather than `removed` — a `memberships.status` value the schema reserved since M1.1 (§3.8c) but never populated until this feature. In the ordinary case (the Primary Journey), the member later joins any gym entirely through the pre-existing self-service join (`join_gym_with_code`), completely unmodified; Forge recognizes the continuity by checking, on every new Membership creation, whether that member's immediately preceding Membership ended as a transfer — a read-only derivation over history (`member_transfer_recognition()`), never a stored fact. For the case where the member cannot complete that join themselves (the Fallback Journey), a new `transfer_codes` entity — distinct from, and not an extension of, the pre-existing `gym_signup_codes` mechanism, since a Transfer Code is scoped to one specific transfer rather than reusable across joiners — lets the origin admin issue a short-lived (72-hour), single-use credential the destination admin redeems on the member's behalf.
+
+**Reused, unmodified**: the gym-change synchronization trigger's Membership-creation logic (§3.8c), the self-service join RPC, the visibility-removing Broadcast mechanism (§3.8b — fires identically on a transfer-tagged ending, since it doesn't inspect `memberships.status`), `admin-remove-member`'s authorization function (imported directly into its new sibling, not copied), and `prevent_profiles_gym_id_change` (§3.8a — independently guarantees a redemption can never overwrite an already-set `gym_id`).
+
+**New**: the gym-change synchronization trigger's ending branch (§3.8c) gained a reason-aware extension — reads a transaction-local Postgres setting, defaulting to `removed` when absent, so Remove Member's own behavior is provably unchanged; its join-creation branch gained a second extension superseding any outstanding active Transfer Code the instant its transfer completes through the ordinary join. Two new Edge Functions, siblings to `admin-remove-member`: `admin-transfer-member` (origin-side ending) and `redeem-transfer-code` (destination-side redemption). Both, plus the Transfer Code issuance/revocation RPCs, rely on small, narrow, service-role-gated RPCs (`end_membership_as_transfer`, `issue_transfer_code`, `revoke_transfer_code`, `redeem_transfer_code`) rather than direct table writes, because PostgREST treats each client call as its own transaction — signaling the ending reason, or atomically marking a code used and writing the tenancy signal, requires both effects inside one function call. A partial unique index (`transfer_codes(membership_id) WHERE status='active'`) is the concurrency-safe mechanism guaranteeing at most one active Transfer Code per transfer under genuinely simultaneous issuance requests. Expiry (72 hours, an implementation parameter) is never a stored value — checked at read time via a small stateless helper, consistent with this codebase's established preference for derived rather than stored-and-maintained state.
+
+**Known, disclosed limitation**: `members`/`profiles` RLS (§3.8a) ties an admin's visibility of a member's identity to an ongoing gym affiliation — once a transfer completes, the origin admin cannot search for that former member by name. The origin-admin Transfer Code panel is therefore surfaced inline, immediately after the transfer action, rather than as a general later-browsable screen — this is a real constraint of the existing, unmodified Member Domain RLS, not a defect, and revisiting it would require a fresh architecture review (see `/docs/DECISIONS.md`).
+
+**M7 status: CLOSED (2026-07-27)**. All 11 Execution Plan steps implemented, independently reviewed, validated against the live database, and committed (`2e3640e` through `8530b6f`) — see `/docs/CHANGELOG.md`.
 
 ---
 
