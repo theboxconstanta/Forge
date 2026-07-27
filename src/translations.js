@@ -734,6 +734,16 @@ export const TRANSLATIONS = {
     adminClientsTransferring: 'Se transferă...',
     adminClientsTransferConfirm: 'Transferă',
     adminClientsTransferButtonFull: '🔁 Transferă la altă sală',
+    adminTransferCodeTitle: 'Cod de transfer',
+    adminTransferCodeIntro: (client) => `Dacă ${client} nu se poate alătura singur unei săli noi, poți emite un cod pe care să-l comunici direct membrului.`,
+    adminTransferCodeIssueButton: 'Emite un cod',
+    adminTransferCodeIssuing: 'Se emite...',
+    adminTransferCodeRevokeButton: 'Revocă codul',
+    adminTransferCodeRevoking: 'Se revocă...',
+    adminTransferCodeDone: 'Gata',
+    adminTransferCodeSkip: 'Nu acum',
+    adminTransferCodeValidityNote: 'Codul este valabil 72 de ore și poate fi folosit o singură dată.',
+    toastTransferCodeRevoked: '✅ Cod revocat',
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ Abonament nou',
@@ -1638,6 +1648,16 @@ export const TRANSLATIONS = {
     adminClientsTransferring: 'Transferring...',
     adminClientsTransferConfirm: 'Transfer',
     adminClientsTransferButtonFull: '🔁 Transfer to another gym',
+    adminTransferCodeTitle: 'Transfer code',
+    adminTransferCodeIntro: (client) => `If ${client} can't join a new gym on their own, you can issue a code to share with them directly.`,
+    adminTransferCodeIssueButton: 'Issue a code',
+    adminTransferCodeIssuing: 'Issuing...',
+    adminTransferCodeRevokeButton: 'Revoke code',
+    adminTransferCodeRevoking: 'Revoking...',
+    adminTransferCodeDone: 'Done',
+    adminTransferCodeSkip: 'Not now',
+    adminTransferCodeValidityNote: 'The code is valid for 72 hours and can be used once.',
+    toastTransferCodeRevoked: '✅ Code revoked',
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ New subscription',

@@ -2199,6 +2199,10 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [transferClientConfirm, setTransferClientConfirm] = useState(null)
   const [transferClientEmailInput, setTransferClientEmailInput] = useState('')
   const [transferringClient, setTransferringClient] = useState(false)
+  const [postTransferPanel, setPostTransferPanel] = useState(null)
+  const [postTransferCode, setPostTransferCode] = useState(null)
+  const [issuingTransferCode, setIssuingTransferCode] = useState(false)
+  const [revokingTransferCode, setRevokingTransferCode] = useState(false)
   const [coachesList, setCoachesList] = useState([])
   const [coachSearch, setCoachSearch] = useState('')
 
@@ -2610,10 +2614,61 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       setTransferClientConfirm(null)
       setTransferClientEmailInput('')
       showToast(t.toastClientTransferred)
+
+      // M7.3 Step 9: identify the just-transferred Membership while the
+      // admin's own session still legitimately has the member's identity
+      // in hand (from `client`, captured before the row above is
+      // filtered out of `clienti`) - members/profiles RLS ties an
+      // admin's visibility into a member's identity to an ongoing gym
+      // affiliation, so this is the only point at which both facts
+      // (who they are, which Membership just ended as a transfer) are
+      // simultaneously available through existing, unmodified RLS.
+      const { data: membershipRow } = await supabase
+        .from('memberships')
+        .select('id')
+        .eq('member_id', client.id)
+        .eq('status', 'transferred')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (membershipRow) {
+        setPostTransferPanel({ clientName: client.full_name || client.email, membershipId: membershipRow.id })
+        setPostTransferCode(null)
+      }
     } catch (e) {
       showToast('❌ ' + e.message)
     }
     setTransferringClient(false)
+  }
+
+  const issuePostTransferCode = async () => {
+    if (!postTransferPanel) return
+    setIssuingTransferCode(true)
+    const { data: code, error } = await supabase.rpc('issue_transfer_code', { p_membership_id: postTransferPanel.membershipId })
+    if (error) { showToast('❌ ' + error.message); setIssuingTransferCode(false); return }
+    const { data: row } = await supabase
+      .from('transfer_codes')
+      .select('id')
+      .eq('membership_id', postTransferPanel.membershipId)
+      .eq('status', 'active')
+      .maybeSingle()
+    setPostTransferCode({ id: row?.id || null, code })
+    setIssuingTransferCode(false)
+  }
+
+  const revokePostTransferCode = async () => {
+    if (!postTransferCode?.id) return
+    setRevokingTransferCode(true)
+    const { error } = await supabase.rpc('revoke_transfer_code', { p_transfer_code_id: postTransferCode.id })
+    if (error) { showToast('❌ ' + error.message); setRevokingTransferCode(false); return }
+    setPostTransferCode(null)
+    showToast(t.toastTransferCodeRevoked)
+    setRevokingTransferCode(false)
+  }
+
+  const closePostTransferPanel = () => {
+    setPostTransferPanel(null)
+    setPostTransferCode(null)
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail, method) => {
@@ -8897,6 +8952,44 @@ function App() {
                     {t.onboardingConfirm}
                   </button>
                 </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {postTransferPanel && (
+        <div onClick={closePostTransferPanel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', padding: '24px', maxWidth: '340px', width: '100%' }}>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminTransferCodeTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '18px' }}>
+              {t.adminTransferCodeIntro(postTransferPanel.clientName)}
+            </div>
+            {postTransferCode ? (
+              <>
+                <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '14px', textAlign: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: '#633806', letterSpacing: '2px' }}>{postTransferCode.code}</div>
+                </div>
+                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px', textAlign: 'center' }}>{t.adminTransferCodeValidityNote}</div>
+                <button disabled={revokingTransferCode} onClick={revokePostTransferCode}
+                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '8px' }}>
+                  {revokingTransferCode ? t.adminTransferCodeRevoking : t.adminTransferCodeRevokeButton}
+                </button>
+                <button onClick={closePostTransferPanel}
+                  style={{ width: '100%', padding: '10px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  {t.adminTransferCodeDone}
+                </button>
+              </>
+            ) : (
+              <>
+                <button disabled={issuingTransferCode} onClick={issuePostTransferCode}
+                  style={{ width: '100%', padding: '10px', background: '#BA7517', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '8px' }}>
+                  {issuingTransferCode ? t.adminTransferCodeIssuing : t.adminTransferCodeIssueButton}
+                </button>
+                <button onClick={closePostTransferPanel}
+                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#888', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                  {t.adminTransferCodeSkip}
+                </button>
               </>
             )}
           </div>
