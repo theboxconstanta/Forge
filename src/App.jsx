@@ -2196,6 +2196,9 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
   const [deleteClientConfirm, setDeleteClientConfirm] = useState(null)
   const [deleteClientEmailInput, setDeleteClientEmailInput] = useState('')
   const [deletingClient, setDeletingClient] = useState(false)
+  const [transferClientConfirm, setTransferClientConfirm] = useState(null)
+  const [transferClientEmailInput, setTransferClientEmailInput] = useState('')
+  const [transferringClient, setTransferringClient] = useState(false)
   const [coachesList, setCoachesList] = useState([])
   const [coachSearch, setCoachSearch] = useState('')
 
@@ -2588,6 +2591,29 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       showToast('❌ ' + e.message)
     }
     setDeletingClient(false)
+  }
+
+  const adminTransferaMembru = async (client) => {
+    if (transferClientEmailInput.trim().toLowerCase() !== client.email?.toLowerCase()) return
+    setTransferringClient(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/admin-transfer-member`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || t.errorTransferringClient)
+      setClienti(prev => prev.filter(c => c.id !== client.id))
+      setClientSelectat(null)
+      setTransferClientConfirm(null)
+      setTransferClientEmailInput('')
+      showToast(t.toastClientTransferred)
+    } catch (e) {
+      showToast('❌ ' + e.message)
+    }
+    setTransferringClient(false)
   }
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail, method) => {
@@ -3280,6 +3306,35 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
                         <button onClick={() => { setDeleteClientConfirm(c.id); setDeleteClientEmailInput('') }}
                           style={{ width: '100%', padding: '8px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                           {t.adminClientsDeleteButtonFull}
+                        </button>
+                      )}
+
+                      {transferClientConfirm === c.id ? (
+                        <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '12px', marginTop: '8px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#633806', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsTransferTitle}</div>
+                          <div style={{ fontSize: '11px', color: '#633806', marginBottom: '8px' }}>
+                            {t.adminClientsTransferWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsTransferWarnSuffix}{' '}
+                            {t.adminClientsTransferConfirmEmailPrompt} <strong>{c.email}</strong>
+                          </div>
+                          <input value={transferClientEmailInput} onChange={e => setTransferClientEmailInput(e.target.value)}
+                            placeholder={c.email} autoFocus
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #BA7517', fontSize: '12px', background: '#fff', boxSizing: 'border-box', marginBottom: '8px' }} />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => { setTransferClientConfirm(null); setTransferClientEmailInput('') }}
+                              style={{ flex: 1, padding: '8px', background: '#fff', color: '#0E0E0E', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                              {t.adminClientsCancel}
+                            </button>
+                            <button disabled={transferringClient || transferClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
+                              onClick={() => adminTransferaMembru(c)}
+                              style={{ flex: 1, padding: '8px', background: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#BA7517' : '#f0dba8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
+                              {transferringClient ? t.adminClientsTransferring : t.adminClientsTransferConfirm}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setTransferClientConfirm(c.id); setTransferClientEmailInput('') }}
+                          style={{ width: '100%', padding: '8px', background: '#fff', color: '#BA7517', border: '1px solid #f0dba8', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', marginTop: '8px' }}>
+                          {t.adminClientsTransferButtonFull}
                         </button>
                       )}
                     </div>
