@@ -2,7 +2,7 @@
 
 > Product roadmap and upcoming milestones. Not a commitment or sequencing guarantee — reflects what's known to be next vs. deferred as of the last update. See `/docs/DECISIONS.md` for why postponed items were postponed.
 >
-> Last updated: 2026-07-21.
+> Last updated: 2026-07-27.
 
 ---
 
@@ -19,6 +19,7 @@
 
 ## Recently closed (see `/docs/CHANGELOG.md` for full detail)
 
+- **Member Domain Migration (M1.1-M1.5.5)** — `members`/`memberships` introduced as a genuine Member Domain, migrated to incrementally (read paths, then write paths) rather than a hard cutover, then the now-dead `profiles`→`members` bridge fully retired. `members` is the sole Source of Truth for Member identity; `profiles.gym_id`/waiver fields remain, Membership-owned, unchanged. Closed 2026-07-27. `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md`.
 - **Online Payments (Stripe), M6** — member-initiated "Renew Now" → Checkout → webhook → automatic Subscription activation. Closed 2026-07-21 against the company's real production Stripe account, validated with one real end-to-end payment. `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
 - **P0-006 (Remove Member / Identity vs. Membership)** — closed 2026-07-21.
 

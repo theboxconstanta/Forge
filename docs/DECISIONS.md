@@ -2,7 +2,7 @@
 
 > Important product and architecture decisions, with the reasoning behind them. Read this before proposing to change something that looks frozen or "obviously" improvable — the reasoning here is usually the answer to "why didn't they just...".
 >
-> Last updated: 2026-07-24.
+> Last updated: 2026-07-27.
 
 ---
 
@@ -182,6 +182,8 @@
 
 **Revisit when**: Forge needs genuine multi-gym membership (a person belonging to two gyms simultaneously) — that's the trigger for the full Identity V2 migration this decision explicitly declined to build now.
 
+**Superseded, in part, 2026-07-27**: the "no Membership table introduced" premise above no longer holds — a Member Domain (`members`/`memberships`) was separately justified and built (see the Member Domain Migration decision below). This did not happen because multi-gym membership arrived; that revisit trigger was never hit. `profiles.gym_id` remains, unchanged, the actual tenancy signal every RLS policy resolves through — only *identity* ownership moved. This paragraph is left in place, not deleted, as the historical record of the reasoning that was true from 2026-07-21 through 2026-07-25.
+
 ---
 
 ## M6: the configured Stripe key is the company's real production account, confirmed intentional (2026-07-21)
@@ -231,3 +233,23 @@
 **Revisit when**: a second, real (not hypothetical) visibility-removing use case is implemented — at that point, re-evaluate whether the reusable trigger-function/topic-naming pattern established here still scales cleanly, or whether the deferred Platform Events design is now justified by genuine repetition rather than speculation.
 
 **M13.X status: CLOSED (2026-07-24)**.
+
+---
+
+## Member Domain Migration: an incremental profiles→members bridge, then its own deliberate retirement, not a hard cutover (2026-07-25 through 2026-07-27)
+
+**Decision**: Member identity was migrated from `profiles` to a new Member Domain (`members`/`memberships`, canonical target architecture: `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md`) in explicit, separately-approved phases rather than one cutover — schema/backfill (M1.1-M1.3), read paths (M1.4), write paths (M1.5.1-M1.5.3), then a dedicated review-and-fix pass on the bridge itself (M1.5.4) followed by retiring it once genuinely dead (M1.5.5).
+
+**Why incremental**: identical reasoning to Workout Engine V2's dual-write decision above — migrating every read path and every write path of something this central in one step would make it much harder to isolate what broke if something did. The bridge (a set of `SECURITY DEFINER` trigger functions keeping `members` synchronized from every `profiles` write) existed specifically to let reads move first while writes stayed on `profiles`, the then-current Source of Truth.
+
+**The bridge outlived its own correctness, and a dedicated phase existed to prove and fix that**: once M1.5.3 moved Member Portal writes directly to `members`, `profiles`' identity columns froze — but two callers of the bridge's shared sync function kept treating `profiles` as authoritative regardless: the gym-join/leave trigger (still necessary, for Membership lifecycle, unrelated to identity) and the manual reconciliation RPC's auto-repair path. Both silently reverted fresh `members` edits back to a stale `profiles` snapshot. A separate, independently and empirically proven finding surfaced in the same review: the shared sync function carried unrevoked `EXECUTE` for `anon`/`authenticated` with no internal authorization check, confirmed exploitable via a real unauthenticated request against the live production API that reached the function's `INSERT` statement (not merely inferred from reading the code). M1.5.4 closed all of this by narrowing the sync function to create-if-missing only — structurally correct for every remaining legitimate caller, and the same change that made the regression impossible — and revoking the exploitable grant.
+
+**Retirement, not indefinite tolerance, once dead**: M1.5.5 did not leave the now-inert trigger/function pair in place "because it's harmless" — a repository-wide audit confirmed zero remaining production callers and zero effect when fired, and it was removed. The one adjacent piece that was *not* removed — the reconciliation view's identity-drift detection case — was deliberately kept, reclassified from an auto-repair action to observability-only, because its remaining purpose (surfacing a bug in the Member Portal's own write, not a synchronization gap) is no longer bridge infrastructure at all.
+
+**What did not move**: `profiles.gym_id` (the tenancy signal underneath `my_gym_id()`, resolved by roughly twenty RLS policies across the schema) and `profiles.waiver_accepted`/`waiver_accepted_at` (mirrored into `memberships`) — both explicitly out of scope for this migration, Membership-owned per the ownership specification, unchanged throughout.
+
+**Validated at every phase** inside rolled-back transactions run as the actual `authenticated` role (never `service_role`), plus, for the exploit finding specifically, a real live HTTP request against the production API proving both the vulnerability and its closure. Commits: `532a4d8` (M1.5.4), `68598b5` (M1.5.5).
+
+**Revisit when**: `profiles.gym_id` migration (rewriting `my_gym_id()` and every dependent RLS policy) is separately scoped and approved — a materially larger effort than this one, not started, not implied by anything here.
+
+**Member Domain Migration status: CLOSED (2026-07-27)**.

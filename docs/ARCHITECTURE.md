@@ -2,7 +2,7 @@
 
 > System architecture and component responsibilities. Updated only at meaningful architectural milestones — see `/docs/CHANGELOG.md` for when each section last changed, and `/docs/DECISIONS.md` for the reasoning behind frozen choices.
 >
-> Last updated: 2026-07-24.
+> Last updated: 2026-07-27.
 
 ---
 
@@ -96,12 +96,14 @@ Supabase Auth, email + password. `profiles.gym_id` scopes a user to their gym. `
 
 **A deleted-user session is not automatically invalidated by Supabase** — an already-issued JWT stays cryptographically valid until its own expiry regardless of whether the underlying `auth.users`/`profiles` rows still exist; only future token refreshes fail. `fetchUserProfile()` (`App.jsx`) is the app's own detection layer: a profile lookup returning zero rows (and not the owner-bootstrap transient window) forces a client-side sign-out (P0-005, 2026-07-21) rather than silently falling through to an unrelated screen.
 
-### 3.8a Member Identity vs. Gym Membership — clarified, not re-architected (2026-07-21)
-Officially: **User** (`auth.users` + `profiles`, global identity) and **Membership** (`profiles.gym_id`, the relationship to one gym) are distinct concepts, deliberately *not* split into separate tables — no Membership table, no RLS rewrite, no auth redesign (see `/docs/DECISIONS.md`). `profiles.gym_id = NULL` is membership having ended; the profile row, `auth.users`, financial history (Orders/Payments), and training/social history (`wod_logs`/`personal_records`/`custom_hero_wods`/`feed_*`) all survive it untouched.
+### 3.8a Member Identity vs. Gym Membership — now a real split, `members` owns identity (updated 2026-07-27)
+**Historical context (2026-07-21, superseded 2026-07-25 through 2026-07-27)**: this section originally documented a deliberate choice to keep User (global identity) and Membership (the gym relationship) as one table, `profiles` — "no Membership table, no RLS rewrite, no auth redesign" (P0-006, see `/docs/DECISIONS.md`). That premise no longer holds. A Member Domain was separately justified and built (§3.8c); the original reasoning is preserved in `/docs/DECISIONS.md` as historical record of what was true from 2026-07-21 through 2026-07-25, not deleted.
 
-**Remove Member** (`admin-remove-member` Edge Function, replaces the retired `admin-delete-client`) implements this: clears `profiles.gym_id`, ends any active subscription through `end_subscription` (never a raw table write), and deletes only genuinely operational/transient data (`bookings`, `class_waitlist`, `class_reminders`, `push_subscriptions`) — never `auth.users`, `profiles`, `orders`, `payments`, or training/social history.
+**Current state**: **Member** (`members` — `email`, `full_name`, `avatar_url`, `gender`, `first_name`, `last_name`, `birth_date`, `weight_unit`, `language`) and **Membership** (`memberships` — `member_id`, `gym_id`, `status`, `waiver_accepted`, `waiver_accepted_at`) are now genuinely separate tables, per `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md`. `members` is the sole Source of Truth for identity; `profiles` cannot propagate identity into it — that mechanism existed only during the migration (§3.8c) and has since been removed entirely. `profiles.gym_id` remains, unchanged, the actual tenancy signal every RLS policy still resolves through `my_gym_id()` — migrating that is a separate, larger, not-yet-started initiative (§3.8c). `profiles.waiver_accepted`/`waiver_accepted_at` remain too, mirrored into `memberships`. `profiles.gym_id = NULL` is still what "membership has ended" means; `auth.users`, financial history (Orders/Payments), and training/social history (`wod_logs`/`personal_records`/`custom_hero_wods`/`feed_*`) all still survive it untouched — unchanged by any of this.
 
-A dedicated **"No Gym" application state** (`noGymMembership` in `App.jsx`) renders when a profile exists with `gym_id = NULL` outside the owner-bootstrap window — this same condition also covers a genuinely-interrupted owner bootstrap (no data signal distinguishes the two today; documented, not resolved).
+**Remove Member** (`admin-remove-member` Edge Function, replaces the retired `admin-delete-client`) still clears `profiles.gym_id`, ends any active subscription through `end_subscription` (never a raw table write), and deletes only genuinely operational/transient data (`bookings`, `class_waitlist`, `class_reminders`, `push_subscriptions`) — never `auth.users`, `profiles`, `members`, `memberships`, `orders`, `payments`, or training/social history. That same `gym_id` write now also transitions the member's `memberships` row to `removed`, via the trigger described in §3.8c.
+
+A dedicated **"No Gym" application state** (`noGymMembership` in `App.jsx`) renders when a profile exists with `gym_id = NULL` outside the owner-bootstrap window — this same condition also covers a genuinely-interrupted owner bootstrap (no data signal distinguishes the two today; documented, not resolved). Unchanged by the Member Domain migration.
 
 **Delete User** (true identity deletion) remains unbuilt, deliberately postponed — see `/docs/DECISIONS.md`.
 
@@ -117,10 +119,27 @@ Forge Core is consumed by multiple clients (this Member App, `forge-admin-web`) 
 
 No Platform Events, no event ledger, no generic cross-client notification system exists or is planned without a second real (non-hypothetical) use case surfacing first — see `/docs/DECISIONS.md` for the full architecture-review reasoning, including why an initial, more general recommendation was explicitly rejected.
 
+### 3.8c Member Domain Migration — bridge introduced, then fully retired (M1.1-M1.5.5, closed 2026-07-27)
+
+Canonical target architecture: `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md` (frozen). Full decision record and phase-by-phase reasoning: `/docs/DECISIONS.md`.
+
+**Why a bridge, not a hard cutover**: migrating every read path and then every write path of Member identity in one step would have made it much harder to isolate what broke if something did — the same reasoning already established for Workout Engine V2's dual-write approach (§3.1). Instead:
+
+- **M1.1-M1.3**: introduced `members`/`memberships` as new, additive tables (reusing a pre-existing, previously-unreferenced `members` table rather than creating a duplicate), backfilled once from every existing `profiles` row.
+- **M1.4 (Read Path Migration)**: every operational, cross-member read (Feed authorship and community roster, Admin client/class rosters, Leaderboard, "who else is booked") moved to read `members` instead of `profiles`. `profiles` remained the write target and Source of Truth for identity during this window; a set of `SECURITY DEFINER` trigger functions kept `members` synchronized from every `profiles` write, in the same transaction.
+- **M1.5.1-M1.5.3 (Write Path Migration)**: added the RLS policy `members` needed to accept any write at all (M1.5.1), migrated the Member Portal's own profile-read path to a merged shape sourcing identity from `members` and Gym-relationship facts from `profiles` (M1.5.2), then retargeted every Member Portal identity write (name, avatar, gender, birth date, weight unit, language, email) directly to `members` — `gym_id` and waiver fields stayed on `profiles`, unchanged, per the ownership specification (M1.5.3).
+- **M1.5.4**: proved and closed two live regressions the incremental migration had introduced — the still-necessary gym-join/leave trigger was silently reverting identity edits back to a stale `profiles` snapshot on every gym transition, and the manual reconciliation RPC was the same bug's admin-invoked twin. Separately, empirically proved (a real unauthenticated request against the live production API, not a code-reading inference) that the bridge's shared sync function carried unrevoked `EXECUTE` for `anon`/`authenticated` with no internal authorization check. Closed by narrowing the sync function to create-if-missing only — the same change that structurally fixes both regressions without touching the gym-lifecycle trigger's own logic — and revoking the exploitable grant. Commit `532a4d8`.
+- **M1.5.5**: retired the now fully dead trigger/function pair the write migration had made obsolete (repository-wide audit confirmed zero remaining production callers, zero effect when fired) — pure infrastructure cleanup, no behavioral change. Commit `68598b5`.
+
+**Current state**: `members` is the sole Source of Truth for Member identity; `profiles` can no longer propagate identity into it — the mechanism that once did so no longer exists in any form. See §3.8a for the current identity/membership split and §3.9 for the updated table inventory.
+
+**What did not move, and remains a separate future initiative**: `profiles.gym_id`, the tenancy signal every RLS policy in this schema resolves through via `my_gym_id()` (roughly twenty tables). Migrating it to a `memberships`-row-based signal would require rewriting `my_gym_id()` and re-verifying every dependent policy — an order of magnitude larger than this migration, not started, not implied by anything above.
+
 ### 3.9 Database structure
 
-21 public tables, all `gym_id`-scoped, RLS on every one:
+23 public tables, RLS on every one. All are `gym_id`-scoped **except** `members` — platform-scoped identity, deliberately independent of any Gym (see §3.8c):
 - **Identity/tenancy**: `gyms`, `profiles`, `admins`, `coaches`, `gym_signup_codes`
+- **Member Domain** (§3.8c): `members` (identity, no `gym_id` by design), `memberships` (the Gym-relationship anchor, `gym_id`-scoped)
 - **Membership/billing**: `subscription_plans`, `subscriptions`
 - **Financial Domain**: `orders`, `payments` (see §3.6)
 - **Scheduling**: `classes`, `bookings`, `class_waitlist`, `class_reminders`, `class_reminder_log`

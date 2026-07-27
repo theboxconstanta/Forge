@@ -1,7 +1,7 @@
 # PROJECT_STATE.md — Forge Engineering Handover
 
 **Status:** Authoritative engineering state snapshot.
-**Date:** 2026-07-21.
+**Date:** 2026-07-27.
 **Scope:** Complete. A new engineer should be able to continue this project after reading only this file, though `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/CHANGELOG.md`, and `docs/security/FORGE_PRODUCTION_SECURITY_BASELINE_v1.md` hold deeper detail on their respective topics and should be treated as the extended reference, not duplicated here in full.
 
 ---
@@ -58,6 +58,7 @@ Forge is a gym-management SaaS for CrossFit/functional-fitness boxes. Athletes s
 8. Financial Domain (`Subscription → Order → Payment → Refund → Reporting`) — closed and frozen 2026-07-20. See `docs/2026-07-20_Financial_Domain_Architecture_Working_Session.md`.
 9. **Online Payments (Stripe) — M6 and M7 CLOSED, 2026-07-21.** Member-initiated "Renew Now" → Stripe Checkout → webhook → automatic Subscription activation, running against the company's real production Stripe account. Validated end-to-end with one real live payment (isolated sandbox gym), including a proven idempotent duplicate-webhook-delivery test. CrossFit C15's `online_payments_enabled = true` is confirmed intentional production configuration, not a carried-forward risk. Full evidence: `docs/2026-07-21_Financial_Domain_Production_Readiness_Report.md`.
 10. **P0-006 (Remove Member / Identity vs. Membership clarification) — CLOSED, 2026-07-21.** All 13 regression checks verified with real data. See `docs/DECISIONS.md`.
+11. **Member Domain Migration (M1.1-M1.5.5) — CLOSED, 2026-07-27.** A genuine Member Domain (`members`/`memberships`) was introduced and migrated to incrementally — read paths first (M1.4), then write paths (M1.5.1-M1.5.3) — rather than a hard cutover, superseding P0-006's earlier "no Membership table" premise. A dedicated review (M1.5.4) found and fixed two live regressions in the migration bridge itself (identity edits silently reverted on gym transitions and via manual reconciliation) plus an independently, empirically proven unauthenticated write vulnerability in the bridge's shared sync function; the now-dead bridge infrastructure was then retired (M1.5.5). `members` is now the sole Source of Truth for Member identity. `profiles.gym_id`/waiver acceptance remain unchanged, Membership-owned. See `docs/architecture/MEMBER_DOMAIN_ARCHITECTURE.md` and `docs/DECISIONS.md`.
 
 **Branch status:** all work lands directly on `main`; no long-lived feature branches. Working tree is clean as of this document (all P0-005-related changes are committed and pushed).
 
@@ -77,7 +78,7 @@ Only implemented components are listed.
 
 **Backend:** Supabase project (`sdfkvfbvgpuspnnnwqwk`, `eu-central-1`). Postgres 17. RLS enabled and enforced on every table (dozens of policies). SECURITY DEFINER helper functions (`is_admin`, `is_coach_or_admin`, `my_gym_id`, `is_platform_admin`, and others) provide the reusable RLS building blocks.
 
-**Database:** every tenant-scoped table carries a `gym_id` column; a `prevent_gym_id_change` trigger blocks mutating an already-set `gym_id`. Multi-tenant isolation is RLS-first — any Edge Function using `service_role` (which bypasses RLS entirely) is individually responsible for reconstructing whatever tenant boundary RLS would otherwise enforce.
+**Database:** every tenant-scoped table carries a `gym_id` column; a `prevent_gym_id_change` trigger blocks mutating an already-set `gym_id`. Multi-tenant isolation is RLS-first — any Edge Function using `service_role` (which bypasses RLS entirely) is individually responsible for reconstructing whatever tenant boundary RLS would otherwise enforce. **Exception**: `members` (Member Domain, see `docs/ARCHITECTURE.md` §3.8c) is deliberately platform-scoped, no `gym_id` column at all — identity is independent of any one Gym by design; `memberships` carries `gym_id` as the Gym-relationship anchor.
 
 **Authentication:** Supabase Auth. Password recovery uses the implicit flow deliberately (not PKCE — see Decisions Log); invalid/expired recovery links are detected via the official SDK mechanism (`supabase.auth.initialize()` returning specific error codes), not a custom timeout heuristic.
 
@@ -218,6 +219,8 @@ Only directly proven statements, no interpretation:
 - `isGymAllowedForKey()`/`TEST_MODE_GYM_ID` provide no gym-level isolation under a live key — only the per-gym `online_payments_enabled` flag currently gates exposure to real Stripe charges.
 - One real, live Stripe payment was completed end-to-end on 2026-07-21 (CrossFit Tester, isolated sandbox gym) and independently confirmed via Stripe's own event log, the database, and the rendered UI.
 - CrossFit C15 is Forge's production gym; its `online_payments_enabled = true` is a confirmed, intentional production configuration (product-owner decision, 2026-07-21) — not a validation artifact, not accidental.
+- `members` is the sole Source of Truth for Member identity as of 2026-07-27 (Member Domain Migration, M1.5); `profiles` cannot propagate identity into it — confirmed by repository-wide audit and live validation, not assumed. `profiles.gym_id` and waiver acceptance remain the tenancy/Membership signal, unchanged.
+- The Member Domain bridge's shared sync function (`sync_member_from_profile()`) was empirically proven exploitable by an unauthenticated client before M1.5.4 — confirmed via a real live HTTP request against the production API that reached the function's `INSERT` statement, not inferred from code reading. Closed the same day; the identical request now returns a permission-denied error. See `docs/DECISIONS.md`.
 
 # Known Unknowns
 
