@@ -4,7 +4,17 @@ import * as Sentry from '@sentry/react'
 import { Capacitor } from '@capacitor/core'
 import './index.css'
 import App from './App.jsx'
+import InviteOnboarding from './InviteOnboarding.jsx'
 import { supabase } from './supabase.js'
+
+// M9 Invite Member (Product Specification Section 4.2) - a public,
+// unauthenticated onboarding route. WOD-SIMPLE has no router (a single
+// component tree gated by auth state), so this is a deliberate, minimal
+// top-level branch, checked once at load, before anything auth-related
+// mounts - the invitee's pre-Final-Commit journey never touches App's own
+// auth gate at all, matching Model D (no real Supabase session exists
+// until Final Commit succeeds).
+const inviteMatch = window.location.pathname.match(/^\/invite\/([^/]+)/)
 
 // Monitorizare erori (Sentry) - pana acum erorile ajungeau doar in console.error,
 // nimeni nu era alertat daca ceva se strica in productie. captureConsoleIntegration
@@ -180,7 +190,7 @@ requestAnimationFrame(__sampleTrace)
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      <App />
+      {inviteMatch ? <InviteOnboarding invitationId={inviteMatch[1]} /> : <App />}
     </Sentry.ErrorBoundary>
   </StrictMode>,
 )

@@ -422,5 +422,30 @@ entrypoint = "./functions/check-subscriptions/index.ts"
 [functions.send-notification]
 enabled = true
 verify_jwt = true
+
+# M9 Invite Member & Onboarding - public, unauthenticated by design (Model D:
+# no Supabase session exists for the invitee until Final Commit succeeds).
+# Security is possession-of-invitation-token + HMAC verification done inside
+# each function, not platform JWT verification - a real production defect
+# was found live (all four returned 401 UNAUTHORIZED_NO_AUTH_HEADER on every
+# call, since the client sends no Authorization header at all) because these
+# entries were missing and functions therefore deployed with the platform
+# default (verify_jwt = true). Declared here so a future redeploy without an
+# explicit --no-verify-jwt flag cannot silently regress this.
+[functions.invitation-status]
+enabled = true
+verify_jwt = false
+
+[functions.invitation-challenge]
+enabled = true
+verify_jwt = false
+
+[functions.invitation-verify]
+enabled = true
+verify_jwt = false
+
+[functions.invitation-final-commit]
+enabled = true
+verify_jwt = false
 import_map = "./functions/send-notification/deno.json"
 entrypoint = "./functions/send-notification/index.ts"

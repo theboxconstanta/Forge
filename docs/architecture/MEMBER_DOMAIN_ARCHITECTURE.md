@@ -369,6 +369,9 @@ Rationale: keeps each domain's invariants independently enforceable and matches 
 **D8 — Member removal ends only the Membership. Identity, cross-Gym history, and financial records are untouched.**
 Rationale: formalizes the existing, already-validated P0-006 pattern, and the Member/Membership split makes this the *only possible* outcome by construction rather than a rule that must be separately remembered and enforced.
 
+**D9 — Phone number is global Member identity data, stored on `members`, not Gym-scoped data.**
+Rationale: `members` already carries every other piece of identity data (`full_name`, `email`, `gender`, `birth_date`, `weight_unit`, `language`) as global, gym-independent fields, consistent with D1 — a phone number follows the same, already-decided pattern, not a new policy. `members` itself has no `gym_id` column at all (by construction, per D1), so there is no mechanism by which phone could be made Gym-scoped without contradicting the Member/Membership split this document already establishes. Consequence, named explicitly and not silently assumed: on a Gym Transfer, the destination Gym sees the same phone number the origin Gym had, exactly as it already sees the same name, email, and birth date today. Whether a Gym should re-confirm a carried-over phone number with the Member is a product/UX question, not an architecture one, and is not resolved here. Column: `members.phone text`, nullable — existing Members and any Member added without a phone remain valid; nothing requires backfill. No RLS change: phone is covered by the same `members_select_own_or_gym_mate`/`members_update_own` policies already governing every other identity field on this table.
+
 ---
 
 # 12. Open Questions
