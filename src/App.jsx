@@ -4179,6 +4179,44 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
         </div>
         </>
       )}
+
+      {postTransferPanel && (
+        <div onClick={closePostTransferPanel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', padding: '24px', maxWidth: '340px', width: '100%' }}>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminTransferCodeTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '18px' }}>
+              {t.adminTransferCodeIntro(postTransferPanel.clientName)}
+            </div>
+            {postTransferCode ? (
+              <>
+                <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '14px', textAlign: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: '#633806', letterSpacing: '2px' }}>{postTransferCode.code}</div>
+                </div>
+                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px', textAlign: 'center' }}>{t.adminTransferCodeValidityNote}</div>
+                <button disabled={revokingTransferCode} onClick={revokePostTransferCode}
+                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '8px' }}>
+                  {revokingTransferCode ? t.adminTransferCodeRevoking : t.adminTransferCodeRevokeButton}
+                </button>
+                <button onClick={closePostTransferPanel}
+                  style={{ width: '100%', padding: '10px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  {t.adminTransferCodeDone}
+                </button>
+              </>
+            ) : (
+              <>
+                <button disabled={issuingTransferCode} onClick={issuePostTransferCode}
+                  style={{ width: '100%', padding: '10px', background: '#BA7517', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '8px' }}>
+                  {issuingTransferCode ? t.adminTransferCodeIssuing : t.adminTransferCodeIssueButton}
+                </button>
+                <button onClick={closePostTransferPanel}
+                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#888', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                  {t.adminTransferCodeSkip}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -8985,44 +9023,6 @@ function App() {
                     {t.onboardingConfirm}
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {postTransferPanel && (
-        <div onClick={closePostTransferPanel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', padding: '24px', maxWidth: '340px', width: '100%' }}>
-            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminTransferCodeTitle}</div>
-            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '18px' }}>
-              {t.adminTransferCodeIntro(postTransferPanel.clientName)}
-            </div>
-            {postTransferCode ? (
-              <>
-                <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '14px', textAlign: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '22px', fontWeight: '700', color: '#633806', letterSpacing: '2px' }}>{postTransferCode.code}</div>
-                </div>
-                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px', textAlign: 'center' }}>{t.adminTransferCodeValidityNote}</div>
-                <button disabled={revokingTransferCode} onClick={revokePostTransferCode}
-                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#E24B4A', border: '1px solid #f0c0c0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '8px' }}>
-                  {revokingTransferCode ? t.adminTransferCodeRevoking : t.adminTransferCodeRevokeButton}
-                </button>
-                <button onClick={closePostTransferPanel}
-                  style={{ width: '100%', padding: '10px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                  {t.adminTransferCodeDone}
-                </button>
-              </>
-            ) : (
-              <>
-                <button disabled={issuingTransferCode} onClick={issuePostTransferCode}
-                  style={{ width: '100%', padding: '10px', background: '#BA7517', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '8px' }}>
-                  {issuingTransferCode ? t.adminTransferCodeIssuing : t.adminTransferCodeIssueButton}
-                </button>
-                <button onClick={closePostTransferPanel}
-                  style={{ width: '100%', padding: '10px', background: '#fff', color: '#888', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                  {t.adminTransferCodeSkip}
-                </button>
               </>
             )}
           </div>
