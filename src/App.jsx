@@ -31,6 +31,7 @@ import {
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
+  isWeightScoredSetsFormat, toKgForRanking,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   effectiveScoreMode, composeFinishedRoundsText, composeStageResult, totalRepsChained,
 } from './workoutFormats'
@@ -1412,12 +1413,26 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
     // singura data si atasat pe log (_setsScore), reutilizat la afisare in
     // randarea Clasamentului, fara sa recalculam.
     if (wodZiFormat?.family === 'sets') {
-      const withScore = arr.map(log => ({ ...log, _setsScore: setsScoreOf(log) }))
+      // M9 Preferences: _setsScore stays the RAW logged number (still shown
+      // as-is at display time, tagged with that member's own weight_unit -
+      // unchanged). _setsRankScore is a separate, kg-normalized value used
+      // ONLY for ordering, so a kg Member and an lbs Member sort correctly
+      // against each other on the same weight-based leaderboard (bug found
+      // during the M9 Preferences audit: raw numbers were compared directly
+      // regardless of unit). Reps-scored sets formats (Total Reps/Lowest
+      // Reps) are never weights, so isWeightScoredSetsFormat skips the
+      // conversion for them - reps stay reps.
+      const weightScored = isWeightScoredSetsFormat(wodZiData?.format_config)
+      const withScore = arr.map(log => {
+        const score = setsScoreOf(log)
+        const rankScore = (weightScored && score != null) ? toKgForRanking(score, log.profile?.weight_unit || 'kg') : score
+        return { ...log, _setsScore: score, _setsRankScore: rankScore }
+      })
       const comparaSets = (a, b) => {
-        if (a._setsScore == null && b._setsScore == null) return new Date(a.logged_at) - new Date(b.logged_at)
-        if (a._setsScore == null) return 1
-        if (b._setsScore == null) return -1
-        if (a._setsScore !== b._setsScore) return b._setsScore - a._setsScore
+        if (a._setsRankScore == null && b._setsRankScore == null) return new Date(a.logged_at) - new Date(b.logged_at)
+        if (a._setsRankScore == null) return 1
+        if (b._setsRankScore == null) return -1
+        if (a._setsRankScore !== b._setsRankScore) return b._setsRankScore - a._setsRankScore
         return new Date(a.logged_at) - new Date(b.logged_at)
       }
       const byMemberSets = {}

@@ -13,6 +13,39 @@ const COMMIT_FAILURE_MESSAGES: Record<string, string> = {
   membership_race_lost: "Contul a fost deja activat.",
 };
 
+// M9 Member Preferences & Internationalization increment. Canonical values
+// only - members.gender/language/weight_unit have no DB CHECK constraint
+// (weight_unit is the one exception, but is re-validated here anyway so
+// all three fail the same way), so this Edge Function is the only gate
+// standing between an arbitrary client payload and these columns.
+const ALLOWED_GENDER = new Set(["masculin", "feminin"]);
+const ALLOWED_LANGUAGE = new Set(["en", "ro"]);
+const ALLOWED_WEIGHT_UNIT = new Set(["kg", "lbs"]);
+
+export function isValidOnboardingPreferences(gender: string, language: string, weightUnit: string): boolean {
+  return ALLOWED_GENDER.has(gender) && ALLOWED_LANGUAGE.has(language) && ALLOWED_WEIGHT_UNIT.has(weightUnit);
+}
+
+// Existing-identity/dormant-Member preferences must never be silently
+// overwritten by whatever an unrelated invitation happened to default to
+// (Preferences audit Section 8/9/14). A single UPDATE ... WHERE id = X AND
+// <col> IS NULL is atomic at the statement level - there is no read-then-
+// write race window, unlike a select-then-conditionally-update pattern
+// would have. One statement per column since PostgREST's query builder
+// can't express a single COALESCE(col, new) SET clause across mixed
+// null/non-null columns in one call.
+async function applyPreferencesIfUnset(
+  admin: any,
+  memberId: string,
+  gender: string,
+  language: string,
+  weightUnit: string,
+): Promise<void> {
+  await admin.from("members").update({ gender }).eq("id", memberId).is("gender", null);
+  await admin.from("members").update({ language }).eq("id", memberId).is("language", null);
+  await admin.from("members").update({ weight_unit: weightUnit }).eq("id", memberId).is("weight_unit", null);
+}
+
 // Final Commit - the one place every M9 Invite Member architecture/security
 // gate in this thread converged on. Ordering is binding, not a stylistic
 // choice (Final Auth-Handoff Security Report Section 10): identity step
@@ -30,9 +63,15 @@ async function handleRequest(req: Request): Promise<Response> {
     const phone = typeof body.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
     const birthDate = typeof body.birth_date === "string" && body.birth_date.trim() ? body.birth_date.trim() : null;
     const waiverId = body.waiver_id as string;
+    const gender = typeof body.gender === "string" ? body.gender : "";
+    const language = typeof body.language === "string" ? body.language : "";
+    const weightUnit = typeof body.weight_unit === "string" ? body.weight_unit : "";
 
-    if (!invitationId || !rawToken || !firstName || !lastName || !waiverId) {
+    if (!invitationId || !rawToken || !firstName || !lastName || !birthDate || !waiverId) {
       return errorResponse("Date lipsă", 400);
+    }
+    if (!isValidOnboardingPreferences(gender, language, weightUnit)) {
+      return errorResponse("Preferințe invalide", 400);
     }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -66,6 +105,7 @@ async function handleRequest(req: Request): Promise<Response> {
       }
 
       await admin.from("members").update({ first_name: firstName, last_name: lastName, full_name: fullName, phone, birth_date: birthDate }).eq("id", inv.member_id);
+      await applyPreferencesIfUnset(admin, inv.member_id, gender, language, weightUnit);
 
       return await handoffSession(admin, inv.invited_email);
     }
@@ -90,6 +130,7 @@ async function handleRequest(req: Request): Promise<Response> {
       }
 
       await admin.from("members").update({ first_name: firstName, last_name: lastName, full_name: fullName, phone, birth_date: birthDate }).eq("id", existingProfile.id);
+      await applyPreferencesIfUnset(admin, existingProfile.id, gender, language, weightUnit);
 
       return await handoffSession(admin, inv.invited_email);
     }
@@ -127,7 +168,11 @@ async function handleRequest(req: Request): Promise<Response> {
       return errorResponse(COMMIT_FAILURE_MESSAGES[commitStatus as string] ?? "Înregistrarea nu a putut fi finalizată. Încearcă din nou.", commitErr ? 500 : 409);
     }
 
-    await admin.from("members").update({ first_name: firstName, last_name: lastName, full_name: fullName, phone, birth_date: birthDate }).eq("id", newMemberId);
+    // Unconditional, unlike applyPreferencesIfUnset used for the existing/
+    // dormant paths above - this row was just created by createUser() a
+    // few lines up, so gender/language/weight_unit are guaranteed null and
+    // the invitation's selections become canonical outright.
+    await admin.from("members").update({ first_name: firstName, last_name: lastName, full_name: fullName, phone, birth_date: birthDate, gender, language, weight_unit: weightUnit }).eq("id", newMemberId);
 
     return await handoffSession(admin, inv.invited_email);
   } catch (err) {

@@ -868,6 +868,28 @@ export function setsDisplayScore(formatId, config, rowsByKey) {
   return maxWeightFromSets(rowsByKey)
 }
 
+// Adevarat daca setsDisplayScore() de mai sus intoarce o GREUTATE (kg/lbs)
+// pt acest WOD, fals daca intoarce un numar de REPS (scoringMode 'Total
+// Reps'/'Lowest Reps') - oglindeste exact ramurile din computeSetsScore.
+// Sursa unica pt Clasament (sortLogs in App.jsx), ca sa nu normalizeze
+// kg/lbs pe un scor care de fapt nu e deloc o greutate.
+export function isWeightScoredSetsFormat(config) {
+  const scoringMode = config?.scoringMode
+  return !scoringMode || scoringMode === 'Total Weight' || scoringMode === 'Max Weight'
+}
+
+// Conversie NEROTUNJITA kg<->lbs, doar pt COMPARATIE/sortare interna -
+// convertWeight() din utils.js rotunjeste la 0.5 (corect pt afisare pe
+// disc de bara, gresit pt clasament: 220lbs rotunjit ar cadea exact pe
+// 100.0kg, la egalitate falsa cu un 100kg real, desi 220lbs < 220.462lbs =
+// echivalentul real al 100kg). Valoarea intoarsa aici nu se afiseaza
+// niciodata, doar se compara.
+const KG_TO_LBS_RANKING = 2.20462
+export function toKgForRanking(value, unit) {
+  if (value == null) return null
+  return unit === 'lbs' ? value / KG_TO_LBS_RANKING : value
+}
+
 // Pentru fiecare numar de reps logat, ia cea mai mare greutate introdusa si o
 // compara cu cel mai mare PR existent la aceeasi miscare + acelasi numar
 // exact de reps (PR-urile se tin separat pe numar de reps). Returneaza doar

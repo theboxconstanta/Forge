@@ -10,8 +10,9 @@ import {
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
   composeStageResult, totalRepsChained, totalRepsAmrapStage,
+  isWeightScoredSetsFormat, toKgForRanking,
 } from './workoutFormats'
-import { getT } from './translations'
+import { getT, TRANSLATIONS } from './translations'
 
 describe('getFormat', () => {
   it('întoarce definiția pentru un id cunoscut', () => {
@@ -395,6 +396,75 @@ describe('computeSetsScore', () => {
   it('Max Weight (Complex) ia greutatea maximă dintre runde', () => {
     const rows = { 'Rundă 1': [{ weight: '20' }], 'Rundă 2': [{ weight: '40' }], 'Rundă 3': [{ weight: '30' }] }
     expect(computeSetsScore('Complex', { scoringMode: 'Max Weight' }, rows)).toBe(40)
+  })
+})
+
+// M9 Member Preferences - leaderboard kg/lbs normalization (audit-found
+// defect: sortLogs compared raw _setsScore numbers across Members without
+// reconciling units). isWeightScoredSetsFormat/toKgForRanking are the two
+// pure functions Clasament's sortLogs (App.jsx) uses to fix it.
+describe('isWeightScoredSetsFormat', () => {
+  it('fără scoringMode configurat - cade pe maxWeightFromSets, deci e o greutate', () => {
+    expect(isWeightScoredSetsFormat({})).toBe(true)
+    expect(isWeightScoredSetsFormat(undefined)).toBe(true)
+  })
+  it('Total Weight / Max Weight - greutate', () => {
+    expect(isWeightScoredSetsFormat({ scoringMode: 'Total Weight' })).toBe(true)
+    expect(isWeightScoredSetsFormat({ scoringMode: 'Max Weight' })).toBe(true)
+  })
+  it('Total Reps / Lowest Reps - NU e greutate (reps, nu se normalizează kg/lbs)', () => {
+    expect(isWeightScoredSetsFormat({ scoringMode: 'Total Reps' })).toBe(false)
+    expect(isWeightScoredSetsFormat({ scoringMode: 'Lowest Reps' })).toBe(false)
+  })
+})
+
+describe('toKgForRanking', () => {
+  it('kg rămâne neschimbat', () => {
+    expect(toKgForRanking(100, 'kg')).toBe(100)
+  })
+  it('null rămâne null', () => {
+    expect(toKgForRanking(null, 'kg')).toBe(null)
+    expect(toKgForRanking(null, 'lbs')).toBe(null)
+  })
+  it('conversia lbs->kg NU e rotunjită la 0.5 (spre deosebire de convertWeight, folosit la afișare) - altfel 220lbs ar cădea fals la egalitate cu 100kg real', () => {
+    const kg = toKgForRanking(220, 'lbs')
+    expect(kg).toBeCloseTo(99.7904, 3)
+    expect(kg).not.toBe(100)
+  })
+  it('100 kg reali > echivalentul lui 220 lbs (220 lbs e ușor mai puțin decât 100kg)', () => {
+    expect(toKgForRanking(100, 'kg')).toBeGreaterThan(toKgForRanking(220, 'lbs'))
+  })
+  it('225 lbs > 100 kg', () => {
+    expect(toKgForRanking(225, 'lbs')).toBeGreaterThan(toKgForRanking(100, 'kg'))
+  })
+  it('echivalent exact (100kg vs 220.462lbs) - egalitate reală, tie-break rămâne treaba apelantului', () => {
+    expect(toKgForRanking(220.462, 'lbs')).toBeCloseTo(100, 6)
+  })
+})
+
+// M9 Member Preferences - InviteOnboarding i18n. Nu retestează tot
+// translations.js (deja acoperit de propriile teste dacă există), doar
+// garantează regula din header-ul fișierului pt cheile noi invite*: orice
+// cheie ro trebuie să existe și în en, și invers - o cheie uitată într-o
+// singură limbă randează gol/⚠️MISSING prima dată cineva chiar comută pe ea.
+describe('translations.js - namespace invite* (M9 Preferences)', () => {
+  const roKeys = Object.keys(TRANSLATIONS.ro).filter(k => k.startsWith('invite'))
+  const enKeys = Object.keys(TRANSLATIONS.en).filter(k => k.startsWith('invite'))
+
+  it('există chei invite* definite', () => {
+    expect(roKeys.length).toBeGreaterThan(0)
+  })
+  it('fiecare cheie invite* din ro există și în en', () => {
+    const missing = roKeys.filter(k => !enKeys.includes(k))
+    expect(missing).toEqual([])
+  })
+  it('fiecare cheie invite* din en există și în ro', () => {
+    const missing = enKeys.filter(k => !roKeys.includes(k))
+    expect(missing).toEqual([])
+  })
+  it('getT(\'en\').inviteProfileGenderMale / getT(\'ro\').inviteProfileGenderMale diferă (traduceri reale, nu placeholder identic)', () => {
+    expect(getT('en').inviteProfileGenderMale).toBe('Male')
+    expect(getT('ro').inviteProfileGenderMale).toBe('Masculin')
   })
 })
 
