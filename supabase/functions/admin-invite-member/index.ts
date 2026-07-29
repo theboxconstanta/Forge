@@ -153,13 +153,46 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 }
 
+// Returns null when Brevo genuinely accepted the send, otherwise a
+// human-readable reason. P0 observability fix: send-invitation-email now
+// propagates Brevo's real HTTP status instead of always returning 200, so
+// functions.invoke()'s own error field is a reliable signal of an actual
+// rejection - but the generic supabase-js error message ("Edge Function
+// returned a non-2xx status code") isn't useful on its own, so the real
+// response body is read from error.context (the underlying Response),
+// exactly like forge-admin-web's own error handling already does for this
+// function's responses.
 async function sendInvitationEmail(admin: any, email: string, gymName: string, invitationId: string, rawToken: string): Promise<string | null> {
   const memberAppUrl = Deno.env.get("MEMBER_APP_URL") || "https://app.forge.ro";
   const link = `${memberAppUrl}/invite/${invitationId}?t=${rawToken}`;
-  const { error } = await admin.functions.invoke("send-invitation-email", {
-    body: { to: email, gymName, link },
+  const { data, error } = await admin.functions.invoke("send-invitation-email", {
+    body: { to: email, gymName, link, invitation_id: invitationId },
   });
-  return error ? errDetail(error).message : null;
+
+  if (!error) {
+    if (data?.ok === false) {
+      // Defensive: send-invitation-email should now return a non-2xx status
+      // on rejection (caught by `error` above), but if it ever returns 200
+      // with ok:false in the body for any reason, treat that as a failure
+      // too rather than silently reporting success.
+      return `Brevo a respins trimiterea (status ${data?.status ?? "necunoscut"})`;
+    }
+    return null;
+  }
+
+  const context = (error as { context?: Response }).context;
+  if (context) {
+    try {
+      const responseBody = await context.json();
+      if (typeof responseBody?.body === "string") {
+        return `Brevo a respins trimiterea (status ${responseBody.status ?? context.status}): ${responseBody.body.slice(0, 300)}`;
+      }
+      if (typeof responseBody?.error === "string") return responseBody.error;
+    } catch {
+      // response body wasn't JSON - fall through to the generic message.
+    }
+  }
+  return errDetail(error).message;
 }
 
 if (import.meta.main) {
