@@ -447,5 +447,3 @@ verify_jwt = false
 [functions.invitation-final-commit]
 enabled = true
 verify_jwt = false
-import_map = "./functions/send-notification/deno.json"
-entrypoint = "./functions/send-notification/index.ts"
