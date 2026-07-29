@@ -88,17 +88,20 @@ async function handleRequest(req: Request): Promise<Response> {
 
       step = "resend_send_invitation_email";
       const { data: gymRow } = await admin.from("gyms").select("name").eq("id", callerGymId).maybeSingle();
-      const inviteErr = await sendInvitationEmail(admin, invRow.invited_email, gymRow?.name ?? "Forge", invitationId, rawInvitationToken);
+      const emailResult = await sendInvitationEmail(admin, invRow.invited_email, gymRow?.name ?? "Forge", invitationId, rawInvitationToken);
 
       // Unlike create, resend's entire purpose is confirming delivery, so
       // the provider outcome is reported to the caller rather than only
       // logged server-side - the DB write (token rotated, audit recorded)
       // already succeeded regardless, matching create's own audit-at-
-      // write-time semantics, not audit-at-delivery-time.
+      // write-time semantics, not audit-at-delivery-time. brevoMessageId
+      // is included so a specific resend can be traced end-to-end without
+      // depending on Brevo's own (observed to lag) events log.
       return new Response(JSON.stringify({
         success: true,
-        emailDispatch: inviteErr ? "failed" : "accepted",
-        emailError: inviteErr ?? undefined,
+        emailDispatch: emailResult.error ? "failed" : "accepted",
+        emailError: emailResult.error ?? undefined,
+        brevoMessageId: emailResult.brevoMessageId,
       }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
 
@@ -141,9 +144,9 @@ async function handleRequest(req: Request): Promise<Response> {
 
     step = "send_invitation_email";
     const { data: gymRow } = await admin.from("gyms").select("name").eq("id", callerGymId).maybeSingle();
-    const inviteErr = await sendInvitationEmail(admin, emailNorm, gymRow?.name ?? "Forge", invitationId as string, rawInvitationToken);
-    if (inviteErr) {
-      console.error("admin-invite-member: invitation email send failed (invitation row still created, resend available):", inviteErr);
+    const emailResult = await sendInvitationEmail(admin, emailNorm, gymRow?.name ?? "Forge", invitationId as string, rawInvitationToken);
+    if (emailResult.error) {
+      console.error("admin-invite-member: invitation email send failed (invitation row still created, resend available):", emailResult.error);
     }
 
     return new Response(JSON.stringify({ success: true, invitation_id: invitationId }), { headers: { ...CORS, "Content-Type": "application/json" } });
@@ -162,7 +165,7 @@ async function handleRequest(req: Request): Promise<Response> {
 // response body is read from error.context (the underlying Response),
 // exactly like forge-admin-web's own error handling already does for this
 // function's responses.
-async function sendInvitationEmail(admin: any, email: string, gymName: string, invitationId: string, rawToken: string): Promise<string | null> {
+async function sendInvitationEmail(admin: any, email: string, gymName: string, invitationId: string, rawToken: string): Promise<{ error: string | null; brevoMessageId?: string }> {
   const memberAppUrl = Deno.env.get("MEMBER_APP_URL") || "https://app.forge.ro";
   const link = `${memberAppUrl}/invite/${invitationId}?t=${rawToken}`;
   const { data, error } = await admin.functions.invoke("send-invitation-email", {
@@ -175,9 +178,9 @@ async function sendInvitationEmail(admin: any, email: string, gymName: string, i
       // on rejection (caught by `error` above), but if it ever returns 200
       // with ok:false in the body for any reason, treat that as a failure
       // too rather than silently reporting success.
-      return `Brevo a respins trimiterea (status ${data?.status ?? "necunoscut"})`;
+      return { error: `Brevo a respins trimiterea (status ${data?.status ?? "necunoscut"})` };
     }
-    return null;
+    return { error: null, brevoMessageId: data?.brevoMessageId };
   }
 
   const context = (error as { context?: Response }).context;
@@ -185,14 +188,14 @@ async function sendInvitationEmail(admin: any, email: string, gymName: string, i
     try {
       const responseBody = await context.json();
       if (typeof responseBody?.body === "string") {
-        return `Brevo a respins trimiterea (status ${responseBody.status ?? context.status}): ${responseBody.body.slice(0, 300)}`;
+        return { error: `Brevo a respins trimiterea (status ${responseBody.status ?? context.status}): ${responseBody.body.slice(0, 300)}` };
       }
-      if (typeof responseBody?.error === "string") return responseBody.error;
+      if (typeof responseBody?.error === "string") return { error: responseBody.error };
     } catch {
       // response body wasn't JSON - fall through to the generic message.
     }
   }
-  return errDetail(error).message;
+  return { error: errDetail(error).message };
 }
 
 if (import.meta.main) {
