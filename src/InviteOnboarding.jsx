@@ -193,7 +193,7 @@ export default function InviteOnboarding({ invitationId }) {
     return (
       <Shell>
         <p style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{waiver?.title || 'Regulament'}</p>
-        <div style={{ maxHeight: '240px', overflowY: 'auto', fontSize: '13px', color: '#555', lineHeight: '1.6', background: '#f8f8f8', borderRadius: '10px', padding: '14px', marginBottom: '18px', border: '1px solid #eee' }}>
+        <div style={{ maxHeight: '240px', overflowY: 'auto', fontSize: '13px', color: '#555', lineHeight: '1.6', background: '#f8f8f8', borderRadius: '10px', padding: '14px', marginBottom: '18px', border: '1px solid #eee', whiteSpace: 'pre-wrap' }}>
           {waiver?.content_ref || 'Regulamentul sălii nu este disponibil momentan.'}
         </div>
         {errorMsg && <p style={{ color: '#E24B4A', fontSize: '13px', marginBottom: '12px' }}>{errorMsg}</p>}
