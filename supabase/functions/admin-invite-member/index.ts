@@ -60,6 +60,48 @@ async function handleRequest(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ success: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
 
+    if (action === "resend") {
+      const invitationId = body.invitation_id as string;
+      if (!invitationId) return errorResponse("Lipsește invitation_id", 400);
+
+      step = "resend_generate_token";
+      const rawInvitationToken = randomToken(32);
+      const tokenHash = await hmac(INVITATION_HMAC_SECRET, rawInvitationToken);
+
+      step = "resend_db_update";
+      const { data: outcome, error: resendErr } = await admin.rpc("m9_resend_invitation", {
+        p_invitation_id: invitationId,
+        p_gym_id: callerGymId,
+        p_actor_admin_id: caller.id,
+        p_new_token_hash: tokenHash,
+      });
+      if (resendErr) return errorResponse(errDetail(resendErr).message, 500);
+      if (outcome === "not_found") return errorResponse("Invitația nu a fost găsită", 404);
+      if (outcome === "already_accepted") return errorResponse("Invitația a fost deja acceptată", 409);
+      if (outcome === "revoked") return errorResponse("Invitația a fost revocată", 409);
+      if (outcome === "expired") return errorResponse("Invitația a expirat", 409);
+      if (outcome !== "ok") return errorResponse("Invitația nu poate fi retrimisă", 409);
+
+      step = "resend_lookup_recipient";
+      const { data: invRow, error: invLookupErr } = await admin.from("gym_invitations").select("invited_email").eq("id", invitationId).maybeSingle();
+      if (invLookupErr || !invRow) return errorResponse("Invitația nu a fost găsită", 404);
+
+      step = "resend_send_invitation_email";
+      const { data: gymRow } = await admin.from("gyms").select("name").eq("id", callerGymId).maybeSingle();
+      const inviteErr = await sendInvitationEmail(admin, invRow.invited_email, gymRow?.name ?? "Forge", invitationId, rawInvitationToken);
+
+      // Unlike create, resend's entire purpose is confirming delivery, so
+      // the provider outcome is reported to the caller rather than only
+      // logged server-side - the DB write (token rotated, audit recorded)
+      // already succeeded regardless, matching create's own audit-at-
+      // write-time semantics, not audit-at-delivery-time.
+      return new Response(JSON.stringify({
+        success: true,
+        emailDispatch: inviteErr ? "failed" : "accepted",
+        emailError: inviteErr ?? undefined,
+      }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+
     if (action !== "create") return errorResponse("Acțiune necunoscută", 400);
 
     step = "validate_email";
