@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.jsx'
 import InviteOnboarding from './InviteOnboarding.jsx'
 import { supabase } from './supabase.js'
+import { matchInviteRoute } from './inviteRoute.js'
 
 // M9 Invite Member (Product Specification Section 4.2) - a public,
 // unauthenticated onboarding route. WOD-SIMPLE has no router (a single
@@ -14,7 +15,20 @@ import { supabase } from './supabase.js'
 // mounts - the invitee's pre-Final-Commit journey never touches App's own
 // auth gate at all, matching Model D (no real Supabase session exists
 // until Final Commit succeeds).
-const inviteMatch = window.location.pathname.match(/^\/invite\/([^/]+)/)
+const inviteMatch = matchInviteRoute(window.location.pathname)
+
+// M9 Mobile Onboarding Scroll fix (2026-07-30). The fixed-frame/overflow:hidden
+// treatment applied to #root on portrait/landscape touch devices (index.css)
+// exists for App.jsx's own internal scroll region (.app-frame's content area)
+// - InviteOnboarding has no such region and relies entirely on normal
+// document scroll, so it silently inherited a hard content clip with no
+// scroll mechanism at all. This class scopes index.css's override back to
+// plain document scrolling for this route only, without touching App's
+// fixed-frame behaviour (a deliberate, hard-won design - see the NavBar/
+// safe-area/cold-start history in index.css's own comments).
+if (inviteMatch) {
+  document.body.classList.add('invite-onboarding')
+}
 
 // Monitorizare erori (Sentry) - pana acum erorile ajungeau doar in console.error,
 // nimeni nu era alertat daca ceva se strica in productie. captureConsoleIntegration

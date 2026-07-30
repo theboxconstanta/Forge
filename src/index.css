@@ -77,11 +77,14 @@ body {
 
 /* Pe telefon in landscape: rotim continutul inapoi la portret (fallback CSS) */
 /* hover:none + pointer:coarse = touch device (telefon/tableta), niciodata desktop */
+/* body.invite-onboarding exclus peste tot mai jos (vezi main.jsx) - forta-rotire
+   la portret e o decizie de UX a app-ului nativ (WOD-SIMPLE ca "telefon"), nu are
+   sens pt un formular public de onboarding, care trebuie doar sa scroleze normal. */
 @media screen and (orientation: landscape) and (max-height: 600px) and (hover: none) and (pointer: coarse) {
   html {
     overflow: hidden;
   }
-  body {
+  body:not(.invite-onboarding) {
     overflow: hidden;
     width: 100dvh;
     height: 100dvw;
@@ -97,6 +100,14 @@ body {
     transform-origin: top left;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+  body.invite-onboarding #root {
+    position: static;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    transform: none;
+    overflow: visible;
   }
 }
 
@@ -124,7 +135,7 @@ body {
    se folosea dvh initial) - dar acela e invizibil (fundal identic), spre
    deosebire de bug-ul dramatic aparut acum. */
 @media screen and (orientation: portrait) and (hover: none) and (pointer: coarse) {
-  body {
+  body:not(.invite-onboarding) {
     overflow: hidden;
   }
   #root {
@@ -138,6 +149,22 @@ body {
        impinge NavBar (copil al #root) in sus odata cu el, independent de
        orice logica JS/--app-vh. */
     overflow: hidden;
+  }
+  /* M9 Mobile Onboarding Scroll fix (2026-07-30) - InviteOnboarding.jsx has
+     no internal scroll region (.app-frame) of its own, it relies entirely
+     on normal document scroll. #root fixed+overflow:hidden hard-clipped any
+     content taller than the viewport with no scroll mechanism at all - real
+     production blocker, confirmed via a real Chrome mobile onboarding
+     attempt where fields below "Unit system" and the Continue button were
+     permanently unreachable. Reverts #root to normal flow for this route
+     only, so body (restored to overflow-y:auto above) is the single scroll
+     container, exactly like desktop already works. */
+  body.invite-onboarding #root {
+    position: static;
+    inset: auto;
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
   }
 }
 
