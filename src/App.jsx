@@ -5058,7 +5058,6 @@ function App() {
   const [gymResults, setGymResults] = useState([])
   const [selectedGym, setSelectedGym] = useState(null)
   const [joinCodeInput, setJoinCodeInput] = useState('')
-  const [gymSignupCodeInput, setGymSignupCodeInput] = useState('')
   const [resetMode, setResetMode] = useState(false)
   // Setat doar cand supabase.auth.initialize() intoarce o eroare cu un cod
   // din RESET_LINK_ERROR_CODES (vezi useEffect-ul de bootstrap si utils.js) -
@@ -6374,16 +6373,14 @@ function App() {
     setOwnerBootstrapping(false)
     if (registerMode === 'owner') {
       if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
-      if (!gymSignupCodeInput.trim()) { setAuthError(t.authGymSignupCodeRequired); setAuthSubmitting(false); return }
-      // Verificare UX (mesaj clar), nu poarta reala de securitate - aia e
-      // reserve_gym_signup_code() + politica RLS gyms_bootstrap_insert de mai
-      // jos (cere un cod chiar rezervat de acest utilizator, nu doar "valid
-      // undeva in tabel" - inchide exact portita prin care cineva ar putea
-      // ocoli UI-ul si ar crea o sala fara sa fi platit).
-      const codeCheck = await supabase.rpc('verify_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
-      if (!codeCheck.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
+      // M10.1 - fluxul de owner nu mai cere un cod de inregistrare pre-emis.
+      // OWNER_ACTIVATION_ARCHITECTURE.md Sectiunea 6/13 cere self-serve,
+      // fara nicio poarta umana (CTA principal "Start Free Trial", fara
+      // card, fara cod) - reserve_gym_signup_code()/verify_gym_signup_code()
+      // ramane in schema (posibil reutilizat mai tarziu pt un flux separat,
+      // asistat de vanzari, per OWNER_ACTIVATION_ARCHITECTURE.md Sectiunea 18),
+      // dar nu mai e apelat de acest ecran.
       setOwnerBootstrapping(true)
-      const newGymId = crypto.randomUUID()
       // Fara gym_id in metadata aici (spre deosebire de fluxul de membru mai
       // jos) - sala cu id-ul newGymId inca nu exista in `gyms` in acest
       // moment (nu poate fi creata inainte de signUp, are nevoie de
@@ -6396,10 +6393,20 @@ function App() {
       // incercare e deja activa - nu mai chemam signUp() a doua oara (ar
       // esua cu "user already registered").
       let ownerId = user?.id
+      // M10.1 - email_confirmed_at al userului proaspat creat decide starea
+      // initiala corecta a gym_activation_state/gym_commercial_state mai
+      // jos. Azi (enable_confirmations=false in proiect) GoTrue seteaza
+      // email_confirmed_at chiar la INSERT-ul din auth.users, nu la un UPDATE
+      // ulterior - trigger-ul on_owner_email_verified_trg (AFTER UPDATE OF
+      // email_confirmed_at) nu s-ar declansa deloc in acest caz, deci starea
+      // initiala trebuie sa reflecte direct faptul deja adevarat la creare,
+      // nu doar sa astepte un UPDATE care nu mai vine.
+      let emailConfirmedAt = user?.email_confirmed_at ?? null
       if (!ownerId) {
         const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
         if (error) { setAuthError(error.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
         ownerId = signUpData.user.id
+        emailConfirmedAt = signUpData.user.email_confirmed_at ?? null
       }
       // De aici incolo `user` e deja autentificat (async, via
       // onAuthStateChange) - ownerBootstrapping NU se reseteaza la eroare,
@@ -6409,15 +6416,48 @@ function App() {
       // care oricum a disparut - exact bug-ul pe care ownerBootstrapping
       // exista sa il previna). Se reseteaza doar la succesul final de mai
       // jos, sau defensiv la inceputul lui handleLogin().
-      const reserveRes = await supabase.rpc('reserve_gym_signup_code', { p_code: gymSignupCodeInput.trim() })
-      if (!reserveRes.data) { setAuthError(t.authGymSignupCodeInvalid); setAuthSubmitting(false); return }
-      const { error: gymErr } = await supabase.from('gyms').insert({
-        id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: ownerId,
+      //
+      // M10.1 - regresie de retry gasita si reparata la self-review: `admins.id`
+      // e cheie primara, deci un retry care ar re-incerca insert-ul in admins
+      // dupa ce a reusit deja o data (esec undeva mai jos, ex. la
+      // gym_activation_state) ar pica mereu cu eroare de cheie duplicata -
+      // contul ar ramane blocat definitiv, cu sala creata dar profilul
+      // nerevendicat niciodata. Verific intai daca exista deja un rand admins
+      // pt acest ownerId (dintr-o incercare anterioara reusita partial) si,
+      // daca da, reutilizez gym_id-ul lui in loc sa mai incerc inca o data
+      // gyms.insert()/admins.insert() (care ar esua oricum pe unicitatea
+      // numelui, respectiv pe PK).
+      const { data: existingAdminRow } = await supabase.from('admins').select('gym_id').eq('id', ownerId).maybeSingle()
+      let newGymId = existingAdminRow?.gym_id
+      if (!newGymId) {
+        newGymId = crypto.randomUUID()
+        const { error: gymErr } = await supabase.from('gyms').insert({
+          id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: ownerId,
+        })
+        if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
+        // admins inainte de gym_activation_state/gym_commercial_state de mai
+        // jos - politicile lor de bootstrap insert (owner_admin_id = auth.uid())
+        // cer explicit un rand deja existent in admins pt (auth.uid(), gym_id).
+        const { error: adminErr } = await supabase.from('admins').insert({ id: ownerId, email: authEmail, gym_id: newGymId })
+        if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      }
+      // M10.1 - OWNER_DOMAIN_IMPLEMENTATION_ARCHITECTURE.md Sectiunea 5.1:
+      // doua randuri separate (nu unul singur), owner_admin_id niciodata
+      // null dupa creare. upsert (nu insert simplu) - idempotent la retry,
+      // consistent cu verificarea existingAdminRow de mai sus.
+      const gymActivationState = emailConfirmedAt ? 'onboarding' : 'unverified'
+      const { error: activationStateErr } = await supabase.from('gym_activation_state').upsert({
+        gym_id: newGymId, owner_admin_id: ownerId, activation_state: gymActivationState,
       })
-      if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
-      await supabase.rpc('consume_my_reserved_gym_signup_code', { p_gym_id: newGymId })
-      const { error: adminErr } = await supabase.from('admins').insert({ id: ownerId, email: authEmail, gym_id: newGymId })
-      if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      if (activationStateErr) { setAuthError(activationStateErr.message); setAuthSubmitting(false); return }
+      const trialStartsNow = !!emailConfirmedAt
+      const { error: commercialStateErr } = await supabase.from('gym_commercial_state').upsert({
+        gym_id: newGymId,
+        commercial_state: trialStartsNow ? 'trial_running' : null,
+        trial_started_at: trialStartsNow ? new Date().toISOString() : null,
+        trial_ends_at: trialStartsNow ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null,
+      })
+      if (commercialStateErr) { setAuthError(commercialStateErr.message); setAuthSubmitting(false); return }
       // Abia acum sala chiar exista - putem "revendica" profilul (null ->
       // valoare, singura tranzitie permisa de prevent_gym_id_change()).
       const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', ownerId)
@@ -7186,10 +7226,7 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymNameLabel}</div>
                 <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', marginBottom: '12px' }} />
-                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymSignupCodeLabel}</div>
-                <input value={gymSignupCodeInput} onChange={e => setGymSignupCodeInput(e.target.value.toUpperCase())} placeholder={t.authGymSignupCodePlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', letterSpacing: '1px' }} />
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
               </div>
             ) : (
               <div>
