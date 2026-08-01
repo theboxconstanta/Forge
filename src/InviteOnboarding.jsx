@@ -11,10 +11,18 @@ const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 // of {invitationId, token} from the URL, verified server-side on every
 // call - nothing here is trusted client state.
 //
-// Steps: loading -> invalid | profile -> verify -> waiver -> submitting ->
-// success | error. "Accept & Complete" (the waiver step's own submit
-// button) is the single action that performs Final Commit - there is no
-// earlier point where anything permanent is written.
+// Steps: loading -> invalid | profile -> waiver -> submitting -> success |
+// error. "Accept & Complete" (the waiver step's own submit button) is the
+// single action that performs Final Commit - there is no earlier point
+// where anything permanent is written.
+//
+// M9.1 (2026-08-01): the email-OTP step was removed - see the M9.1
+// architecture report. The invitation token itself (256-bit random,
+// HMAC-hashed at rest, single-use, time-limited, revocable, tenant-scoped)
+// already provides everything the OTP step added on top of it; Forge is
+// invite-only (no public registration), so the admin's own act of sending
+// the invitation to a specific address is the trust boundary, matching
+// Slack/Notion/Linear/GitHub/Figma/Atlassian's own invitation flows.
 //
 // i18n: `lang` is local component state, defaulting to 'en' (Forge's
 // global default for brand-new invitees - App.jsx's own pre-auth default
@@ -36,13 +44,7 @@ const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const SERVER_ERROR_KEYS = {
   'Link invalid': 'inviteErrLinkInvalid',
   'Această invitație nu mai este validă': 'inviteErrInvitationInvalid',
-  'Așteaptă puțin înainte de a cere un cod nou': 'inviteErrCooldown',
-  'Prea multe cereri de cod. Contactează sala pentru o invitație nouă.': 'inviteErrResendCap',
-  'Codul nu a putut fi trimis. Încearcă din nou.': 'inviteErrCodeSendFailed',
-  'Cerere invalidă': 'inviteErrInvalidRequest',
-  'Cod incorect sau expirat': 'inviteErrWrongCode',
   'Date lipsă': 'inviteErrMissingFields',
-  'Verificarea emailului a expirat. Te rugăm să reiei verificarea.': 'inviteErrEmailNotVerified',
   'Regulamentul a fost actualizat. Te rugăm să îl revizuiești din nou.': 'inviteErrStaleWaiver',
   'A apărut o eroare neașteptată. Te rugăm să încerci din nou.': 'inviteErrMembershipMissing',
   'Contul a fost deja activat.': 'inviteErrAlreadyActivated',
@@ -106,11 +108,6 @@ export default function InviteOnboarding({ invitationId }) {
   const [gender, setGender] = useState('')
   const [weightUnit, setWeightUnit] = useState('kg')
 
-  const [code, setCode] = useState('')
-  const [sendingCode, setSendingCode] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [codeSentOnce, setCodeSentOnce] = useState(false)
-
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -130,26 +127,6 @@ export default function InviteOnboarding({ invitationId }) {
   const submitProfile = (e) => {
     e.preventDefault()
     if (!profileValid) return
-    setStep('verify')
-  }
-
-  const sendCode = async () => {
-    setSendingCode(true)
-    setErrorMsg('')
-    const { ok, json } = await callFn('invitation-challenge', { invitation_id: invitationId, token })
-    setSendingCode(false)
-    if (!ok) { setErrorMsg(translateServerError(t, json.error)); return }
-    setCodeSentOnce(true)
-  }
-
-  const verifyCode = async (e) => {
-    e.preventDefault()
-    if (!code.trim()) return
-    setVerifying(true)
-    setErrorMsg('')
-    const { ok, json } = await callFn('invitation-verify', { invitation_id: invitationId, token, code: code.trim() })
-    setVerifying(false)
-    if (!ok) { setErrorMsg(translateServerError(t, json.error)); return }
     setStep('waiver')
   }
 
@@ -248,31 +225,6 @@ export default function InviteOnboarding({ invitationId }) {
 
           <button type="submit" disabled={!profileValid} style={!profileValid ? buttonDisabledStyle : buttonStyle}>{t.inviteProfileContinueButton}</button>
         </form>
-      </Shell>
-    )
-  }
-
-  if (step === 'verify') {
-    return (
-      <Shell>
-        <p style={{ textAlign: 'center', fontSize: '14px', color: '#888', marginBottom: '20px' }}>{t.inviteVerifyIntro(invitedEmail)}</p>
-        {!codeSentOnce ? (
-          <button onClick={sendCode} disabled={sendingCode} style={sendingCode ? buttonDisabledStyle : buttonStyle}>
-            {sendingCode ? t.inviteVerifySending : t.inviteVerifySendButton}
-          </button>
-        ) : (
-          <form onSubmit={verifyCode}>
-            <div style={labelStyle}>{t.inviteVerifyCodeLabel}</div>
-            <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={{ ...inputStyle, textAlign: 'center', fontSize: '22px', letterSpacing: '6px' }} autoFocus />
-            {errorMsg && <p style={{ color: '#E24B4A', fontSize: '13px', marginBottom: '12px' }}>{errorMsg}</p>}
-            <button type="submit" disabled={verifying || code.length !== 6} style={(verifying || code.length !== 6) ? buttonDisabledStyle : buttonStyle}>
-              {verifying ? t.inviteVerifyChecking : t.inviteVerifySubmitButton}
-            </button>
-            <button type="button" onClick={sendCode} disabled={sendingCode} style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: '#888', fontSize: '13px', marginTop: '10px', cursor: 'pointer' }}>
-              {t.inviteVerifyResendButton}
-            </button>
-          </form>
-        )}
       </Shell>
     )
   }

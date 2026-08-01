@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { CORS, errDetail, errorResponse, resolveInvitationByToken, VERIFICATION_FRESHNESS_SECONDS } from "../_shared/invite.ts";
+import { CORS, errDetail, errorResponse, resolveInvitationByToken } from "../_shared/invite.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -7,7 +7,6 @@ const INVITATION_HMAC_SECRET = Deno.env.get("INVITATION_HMAC_SECRET")!;
 
 const COMMIT_FAILURE_MESSAGES: Record<string, string> = {
   invalid_invitation: "Această invitație nu mai este validă",
-  email_not_verified: "Verificarea emailului a expirat. Te rugăm să reiei verificarea.",
   stale_waiver: "Regulamentul a fost actualizat. Te rugăm să îl revizuiești din nou.",
   membership_missing: "A apărut o eroare neașteptată. Te rugăm să încerci din nou.",
   membership_race_lost: "Contul a fost deja activat.",
@@ -127,7 +126,6 @@ async function handleRequest(req: Request): Promise<Response> {
         p_gym_id: inv.gym_id,
         p_member_id: inv.member_id,
         p_waiver_id: waiverId,
-        p_verification_freshness_seconds: VERIFICATION_FRESHNESS_SECONDS,
       });
       if (commitErr) return errorResponse(errDetail(commitErr).message, 500);
       if (commitStatus !== "ok") {
@@ -157,7 +155,6 @@ async function handleRequest(req: Request): Promise<Response> {
         p_gym_id: inv.gym_id,
         p_member_id: existingProfile.id,
         p_waiver_id: waiverId,
-        p_verification_freshness_seconds: VERIFICATION_FRESHNESS_SECONDS,
       });
       if (commitErr) return errorResponse(errDetail(commitErr).message, 500);
       if (commitStatus !== "ok") {
@@ -190,7 +187,6 @@ async function handleRequest(req: Request): Promise<Response> {
       p_gym_id: inv.gym_id,
       p_new_member_id: newMemberId,
       p_waiver_id: waiverId,
-      p_verification_freshness_seconds: VERIFICATION_FRESHNESS_SECONDS,
     });
     if (commitErr || commitStatus !== "ok") {
       console.error("invitation-final-commit: SQL commit failed after createUser, compensating:", commitErr ? errDetail(commitErr) : commitStatus);

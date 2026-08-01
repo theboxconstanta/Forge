@@ -120,12 +120,12 @@ describe('InviteOnboarding - immediate language rerender', () => {
 })
 
 describe('InviteOnboarding - Final Commit payload', () => {
-  it('sends gender, language and weight_unit through to invitation-final-commit', async () => {
+  // M9.1 (2026-08-01): OTP removed - Personal Details now goes straight to
+  // Waiver, no intermediate verify step. See the M9.1 architecture report.
+  it('goes straight from Personal Details to Waiver (no OTP step) and sends gender/language/weight_unit through to invitation-final-commit', async () => {
     let finalCommitBody = null
     mockFetchSequence([
       ['invitation-status', () => jsonResponse(STATUS_RESPONSE)],
-      ['invitation-challenge', () => jsonResponse({ success: true })],
-      ['invitation-verify', () => jsonResponse({ success: true })],
       ['invitation-final-commit', (body) => { finalCommitBody = body; return jsonResponse({ success: true, token_hash: 'hashed' }) }],
     ])
     render(<InviteOnboarding invitationId="inv-1" />)
@@ -138,13 +138,6 @@ describe('InviteOnboarding - Final Commit payload', () => {
     fireEvent.click(screen.getByText('Imperial (lb)'))
     fireEvent.click(screen.getByText('Română'))
     fireEvent.click(screen.getByText('Continuă'))
-
-    await waitFor(() => expect(screen.getByText('Trimite cod de verificare')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Trimite cod de verificare'))
-
-    const codeInput = await screen.findByDisplayValue('')
-    fireEvent.change(codeInput, { target: { value: '123456' } })
-    fireEvent.click(screen.getByText('Confirmă codul'))
 
     await waitFor(() => expect(screen.getByText('Accept și finalizează')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Accept și finalizează'))
