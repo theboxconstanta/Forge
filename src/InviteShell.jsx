@@ -1,7 +1,8 @@
-// Shared shell for the two public, unauthenticated invitation-acceptance
-// pages (InviteOnboarding.jsx / AcceptAdminInvitation.jsx as of M10.3).
-// Its own file, exporting only this one component - same react-refresh
-// reasoning as inviteUiKit.js's own comment.
+// Shared shell for public, unauthenticated pages that use this bare
+// wordmark-plus-centered-card look: the two invitation-acceptance pages
+// (InviteOnboarding.jsx / AcceptAdminInvitation.jsx, M10.3) and the Pricing
+// page (M10.4). Its own file, exporting only this one component - same
+// react-refresh reasoning as inviteUiKit.js's own comment.
 export default function InviteShell({ children }) {
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', background: '#fff' }}>

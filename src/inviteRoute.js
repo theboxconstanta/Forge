@@ -18,3 +18,12 @@ export function matchInviteRoute(pathname) {
 export function matchAdminInviteRoute(pathname) {
   return pathname.match(/^\/admin-invite\/([^/]+)/)
 }
+
+// M10.4 Platform Plan Catalog & Pricing Page (M10_IMPLEMENTATION_PLAN.md
+// Section 5). Public, unauthenticated, no captured id - unlike the two
+// routes above, there is nothing to look up by id, just a static page.
+// Boolean, not a regex match object, since there is no capture group to
+// expose to a caller.
+export function matchPricingRoute(pathname) {
+  return pathname === '/pricing'
+}

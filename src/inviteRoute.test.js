@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchInviteRoute, matchAdminInviteRoute } from './inviteRoute'
+import { matchInviteRoute, matchAdminInviteRoute, matchPricingRoute } from './inviteRoute'
 
 describe('matchInviteRoute', () => {
   it('matches /invite/<id>', () => {
@@ -34,5 +34,19 @@ describe('matchAdminInviteRoute', () => {
   it('does not match unrelated paths', () => {
     expect(matchAdminInviteRoute('/admin-invite')).toBe(null)
     expect(matchAdminInviteRoute('/admin-invite/')).toBe(null)
+  })
+})
+
+describe('matchPricingRoute', () => {
+  it('matches /pricing', () => {
+    expect(matchPricingRoute('/pricing')).toBe(true)
+  })
+  it('does not match the root path', () => {
+    expect(matchPricingRoute('/')).toBe(false)
+  })
+  it('does not match unrelated or near-miss paths', () => {
+    expect(matchPricingRoute('/pricing/')).toBe(false)
+    expect(matchPricingRoute('/pricing/extra')).toBe(false)
+    expect(matchPricingRoute('/invite/abc-123')).toBe(false)
   })
 })

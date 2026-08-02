@@ -6,8 +6,9 @@ import './index.css'
 import App from './App.jsx'
 import InviteOnboarding from './InviteOnboarding.jsx'
 import AcceptAdminInvitation from './AcceptAdminInvitation.jsx'
+import PricingPage from './PricingPage.jsx'
 import { supabase } from './supabase.js'
-import { matchInviteRoute, matchAdminInviteRoute } from './inviteRoute.js'
+import { matchInviteRoute, matchAdminInviteRoute, matchPricingRoute } from './inviteRoute.js'
 
 // M9 Invite Member (Product Specification Section 4.2) - a public,
 // unauthenticated onboarding route. WOD-SIMPLE has no router (a single
@@ -23,6 +24,9 @@ const inviteMatch = matchInviteRoute(window.location.pathname)
 // region) - see the mobile-scroll-fix comment immediately below, which
 // applies identically to both routes for the identical reason.
 const adminInviteMatch = matchAdminInviteRoute(window.location.pathname)
+// M10.4 - Pricing page's own public route, same reasoning as the two above:
+// no auth, no App shell, checked once alongside them.
+const pricingMatch = matchPricingRoute(window.location.pathname)
 
 // M9 Mobile Onboarding Scroll fix (2026-07-30). The fixed-frame/overflow:hidden
 // treatment applied to #root on portrait/landscape touch devices (index.css)
@@ -32,8 +36,10 @@ const adminInviteMatch = matchAdminInviteRoute(window.location.pathname)
 // scroll mechanism at all. This class scopes index.css's override back to
 // plain document scrolling for this route only, without touching App's
 // fixed-frame behaviour (a deliberate, hard-won design - see the NavBar/
-// safe-area/cold-start history in index.css's own comments).
-if (inviteMatch || adminInviteMatch) {
+// safe-area/cold-start history in index.css's own comments). PricingPage
+// reuses the identical Shell (InviteShell.jsx) and therefore the identical
+// scroll assumption - included here for the same reason.
+if (inviteMatch || adminInviteMatch || pricingMatch) {
   document.body.classList.add('invite-onboarding')
 }
 
@@ -213,6 +219,7 @@ createRoot(document.getElementById('root')).render(
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       {inviteMatch ? <InviteOnboarding invitationId={inviteMatch[1]} />
         : adminInviteMatch ? <AcceptAdminInvitation invitationId={adminInviteMatch[1]} />
+        : pricingMatch ? <PricingPage />
         : <App />}
     </Sentry.ErrorBoundary>
   </StrictMode>,
