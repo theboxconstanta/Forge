@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { getT } from './translations.js'
+import Shell from './InviteShell.jsx'
+import { inputStyle, buttonStyle, buttonDisabledStyle } from './inviteUiKit.js'
 
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
@@ -65,10 +67,13 @@ async function callFn(name, body) {
   return { ok: res.ok, status: res.status, json }
 }
 
-const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1.5px solid #e0e0e0', fontSize: '15px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }
+// inputStyle/buttonStyle/buttonDisabledStyle now imported from
+// inviteUiKit.js, Shell from InviteShell.jsx (both above) - moved out of
+// this file, not just exported from it, to fix the react-refresh/only-
+// export-components lint error that resulted from exporting them
+// alongside this file's own default component export. AcceptAdminInvitation.jsx
+// (M10.3) imports the same two files rather than duplicating these values.
 const labelStyle = { fontSize: '12px', color: '#888', marginBottom: '4px', fontWeight: '500' }
-const buttonStyle = { width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }
-const buttonDisabledStyle = { ...buttonStyle, opacity: 0.6, cursor: 'not-allowed' }
 const sectionTitleStyle = { fontSize: '12px', fontWeight: '700', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', margin: '20px 0 12px' }
 const tileRowStyle = { display: 'flex', gap: '10px', marginBottom: '14px' }
 function tileStyle(active) {
@@ -76,19 +81,6 @@ function tileStyle(active) {
 }
 function tileLabelStyle(active) {
   return { fontSize: '13px', fontWeight: '700', color: active ? '#ABE73C' : '#888' }
-}
-
-function Shell({ children }) {
-  return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', background: '#fff' }}>
-      <div style={{ width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '24px', fontWeight: '900', color: '#0E0E0E', letterSpacing: '2px' }}>FORGE</div>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
 }
 
 export default function InviteOnboarding({ invitationId }) {

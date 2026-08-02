@@ -7,3 +7,14 @@
 export function matchInviteRoute(pathname) {
   return pathname.match(/^\/invite\/([^/]+)/)
 }
+
+// M10.3 - Admin Invitation public route (OWNER_DOMAIN_IMPLEMENTATION_
+// ARCHITECTURE.md Section 5.5). A distinct path from /invite/<id> above -
+// deliberately, since accepting one is a structurally different write
+// (Admin role, never a Membership), and the two must never be confused by
+// a shared route. `^` anchoring means the two patterns cannot collide:
+// /admin-invite/<id> does not start with /invite/, so matchInviteRoute
+// never matches it.
+export function matchAdminInviteRoute(pathname) {
+  return pathname.match(/^\/admin-invite\/([^/]+)/)
+}

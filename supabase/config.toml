@@ -483,3 +483,18 @@ verify_jwt = false
 [functions.invitation-final-commit]
 enabled = true
 verify_jwt = false
+
+# M10.3 - accept-admin-invitation mixes authenticated-Admin actions (send,
+# revoke - a real Bearer token, verified inside the function itself via
+# anonClient.auth.getUser()) with entirely unauthenticated invitee actions
+# (status, accept - Model D, no session exists yet). verify_jwt=false is
+# required for the latter two to ever reach this function's code at all -
+# without it, Supabase's own gateway rejects an unauthenticated request
+# before it arrives, exactly the class of bug already found once this
+# session for invitation-status et al. (see this file's own comment
+# immediately above). The function's own internal Bearer-token check
+# remains the real, sole security boundary for send/revoke regardless of
+# this gateway-level setting.
+[functions.accept-admin-invitation]
+enabled = true
+verify_jwt = false

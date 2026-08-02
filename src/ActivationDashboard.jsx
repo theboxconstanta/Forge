@@ -76,6 +76,18 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
 
   const [optionalOpen, setOptionalOpen] = useState(false)
 
+  // M10.3 - the co-admin/coach invite row, the one M10.2 optional item
+  // this milestone turns from a static label into a real action
+  // (M10_IMPLEMENTATION_PLAN.md's own explicit sequencing note: "add one
+  // row to an already-live optional list, not build a new list from
+  // scratch"). Same shape as the Member-invite state above, distinct
+  // fields since the two are genuinely separate actions against separate
+  // Edge Functions/tables.
+  const [coachInviteEmail, setCoachInviteEmail] = useState('')
+  const [sendingCoachInvite, setSendingCoachInvite] = useState(false)
+  const [coachInviteError, setCoachInviteError] = useState('')
+  const [coachInviteSentTo, setCoachInviteSentTo] = useState('')
+
   const activationStateRef = useRef(null)
   // Always-current t/showToast for the realtime callback below, without
   // making the subscription effect depend on them directly - t and
@@ -160,6 +172,23 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
     setInviteSentTo(email)
     setInviteEmail('')
     setSendingInvite(false)
+  }
+
+  const sendCoachInvite = async () => {
+    const email = coachInviteEmail.trim()
+    if (!email) { setCoachInviteError(t.toastFillEmail); return }
+    setSendingCoachInvite(true); setCoachInviteError('')
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${EDGE_BASE}/accept-admin-invitation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action: 'send', email }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok || json.error) { setCoachInviteError(json.error || t.toastGenericError); setSendingCoachInvite(false); return }
+    setCoachInviteSentTo(email)
+    setCoachInviteEmail('')
+    setSendingCoachInvite(false)
   }
 
   if (loading || !activationState || activationState === 'activated') return null
@@ -271,7 +300,22 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
           <ul style={{ margin: '4px 0 0', paddingLeft: '20px', fontSize: '12px', color: '#aaa', lineHeight: '1.9' }}>
             <li>{t.activationOptionalPlanItem}</li>
             <li>{t.activationOptionalLogoItem}</li>
-            <li>{t.activationOptionalCoachItem}</li>
+            <li style={{ marginBottom: '6px' }}>
+              {t.activationOptionalCoachItem}
+              {coachInviteSentTo ? (
+                <div style={{ color: '#4A9E2F', fontWeight: '600', marginTop: '2px' }}>{t.activationCoachInviteSentConfirm(coachInviteSentTo)}</div>
+              ) : (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                  <input type="email" aria-label={t.activationOptionalCoachItem} value={coachInviteEmail} onChange={e => setCoachInviteEmail(e.target.value)} placeholder={t.activationCoachInviteEmailPlaceholder}
+                    style={{ flex: 1, padding: '7px 8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'system-ui' }} />
+                  <button onClick={sendCoachInvite} disabled={sendingCoachInvite}
+                    style={{ padding: '7px 10px', background: sendingCoachInvite ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: sendingCoachInvite ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                    {sendingCoachInvite ? t.activationCoachInviteSending : t.activationCoachInviteButton}
+                  </button>
+                </div>
+              )}
+              {coachInviteError && <div style={{ color: '#E24B4A', marginTop: '4px' }}>{coachInviteError}</div>}
+            </li>
             <li>{t.activationOptionalPaymentsItem}</li>
             <li>{t.activationOptionalScheduleItem}</li>
           </ul>

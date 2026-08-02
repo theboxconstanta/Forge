@@ -82,6 +82,27 @@ async function handleRequest(req: Request): Promise<Response> {
       return new Response(JSON.stringify(result), { status: result.ok ? 200 : result.status, headers: { ...CORS, "Content-Type": "application/json" } });
     }
 
+    // M10.3 - Admin Invitation email. A distinct `type`, not the default
+    // branch below: an invited co-admin/coach is being asked to help run
+    // the gym, not to join it as a member - "join Forge" copy would read
+    // as the wrong invitation entirely to someone about to get an Admin
+    // role. Reuses the same sendEmail()/emailTemplate() infrastructure
+    // unchanged, same as the existing `code` branch already does - this
+    // function was already built as a type-dispatched wrapper, not
+    // hard-coded to one message, so a third type is the smallest addition
+    // consistent with its own existing shape.
+    if (body.type === "admin_invite") {
+      const { to, gymName, link } = body;
+      if (!to || !link) return new Response(JSON.stringify({ error: "missing fields" }), { status: 400, headers: CORS });
+      const html = `<p style="font-size:14px;margin:0 0 12px">You've been invited to help manage <strong>${gymName ?? "a gym"}</strong> on Forge as an Admin.</p>
+        <p style="font-size:14px;margin:0 0 16px">Click below to accept:</p>
+        <a href="${link}" style="display:inline-block;padding:12px 24px;background:#ABE73C;color:#0E0E0E;border-radius:10px;text-decoration:none;font-weight:600">Accept invitation</a>
+        <p style="font-size:12px;color:#666;margin:16px 0 0">This link expires in 72 hours.</p>`;
+      const result = await sendEmail(to, `You're invited to help manage ${gymName ?? "a gym"} on Forge`, html, log);
+      log("invocation_end", { result: result.ok ? "accepted" : "rejected" });
+      return new Response(JSON.stringify(result), { status: result.ok ? 200 : result.status, headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+
     // default: invitation link
     const { to, gymName, link } = body;
     if (!to || !link) return new Response(JSON.stringify({ error: "missing fields" }), { status: 400, headers: CORS });

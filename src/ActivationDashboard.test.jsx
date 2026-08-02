@@ -115,6 +115,32 @@ describe('ActivationDashboard - pre-First-Value (brand-new Owner)', () => {
     expect(publishedBody.title).toBeTruthy()
     expect(publishedBody.content).toBeTruthy()
   })
+
+  it('M10.3 - inviting a co-admin/coach calls accept-admin-invitation with action:send, independent of the Member invite action', async () => {
+    queryData.gym_activation_state = { activation_state: 'onboarding' }
+    queryData.gym_commercial_state = { trial_ends_at: null }
+    queryData.gym_waivers = { id: 'waiver-1' }
+    let sentBody = null
+    let sentUrl = null
+    globalThis.fetch = vi.fn((url, opts) => {
+      sentUrl = String(url)
+      sentBody = JSON.parse(opts.body)
+      return Promise.resolve(jsonResponse({ success: true, invitation_id: 'admin-inv-1' }))
+    })
+
+    render(<ActivationDashboard {...baseProps} />)
+    await waitFor(() => expect(screen.getByText('Optional setup (you can do this anytime)')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Optional setup (you can do this anytime)'))
+
+    const coachEmailInput = screen.getByLabelText('Invite a co-admin or coach')
+    fireEvent.change(coachEmailInput, { target: { value: 'coach@example.com' } })
+    fireEvent.click(screen.getByText('Invite'))
+
+    await waitFor(() => expect(screen.getByText('✓ Admin invitation sent to coach@example.com')).toBeInTheDocument())
+    expect(sentUrl).toContain('accept-admin-invitation')
+    expect(sentBody.action).toBe('send')
+    expect(sentBody.email).toBe('coach@example.com')
+  })
 })
 
 describe('ActivationDashboard - post-First-Value, pre-Activation', () => {

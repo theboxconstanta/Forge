@@ -5,8 +5,9 @@ import { Capacitor } from '@capacitor/core'
 import './index.css'
 import App from './App.jsx'
 import InviteOnboarding from './InviteOnboarding.jsx'
+import AcceptAdminInvitation from './AcceptAdminInvitation.jsx'
 import { supabase } from './supabase.js'
-import { matchInviteRoute } from './inviteRoute.js'
+import { matchInviteRoute, matchAdminInviteRoute } from './inviteRoute.js'
 
 // M9 Invite Member (Product Specification Section 4.2) - a public,
 // unauthenticated onboarding route. WOD-SIMPLE has no router (a single
@@ -16,6 +17,12 @@ import { matchInviteRoute } from './inviteRoute.js'
 // auth gate at all, matching Model D (no real Supabase session exists
 // until Final Commit succeeds).
 const inviteMatch = matchInviteRoute(window.location.pathname)
+// M10.3 - Admin Invitation's own public route, checked alongside the M9
+// one above. AcceptAdminInvitation.jsx reuses InviteOnboarding.jsx's own
+// <Shell> (same normal-document-scroll reliance, no internal scroll
+// region) - see the mobile-scroll-fix comment immediately below, which
+// applies identically to both routes for the identical reason.
+const adminInviteMatch = matchAdminInviteRoute(window.location.pathname)
 
 // M9 Mobile Onboarding Scroll fix (2026-07-30). The fixed-frame/overflow:hidden
 // treatment applied to #root on portrait/landscape touch devices (index.css)
@@ -26,7 +33,7 @@ const inviteMatch = matchInviteRoute(window.location.pathname)
 // plain document scrolling for this route only, without touching App's
 // fixed-frame behaviour (a deliberate, hard-won design - see the NavBar/
 // safe-area/cold-start history in index.css's own comments).
-if (inviteMatch) {
+if (inviteMatch || adminInviteMatch) {
   document.body.classList.add('invite-onboarding')
 }
 
@@ -204,7 +211,9 @@ requestAnimationFrame(__sampleTrace)
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      {inviteMatch ? <InviteOnboarding invitationId={inviteMatch[1]} /> : <App />}
+      {inviteMatch ? <InviteOnboarding invitationId={inviteMatch[1]} />
+        : adminInviteMatch ? <AcceptAdminInvitation invitationId={adminInviteMatch[1]} />
+        : <App />}
     </Sentry.ErrorBoundary>
   </StrictMode>,
 )
