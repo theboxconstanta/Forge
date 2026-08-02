@@ -156,11 +156,28 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "https://forge-delta-ivory.vercel.app"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# M10.1a - site_url above was still the local-dev placeholder (127.0.0.1:3000)
+# even though this file targets the linked production project
+# (docs/ARCHITECTURE.md confirms forge-delta-ivory.vercel.app as the real
+# production domain, matching the APP_BASE_URL fallback already hardcoded in
+# supabase/functions/create-checkout-session/index.ts). Left uncorrected,
+# every confirmation/reset email link generated once enable_confirmations is
+# on would have pointed at localhost for every real user. Both localhost
+# variants are kept below so local dev auth testing still works.
+#
+# CORRECTION, same day: the first `config push` of this change (before this
+# line existed) replaced the live additional_redirect_urls list wholesale
+# with only the two localhost entries below, silently dropping the
+# production URL that was already correctly present live
+# (https://forge-delta-ivory.vercel.app) - `config push` diffs and applies
+# this whole [auth] block as one unit, with no per-field merge. Caught
+# immediately by re-running `config push` and reading its own diff output
+# before assuming success; restored here.
+additional_redirect_urls = ["https://forge-delta-ivory.vercel.app", "http://127.0.0.1:3000", "https://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -223,13 +240,28 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# M10.1a - ADR-001: Owner Bootstrap must not run before verified identity.
+# Safe to flip globally (not scoped per-flow, since Supabase has no such
+# scoping): M9 Final Commit already creates every Member identity via
+# admin.auth.admin.createUser({ email_confirm: true, ... }), an explicit
+# per-call override independent of this project-wide setting - verified
+# directly in supabase/functions/invitation-final-commit/index.ts before
+# this flip, per M10_1_IMPLEMENTATION_STRATEGY.md Section 3.3. The one
+# other public signUp() caller (Member self-join-by-code) is intentionally
+# NOT exempted - it has no vouching Admin either, so requiring confirmation
+# there is consistent with, not a regression of, the same principle.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# M10.1a - restored to the value that was actually live (1m0s), not this
+# file's stale default (1s) - same drift-caught-and-fixed incident as
+# additional_redirect_urls/mfa.totp above.
+max_frequency = "1m0s"
 # Number of characters used in the email OTP.
-otp_length = 6
+# M10.1a - restored to the value that was actually live (8), not this
+# file's stale default (6).
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
@@ -299,9 +331,13 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
+# M10.1a - restored to true/true: this file's default (false/false) had
+# silently diverged from what was actually live (true/true) before this
+# milestone's config push - caught and fixed the same day, see the
+# additional_redirect_urls comment above for the same incident.
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

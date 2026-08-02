@@ -4935,6 +4935,11 @@ function App() {
   // la paywall-ul de abonament ca un membru obisnuit, cu un mesaj complet
   // fara legatura cu problema reala. Bug real gasit live (07-14).
   const [noGymMembership, setNoGymMembership] = useState(false)
+  // M10.1a - fetchUserProfile() seteaza acest flag pt un owner verificat
+  // (sesiune noua, email_confirmed_at deja true) care nu a trecut inca prin
+  // bootstrap_owner_gym - vezi ramura dedicata de acolo pt semnalul exact
+  // (fara member, fara admin, gym_id null).
+  const [pendingOwnerBootstrap, setPendingOwnerBootstrap] = useState(false)
   // Inainte de login nu exista userProfile din care sa citim limba - localStorage
   // (aceeasi convenție ca forge_remember_email) tine limba intre sesiuni pe acest
   // device; dupa login, se sincronizeaza cu profiles.language (sursa de adevar
@@ -5310,6 +5315,13 @@ function App() {
       // reprodusa live (login cu parola "scursa" a reusit, HTTP 200).
       setProfileNewPassword('')
       setProfileNewPasswordConfirm('')
+      // M10.1a - acelasi motiv de fond ca mai sus (App() nu se remonteaza
+      // intre sesiuni): fara acest reset, un al doilea cont logat pe acelasi
+      // tab dupa ce primul a ramas pe ecranul "creeaza-ti sala" ar vedea
+      // pentru o clipa acel ecran cu numele de sala tastat de primul cont,
+      // pana ce fetchUserProfile() celui de-al doilea cont corecteaza.
+      setPendingOwnerBootstrap(false)
+      setNewGymName('')
     }
   }, [user])
 
@@ -5678,9 +5690,16 @@ function App() {
     // interogarea care decide existenta contului (vezi ramura `!data` de mai
     // jos) - un members lipsa (drift, niciodata observat live) degradeaza
     // gracios la campuri de identitate `undefined`, nu la userProfile null.
-    const [{ data: profileRow }, { data: memberRow }] = await Promise.all([
+    // M10.1a - al treilea query in paralel, doar pt semnalul de mai jos
+    // (pendingOwnerBootstrap): un rand admins e singurul mod sigur, fara
+    // race, de a sti "acest user a trecut deja prin Bootstrap" fara sa
+    // depinda de starea separata isAdmin (populata de checkAdmin(), un alt
+    // efect async pornit in acelasi tick, care ar putea sa nu fi ajuns inca
+    // la raspuns cand se evalueaza ramura de mai jos).
+    const [{ data: profileRow }, { data: memberRow }, { data: adminRow }] = await Promise.all([
       supabase.from('profiles').select('gym_id, waiver_accepted, waiver_accepted_at').eq('id', user.id).maybeSingle(),
       supabase.from('members').select('id, email, full_name, avatar_url, created_at, gender, first_name, last_name, birth_date, weight_unit, language').eq('id', user.id).maybeSingle(),
+      supabase.from('admins').select('id').eq('id', user.id).maybeSingle(),
     ])
     const data = profileRow ? {
       ...memberRow,
@@ -5700,6 +5719,7 @@ function App() {
       const { data: gymRow } = await supabase.from('gyms').select('id, name, primary_color').eq('id', data.gym_id).maybeSingle()
       setGymBlocked(!gymRow)
       setNoGymMembership(false)
+      setPendingOwnerBootstrap(false)
       if (gymRow) setMyGym({ name: gymRow.name, primaryColor: gymRow.primary_color || CURRENT_GYM.primaryColor })
     } else if (data && !ownerBootstrapping && hadGymBefore) {
       // Eliminare live, cat timp sesiunea era deja activa (admin-remove-member):
@@ -5734,6 +5754,7 @@ function App() {
       setMyGym(CURRENT_GYM)
       setGymBlocked(false)
       setNoGymMembership(false)
+      setPendingOwnerBootstrap(false)
       setClientsReloadToken(0)
       setAdminSubsReloadToken(0)
       try {
@@ -5743,6 +5764,25 @@ function App() {
       }
       setUser(null)
       return
+    } else if (data && !ownerBootstrapping && !memberRow && !adminRow) {
+      // M10.1a - PENDING_OWNER_IMPLEMENTATION_CONTRACT.md: dupa activarea
+      // enable_confirmations, signUp()-ul fluxului de owner nu mai
+      // stabileste o sesiune activa (asteapta click pe linkul din email,
+      // posibil peste zile, posibil pe alt tab/device dupa un reload
+      // complet - ownerBootstrapping, un flag React local, nu mai
+      // supravietuieste acelei ferestre). La revenire (sesiune noua,
+      // verificata), acest user nu are inca gym_id, dar - spre deosebire de
+      // ramura noGymMembership de mai jos - nu a avut NICIODATA vreun rand
+      // in members (un membru eliminat pastreaza mereu identitatea in
+      // Member Domain - "identity outlives commerce", MEMBER_DOMAIN_
+      // ARCHITECTURE.md D1) si nici in admins. Acest tipar (fara member,
+      // fara admin) e atins DOAR de un owner verificat, inca ne-bootstrap-uit -
+      // separat deliberat de ecranul "No Gym" (acela ramane exact ce era,
+      // pt P0-006), ca sa nu arate un mesaj complet gresit ("nu esti membru
+      // al niciunei sali") cuiva care tocmai incearca sa devina Owner.
+      setGymBlocked(false)
+      setNoGymMembership(false)
+      setPendingOwnerBootstrap(true)
     } else if (data && !ownerBootstrapping) {
       // Profil existent, fara gym_id, in afara ferestrei de owner bootstrapping,
       // deja asa la acest prim fetch al sesiunii (nu o tranzitie live - vezi
@@ -5754,6 +5794,7 @@ function App() {
       // separata deliberat de ecranul vechi de inregistrare neterminata (P0-006).
       setGymBlocked(false)
       setNoGymMembership(true)
+      setPendingOwnerBootstrap(false)
     } else if (!data && !ownerBootstrapping) {
       // Sesiune locala inca valida (JWT neexpirat) dar contul a fost sters
       // (ex. Delete User, cand va exista) - fara asta, `data === null` cadea
@@ -5768,6 +5809,7 @@ function App() {
     } else {
       setGymBlocked(false)
       setNoGymMembership(false)
+      setPendingOwnerBootstrap(false)
     }
     const currentYear = new Date().getFullYear()
     const waiverInLS = localStorage.getItem(`waiver_${user?.id}_${currentYear}`) === '1'
@@ -6361,63 +6403,25 @@ function App() {
     // nou, dupa validare.
     setOwnerBootstrapping(false)
     if (registerMode === 'owner') {
-      if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); setAuthSubmitting(false); return }
-      // M10.1 - fluxul de owner nu mai cere un cod de inregistrare pre-emis.
-      // OWNER_ACTIVATION_ARCHITECTURE.md Sectiunea 6/13 cere self-serve,
-      // fara nicio poarta umana (CTA principal "Start Free Trial", fara
-      // card, fara cod) - reserve_gym_signup_code()/verify_gym_signup_code()
-      // ramane in schema (posibil reutilizat mai tarziu pt un flux separat,
-      // asistat de vanzari, per OWNER_ACTIVATION_ARCHITECTURE.md Sectiunea 18),
-      // dar nu mai e apelat de acest ecran.
-      setOwnerBootstrapping(true)
-      // Fara gym_id in metadata aici (spre deosebire de fluxul de membru mai
-      // jos) - sala cu id-ul newGymId inca nu exista in `gyms` in acest
-      // moment (nu poate fi creata inainte de signUp, are nevoie de
-      // auth.uid()). handle_new_user() ar incerca sa insereze un gym_id care
-      // incalca FK-ul spre gyms(id), iar signUp() ar pica generic cu 500 -
-      // bug real gasit live. profiles.gym_id ramane null pana la pasul de
-      // mai jos, dupa ce sala chiar exista.
-      // Daca userul reincearca dupa un esec anterior (retry pe acelasi
-      // ecran, tinut deschis de ownerBootstrapping), sesiunea din prima
-      // incercare e deja activa - nu mai chemam signUp() a doua oara (ar
-      // esua cu "user already registered").
-      let ownerId = user?.id
-      if (!ownerId) {
-        const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
-        if (error) { setAuthError(error.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
-        ownerId = signUpData.user.id
+      // M10.1a - ADR-001 / PENDING_OWNER_IMPLEMENTATION_CONTRACT.md: acest
+      // ecran nu mai colecteaza numele salii si nu mai apeleaza Bootstrap -
+      // numele salii nu face parte din Pending Owner (Bootstrap poate
+      // functiona fara el, se cere din nou, o singura data, exact la
+      // Bootstrap - vezi ecranul dedicat "creeaza-ti sala" mai jos, si
+      // handleBootstrapOwnerGym()). Cu enable_confirmations=true, signUp()
+      // de mai jos nu mai stabileste o sesiune activa - nu mai exista niciun
+      // pas sincron de facut dupa el. Daca userul apasa Inregistreaza-te a
+      // doua oara inainte sa verifice emailul (acelasi ecran, nicio sesiune
+      // inca), signUp() cu acelasi email nesigilat inca e gestionat idempotent
+      // chiar de Supabase (retrimite confirmarea, nu duplica/esueaza) -
+      // PENDING_OWNER_IMPLEMENTATION_CONTRACT.md Partea 1, "Idempotency & retry".
+      if (!user) {
+        const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+        if (error) { setAuthError(error.message); setAuthSubmitting(false); return }
       }
-      // De aici incolo `user` e deja autentificat (async, via
-      // onAuthStateChange) - ownerBootstrapping NU se reseteaza la eroare,
-      // ca sa ramana pe ecranul de register (altfel gate-ul `!user ||
-      // ownerBootstrapping` ar cadea pe `false`, iar userul ar cadea direct
-      // in aplicatia principala, fara sala, cu eroarea afisata pe un ecran
-      // care oricum a disparut - exact bug-ul pe care ownerBootstrapping
-      // exista sa il previna). Se reseteaza doar la succesul final de mai
-      // jos, sau defensiv la inceputul lui handleLogin().
-      //
-      // PENDING_OWNER_IMPLEMENTATION_CONTRACT.md - Bootstrap e o singura
-      // operatie privilegiata (bootstrap_owner_gym, SECURITY DEFINER, o
-      // singura tranzactie SQL) - clientul nu mai scrie direct in
-      // gyms/admins/gym_activation_state/gym_commercial_state/profiles (nu
-      // mai are nici macar dreptul, politicile de INSERT au fost eliminate).
-      // RPC-ul insusi revalideaza email_confirmed_at (ADR-001 Invariant 2)
-      // si e idempotent - sigur de reapelat la double-click/retry/raspuns
-      // pierdut pe retea, intoarce sala deja creata in loc sa esueze.
-      const { data: newGymId, error: bootstrapErr } = await supabase.rpc('bootstrap_owner_gym', { p_gym_name: newGymName.trim() })
-      if (bootstrapErr) {
-        setAuthError(bootstrapErr.message === 'gym_name_taken' ? t.toastGymNameTaken : bootstrapErr.message)
-        setAuthSubmitting(false)
-        return
-      }
-      // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
-      // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
-      // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
-      // iar Bootstrap-ul de mai sus tocmai a schimbat ce ar gasi acele
-      // functii oricum.
-      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', ownerId).maybeSingle()
-      setUserProfile(freshProfile); setIsAdmin(true)
-      setOwnerBootstrapping(false)
+      setAuthError(t.authCheckEmailConfirm)
+      setAuthSubmitting(false)
+      return
     } else {
       if (!selectedGym) { setAuthError(t.authPickGymFirst); setAuthSubmitting(false); return }
       if (!joinCodeInput.trim()) { setAuthError(t.authGymCodeRequired); setAuthSubmitting(false); return }
@@ -6443,6 +6447,30 @@ function App() {
     setAuthSubmitting(false)
   }
 
+  // M10.1a - randat doar cat pendingOwnerBootstrap e true (owner verificat,
+  // inca ne-bootstrap-uit - vezi ramura dedicata din fetchUserProfile).
+  // Singurul apelant al bootstrap_owner_gym in tot fisierul - RPC-ul insusi
+  // e idempotent (sigur de reapelat la double-click/retry) si revalideaza
+  // email_confirmed_at server-side (ADR-001 Invariant 2), deci acest
+  // handler nu are nevoie de nicio logica proprie de retry/protectie.
+  const handleBootstrapOwnerGym = async () => {
+    if (!newGymName.trim()) { setAuthError(t.authGymNameRequired); return }
+    setAuthSubmitting(true); setAuthError('')
+    const { error: bootstrapErr } = await supabase.rpc('bootstrap_owner_gym', { p_gym_name: newGymName.trim() })
+    if (bootstrapErr) {
+      setAuthError(bootstrapErr.message === 'gym_name_taken' ? t.toastGymNameTaken : bootstrapErr.message)
+      setAuthSubmitting(false)
+      return
+    }
+    // Sincronizare directa, nu prin closure vechi - checkAdmin()/
+    // fetchUserProfile() au fost pornite la login, inainte ca Bootstrap-ul
+    // de mai sus sa fi schimbat ce ar gasi.
+    const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    setUserProfile(freshProfile); setIsAdmin(true); setPendingOwnerBootstrap(false)
+    setNewGymName('')
+    setAuthSubmitting(false)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     // Reset explicit - altfel un login imediat urmator, cu alt cont, ar
@@ -6450,6 +6478,7 @@ function App() {
     // de la contul anterior, pana ce fetchUserProfile() apuca sa corecteze.
     setGymBlocked(false)
     setNoGymMembership(false)
+    setPendingOwnerBootstrap(false)
     // userProfile ramane altfel cu datele contului vechi pana se rezolva
     // fetchUserProfile() a noului cont - null aici garanteaza ca ecranul
     // Profil (si orice alt loc care citeste userProfile direct) nu poate
@@ -7172,11 +7201,11 @@ function App() {
               </button>
             </div>
             {registerMode === 'owner' ? (
-              <div>
-                <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymNameLabel}</div>
-                <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
-              </div>
+              // M10.1a - numele salii nu se mai cere aici (Pending Owner nu
+              // il contine - vezi PENDING_OWNER_IMPLEMENTATION_CONTRACT.md
+              // Partea 1). Se cere o singura data, dupa verificarea emailului,
+              // pe ecranul dedicat randat mai jos (pendingOwnerBootstrap).
+              <div style={{ fontSize: '13px', color: '#aaa', lineHeight: '1.5' }}>{t.authOwnerSignupHint}</div>
             ) : (
               <div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authFindGymLabel}</div>
@@ -7285,6 +7314,27 @@ function App() {
             <button onClick={handleJoinGymWithCode} disabled={joiningGym}
               style={{ width: '100%', padding: '13px', background: joiningGym ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: joiningGym ? 'not-allowed' : 'pointer', marginBottom: '10px' }}>
               {joiningGym ? t.noGymJoining : t.noGymJoinButton}
+            </button>
+            <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              {t.paywallLogout}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingOwnerBootstrap && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.ownerBootstrapTitle}</div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.ownerBootstrapText}</div>
+            <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#fafafa', marginBottom: '10px' }} />
+            {authError && (
+              <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{authError}</div>
+            )}
+            <button onClick={handleBootstrapOwnerGym} disabled={authSubmitting}
+              style={{ width: '100%', padding: '13px', background: authSubmitting ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', marginBottom: '10px' }}>
+              {authSubmitting ? t.ownerBootstrapCreating : t.ownerBootstrapButton}
             </button>
             <button onClick={handleLogout} style={{ width: '100%', padding: '13px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               {t.paywallLogout}
