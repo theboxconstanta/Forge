@@ -6330,17 +6330,6 @@ function App() {
     setAuthSubmitting(false)
   }
 
-  // Cod scurt de alaturare per sala - fara 0/O/1/I (ambigue vizual). Coliziune
-  // extrem de improbabila la scara asta (32^6 combinatii), iar constrangerea
-  // UNIQUE din DB e garantia reala - un eventual conflict pica vizibil ca
-  // eroare la insert, nu se pierde silentios.
-  const generateJoinCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let code = ''
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
-    return code
-  }
-
   // Cautare sala la inregistrare - dupa nume (unic, impus la creare) SAU cod
   // de alaturare, intr-un singur camp. Rulează pe clientul anonim (inainte
   // de autentificare) - politica gyms_select_public permite explicit asta.
@@ -6393,20 +6382,10 @@ function App() {
       // incercare e deja activa - nu mai chemam signUp() a doua oara (ar
       // esua cu "user already registered").
       let ownerId = user?.id
-      // M10.1 - email_confirmed_at al userului proaspat creat decide starea
-      // initiala corecta a gym_activation_state/gym_commercial_state mai
-      // jos. Azi (enable_confirmations=false in proiect) GoTrue seteaza
-      // email_confirmed_at chiar la INSERT-ul din auth.users, nu la un UPDATE
-      // ulterior - trigger-ul on_owner_email_verified_trg (AFTER UPDATE OF
-      // email_confirmed_at) nu s-ar declansa deloc in acest caz, deci starea
-      // initiala trebuie sa reflecte direct faptul deja adevarat la creare,
-      // nu doar sa astepte un UPDATE care nu mai vine.
-      let emailConfirmedAt = user?.email_confirmed_at ?? null
       if (!ownerId) {
         const { data: signUpData, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
         if (error) { setAuthError(error.message); setAuthSubmitting(false); setOwnerBootstrapping(false); return }
         ownerId = signUpData.user.id
-        emailConfirmedAt = signUpData.user.email_confirmed_at ?? null
       }
       // De aici incolo `user` e deja autentificat (async, via
       // onAuthStateChange) - ownerBootstrapping NU se reseteaza la eroare,
@@ -6417,55 +6396,25 @@ function App() {
       // exista sa il previna). Se reseteaza doar la succesul final de mai
       // jos, sau defensiv la inceputul lui handleLogin().
       //
-      // M10.1 - regresie de retry gasita si reparata la self-review: `admins.id`
-      // e cheie primara, deci un retry care ar re-incerca insert-ul in admins
-      // dupa ce a reusit deja o data (esec undeva mai jos, ex. la
-      // gym_activation_state) ar pica mereu cu eroare de cheie duplicata -
-      // contul ar ramane blocat definitiv, cu sala creata dar profilul
-      // nerevendicat niciodata. Verific intai daca exista deja un rand admins
-      // pt acest ownerId (dintr-o incercare anterioara reusita partial) si,
-      // daca da, reutilizez gym_id-ul lui in loc sa mai incerc inca o data
-      // gyms.insert()/admins.insert() (care ar esua oricum pe unicitatea
-      // numelui, respectiv pe PK).
-      const { data: existingAdminRow } = await supabase.from('admins').select('gym_id').eq('id', ownerId).maybeSingle()
-      let newGymId = existingAdminRow?.gym_id
-      if (!newGymId) {
-        newGymId = crypto.randomUUID()
-        const { error: gymErr } = await supabase.from('gyms').insert({
-          id: newGymId, name: newGymName.trim(), join_code: generateJoinCode(), owner_id: ownerId,
-        })
-        if (gymErr) { setAuthError(gymErr.message); setAuthSubmitting(false); return }
-        // admins inainte de gym_activation_state/gym_commercial_state de mai
-        // jos - politicile lor de bootstrap insert (owner_admin_id = auth.uid())
-        // cer explicit un rand deja existent in admins pt (auth.uid(), gym_id).
-        const { error: adminErr } = await supabase.from('admins').insert({ id: ownerId, email: authEmail, gym_id: newGymId })
-        if (adminErr) { setAuthError(adminErr.message); setAuthSubmitting(false); return }
+      // PENDING_OWNER_IMPLEMENTATION_CONTRACT.md - Bootstrap e o singura
+      // operatie privilegiata (bootstrap_owner_gym, SECURITY DEFINER, o
+      // singura tranzactie SQL) - clientul nu mai scrie direct in
+      // gyms/admins/gym_activation_state/gym_commercial_state/profiles (nu
+      // mai are nici macar dreptul, politicile de INSERT au fost eliminate).
+      // RPC-ul insusi revalideaza email_confirmed_at (ADR-001 Invariant 2)
+      // si e idempotent - sigur de reapelat la double-click/retry/raspuns
+      // pierdut pe retea, intoarce sala deja creata in loc sa esueze.
+      const { data: newGymId, error: bootstrapErr } = await supabase.rpc('bootstrap_owner_gym', { p_gym_name: newGymName.trim() })
+      if (bootstrapErr) {
+        setAuthError(bootstrapErr.message === 'gym_name_taken' ? t.toastGymNameTaken : bootstrapErr.message)
+        setAuthSubmitting(false)
+        return
       }
-      // M10.1 - OWNER_DOMAIN_IMPLEMENTATION_ARCHITECTURE.md Sectiunea 5.1:
-      // doua randuri separate (nu unul singur), owner_admin_id niciodata
-      // null dupa creare. upsert (nu insert simplu) - idempotent la retry,
-      // consistent cu verificarea existingAdminRow de mai sus.
-      const gymActivationState = emailConfirmedAt ? 'onboarding' : 'unverified'
-      const { error: activationStateErr } = await supabase.from('gym_activation_state').upsert({
-        gym_id: newGymId, owner_admin_id: ownerId, activation_state: gymActivationState,
-      })
-      if (activationStateErr) { setAuthError(activationStateErr.message); setAuthSubmitting(false); return }
-      const trialStartsNow = !!emailConfirmedAt
-      const { error: commercialStateErr } = await supabase.from('gym_commercial_state').upsert({
-        gym_id: newGymId,
-        commercial_state: trialStartsNow ? 'trial_running' : null,
-        trial_started_at: trialStartsNow ? new Date().toISOString() : null,
-        trial_ends_at: trialStartsNow ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null,
-      })
-      if (commercialStateErr) { setAuthError(commercialStateErr.message); setAuthSubmitting(false); return }
-      // Abia acum sala chiar exista - putem "revendica" profilul (null ->
-      // valoare, singura tranzitie permisa de prevent_gym_id_change()).
-      const { error: claimErr } = await supabase.from('profiles').update({ gym_id: newGymId }).eq('id', ownerId)
-      if (claimErr) { setAuthError(claimErr.message); setAuthSubmitting(false); return }
       // Sincronizare directa cu id-ul proaspat din signUp, nu prin closure-ul
       // vechi al lui `user`/checkAdmin/fetchUserProfile - onAuthStateChange
       // poate sa nu fi apucat inca sa actualizeze starea React in acest tick,
-      // iar pasii de mai sus tocmai au schimbat ce ar gasi acele functii oricum.
+      // iar Bootstrap-ul de mai sus tocmai a schimbat ce ar gasi acele
+      // functii oricum.
       const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', ownerId).maybeSingle()
       setUserProfile(freshProfile); setIsAdmin(true)
       setOwnerBootstrapping(false)
