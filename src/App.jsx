@@ -11,6 +11,7 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
+import ActivationDashboard from './ActivationDashboard'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
@@ -7432,6 +7433,14 @@ function App() {
         const logZiSkill2 = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && l.slot === 2) : null
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
+
+            {/* M10.2 - Activation Dashboard. Same screen, evolving content
+                (Dashboard Evolution decision, M10.2_FINAL_PRODUCT_REVISION.md) -
+                never a separate route. Renders null once activated; a
+                long-time Admin never sees this component render anything. */}
+            {isAdmin && userProfile?.gym_id && (
+              <ActivationDashboard gymId={userProfile.gym_id} gymName={myGym?.name} t={t} lang={lang} showToast={showToast} />
+            )}
 
             {/* ── Card dată + calendar săptămânal ── */}
             <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
