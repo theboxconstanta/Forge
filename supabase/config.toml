@@ -498,3 +498,25 @@ verify_jwt = false
 [functions.accept-admin-invitation]
 enabled = true
 verify_jwt = false
+
+# M10.5 - purchase-platform-plan requires a real, authenticated Owner
+# session (a Bearer token, checked inside the function itself via
+# anonClient.auth.getUser()) - verify_jwt = true is the platform default,
+# declared explicitly anyway so a future redeploy cannot silently drift,
+# the same "explicit beats implicit" lesson this file's own comments
+# already state for the invitation functions above.
+[functions.purchase-platform-plan]
+enabled = true
+verify_jwt = true
+
+# M10.5 - platform-billing-webhook receives an entirely unauthenticated,
+# external inbound call from Stripe (no Supabase session, no Bearer token
+# at all) - verify_jwt = false is required for the same structural reason
+# invitation-status et al. need it above; Stripe's own signature (verified
+# inside the function against PLATFORM_STRIPE_WEBHOOK_SECRET) is the real
+# and only security boundary here, not this gateway-level setting. A
+# separate signing secret and a separate Stripe-side endpoint from
+# stripe-webhook's own STRIPE_WEBHOOK_SECRET, non-negotiably (Principle 3.2).
+[functions.platform-billing-webhook]
+enabled = true
+verify_jwt = false

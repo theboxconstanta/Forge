@@ -1,0 +1,22 @@
+-- M10.5 Platform Purchase Flow - close a real, live anon EXECUTE exposure.
+--
+-- Found during production verification, not assumed safe: purchase_
+-- platform_plan had EXECUTE granted to anon despite this migration's own
+-- companion never granting it explicitly and despite an explicit
+-- `revoke ... from public` already having run. Checked directly against
+-- information_schema.role_routine_grants, not assumed correct from the
+-- migration's own revoke statement having run - the same discipline
+-- M10.3's own PUBLIC-grant finding already established.
+--
+-- Narrower than that M10.3 finding, and a different shape: register_
+-- platform_payment/refund_platform_payment (created in the same migration,
+-- same file, same revoke-from-public pattern) do NOT have this exposure -
+-- checked directly, side by side. The one structural difference is that
+-- purchase_platform_plan is the only one of the three that also received
+-- an explicit `grant ... to authenticated`. The exact causal mechanism for
+-- why granting to authenticated appears to correlate with an anon grant
+-- also appearing is not fully understood and is named as a remaining risk,
+-- not glossed over - exactly the same honesty this project applied to the
+-- structurally similar, still-unexplained PUBLIC-grant finding in M10.3.
+
+revoke execute on function purchase_platform_plan(uuid, uuid) from anon;

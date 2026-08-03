@@ -12,6 +12,7 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
 import ActivationDashboard from './ActivationDashboard'
+import PlatformBilling from './PlatformBilling'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
@@ -2127,7 +2128,7 @@ function MiniSwitch({ checked, onChange }) {
   )
 }
 
-function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
+function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
   const [paidUntilEdits, setPaidUntilEdits] = useState({})
@@ -3200,7 +3201,7 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }, { id: 'platforma', icon: Flag, lbl: t.platformAdminTab, adminOnly: true, platformOnly: true }].filter(tab => (!tab.adminOnly || isAdmin) && (!tab.platformOnly || isPlatformAdmin)).map(tab => (
+        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }, { id: 'billing', icon: CreditCard, lbl: t.billingTabLabel, ownerOnly: true }, { id: 'platforma', icon: Flag, lbl: t.platformAdminTab, adminOnly: true, platformOnly: true }].filter(tab => (!tab.adminOnly || isAdmin) && (!tab.platformOnly || isPlatformAdmin) && (!tab.ownerOnly || isOwner)).map(tab => (
           <div key={tab.id} onClick={() => setAdminTab(tab.id)}
             style={{ flex: adminTab === tab.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === tab.id ? '600' : '400', background: adminTab === tab.id ? '#0E0E0E' : '#fff', color: adminTab === tab.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <tab.icon size={13} color={adminTab === tab.id ? '#fff' : '#888'} />{adminTab === tab.id ? ` ${tab.lbl}` : ''}
@@ -4136,6 +4137,8 @@ function Admin({ showToast, user, isAdmin, isCoach, gymId, isPlatformAdmin, onWo
         </>
       )}
 
+      {adminTab === 'billing' && isOwner && <PlatformBilling gymId={gymId} t={t} lang={lang} showToast={showToast} />}
+
       {adminTab === 'platforma' && isPlatformAdmin && (
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -4915,6 +4918,20 @@ function App() {
   }
   const [checkoutOrderId, setCheckoutOrderId] = useState(null)
   const [checkoutStatus, setCheckoutStatus] = useState(null) // null | 'waiting' | 'confirmed' | 'timeout'
+  // M10.5 - Platform Billing's own waiting-for-webhook state, deliberately
+  // a separate, parallel state rather than generalizing checkoutStatus
+  // above to carry a "kind" - the two can never be simultaneously true in
+  // practice (an Owner is never mid-Checkout for both a Member Subscription
+  // and a Platform Subscription at once), and keeping them structurally
+  // independent means this addition carries zero regression risk to the
+  // already-live, real-money Member-billing polling flow above (Decision:
+  // reuse the existing polling modal's design/timing/copy shape exactly -
+  // M10.5_PRODUCT_DECISIONS.md Decision 1 - not necessarily its literal
+  // code, when literally sharing it would mean touching a live financial
+  // code path for no functional benefit). No orderId companion state here
+  // (unlike checkoutOrderId above) - nothing in this modal ever reads it;
+  // the polling effect's own ref already holds the id it needs.
+  const [platformCheckoutStatus, setPlatformCheckoutStatus] = useState(null) // null | 'waiting' | 'confirmed' | 'timeout'
   const [noGymJoinCode, setNoGymJoinCode] = useState('')
   const [joiningGym, setJoiningGym] = useState(false)
   const [noGymJoinError, setNoGymJoinError] = useState('')
@@ -4928,6 +4945,13 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isCoach, setIsCoach] = useState(false)
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  // M10.5 - Section 4's tier distinction: every Admin may operate the
+  // product, but only the Gym's one Owner may see/act on Platform Billing.
+  // Resolved the same way as isAdmin/isPlatformAdmin - a direct identity
+  // check, not a role stored on the profile (OWNER_DOMAIN_IMPLEMENTATION_
+  // ARCHITECTURE.md Section 4: ownership is a fact about a specific Gym,
+  // never a fact about the person).
+  const [isOwner, setIsOwner] = useState(false)
   const [gymBlocked, setGymBlocked] = useState(false)
   // Un profil autentificat cu gym_id null in afara ferestrei live de
   // bootstrap owner (vezi ownerBootstrapping) inseamna mereu o inregistrare
@@ -5344,6 +5368,7 @@ function App() {
       fetchWodZi()
       checkAdmin()
       checkCoach()
+      checkOwner()
       checkPlatformAdmin()
       fetchAbonamentMeu(true)
       fetchClasament()
@@ -5976,6 +6001,14 @@ function App() {
     setIsPlatformAdmin(!!data)
   }
 
+  // M10.5 - no gym_id needed here, mirroring checkAdmin's own identity-only
+  // lookup (gym_activation_state's own RLS - "readable by any Admin of the
+  // Gym" - already allows this caller to read their own Gym's row).
+  const checkOwner = async () => {
+    const { data } = await supabase.from('gym_activation_state').select('gym_id').eq('owner_admin_id', user.id).maybeSingle()
+    setIsOwner(!!data)
+  }
+
   const fetchAbonamentMeu = async (isFirstLoad = false) => {
     if (isFirstLoad) setAbonamentLoading(true)
     const fetchActive = async () => {
@@ -6236,6 +6269,39 @@ function App() {
       }
       if (Date.now() - startedAt > 60000) {
         setCheckoutStatus('timeout')
+        return
+      }
+      setTimeout(poll, 3000)
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [])
+
+  // M10.5 - Platform Billing's own waiting screen, a direct structural
+  // mirror of the Member-billing polling effect immediately above (same
+  // 3s interval, same 60s timeout, same read-only status check - never a
+  // write; register_platform_payment via the webhook is the only real
+  // activation path). Distinct query param (`platform_checkout`, not
+  // `checkout`) so the two can never collide or be misread as each other.
+  const platformCheckoutOrderIdFromUrlRef = useRef(new URLSearchParams(window.location.search).get('platform_checkout'))
+  useEffect(() => {
+    const orderId = platformCheckoutOrderIdFromUrlRef.current
+    if (!orderId) return
+    window.history.replaceState({}, '', window.location.pathname)
+    setPlatformCheckoutStatus('waiting')
+
+    let cancelled = false
+    const startedAt = Date.now()
+    const poll = async () => {
+      if (cancelled) return
+      const { data } = await supabase.from('platform_orders').select('status').eq('id', orderId).maybeSingle()
+      if (cancelled) return
+      if (data?.status === 'paid') {
+        setPlatformCheckoutStatus('confirmed')
+        return
+      }
+      if (Date.now() - startedAt > 60000) {
+        setPlatformCheckoutStatus('timeout')
         return
       }
       setTimeout(poll, 3000)
@@ -7407,6 +7473,40 @@ function App() {
             </div>
             {checkoutStatus !== 'waiting' && (
               <button onClick={() => { setCheckoutStatus(null); setCheckoutOrderId(null); setScreen('abonament') }}
+                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                {t.checkoutCloseButton}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* M10.5 - Platform Billing's own waiting screen, identical shape to
+          the Member-billing one above (Decision 1: reuse the design, not
+          necessarily the code - see the state/effect comments upstream for
+          why these were kept structurally separate). Closing returns to
+          the Admin screen; landing back on the Billing tab specifically
+          requires one more tap (adminTab is Admin's own local state, not
+          reachable from here) - a minor, disclosed UX rough edge, not a
+          correctness or safety gap. */}
+      {platformCheckoutStatus && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
+            <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
+              {platformCheckoutStatus === 'confirmed' ? <CheckCircle2 size={48} color="#2F6600" strokeWidth={1.5} /> : <RotateCw size={48} color="#0E0E0E" strokeWidth={1.5} />}
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
+              {platformCheckoutStatus === 'waiting' ? t.platformCheckoutWaitingTitle
+                : platformCheckoutStatus === 'confirmed' ? t.platformCheckoutConfirmedTitle
+                : t.platformCheckoutTimeoutTitle}
+            </div>
+            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
+              {platformCheckoutStatus === 'waiting' ? t.platformCheckoutWaitingText
+                : platformCheckoutStatus === 'confirmed' ? t.platformCheckoutConfirmedText
+                : t.platformCheckoutTimeoutText}
+            </div>
+            {platformCheckoutStatus !== 'waiting' && (
+              <button onClick={() => { setPlatformCheckoutStatus(null); setScreen('admin') }}
                 style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                 {t.checkoutCloseButton}
               </button>
@@ -8788,7 +8888,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
