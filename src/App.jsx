@@ -13,6 +13,7 @@ import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
 import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
+import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
@@ -4953,6 +4954,12 @@ function App() {
   // never a fact about the person).
   const [isOwner, setIsOwner] = useState(false)
   const [gymBlocked, setGymBlocked] = useState(false)
+  // M10.8 - Trial Expiry Enforcement. Set exclusively from is_gym_access_
+  // blocked()'s own return value (server-side, the actual predicate,
+  // exhaustively tested against every OWNER_LIFECYCLE_STATE_MACHINE.md
+  // Section 6 combination cell) - this component never re-derives the
+  // decision itself from raw commercial_state.
+  const [trialExpired, setTrialExpired] = useState(false)
   // Un profil autentificat cu gym_id null in afara ferestrei live de
   // bootstrap owner (vezi ownerBootstrapping) inseamna mereu o inregistrare
   // intrerupta la mijloc (ex. reload de pagina in timpul secventei) - fara
@@ -5747,6 +5754,16 @@ function App() {
       setNoGymMembership(false)
       setPendingOwnerBootstrap(false)
       if (gymRow) setMyGym({ name: gymRow.name, primaryColor: gymRow.primary_color || CURRENT_GYM.primaryColor })
+      // M10.8 - reads Gym Commercial State only, via the one server-side
+      // predicate (is_gym_access_blocked), never Gym Activation State -
+      // OWNER_DOMAIN_IMPLEMENTATION_ARCHITECTURE.md Section 16's own named
+      // failure mode, the one thing this milestone exists to prevent.
+      // Re-runs on every fetchUserProfile() call, including the existing
+      // visibilitychange handler below - "delayed state refresh" and
+      // "multiple tabs" freshness come from that already-proven mechanism,
+      // not a new one built for this milestone specifically.
+      const { data: blocked } = await supabase.rpc('is_gym_access_blocked', { p_gym_id: data.gym_id })
+      setTrialExpired(!!blocked)
     } else if (data && !ownerBootstrapping && hadGymBefore) {
       // Eliminare live, cat timp sesiunea era deja activa (admin-remove-member):
       // postgres_changes/Broadcast nu pot livra evenimentul profiles.gym_id ->
@@ -7364,6 +7381,13 @@ function App() {
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
           </div>
         </div>
+      )}
+
+      {/* M10.8 - a completely separate, pre-existing platform-admin-driven
+          block (gymBlocked, gyms.is_active) takes precedence if somehow
+          both are true at once - never stack two full-screen paywalls. */}
+      {trialExpired && !isPlatformAdmin && !gymBlocked && (
+        <TrialExpiredPaywall isOwner={isOwner} gymId={userProfile?.gym_id} t={t} lang={lang} showToast={showToast} />
       )}
 
       {noGymMembership && (
