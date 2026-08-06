@@ -29,6 +29,7 @@ import {
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
+import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
@@ -4488,7 +4489,7 @@ function parseWodLogDetails(w, t) {
   return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
 }
 
-function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, t, lang }) {
+function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
@@ -4531,6 +4532,14 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const wodSubtitlu = w.wods
                 ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}`
                 : (w.format_snapshot ? formatTypeLabel(w.format_snapshot, w.format_config_snapshot) : null)
+              // Results Phase 2 Slice 4 - "vs data trecuta", vizibil chiar si
+              // cand cardul e inchis (membrul trebuie sa vada progresia dintr-o
+              // privire, fara sa deschida fiecare log). null cand WOD-ul nu s-a
+              // mai repetat inainte (prima incercare) sau formatul nu e in scope-ul
+              // cuantitativ V1 (For Time/AMRAP - vezi RESULTS_PHASE2_SLICE4 raport).
+              const progressionNote = w.performance_identity_id
+                ? formatProgressionNote(progressionByIdentity?.get(w.performance_identity_id))
+                : null
               const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null
               // Ca la weightKeyForVariant: doar variantele reale (RX/Intermediate/
               // Beginner/OnRamp) au o coloana movements_* prescrisa pe wods - la o
@@ -4615,6 +4624,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   </div>
                   {wodSubtitlu && (
                     <div style={{ marginTop: '2px', fontSize: '12px', color: '#888' }}>{wodSubtitlu}</div>
+                  )}
+                  {progressionNote && (
+                    <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', fontWeight: '600' }}>{progressionNote}</div>
                   )}
                   {!isOpen && !areRezultatFinal && (
                     <div style={{ marginTop: '6px', fontSize: '12px', color: '#aaa' }}>—</div>
@@ -4969,6 +4981,13 @@ function App() {
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
+  // Results Phase 2 Slice 4 - Universal Workout Progression. Keyed by
+  // performance_identity_id (see JurnalList's own "vs data trecuta" note),
+  // fetched once per session and re-fetched on the same wod_logs realtime
+  // event that already re-fetches wodLogs (a new log can change any
+  // repeated workout's progression, not just the one just logged - e.g.
+  // an edit to an older entry can change what "previous attempt" means).
+  const [progressionByIdentity, setProgressionByIdentity] = useState(new Map())
   // Numele Hero WOD/Girl deschis pe ecranul Benchmark Detail (Results Phase
   // 1) - o aproximare prin potrivire de nume peste wodLogs deja incarcat
   // (fara query nou), NU o identitate structurata de Benchmark (vezi
@@ -5702,7 +5721,7 @@ function App() {
         fetchWodZiWorkoutV2(dataAcasaRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wod_logs' }, () => {
-        fetchWodLogs(); fetchClasament(clasamentDateRef.current)
+        fetchWodLogs(); fetchClasament(clasamentDateRef.current); fetchProgressionData()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_logs' }, () => {
         fetchSkillLogs()
@@ -5786,6 +5805,14 @@ function App() {
       .on('broadcast', { event: '*' }, () => { setClientsReloadToken(t => t + 1); fetchUserProfile() })
       .subscribe()
     return () => { supabase.removeChannel(visibilityChannel) }
+  }, [userProfile?.gym_id])
+
+  // Results Phase 2 Slice 4 - fires once gym_id is actually known (unlike
+  // fetchWodLogs/fetchPRuri above, this one genuinely needs it), then again
+  // on the same wod_logs realtime event that already re-fetches wodLogs.
+  useEffect(() => {
+    if (!userProfile?.gym_id) return
+    fetchProgressionData()
   }, [userProfile?.gym_id])
 
   useEffect(() => {
@@ -6241,6 +6268,18 @@ function App() {
   const fetchWodLogs = async () => {
     const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')})`).eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
+  }
+
+  // Results Phase 2 Slice 4 - non-critical enhancement, same reasoning as
+  // resolveBenchmarkNames elsewhere: a failed fetch just means no "vs data
+  // trecuta" notes render this pass, never blocks Jurnal from showing.
+  const fetchProgressionData = async () => {
+    if (!userProfile?.gym_id) return
+    try {
+      setProgressionByIdentity(await fetchProgressionForMember(userProfile.gym_id, user.id))
+    } catch {
+      // non-critical, see comment above
+    }
   }
 
   const fetchSkillLogs = async () => {
@@ -8286,7 +8325,7 @@ function App() {
               </div>
             </div>
             <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
-            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} t={t} lang={lang}
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
