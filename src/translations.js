@@ -539,6 +539,10 @@ export const TRANSLATIONS = {
     prEmpty: 'Niciun PR salvat încă',
     prDeleteConfirm: 'Șterge?',
     prEditHeroWodButton: '✎ Editează Hero WOD-ul',
+    prViewLoggedHistoryButton: 'Vezi istoricul logat',
+    benchmarkDetailTitle: (name) => `Istoric ${name}`,
+    benchmarkDetailEmpty: 'Niciun rezultat logat pentru acest WOD încă.',
+    benchmarkDetailApproxNote: 'Bazat pe potrivirea numelui WOD-ului — poate rata rezultate logate sub un nume ușor diferit.',
     prPercentOf1rm: (bestKg, unit) => `% DIN 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'ISTORIC',
     prRepCountLabel: (n) => `${n}RM`,
@@ -834,6 +838,19 @@ export const TRANSLATIONS = {
     adminTransferCodeSkip: 'Nu acum',
     adminTransferCodeValidityNote: 'Codul este valabil 72 de ore și poate fi folosit o singură dată.',
     toastTransferCodeRevoked: '✅ Cod revocat',
+
+    // Admin - Add Member (M9 Increment 1 - Manual Member Enrollment)
+    adminAddMemberOpenButton: '+ Adaugă membru',
+    adminAddMemberCancel: 'Anulează',
+    adminAddMemberEmailLabel: 'Email',
+    adminAddMemberEmailPlaceholder: 'email@exemplu.com',
+    adminAddMemberNameLabel: 'Nume complet (opțional)',
+    adminAddMemberNamePlaceholder: 'Nume și prenume',
+    adminAddMemberSubmitButton: 'Adaugă membru',
+    adminAddMemberSaving: 'Se adaugă...',
+    toastFillEmail: 'Completează emailul',
+    toastMemberAdded: '✅ Membru adăugat',
+    toastMemberResolvedExisting: '✅ Membru readăugat în sala ta',
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ Abonament nou',
@@ -1587,6 +1604,10 @@ export const TRANSLATIONS = {
     prEmpty: 'No PRs saved yet',
     prDeleteConfirm: 'Delete?',
     prEditHeroWodButton: '✎ Edit the Hero WOD',
+    prViewLoggedHistoryButton: 'View logged history',
+    benchmarkDetailTitle: (name) => `${name} History`,
+    benchmarkDetailEmpty: 'No logged results for this workout yet.',
+    benchmarkDetailApproxNote: 'Based on matching the workout name — may miss results logged under a slightly different name.',
     prPercentOf1rm: (bestKg, unit) => `% OF 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'HISTORY',
     prRepCountLabel: (n) => `${n}RM`,
@@ -1879,6 +1900,19 @@ export const TRANSLATIONS = {
     adminTransferCodeSkip: 'Not now',
     adminTransferCodeValidityNote: 'The code is valid for 72 hours and can be used once.',
     toastTransferCodeRevoked: '✅ Code revoked',
+
+    // Admin - Add Member (M9 Increment 1 - Manual Member Enrollment)
+    adminAddMemberOpenButton: '+ Add member',
+    adminAddMemberCancel: 'Cancel',
+    adminAddMemberEmailLabel: 'Email',
+    adminAddMemberEmailPlaceholder: 'email@example.com',
+    adminAddMemberNameLabel: 'Full name (optional)',
+    adminAddMemberNamePlaceholder: 'Full name',
+    adminAddMemberSubmitButton: 'Add member',
+    adminAddMemberSaving: 'Adding...',
+    toastFillEmail: 'Enter the email',
+    toastMemberAdded: '✅ Member added',
+    toastMemberResolvedExisting: '✅ Member re-added to your gym',
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ New subscription',

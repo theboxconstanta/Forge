@@ -2196,6 +2196,18 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [durataPlan, setDurataPlan] = useState(1)
   const [savingPlan, setSavingPlan] = useState(false)
 
+  // M9 Increment 1 - Manual Member Enrollment (Product Specification
+  // Section 4.1). Minimal fields only: email + full_name are the only two
+  // fields handle_new_user() actually persists on profiles at creation time
+  // (Section 4.1's own "completeness is never a precondition for
+  // existing") - richer profile detail remains editable later via the
+  // member's own profile or a future Edit Member capability, not collected
+  // here.
+  const [addMemberFormOpen, setAddMemberFormOpen] = useState(false)
+  const [emailMembruNou, setEmailMembruNou] = useState('')
+  const [numeMembruNou, setNumeMembruNou] = useState('')
+  const [savingMembruNou, setSavingMembruNou] = useState(false)
+
   const [rezervariClasa, setRezervariClasa] = useState({})
   const [clasaDeschisa, setClasaDeschisa] = useState(null)
   const [clientSelectat, setClientSelectat] = useState(null)
@@ -3076,6 +3088,36 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     showToast(t.toastWodDeletedAdmin); await fetchWods(); onWodChanged?.()
   }
 
+  // M9 Increment 1 - Manual Member Enrollment. Calls admin-add-member (Edge
+  // Function, not a plain RPC - members.id/profiles.id both cascade from
+  // auth.users, so creating a genuinely new identity requires the Auth
+  // Admin API, which only a service-role Edge Function can reach). The
+  // explicit fetchClienti() below covers this admin's own session
+  // immediately; every other open Web Admin session on this Gym converges
+  // on its own via the existing profiles realtime subscription
+  // (setClientsReloadToken) - no new subscription was added for this.
+  const adaugaMembruManual = async () => {
+    const emailVal = emailMembruNou.trim()
+    if (!emailVal) { showToast(t.toastFillEmail); return }
+    setSavingMembruNou(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${EDGE_BASE}/admin-add-member`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ email: emailVal, full_name: numeMembruNou.trim() || null }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) throw new Error(json.error || t.toastGenericError)
+      setEmailMembruNou(''); setNumeMembruNou(''); setAddMemberFormOpen(false)
+      showToast(json.outcome === 'resolved_existing' ? t.toastMemberResolvedExisting : t.toastMemberAdded)
+      await fetchClienti()
+    } catch (e) {
+      showToast('❌ ' + e.message)
+    }
+    setSavingMembruNou(false)
+  }
+
   const saveAbonament = async () => {
     if (!emailAbonament || !planSelectat) { showToast(t.toastFillEmailAndPlan); return }
     setSavingAbonament(true)
@@ -3218,6 +3260,45 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             <input value={searchClienti} onChange={e => setSearchClienti(e.target.value)} placeholder={t.adminClientsSearchPlaceholder}
               style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
           </div>
+
+          {/*
+            M9 Increment 1 - Manual Member Enrollment (Product Specification Section 4.1)
+
+            TECHNICAL DEBT, not a live capability administrators are expected to use:
+            forge-admin-web (a separate repository - Desktop/forge-admin-web, a distinct
+            Vercel project) is the canonical Forge Admin Web real administrators actually
+            use in production. This "Clienti" tab and this Add Member action were built
+            here by mistake before that was verified. The equivalent, correct UI now lives
+            in forge-admin-web/src/features/members/MembersList.tsx, calling the same,
+            unmodified admin-add-member Edge Function this block also calls.
+
+            Left in place deliberately, not removed: WOD-SIMPLE's own current production
+            role (Member App? Capacitor mobile admin fallback? genuinely unused?) has not
+            yet been determined. Do not delete this tab, or treat it as dead code, until
+            that determination is made explicitly - see the M9 Increment 1 corrective
+            implementation for the investigation that found this.
+          */}
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <button onClick={() => setAddMemberFormOpen(v => !v)}
+              style={{ width: '100%', padding: '10px', background: addMemberFormOpen ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+              {addMemberFormOpen ? t.adminAddMemberCancel : t.adminAddMemberOpenButton}
+            </button>
+            {addMemberFormOpen && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminAddMemberEmailLabel}</div>
+                <input value={emailMembruNou} onChange={e => setEmailMembruNou(e.target.value)} placeholder={t.adminAddMemberEmailPlaceholder} type="email"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminAddMemberNameLabel}</div>
+                <input value={numeMembruNou} onChange={e => setNumeMembruNou(e.target.value)} placeholder={t.adminAddMemberNamePlaceholder}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+                <button onClick={adaugaMembruManual} disabled={savingMembruNou || !emailMembruNou.trim()}
+                  style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: (savingMembruNou || !emailMembruNou.trim()) ? 'not-allowed' : 'pointer', opacity: (savingMembruNou || !emailMembruNou.trim()) ? 0.6 : 1 }}>
+                  {savingMembruNou ? t.adminAddMemberSaving : t.adminAddMemberSubmitButton}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
             {[
               { id: 'toti', lbl: t.adminClientsFilterAll, count: clienti.filter(c => !searchClienti || c.full_name?.toLowerCase().includes(searchClienti.toLowerCase()) || c.email?.toLowerCase().includes(searchClienti.toLowerCase())).length },
@@ -4877,6 +4958,12 @@ function App() {
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
+  // Numele Hero WOD/Girl deschis pe ecranul Benchmark Detail (Results Phase
+  // 1) - o aproximare prin potrivire de nume peste wodLogs deja incarcat
+  // (fara query nou), NU o identitate structurata de Benchmark (vezi
+  // RESULTS_DOMAIN_ARCHITECTURE.md §7 pt fix-ul real). Rateaza orice WOD
+  // custom de sala cu nume diferit de HERO_WODS_INFO.
+  const [benchmarkDetailName, setBenchmarkDetailName] = useState(null)
   // Care slot de Skill Work e editat pe ecranul logSkill (1 = SKILL, 2 = SKILL 2).
   const [skillLogSlot, setSkillLogSlot] = useState(1)
   const [skillLogNote, setSkillLogNote] = useState('')
@@ -5377,6 +5464,7 @@ function App() {
       checkCoach()
       checkOwner()
       checkPlatformAdmin()
+      checkOwner()
       fetchAbonamentMeu(true)
       fetchClasament()
       registerPushSubscription()
@@ -8708,6 +8796,12 @@ function App() {
                       ))}
                     </div>
                   )}
+                  {cat === 'HERO_WODS' && (
+                    <button onClick={() => { setBenchmarkDetailName(movement); setPrevScreen('pr'); setScreen('benchmarkDetail') }}
+                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+                      {t.prViewLoggedHistoryButton}
+                    </button>
+                  )}
                   {cat === 'HERO_WODS' && customHeroWods.some(w => w.name === movement) && (
                     <button onClick={() => {
                         const cw = customHeroWods.find(w => w.name === movement)
@@ -8908,6 +9002,48 @@ function App() {
         )
       })()}
 
+
+      {screen === 'benchmarkDetail' && (() => {
+        // Client-side filter over wodLogs already loaded for this member
+        // (fetchWodLogs) - no new query. Approximation via wods.name match,
+        // not a structured Benchmark identity (see the state declaration
+        // above and RESULTS_PHASE1_IMPLEMENTATION_REPORT_FINAL.md).
+        const entries = wodLogs
+          .filter(l => l.wods?.name === benchmarkDetailName)
+          .sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at))
+        return (
+          <div style={{ padding: '16px' }}>
+            <button onClick={() => setScreen(prevScreen)}
+              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
+              ‹ {t.prHistoryLabel}
+            </button>
+            <div style={{ fontSize: '18px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.benchmarkDetailTitle(benchmarkDetailName)}</div>
+            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px' }}>{t.benchmarkDetailApproxNote}</div>
+            {entries.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.benchmarkDetailEmpty}</div>
+            ) : (
+              <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                {entries.map((log, idx) => {
+                  const { rezultatBucati } = parseWodLogDetails(log, t)
+                  return (
+                    <div key={log.id} style={{ padding: '12px 14px', borderBottom: idx < entries.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
+                        {log.variant_level && (
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#888', textTransform: 'uppercase' }}>{log.variant_level}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginTop: '2px' }}>
+                        {rezultatBucati.length > 0 ? rezultatBucati.join(' · ') : '—'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
