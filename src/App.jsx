@@ -30,6 +30,7 @@ import {
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
+import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
@@ -4489,6 +4490,44 @@ function parseWodLogDetails(w, t) {
   return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
 }
 
+// Results Phase 2 Slice 5 - Analytics Foundation. O singura sursa
+// (athlete_performance_summary) - orice numar de aici e identic cu ce
+// arata Admin's own AthletePerformanceOverview.tsx pentru acelasi membru,
+// pt ca ambele citesc aceeasi vedere Postgres, nimic calculat aici.
+function PerformanceOverviewPanel({ gymId, memberId }) {
+  const [summary, setSummary] = useState(undefined)
+  useEffect(() => {
+    if (!gymId || !memberId) return
+    let cancelled = false
+    getAthletePerformanceSummary(gymId, memberId)
+      .then(s => { if (!cancelled) setSummary(s) })
+      .catch(() => { if (!cancelled) setSummary(null) })
+    return () => { cancelled = true }
+  }, [gymId, memberId])
+  if (!summary) return null
+  const stat = (value, label) => (
+    <div>
+      <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E' }}>{value}</div>
+      <div style={{ fontSize: '11px', color: '#888' }}>{label}</div>
+    </div>
+  )
+  return (
+    <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+        {stat(summary.total_workouts_completed, 'WOD-uri logate')}
+        {stat(summary.benchmarks_completed, 'Benchmark-uri')}
+        {stat(summary.total_pr_count, 'PR-uri totale')}
+        {stat(summary.recent_pr_count_30d, 'PR-uri (30z)')}
+      </div>
+      {summary.current_performance_trend && (
+        <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
+          Trend: <strong style={{ color: '#555' }}>{formatTrendLabel(summary.current_performance_trend)}</strong>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
@@ -8768,6 +8807,10 @@ function App() {
             )}
           </div>
         </div>
+      )}
+
+      {screen === 'pr' && userProfile?.gym_id && (
+        <PerformanceOverviewPanel gymId={userProfile.gym_id} memberId={user.id} />
       )}
 
       {screen === 'pr' && (() => {
