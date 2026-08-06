@@ -4519,8 +4519,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // legat (ex. "AMRAP 20:00") - la logare libera (fara wod_id) nu exista
               // un WOD legat, iar variant_level e deja formatul insusi, deci n-are
               // sens sa-l repetam pe un rand separat.
-              const wodNume = w.wods?.name || null
-              const wodSubtitlu = w.wods ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}` : null
+              // Results Phase 2 Slice 2 - falls back to the Scoring Snapshot
+              // frozen at logging time (wod_name_snapshot/format_snapshot/
+              // format_config_snapshot) once the linked WOD has been
+              // deleted (w.wods null, wod_id nulled by the FK correction -
+              // RESULTS_PHASE2_SLICE2_IMPLEMENTATION_REPORT.md). Duration
+              // has no snapshot column (a minor cosmetic detail, not an
+              // interpretation-critical fact) - omitted from the subtitle
+              // in that fallback case rather than adding a column for it.
+              const wodNume = w.wods?.name || w.wod_name_snapshot || null
+              const wodSubtitlu = w.wods
+                ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}`
+                : (w.format_snapshot ? formatTypeLabel(w.format_snapshot, w.format_config_snapshot) : null)
               const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null
               // Ca la weightKeyForVariant: doar variantele reale (RX/Intermediate/
               // Beginner/OnRamp) au o coloana movements_* prescrisa pe wods - la o
@@ -4980,7 +4990,11 @@ function App() {
     let cancelled = false
     ;(async () => {
       try {
-        const names = [...new Set(wodLogs.map(l => l.wods?.name).filter(Boolean))]
+        // Falls back to wod_name_snapshot for a log whose WOD was since
+        // deleted (Results Phase 2 Slice 2) - a historical entry must
+        // still resolve correctly, not silently drop out of its own
+        // Benchmark's history just because the original WOD is gone.
+        const names = [...new Set(wodLogs.map(l => l.wods?.name ?? l.wod_name_snapshot).filter(Boolean))]
         const map = await resolveBenchmarkNames(names)
         if (!cancelled) setBenchmarkResolutionMap(map)
       } catch {
@@ -9041,7 +9055,11 @@ function App() {
         const targetResolved = benchmarkResolutionMap.get(benchmarkDetailName)
         const entries = wodLogs
           .filter(l => {
-            const name = l.wods?.name
+            // Falls back to wod_name_snapshot once the linked WOD is gone
+            // (Slice 2) - a deleted WOD's own historical entries must keep
+            // matching this Benchmark's history exactly as they did before
+            // deletion, both by exact name and by alias resolution.
+            const name = l.wods?.name ?? l.wod_name_snapshot
             if (name === benchmarkDetailName) return true
             if (!targetResolved || !name) return false
             const logResolved = benchmarkResolutionMap.get(name)
