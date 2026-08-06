@@ -28,6 +28,7 @@ import {
   syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId,
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
 } from './workoutEngine'
+import { resolveBenchmarkNames } from './benchmarkResolution'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
@@ -4964,6 +4965,31 @@ function App() {
   // RESULTS_DOMAIN_ARCHITECTURE.md §7 pt fix-ul real). Rateaza orice WOD
   // custom de sala cu nume diferit de HERO_WODS_INFO.
   const [benchmarkDetailName, setBenchmarkDetailName] = useState(null)
+  // Results Phase 2, Slice 1 - the canonical resolution upgrade for the
+  // screen above. Resolves every distinct wods.name already present in
+  // wodLogs (one batched call, not one per log) so a log against an ALIAS
+  // of this benchmark (e.g. "The Murph" when viewing "Murph") is found
+  // too - something the plain name-match filter below can never do on its
+  // own. Kept as a strict UNION with that exact-match filter, never a
+  // replacement of it - a resolution failure (offline, RPC error) can
+  // only ever show fewer bonus matches, never break the screen back down
+  // to zero results.
+  const [benchmarkResolutionMap, setBenchmarkResolutionMap] = useState(new Map())
+  useEffect(() => {
+    if (screen !== 'benchmarkDetail' || !benchmarkDetailName) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const names = [...new Set(wodLogs.map(l => l.wods?.name).filter(Boolean))]
+        const map = await resolveBenchmarkNames(names)
+        if (!cancelled) setBenchmarkResolutionMap(map)
+      } catch {
+        // Non-critical enhancement - the screen already works from the
+        // exact-name-match filter alone.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [screen, benchmarkDetailName, wodLogs])
   // Care slot de Skill Work e editat pe ecranul logSkill (1 = SKILL, 2 = SKILL 2).
   const [skillLogSlot, setSkillLogSlot] = useState(1)
   const [skillLogNote, setSkillLogNote] = useState('')
@@ -9005,11 +9031,22 @@ function App() {
 
       {screen === 'benchmarkDetail' && (() => {
         // Client-side filter over wodLogs already loaded for this member
-        // (fetchWodLogs) - no new query. Approximation via wods.name match,
-        // not a structured Benchmark identity (see the state declaration
-        // above and RESULTS_PHASE1_IMPLEMENTATION_REPORT_FINAL.md).
+        // (fetchWodLogs) - no new query beyond the batched resolution call
+        // above. Slice 1: a log now matches either by the same exact name
+        // (the original Phase 1 approximation, always available, zero
+        // network dependency) OR by resolving to the SAME canonical
+        // benchmark_id as benchmarkDetailName itself (catches aliases -
+        // see the effect above). Union, not replacement, per that same
+        // effect's own comment.
+        const targetResolved = benchmarkResolutionMap.get(benchmarkDetailName)
         const entries = wodLogs
-          .filter(l => l.wods?.name === benchmarkDetailName)
+          .filter(l => {
+            const name = l.wods?.name
+            if (name === benchmarkDetailName) return true
+            if (!targetResolved || !name) return false
+            const logResolved = benchmarkResolutionMap.get(name)
+            return logResolved?.benchmarkId === targetResolved.benchmarkId
+          })
           .sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at))
         return (
           <div style={{ padding: '16px' }}>
