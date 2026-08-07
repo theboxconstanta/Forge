@@ -146,8 +146,24 @@ async function handleRequest(req: Request): Promise<Response> {
     await notify(supabase, sub.member_email, "expiring_1d", planName, sub.end_date, gymName);
   }
 
+  // P0 fix (FINANCIAL_P0_UNAUTHORIZED_MEMBERSHIP_ACTIVATION_REPORT.md) -
+  // cleanup_abandoned_queued_subscriptions is service-role-only by design
+  // (see its own migration); this Edge Function already runs on
+  // service_role and is the established periodic job in this codebase, so
+  // it's the correct place to call it rather than inventing a second
+  // scheduled job. A failure here must never break the expiry-notification
+  // work above it - caught and logged, not thrown.
+  let cleanedUp = 0;
+  try {
+    const { data, error } = await supabase.rpc("cleanup_abandoned_queued_subscriptions", { p_older_than_hours: 24 });
+    if (error) console.error("cleanup_abandoned_queued_subscriptions failed:", error.message);
+    else cleanedUp = (data as number) ?? 0;
+  } catch (e) {
+    console.error("cleanup_abandoned_queued_subscriptions threw:", e);
+  }
+
   return new Response(
-    JSON.stringify({ checked: today, exp3: exp3?.length ?? 0, exp1: exp1?.length ?? 0 }),
+    JSON.stringify({ checked: today, exp3: exp3?.length ?? 0, exp1: exp1?.length ?? 0, cleanedUp }),
     { headers: { "Content-Type": "application/json" } }
   );
 }

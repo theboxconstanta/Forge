@@ -2218,6 +2218,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [metodaPlata, setMetodaPlata] = useState('')
   const [savingAbonament, setSavingAbonament] = useState(false)
   const [metodaActivare, setMetodaActivare] = useState({})
+  // P0 fix (FINANCIAL_P0_UNAUTHORIZED_MEMBERSHIP_ACTIVATION_REPORT.md) - a
+  // real amount admin has actually collected, per queued subscription id.
+  // Without this, activate_queued_subscription's new payment guard would
+  // have no legitimate way to be satisfied for a cash/card-in-person sale -
+  // this replaces the old notes-regex mechanism, which nothing in this
+  // codebase ever actually wrote to (dead code, confirmed before this fix).
+  const [sumaActivare, setSumaActivare] = useState({})
 
   const [numePlan, setNumePlan] = useState('')
   const [sedintePlan, setSedintePlan] = useState('')
@@ -2771,17 +2778,25 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     setRedeemingCode(false)
   }
 
-  const adminActiveazaAboQueued = async (aboQueued, memberEmail, method) => {
+  const adminActiveazaAboQueued = async (aboQueued, memberEmail, method, amountPaid) => {
     const duration = aboQueued.subscription_plans?.duration_months || 1
     const endStr = addMonthsClamped(new Date(), duration)
+    const parsedAmount = amountPaid ? parseFloat(amountPaid) : null
+    const validAmount = (parsedAmount != null && !isNaN(parsedAmount)) ? parsedAmount : null
     const { error } = await supabase.rpc('activate_queued_subscription', {
       p_subscription_id: aboQueued.id,
       p_end_date: endStr,
       p_method: method || null,
+      p_amount_paid: validAmount,
     })
-    if (error) { showToast(t.toastActivateError); console.error(error); return }
+    // P0 fix - this RPC now genuinely refuses activation when the linked
+    // order isn't paid (see the migration + report); this generic error
+    // toast is what a coach/admin sees when they try to activate without
+    // entering an amount above, not just a network failure anymore.
+    if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.unknownErrorFallback)); console.error(error); return }
     showToast(t.toastSubscriptionActivated)
     setMetodaActivare(prev => { const next = { ...prev }; delete next[aboQueued.id]; return next })
+    setSumaActivare(prev => { const next = { ...prev }; delete next[aboQueued.id]; return next })
     await fetchAbonamente()
   }
 
@@ -3228,7 +3243,16 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const abo = abonamente.find(a => a.id === id)
     if (abo?.queued) {
       const { error: deleteError } = await supabase.rpc('delete_queued_subscription', { p_subscription_id: id })
-      if (deleteError) console.error('stergeAbonament (queued):', deleteError)
+      if (deleteError) {
+        // P0 fix (FINANCIAL_P0_UNAUTHORIZED_MEMBERSHIP_ACTIVATION_REPORT.md) -
+        // this used to show the "deleted" success toast unconditionally,
+        // even when the RPC itself failed - the exact reported symptom
+        // ("scheduled subscriptions could not be deleted") was this error
+        // being silently logged and swallowed while the UI claimed success.
+        showToast(t.toastGenericErrorWithFallback(deleteError.message || t.unknownErrorFallback))
+        console.error('stergeAbonament (queued):', deleteError)
+        return
+      }
       showToast(t.toastQueuedSubscriptionDeleted)
       await fetchAbonamente(); fetchRapoarte()
       return
@@ -3481,17 +3505,20 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                           {t.adminClientsAutoActivateNote}
                         </div>
                         {aboQueued.notes && <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{aboQueued.notes}</div>}
-                        {aboQueued.notes && (
-                          <select value={metodaActivare[aboQueued.id] || ''} onClick={e => e.stopPropagation()}
-                            onChange={e => setMetodaActivare(prev => ({ ...prev, [aboQueued.id]: e.target.value }))}
-                            style={{ width: '100%', padding: '6px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginBottom: '6px' }}>
-                            <option value="">{t.metodaPlataPlaceholder}</option>
-                            <option value="cash">{t.metodaPlataCash}</option>
-                            <option value="card">{t.metodaPlataCard}</option>
-                            <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
-                          </select>
-                        )}
-                        <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email, metodaActivare[aboQueued.id]) }}
+                        <input type="number" value={sumaActivare[aboQueued.id] || ''} onClick={e => e.stopPropagation()}
+                          onChange={e => setSumaActivare(prev => ({ ...prev, [aboQueued.id]: e.target.value }))}
+                          placeholder={t.activateAmountPlaceholder}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginBottom: '4px' }} />
+                        <div style={{ fontSize: '10px', color: '#888', marginBottom: '6px' }}>{t.activateAmountHint}</div>
+                        <select value={metodaActivare[aboQueued.id] || ''} onClick={e => e.stopPropagation()}
+                          onChange={e => setMetodaActivare(prev => ({ ...prev, [aboQueued.id]: e.target.value }))}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginBottom: '6px' }}>
+                          <option value="">{t.metodaPlataPlaceholder}</option>
+                          <option value="cash">{t.metodaPlataCash}</option>
+                          <option value="card">{t.metodaPlataCard}</option>
+                          <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
+                        </select>
+                        <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(aboQueued, c.email, metodaActivare[aboQueued.id], sumaActivare[aboQueued.id]) }}
                           style={{ width: '100%', padding: '7px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                           <Zap size={13} /> {t.adminClientsActivateNow}
                         </button>
@@ -3742,18 +3769,21 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{q.subscription_plans?.name}</div>
                               {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.adminSubsSessionsTotal(q.sessions_total)}</div>}
                               {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
-                              {q.notes && (
-                                <select value={metodaActivare[q.id] || ''} onClick={e => e.stopPropagation()}
-                                  onChange={e => setMetodaActivare(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                  style={{ width: '100%', padding: '5px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginTop: '4px' }}>
-                                  <option value="">{t.metodaPlataPlaceholder}</option>
-                                  <option value="cash">{t.metodaPlataCash}</option>
-                                  <option value="card">{t.metodaPlataCard}</option>
-                                  <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
-                                </select>
-                              )}
+                              <input type="number" value={sumaActivare[q.id] || ''} onClick={e => e.stopPropagation()}
+                                onChange={e => setSumaActivare(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                placeholder={t.activateAmountPlaceholder}
+                                style={{ width: '100%', padding: '5px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginTop: '4px' }} />
+                              <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>{t.activateAmountHint}</div>
+                              <select value={metodaActivare[q.id] || ''} onClick={e => e.stopPropagation()}
+                                onChange={e => setMetodaActivare(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                style={{ width: '100%', padding: '5px 8px', borderRadius: '7px', border: '1px solid #e0e0e0', fontSize: '11px', background: '#fff', boxSizing: 'border-box', marginTop: '4px' }}>
+                                <option value="">{t.metodaPlataPlaceholder}</option>
+                                <option value="cash">{t.metodaPlataCash}</option>
+                                <option value="card">{t.metodaPlataCard}</option>
+                                <option value="bank_transfer">{t.metodaPlataTransferBancar}</option>
+                              </select>
                               <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                                <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email, metodaActivare[q.id]) }}
+                                <button onClick={e => { e.stopPropagation(); adminActiveazaAboQueued(q, email, metodaActivare[q.id], sumaActivare[q.id]) }}
                                   style={{ flex: 1, padding: '6px', background: '#5B7FCC', color: '#fff', border: 'none', borderRadius: '7px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Zap size={12} /> {t.adminSubsActivateNow}</button>
                                 <button onClick={e => { e.stopPropagation(); stergeAbonament(q.id) }}
                                   style={{ padding: '6px 10px', borderRadius: '7px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
