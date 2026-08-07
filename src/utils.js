@@ -138,6 +138,17 @@ export function getInitiale(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+// Home Dashboard Visual Redesign (HOME_DASHBOARD_UI_REDESIGN_REPORT.md) -
+// display-only name formatting for the class-detail roster ("Stelian P."
+// instead of the full name) - never touches the underlying member.full_name
+// data, purely how one component renders it.
+export function formatFirstNameLastInitial(fullName) {
+  if (!fullName) return ''
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length < 2) return parts[0] || ''
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+
 export function parseWodMinute(durataStr) {
   if (!durataStr) return null
   const match = durataStr.match(/(\d+)/)

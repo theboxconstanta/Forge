@@ -95,6 +95,56 @@ export function Modal({ title, onClose, children, maxWidth = '360px' }) {
   )
 }
 
+// Home Dashboard Visual Redesign (HOME_DASHBOARD_UI_REDESIGN_REPORT.md) - a
+// bottom-anchored sibling of Modal, for the class-detail sheet. Same
+// focus-trap/Escape/aria-modal behavior as Modal (duplicated rather than
+// composed, since the two differ in backdrop opacity, positioning, and
+// have no other shared JSX), reused verbatim rather than reinvented - this
+// is a presentation-only addition, no new data flow.
+export function BottomSheet({ onClose, children, maxHeight = '85vh' }) {
+  const sheetRef = useRef(null)
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement
+    const first = sheetRef.current?.querySelector('button:not([disabled]), [href], input, textarea, select')
+    first?.focus()
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !sheetRef.current) return
+      const focusable = sheetRef.current.querySelectorAll('button:not([disabled]), [href], input, textarea, select')
+      if (focusable.length === 0) return
+      const list = [...focusable]
+      const activeIndex = list.indexOf(document.activeElement)
+      if (e.shiftKey && activeIndex === 0) {
+        e.preventDefault()
+        list[list.length - 1].focus()
+      } else if (!e.shiftKey && activeIndex === list.length - 1) {
+        e.preventDefault()
+        list[0].focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previouslyFocused?.focus()
+    }
+  }, [onClose])
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end' }}>
+      <div ref={sheetRef} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: '24px 24px 0 0', width: '100%', maxHeight, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '10px 20px 28px', boxSizing: 'border-box' }}>
+        <div style={{ width: '36px', height: '4px', background: '#E5E5E5', borderRadius: '2px', margin: '0 auto 18px' }} />
+        {children}
+      </div>
+    </div>
+  )
+}
+
 /**
  * P0 UX copy refinement (MEMBERSHIP_COVERAGE_DIALOG_COPY_REFINEMENT_REPORT.md)
  * - shown in place of the generic "Booking failed" toast specifically when

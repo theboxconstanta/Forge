@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban, ChevronDown,
+  Archive, Ban, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -18,8 +18,9 @@ import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
+  formatFirstNameLastInitial,
 } from './utils'
-import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog } from './components'
+import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet } from './components'
 import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
@@ -5077,7 +5078,6 @@ function App() {
   const [wodDeschis, setWodDeschis] = useState(false)
   const [skillDeschis, setSkillDeschis] = useState(false)
   const [skillDeschis2, setSkillDeschis2] = useState(false)
-  const [claseHomeDeschis, setClaseHomeDeschis] = useState(false)
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
   // Faza 7 (Member View -> Workout Engine V2) - randul V2 (workouts +
@@ -7924,218 +7924,247 @@ function App() {
               <ActivationDashboard gymId={userProfile.gym_id} gymName={myGym?.name} t={t} lang={lang} showToast={showToast} />
             )}
 
-            {/* ── Card dată + calendar săptămânal ── */}
-            <div style={{ background: '#fff', padding: '20px 20px 18px', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                {/* Navigare dată */}
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
-                      style={{ fontSize: '24px', fontWeight: '900', color: '#0E0E0E', letterSpacing: '-0.5px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {selData.getDate()} {selData.toLocaleDateString(localeFor(lang), { month: 'long' }).toUpperCase()}
-                      <span style={{ fontSize: '14px', color: '#bbb' }}>▾</span>
-                    </div>
-                    {!esteAzi && (
-                      <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                        style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer', marginTop: '2px' }}>{t.homeBackToToday}</div>
-                    )}
-                  </div>
+            {/* ── Header (Home Dashboard Visual Redesign) - greeting only,
+                no additional controls. Sessions counter + avatar stay (an
+                existing nav affordance to /profile, not a new control);
+                the date-tap-to-calendar trigger and "back to today" link
+                move down into the Date selector section below, right next
+                to the chip strip they govern - same setShowCalPicker/
+                setDataAcasa/scrollChipToDate calls, unchanged. */}
+            <div style={{ padding: '28px 20px 8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '18px', fontWeight: '900', color: '#0E0E0E', lineHeight: 1 }}>{wodLogs.length}</div>
+                  <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#0E0E0E', lineHeight: 1 }}>{wodLogs.length}</div>
-                    <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
-                  </div>
-                  <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
-                    style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
-                    {avatarUploading ? (
-                      <span style={{ fontSize: '10px', color: '#ABE73C', animation: 'spin 1s linear infinite' }}>⏳</span>
-                    ) : userProfile?.avatar_url ? (
-                      <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#ABE73C', letterSpacing: '-0.5px' }}>{initiale}</span>
-                    )}
-                  </div>
+                <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
+                  style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+                  {avatarUploading ? (
+                    <span style={{ fontSize: '10px', color: '#ABE73C', animation: 'spin 1s linear infinite' }}>⏳</span>
+                  ) : userProfile?.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#ABE73C', letterSpacing: '-0.5px' }}>{initiale}</span>
+                  )}
                 </div>
               </div>
-              <p style={{ fontSize: '14px', color: '#888', marginBottom: '18px' }}>{t.homeGreeting(prenume)}</p>
-
+              <p style={{ fontSize: '26px', fontWeight: '800', color: '#0E0E0E', lineHeight: 1.25, letterSpacing: '-0.3px', margin: '14px 0 0' }}>{t.homeGreeting(prenume)}</p>
             </div>
 
-            {/* ── Clase disponibile ── */}
-            <div style={{ background: '#fff', marginBottom: '10px' }}>
-              <div style={{ padding: '14px 20px 10px' }}>
-                {/* Chip scroll: tot anul curent (1 Ian – 31 Dec) */}
-                <div ref={homeCalScrollRef} className="hide-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                  {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
-                    const selectat = ds === dataAcasa
+            {/* ── Date selector - horizontal chip strip, unchanged
+                selection logic (setDataAcasa/homeCalendarChips), refined
+                styling only: white background, subtler borders, larger
+                touch targets, selected day stays lime green. */}
+            <div style={{ padding: '20px 20px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
+                  style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', letterSpacing: '0.02em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {selData.toLocaleDateString(localeFor(lang), { month: 'long' }).toUpperCase()} {selData.getFullYear()}
+                  <span style={{ fontSize: '11px', color: '#bbb' }}>▾</span>
+                </div>
+                {!esteAzi && (
+                  <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
+                    style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>{t.homeBackToToday}</div>
+                )}
+              </div>
+              <div ref={homeCalScrollRef} className="hide-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
+                  const selectat = ds === dataAcasa
+                  return (
+                    <div key={ds}
+                      ref={eAzi ? homeCalTodayRef : null}
+                      onClick={() => setDataAcasa(ds)}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', width: '60px', height: '72px', borderRadius: '18px', flexShrink: 0, cursor: 'pointer', boxSizing: 'border-box',
+                        background: selectat ? '#ABE73C' : '#fff',
+                        border: selectat ? 'none' : eAzi ? '2px solid #0E0E0E' : '1px solid #ECECEC',
+                        // translateZ(0) forteaza cardul pe propriul layer GPU - fara asta, pe iOS
+                        // Safari, schimbarea de background la selectare/deselectare lasa pixeli
+                        // "fantoma" din vechea culoare la colturile rotunjite (raportat: linie lime
+                        // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
+                        // scroll orizontal). NU se elimina - vezi PAST tuning report.
+                        transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#0E0E0E' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '21px', fontWeight: selectat || eAzi ? '900' : '500', color: '#0E0E0E', lineHeight: 1 }}>{dayNum}</span>
+                      <span style={{ fontSize: '10px', color: selectat ? '#0E0E0E' : '#aaa', fontWeight: '500' }}>{luna}</span>
+                      <span style={{ fontSize: '9px', lineHeight: 1, color: selectat ? '#0E0E0E' : '#ABE73C', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ── Today schedule - Home Dashboard Visual Redesign: the
+                "N classes available" dropdown is gone, classes render
+                immediately. Same claseZi/rezervariMele/rezervariPerClasa/
+                waitlistMea/sedinteLimitate/sedinteRamase/isAdmin reads as
+                the dropdown used - only the JSX changed. clasaHomeSelectata
+                now means "which class's detail sheet is open" instead of
+                "which card is inline-expanded" - same state, new render
+                target (BottomSheet instead of an inline reveal). */}
+            <div style={{ padding: '0 20px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em', color: '#0E0E0E' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
+                <div style={{ fontSize: '13px', color: '#888', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
+              </div>
+              {claseZi.length === 0 ? (
+                <div style={{ padding: '20px 0', textAlign: 'center', color: '#bbb', fontSize: '13px' }}>{t.homeNoClasses(esteAzi)}</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {claseZi.map(c => {
+                    const rezervat = rezervariMele.includes(c.id)
+                    const nrRez = rezervariPerClasa[c.id]?.count || 0
+                    const plin = !rezervat && nrRez >= c.max_spots
+                    const peWaitlist = !rezervat && waitlistMea.includes(c.id)
                     return (
-                      <div key={ds}
-                        ref={eAzi ? homeCalTodayRef : null}
-                        onClick={() => setDataAcasa(ds)}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', width: '64px', height: '64px', borderRadius: '16px', flexShrink: 0, cursor: 'pointer',
-                          background: selectat ? '#ABE73C' : 'transparent',
-                          border: selectat ? 'none' : eAzi ? '2px solid #0E0E0E' : '1px solid #e8e8e8',
-                          // translateZ(0) forteaza cardul pe propriul layer GPU - fara asta, pe iOS
-                          // Safari, schimbarea de background la selectare/deselectare lasa pixeli
-                          // "fantoma" din vechea culoare la colturile rotunjite (raportat: linie lime
-                          // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
-                          // scroll orizontal).
-                          transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#0E0E0E' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                        <span style={{ fontSize: '20px', fontWeight: selectat || eAzi ? '900' : '500', color: '#0E0E0E', lineHeight: 1 }}>{dayNum}</span>
-                        <span style={{ fontSize: '10px', color: selectat ? '#0E0E0E' : '#aaa', fontWeight: '500' }}>{luna}</span>
-                        <span style={{ fontSize: '9px', lineHeight: 1, color: selectat ? '#0E0E0E' : '#ABE73C', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                      <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #ABE73C' : '1px solid #ECECEC', borderRadius: '22px', padding: '14px 16px', cursor: 'pointer' }}>
+                        <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '14px', padding: '10px 12px', textAlign: 'center', minWidth: '60px', flexShrink: 0 }}>
+                          <div style={{ fontSize: '15px', fontWeight: '800', lineHeight: 1.1, letterSpacing: '-0.2px' }}>{c.start_time?.slice(0, 5)}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{c.coach}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {rezervat
+                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#ABE73C', padding: '3px 9px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
+                            : peWaitlist
+                            ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
+                            : plin
+                            ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
+                            : <span style={{ fontSize: '12px', color: '#888', fontWeight: '600' }}>{nrRez}/{c.max_spots}</span>}
+                          <ChevronRight size={16} color="#ccc" strokeWidth={2} />
+                        </div>
                       </div>
                     )
                   })}
                 </div>
-              </div>
-              <div style={{ padding: '0 20px 14px' }}>
-                <div onClick={() => setClaseHomeDeschis(v => !v)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '12px 14px', borderRadius: '12px', transition: 'background 0.15s, border-color 0.15s',
-                    border: claseHomeDeschis ? '1.5px solid #0E0E0E' : '1.5px solid #e0e0e0',
-                    background: claseHomeDeschis ? '#0E0E0E' : '#fafafa' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: claseHomeDeschis ? '#ABE73C' : '#0E0E0E' }}>
-                    {claseZi.length === 0 ? t.homeNoClasses(esteAzi) : t.homeClassesAvailable(claseZi.length)}
-                  </span>
-                  <span style={{ fontSize: '11px', color: claseHomeDeschis ? '#ABE73C' : '#888', display: 'inline-block', transform: claseHomeDeschis ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s, color 0.15s' }}>▼</span>
-                </div>
-              </div>
-              {claseHomeDeschis && (
-              <div style={{ padding: '0 16px 16px' }}>
-                {claseZi.length === 0
-                  ? <div style={{ padding: '8px 4px', color: '#aaa', fontSize: '13px' }}>{t.homeNoClasses(esteAzi)}</div>
-                  : claseZi.map(c => {
-                      const rezervat = rezervariMele.includes(c.id)
-                      const nrRez = rezervariPerClasa[c.id]?.count || 0
-                      const plin = !rezervat && nrRez >= c.max_spots
-                      const peWaitlist = !rezervat && waitlistMea.includes(c.id)
-                      const blocat = !rezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
-                      const deschis = clasaHomeSelectata === c.id
-                      const esteInTrecut = new Date(`${c.date}T${c.start_time}`) <= new Date()
-                      return (
-                        <div key={c.id}
-                          onClick={() => setClasaHomeSelectata(deschis ? null : c.id)}
-                          style={{ borderRadius: '14px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
-                            background: rezervat ? '#ABE73C' : deschis ? '#FFFFFF' : '#fafafa',
-                            border: rezervat ? '2px solid #ABE73C' : deschis ? '2px solid #0E0E0E' : '1px solid #ececec' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <span style={{ fontSize: '17px', fontWeight: '800', color: rezervat ? '#0E0E0E' : '#0E0E0E', letterSpacing: '-0.3px' }}>{c.start_time?.slice(0,5)}</span>
-                              <span style={{ fontSize: '12px', color: '#888', marginLeft: '8px' }}>{c.end_time?.slice(0,5)}</span>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              {rezervat
-                                ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#ABE73C', padding: '2px 8px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
-                                : peWaitlist
-                                ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
-                              : plin
-                                ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
-                                : <span style={{ fontSize: '11px', color: '#888' }}>{t.homeSpotsLeft(nrRez, c.max_spots)}</span>}
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '12px', color: rezervat ? '#0E0E0E' : '#888', marginTop: '3px' }}>{c.name || t.homeDefaultClassName} · {c.coach}</div>
-                          {deschis && (
-                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${rezervat ? '#0E0E0E' : '#e0e0e0'}` }}
-                              onClick={e => e.stopPropagation()}>
-                              {(() => {
-                                const membri = rezervariPerClasa[c.id]?.membri || []
-                                const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
-                                // Class Operations - Instant Coach Check-in: Owner/Admin/Coach get
-                                // interactive chips directly on this same card members already see -
-                                // "no Dashboard, no Attendance page, no extra navigation" is the
-                                // mission's own point. Members get exactly the read-only chip this
-                                // screen already rendered - canToggle false means the chip branch
-                                // below is never reached for them, so their own view is unchanged.
-                                const canToggleAtt = isAdmin || isCoach
-                                const attInteractive = isInAttendanceGraceWindow(c.date, c.end_time)
-                                const nrPrezenti = membri.filter(m => m.checkedIn).length
-                                return membri.length > 0 ? (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                      <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', fontWeight: '700', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
-                                      {canToggleAtt && nrPrezenti > 0 && (
-                                        <div style={{ fontSize: '10px', fontWeight: '600', color: '#0E0E0E', background: rezervat ? 'rgba(14,14,14,0.08)' : '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
-                                      )}
-                                    </div>
-                                    {canToggleAtt && attInteractive && (
-                                      <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Users size={11} /> {t.homeAttendanceTapHint}
-                                      </div>
-                                    )}
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                      {membri.map((m, mi) => {
-                                        const interactive = canToggleAtt && attInteractive
-                                        const pending = pendingCheckins.has(m.bookingId)
-                                        const chipStyle = m.checkedIn
-                                          ? { background: '#E7F6EA', color: '#1E6B36', border: '1px solid #BFE6C8', fontWeight: '600' }
-                                          : { background: rezervat ? 'rgba(255,255,255,0.7)' : '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', border: '1px solid transparent', fontWeight: '500' }
-                                        const content = (
-                                          <>
-                                            {m.checkedIn ? <CheckCircle2 size={14} color="#1E6B36" /> : <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={18} />}
-                                            {m.name}
-                                          </>
-                                        )
-                                        const sharedStyle = { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', padding: '3px 8px 3px 3px', borderRadius: '20px', opacity: pending ? 0.55 : 1, ...chipStyle }
-                                        return interactive ? (
-                                          <button key={mi} type="button" disabled={pending}
-                                            onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
-                                            style={{ ...sharedStyle, border: m.checkedIn ? chipStyle.border : '1px solid #d0d0d0', cursor: pending ? 'wait' : 'pointer' }}>
-                                            {content}
-                                          </button>
-                                        ) : (
-                                          <span key={mi} style={sharedStyle}>{content}</span>
-                                        )
-                                      })}
-                                    </div>
-                                    {canToggleAtt && !attInteractive && (
-                                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '6px' }}>{t.homeAttendanceReadOnly}</div>
-                                    )}
-                                  </div>
-                                ) : cnt > 0 ? (
-                                  <div style={{ fontSize: '11px', color: rezervat ? '#0E0E0E' : '#aaa', marginBottom: '10px' }}>{t.homeParticipantsCount(cnt)}</div>
-                                ) : null
-                              })()}
-                              {!esteInTrecut ? (
-                                rezervat ? (
-                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                                    style={{ width: '100%', padding: '9px', background: 'transparent', color: '#0E0E0E', border: '1px solid #0E0E0E', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                                    {t.homeCancelReservation}
-                                  </button>
-                                ) : peWaitlist ? (
-                                  <button onClick={() => toggleWaitlist(c.id)}
-                                    style={{ width: '100%', padding: '9px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                                    {t.homeWaitlistCancel}
-                                  </button>
-                                ) : blocat ? (
-                                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#888', padding: '6px' }}>{t.homeSessionsExhausted}</div>
-                                ) : plin ? (
-                                  <button onClick={() => toggleWaitlist(c.id)}
-                                    style={{ width: '100%', padding: '9px', background: '#FFFFFF', color: '#555', border: '1px solid #e0e0e0', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                                    {t.homeJoinWaitlist}
-                                  </button>
-                                ) : (
-                                  <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                                    style={{ width: '100%', padding: '9px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                                    {t.homeBookSpot}
-                                  </button>
-                                )
-                              ) : (
-                                <div style={{ textAlign: 'center', fontSize: '11px', color: '#bbb', padding: '4px' }}>{t.homeClassPast}</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                }
-              </div>
               )}
             </div>
 
-            {/* ── WOD ── */}
-            <div style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px' }}>
+            {/* ── Class detail bottom sheet - new UI, existing data/mutations
+                only (rezervariPerClasa/handleHomeCheckIn/toggleRezervare/
+                toggleWaitlist, all byte-identical to what the old inline
+                expansion called). Member vs Coach/Admin gating unchanged:
+                canToggleAtt = isAdmin || isCoach. */}
+            {clasaHomeSelectata && (() => {
+              const c = claseZi.find(cc => cc.id === clasaHomeSelectata)
+              if (!c) return null
+              const rezervat = rezervariMele.includes(c.id)
+              const nrRez = rezervariPerClasa[c.id]?.count || 0
+              const plin = !rezervat && nrRez >= c.max_spots
+              const peWaitlist = !rezervat && waitlistMea.includes(c.id)
+              const blocat = !rezervat && !isAdmin && sedinteLimitate && sedinteRamase <= 0
+              const esteInTrecut = new Date(`${c.date}T${c.start_time}`) <= new Date()
+              const membri = rezervariPerClasa[c.id]?.membri || []
+              const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
+              const canToggleAtt = isAdmin || isCoach
+              const attInteractive = isInAttendanceGraceWindow(c.date, c.end_time)
+              const nrPrezenti = membri.filter(m => m.checkedIn).length
+              return (
+                <BottomSheet onClose={() => setClasaHomeSelectata(null)}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+                    <div>
+                      <div style={{ fontSize: '19px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '-0.2px' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
+                      <div style={{ fontSize: '13px', color: '#888', marginTop: '3px' }}>{c.coach}</div>
+                    </div>
+                    <button type="button" onClick={() => setClasaHomeSelectata(null)} aria-label={t.homeClassDetailClose}
+                      style={{ background: '#f5f5f5', border: 'none', borderRadius: '50%', width: '30px', height: '30px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                      <X size={14} color="#888" />
+                    </button>
+                  </div>
+                  {(() => {
+                    // Class Operations - Instant Coach Check-in: Owner/Admin/Coach get
+                    // interactive rows directly in this same sheet members already see -
+                    // "no Dashboard, no Attendance page, no extra navigation" is the
+                    // mission's own point. Members get exactly the read-only status
+                    // this screen already rendered - canToggleAtt false means the
+                    // interactive branch below is never reached for them.
+                    return membri.length > 0 ? (
+                      <div style={{ marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
+                          {canToggleAtt && nrPrezenti > 0 && (
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', background: '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
+                          )}
+                        </div>
+                        {canToggleAtt && attInteractive && (
+                          <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Users size={12} /> {t.homeAttendanceTapHint}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          {membri.map((m, mi) => {
+                            const interactive = canToggleAtt && attInteractive
+                            const pending = pendingCheckins.has(m.bookingId)
+                            return (
+                              <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={34} />
+                                <div style={{ flex: 1, fontSize: '14px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
+                                {interactive ? (
+                                  <button type="button" disabled={pending}
+                                    onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
+                                    style={{ fontSize: '12px', fontWeight: '700', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
+                                      background: m.checkedIn ? '#E7F6EA' : '#0E0E0E', color: m.checkedIn ? '#1E6B36' : '#ABE73C', border: m.checkedIn ? '1px solid #BFE6C8' : 'none' }}>
+                                    {m.checkedIn ? `✓ ${t.homeCheckedInAction}` : t.homeCheckInAction}
+                                  </button>
+                                ) : m.checkedIn ? (
+                                  <span style={{ fontSize: '12px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                    <CheckCircle2 size={14} color="#1E6B36" /> {t.homeCheckedInAction}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '12px', color: '#ccc', flexShrink: 0 }}>{t.homeCheckInAction}</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {canToggleAtt && !attInteractive && (
+                          <div style={{ fontSize: '11px', color: '#aaa', marginTop: '10px' }}>{t.homeAttendanceReadOnly}</div>
+                        )}
+                      </div>
+                    ) : cnt > 0 ? (
+                      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '20px' }}>{t.homeParticipantsCount(cnt)}</div>
+                    ) : null
+                  })()}
+                  {!esteInTrecut ? (
+                    rezervat ? (
+                      <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                        style={{ width: '100%', padding: '13px', background: 'transparent', color: '#0E0E0E', border: '1px solid #0E0E0E', borderRadius: '14px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                        {t.homeCancelReservation}
+                      </button>
+                    ) : peWaitlist ? (
+                      <button onClick={() => toggleWaitlist(c.id)}
+                        style={{ width: '100%', padding: '13px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                        {t.homeWaitlistCancel}
+                      </button>
+                    ) : blocat ? (
+                      <div style={{ textAlign: 'center', fontSize: '13px', color: '#888', padding: '8px' }}>{t.homeSessionsExhausted}</div>
+                    ) : plin ? (
+                      <button onClick={() => toggleWaitlist(c.id)}
+                        style={{ width: '100%', padding: '13px', background: '#FFFFFF', color: '#555', border: '1px solid #e0e0e0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                        {t.homeJoinWaitlist}
+                      </button>
+                    ) : (
+                      <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
+                        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                        {t.homeBookSpot}
+                      </button>
+                    )
+                  ) : (
+                    <div style={{ textAlign: 'center', fontSize: '12px', color: '#bbb', padding: '6px' }}>{t.homeClassPast}</div>
+                  )}
+                </BottomSheet>
+              )
+            })()}
+
+            {/* ── WOD ── (Home Dashboard Visual Redesign: outer card only
+                gets a subtle border/radius/padding refresh to match the
+                new page's card language - the internal collapse/warmup/
+                skill/variant-picker/log-button logic below is untouched,
+                having already been through 4 dedicated visual passes this
+                session, see WORKOUT_VARIANT_ULTRA_MINIMAL_UI_REPORT.md) */}
+            <div style={{ background: '#fff', border: '1px solid #ECECEC', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
@@ -8342,32 +8371,38 @@ function App() {
               )}
             </div>
 
-            {/* ── Card abonament ── */}
+            {/* ── Card abonament (Home Dashboard Visual Redesign: compact,
+                secondary treatment - smaller type, subtle border, less
+                vertical weight than every section above it. Same
+                abonamentReal/sessTotal/sessUsed/zileRamase/progres reads,
+                same tap-to-/abonament navigation, unchanged.) ── */}
             {abonamentReal && (
-              <div onClick={() => setScreen('abonament')} style={{ background: '#fff', marginBottom: '10px', padding: '16px 20px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
-                    <div style={{ marginTop: '4px' }}><CreditCard size={22} color="#0E0E0E" strokeWidth={1.75} /></div>
+              <div onClick={() => setScreen('abonament')} style={{ background: '#fff', border: '1px solid #ECECEC', borderRadius: '18px', margin: '0 20px 12px', padding: '14px 16px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CreditCard size={17} color="#888" strokeWidth={1.75} />
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
-                      <div style={{ fontSize: '18px', fontWeight: '800', lineHeight: 1 }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', lineHeight: 1 }}>
                         <span style={{ color: '#0E0E0E' }}>{sessUsed}</span>
-                        <span style={{ color: '#ddd', fontWeight: '400', fontSize: '16px' }}> / </span>
+                        <span style={{ color: '#ccc', fontWeight: '400' }}> / </span>
                         <span style={{ color: '#0E0E0E' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{t.homeUnlimited}</div>
                     )}
-                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{t.homeDaysLeft(zileRamase)}</div>
                   </div>
                 </div>
-                {sessTotal && (
-                  <div style={{ height: '7px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#0E0E0E', borderRadius: '4px' }} />
-                  </div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {sessTotal ? (
+                    <div style={{ flex: 1, height: '5px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden', marginRight: '10px' }}>
+                      <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#0E0E0E', borderRadius: '3px' }} />
+                    </div>
+                  ) : <div />}
+                  <div style={{ fontSize: '11px', color: '#aaa', whiteSpace: 'nowrap' }}>{t.homeDaysLeft(zileRamase)}</div>
+                </div>
               </div>
             )}
 
