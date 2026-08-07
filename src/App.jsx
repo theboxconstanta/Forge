@@ -8238,15 +8238,19 @@ function App() {
                       dividers instead of background blocks. The colored
                       border + colored title + small check icon replace the
                       old black "Selected" pill. */}
-                  {/* P0 UI refinement (WORKOUT_VARIANT_MINIMAL_UI_REFINEMENT_REPORT.md) -
-                      minimal white-card pass. The LevelDot is now the ONLY
-                      colored element in this block - title, border, and
-                      chevron are all neutral regardless of selection state,
-                      "equally important" per the approved mockup. Selection
-                      is communicated purely by whether the content below is
-                      open and by chevron orientation - no colored border, no
-                      colored title, no badge/checkmark. Selection state and
-                      the click handler are unchanged from before. */}
+                  {/* P0 UI refinement (WORKOUT_VARIANT_TYPOGRAPHY_TUNING_REPORT.md) -
+                      header-only typography/spacing tuning on top of the
+                      minimal white-card pass. The LevelDot remains the ONLY
+                      colored element - title, border, and chevron stay
+                      neutral regardless of selection state. Collapsed rows
+                      use a fixed 62px min-height (border-box, vertically
+                      centered via flex) to hit the requested 60-64px target
+                      deterministically, independent of font-metric
+                      variance; the expanded card keeps its own generous,
+                      content-driven padding, unconstrained by that same
+                      number (a card showing movements can't be capped at
+                      64px). Selection state, the click handler, and every
+                      expanded-content style below the header are unchanged. */}
                   {metconVariantsForDisplay(primarySectionV).map((v, i) => {
                     const miscari = v.movements
                     const notaVarianta = v.notes
@@ -8257,10 +8261,15 @@ function App() {
                         setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
                         setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
                       }}
-                        style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '20px', padding: '20px', marginBottom: '20px', cursor: 'pointer' }}>
+                        style={{
+                          background: '#fff', border: '1px solid #E5E7EB', borderRadius: '20px', boxSizing: 'border-box',
+                          padding: isSelected ? '20px' : '0 20px', minHeight: isSelected ? undefined : '62px',
+                          display: isSelected ? 'block' : 'flex', flexDirection: isSelected ? undefined : 'column', justifyContent: isSelected ? undefined : 'center',
+                          marginBottom: '16px', cursor: 'pointer',
+                        }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <LevelDot nivel={v.nivel} />
-                          <span style={{ fontSize: '19px', fontWeight: '600', color: '#0E0E0E' }}>{v.nivel}</span>
+                          <LevelDot nivel={v.nivel} size={8} />
+                          <span style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{v.nivel}</span>
                           {isSelected
                             ? <ChevronUp size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />
                             : <ChevronDown size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />}
