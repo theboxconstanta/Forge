@@ -97,38 +97,35 @@ describe('Modal', () => {
 })
 
 const membershipCoverageT = {
-  membershipCoverageDialogTitle: 'Abonamentul nu acoperă această clasă',
+  membershipCoverageDialogTitle: 'Abonamentul tău nu acoperă această dată',
   membershipCoverageDialogBody1: 'Clasa pe care încerci să o rezervi are loc după expirarea abonamentului tău.',
-  membershipCoverageDialogBody2: 'Pentru a rezerva această clasă, ai nevoie de un abonament valabil la data ei.',
-  membershipCoverageDialogRenew: 'Reînnoiește abonamentul',
-  membershipCoverageDialogClose: 'Închide',
+  membershipCoverageDialogBody2: 'Vei putea rezerva această clasă după ce îți prelungești abonamentul pentru perioada respectivă.',
+  membershipCoverageDialogButton: 'Am înțeles',
 }
 
 describe('MembershipCoverageDialog', () => {
   it('afiseaza exact titlul si corpul textului cerut, prin infrastructura de traduceri existenta', () => {
-    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={() => {}} />)
-    expect(screen.getByText('Abonamentul nu acoperă această clasă')).toBeInTheDocument()
+    render(<MembershipCoverageDialog t={membershipCoverageT} onClose={() => {}} />)
+    expect(screen.getByText('Abonamentul tău nu acoperă această dată')).toBeInTheDocument()
     expect(screen.getByText('Clasa pe care încerci să o rezervi are loc după expirarea abonamentului tău.')).toBeInTheDocument()
-    expect(screen.getByText('Pentru a rezerva această clasă, ai nevoie de un abonament valabil la data ei.')).toBeInTheDocument()
+    expect(screen.getByText('Vei putea rezerva această clasă după ce îți prelungești abonamentul pentru perioada respectivă.')).toBeInTheDocument()
   })
 
-  it('apeleaza onRenew la click pe butonul principal', () => {
-    const onRenew = vi.fn()
-    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={onRenew} onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Reînnoiește abonamentul' }))
-    expect(onRenew).toHaveBeenCalledTimes(1)
+  it('afiseaza un singur buton, fara actiune de reinnoire', () => {
+    render(<MembershipCoverageDialog t={membershipCoverageT} onClose={() => {}} />)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
-  it('apeleaza onClose la click pe butonul secundar', () => {
+  it('apeleaza onClose la click pe singurul buton', () => {
     const onClose = vi.fn()
-    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Închide' }))
+    render(<MembershipCoverageDialog t={membershipCoverageT} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Am înțeles' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('apeleaza onClose la Escape (mostenit din Modal)', () => {
     const onClose = vi.fn()
-    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={onClose} />)
+    render(<MembershipCoverageDialog t={membershipCoverageT} onClose={onClose} />)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
   })

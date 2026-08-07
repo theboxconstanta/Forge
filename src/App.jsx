@@ -7735,7 +7735,6 @@ function App() {
         <MembershipCoverageDialog
           t={t}
           onClose={() => setMembershipCoverageDialog(false)}
-          onRenew={() => { setMembershipCoverageDialog(false); setScreen('abonament') }}
         />
       )}
 

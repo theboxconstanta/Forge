@@ -96,27 +96,33 @@ export function Modal({ title, onClose, children, maxWidth = '360px' }) {
 }
 
 /**
- * P0 UX refinement - shown in place of the generic "Booking failed" toast
- * specifically when the canonical trigger (enforce_subscription_sessions,
- * see 20260817000000_membership_coverage_error_code.sql) rejects a
- * booking because no membership covers the class's own date - never for
- * any other booking failure (network, duplicate, capacity, session
- * exhaustion), which keep their existing generic handling untouched.
+ * P0 UX copy refinement (MEMBERSHIP_COVERAGE_DIALOG_COPY_REFINEMENT_REPORT.md)
+ * - shown in place of the generic "Booking failed" toast specifically when
+ * the canonical trigger (enforce_subscription_sessions, see
+ * 20260817000000_membership_coverage_error_code.sql) rejects a booking
+ * because no membership covers the class's own date - never for any other
+ * booking failure (network, duplicate, capacity, session exhaustion),
+ * which keep their existing generic handling untouched.
+ *
+ * Purely informational, no renewal CTA: on the PWA, this dialog is only
+ * ever reachable with a currently-active membership (the pre-existing
+ * "no active subscription" paywall, elsewhere in App.jsx, blocks the
+ * entire booking surface before this trigger is ever reached otherwise) -
+ * so every rejection this dialog represents is "active today, doesn't
+ * reach this class's date," never "already expired." A renewal button
+ * would be misleading here; the member isn't missing a membership, the
+ * membership just doesn't extend far enough yet.
  */
-export function MembershipCoverageDialog({ t, onRenew, onClose }) {
+export function MembershipCoverageDialog({ t, onClose }) {
   return (
     <Modal title={t.membershipCoverageDialogTitle} onClose={onClose}>
       <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
         <p style={{ margin: '0 0 10px' }}>{t.membershipCoverageDialogBody1}</p>
         <p style={{ margin: 0 }}>{t.membershipCoverageDialogBody2}</p>
       </div>
-      <button onClick={onRenew}
-        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
-        {t.membershipCoverageDialogRenew}
-      </button>
       <button onClick={onClose}
-        style={{ width: '100%', padding: '10px', background: 'transparent', color: '#555', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-        {t.membershipCoverageDialogClose}
+        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+        {t.membershipCoverageDialogButton}
       </button>
     </Modal>
   )
