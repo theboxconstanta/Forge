@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { afterEach } from 'vitest'
-import { AvatarCircle, LevelDot } from './components'
+import { AvatarCircle, LevelDot, Modal, MembershipCoverageDialog } from './components'
 import { NIVEL_DOT_COLORS } from './utils'
 
 afterEach(() => {
@@ -56,5 +56,80 @@ describe('LevelDot', () => {
   it('respectă dimensiunea (size) primită', () => {
     const { container } = render(<LevelDot nivel="RX" size={20} />)
     expect(container.firstChild).toHaveStyle({ width: '20px', height: '20px' })
+  })
+})
+
+describe('Modal', () => {
+  it('randeaza titlul si continutul cu rolul/atributele ARIA corecte', () => {
+    render(<Modal title="Titlu test" onClose={() => {}}><p>Continut</p></Modal>)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title')
+    expect(screen.getByText('Titlu test')).toBeInTheDocument()
+    expect(screen.getByText('Continut')).toBeInTheDocument()
+  })
+
+  it('apeleaza onClose la apasarea tastei Escape', () => {
+    const onClose = vi.fn()
+    render(<Modal title="Titlu test" onClose={onClose}><p>Continut</p></Modal>)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('apeleaza onClose la click pe fundal, dar nu la click in interiorul cardului', () => {
+    const onClose = vi.fn()
+    render(<Modal title="Titlu test" onClose={onClose}><p>Continut</p></Modal>)
+    fireEvent.click(screen.getByText('Continut'))
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('dialog').parentElement)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('muta focusul pe primul element focusabil la montare', () => {
+    render(
+      <Modal title="Titlu test" onClose={() => {}}>
+        <button>Primul buton</button>
+        <button>Al doilea buton</button>
+      </Modal>,
+    )
+    expect(screen.getByRole('button', { name: 'Primul buton' })).toHaveFocus()
+  })
+})
+
+const membershipCoverageT = {
+  membershipCoverageDialogTitle: 'Abonamentul nu acoperă această clasă',
+  membershipCoverageDialogBody1: 'Clasa pe care încerci să o rezervi are loc după expirarea abonamentului tău.',
+  membershipCoverageDialogBody2: 'Pentru a rezerva această clasă, ai nevoie de un abonament valabil la data ei.',
+  membershipCoverageDialogRenew: 'Reînnoiește abonamentul',
+  membershipCoverageDialogClose: 'Închide',
+}
+
+describe('MembershipCoverageDialog', () => {
+  it('afiseaza exact titlul si corpul textului cerut, prin infrastructura de traduceri existenta', () => {
+    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={() => {}} />)
+    expect(screen.getByText('Abonamentul nu acoperă această clasă')).toBeInTheDocument()
+    expect(screen.getByText('Clasa pe care încerci să o rezervi are loc după expirarea abonamentului tău.')).toBeInTheDocument()
+    expect(screen.getByText('Pentru a rezerva această clasă, ai nevoie de un abonament valabil la data ei.')).toBeInTheDocument()
+  })
+
+  it('apeleaza onRenew la click pe butonul principal', () => {
+    const onRenew = vi.fn()
+    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={onRenew} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Reînnoiește abonamentul' }))
+    expect(onRenew).toHaveBeenCalledTimes(1)
+  })
+
+  it('apeleaza onClose la click pe butonul secundar', () => {
+    const onClose = vi.fn()
+    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Închide' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('apeleaza onClose la Escape (mostenit din Modal)', () => {
+    const onClose = vi.fn()
+    render(<MembershipCoverageDialog t={membershipCoverageT} onRenew={() => {}} onClose={onClose} />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

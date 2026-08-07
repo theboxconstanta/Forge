@@ -19,7 +19,7 @@ import {
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
-import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
+import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog } from './components'
 import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
@@ -2147,6 +2147,16 @@ function MiniSwitch({ checked, onChange }) {
 async function checkInBooking(bookingId, checkedIn) {
   return supabase.from('bookings').update({ checked_in: checkedIn }).eq('id', bookingId)
 }
+
+// P0 UX refinement - the canonical trigger (enforce_subscription_sessions,
+// 20260817000000_membership_coverage_error_code.sql) attaches this exact
+// SQLSTATE to ONLY the "membership does not cover the class date"
+// rejection, distinct from every other raise in that function and in
+// enforce_class_capacity() (which all keep Postgres's own default P0001) -
+// checking error.code === MEMBERSHIP_COVERAGE_ERROR_CODE is the
+// non-brittle way to detect this one specific rejection reason, instead
+// of matching on the exception's own message text.
+const MEMBERSHIP_COVERAGE_ERROR_CODE = 'FRG01'
 
 function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
@@ -5168,6 +5178,12 @@ function App() {
   // adminToggleCheckIn below is the single canonical mutation both share),
   // mirrors forge-admin-web's identical pendingBookingIds guard.
   const [pendingCheckins, setPendingCheckins] = useState(new Set())
+  // P0 UX refinement - shown instead of the generic booking-failed toast
+  // specifically when the canonical trigger rejects a booking because no
+  // membership covers the class's own date (error.code === 'FRG01', see
+  // 20260817000000_membership_coverage_error_code.sql) - every other
+  // booking failure keeps the existing toast unchanged.
+  const [membershipCoverageDialog, setMembershipCoverageDialog] = useState(false)
   const [waitlistMea, setWaitlistMea] = useState([])
   const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
   const [toast, setToast] = useState('')
@@ -7298,7 +7314,10 @@ function App() {
       showToast(t.toastBookingCancelled)
     } else {
       const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId, gym_id: userProfile.gym_id })
-      if (insErr) { showToast(t.toastBookingError); console.error(insErr); return }
+      if (insErr) {
+        if (insErr.code === MEMBERSHIP_COVERAGE_ERROR_CODE) { setMembershipCoverageDialog(true); return }
+        showToast(t.toastBookingError); console.error(insErr); return
+      }
       setRezervariMele(prev => [...prev, clasaId])
       if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, +1, { max: abonamentReal.sessions_total })
@@ -7710,6 +7729,14 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {membershipCoverageDialog && (
+        <MembershipCoverageDialog
+          t={t}
+          onClose={() => setMembershipCoverageDialog(false)}
+          onRenew={() => { setMembershipCoverageDialog(false); setScreen('abonament') }}
+        />
       )}
 
       {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && screen !== 'catalog' && (
