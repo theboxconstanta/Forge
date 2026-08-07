@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban, ChevronUp, ChevronDown,
+  Archive, Ban, ChevronDown,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -8238,74 +8238,78 @@ function App() {
                       dividers instead of background blocks. The colored
                       border + colored title + small check icon replace the
                       old black "Selected" pill. */}
-                  {/* P0 UI refinement (WORKOUT_VARIANT_TYPOGRAPHY_TUNING_REPORT.md) -
-                      header-only typography/spacing tuning on top of the
-                      minimal white-card pass. The LevelDot remains the ONLY
-                      colored element - title, border, and chevron stay
-                      neutral regardless of selection state. Collapsed rows
-                      use a fixed 62px min-height (border-box, vertically
-                      centered via flex) to hit the requested 60-64px target
-                      deterministically, independent of font-metric
-                      variance; the expanded card keeps its own generous,
-                      content-driven padding, unconstrained by that same
-                      number (a card showing movements can't be capped at
-                      64px). Selection state, the click handler, and every
-                      expanded-content style below the header are unchanged. */}
-                  {metconVariantsForDisplay(primarySectionV).map((v, i) => {
-                    const miscari = v.movements
-                    const notaVarianta = v.notes
-                    const isSelected = variantaAleasa === i
-                    return (
-                      <div key={i} onClick={() => {
-                        const dejaSelectata = variantaAleasa === i
-                        setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
-                        setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
-                      }}
-                        style={{
-                          background: '#fff', border: '1px solid #E5E7EB', borderRadius: '20px', boxSizing: 'border-box',
-                          padding: isSelected ? '20px' : '0 20px', minHeight: isSelected ? undefined : '62px',
-                          display: isSelected ? 'block' : 'flex', flexDirection: isSelected ? undefined : 'column', justifyContent: isSelected ? undefined : 'center',
-                          marginBottom: '16px', cursor: 'pointer',
-                        }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <LevelDot nivel={v.nivel} size={8} />
-                          <span style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{v.nivel}</span>
-                          {isSelected
-                            ? <ChevronUp size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />
-                            : <ChevronDown size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />}
-                        </div>
-                        {isSelected && (miscari.length > 0 || notaVarianta) && (
-                          <>
-                            <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                <span style={{ fontSize: '16px', fontWeight: '600', color: '#4B5563' }}>{primarySectionV?.format}</span>
-                                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '400' }}>{formatWodDurata(wodZiData?.duration)}</span>
+                  {/* P0 UI refinement (WORKOUT_VARIANT_ULTRA_MINIMAL_UI_REPORT.md) -
+                      ultra-minimal pass. The variant selector is now
+                      deliberately quiet: 14px/500 black title (no bold, no
+                      color), a 6px dot as the only accent, a single
+                      ChevronDown that rotates in place on expand (no
+                      icon-swap - a rotating transform is what actually
+                      animates, swapping components can't). The coach-notes
+                      callout, previously kept as a deliberate colored
+                      accent across two prior passes, is flattened here too
+                      per this pass's explicit "no colored sections"
+                      instruction - a plain top divider replaces the amber
+                      box. Collapsed height uses the same deterministic
+                      border-box + minHeight + flex-center technique as the
+                      previous pass, just retargeted to 52px exactly instead
+                      of a 60-64px range. Selection state and the click
+                      handler are unchanged. */}
+                  <div style={{ marginTop: '24px' }}>
+                    {metconVariantsForDisplay(primarySectionV).map((v, i) => {
+                      const miscari = v.movements
+                      const notaVarianta = v.notes
+                      const isSelected = variantaAleasa === i
+                      return (
+                        <div key={i} onClick={() => {
+                          const dejaSelectata = variantaAleasa === i
+                          setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
+                          setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
+                        }}
+                          style={{
+                            background: '#fff', border: '1px solid #ECECEC', borderRadius: '20px', boxSizing: 'border-box',
+                            padding: isSelected ? '14px 18px' : '0 18px', minHeight: isSelected ? undefined : '52px',
+                            display: isSelected ? 'block' : 'flex', flexDirection: isSelected ? undefined : 'column', justifyContent: isSelected ? undefined : 'center',
+                            marginBottom: '12px', cursor: 'pointer',
+                          }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <LevelDot nivel={v.nivel} size={6} />
+                            <span style={{ fontSize: '14px', fontWeight: '500', color: '#0E0E0E' }}>{v.nivel}</span>
+                            <ChevronDown size={16} color="#A1A1AA" strokeWidth={1.5}
+                              style={{ marginLeft: 'auto', transform: isSelected ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
+                          </div>
+                          {isSelected && (miscari.length > 0 || notaVarianta) && (
+                            <>
+                              <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: '400', color: '#6B7280' }}>{primarySectionV?.format}</span>
+                                  <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '400' }}>{formatWodDurata(wodZiData?.duration)}</span>
+                                </div>
+                                {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
+                                {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
+                                  <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '400', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                                )}
                               </div>
-                              {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
-                              {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                                <div style={{ fontSize: '14px', color: '#6B7280', fontWeight: '400', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                              {miscari.length > 0 && (
+                                <div>
+                                  {miscari.map((m, mi) => (
+                                    <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                      {m}
+                                    </div>
+                                  ))}
+                                </div>
                               )}
-                            </div>
-                            {miscari.length > 0 && (
-                              <div>
-                                {miscari.map((m, mi) => (
-                                  <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                    {m}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {notaVarianta && (
-                              <div style={{ padding: '10px 12px', background: '#FFF9EC', border: '1px solid #F3DE9C', borderRadius: '12px', marginTop: '16px' }}>
-                                <div style={{ fontSize: '10px', fontWeight: '700', color: '#8A6D1D', letterSpacing: '0.06em', marginBottom: '2px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
-                                <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{notaVarianta}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
+                              {notaVarianta && (
+                                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
+                                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
+                                  <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                   <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                     style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
