@@ -78,3 +78,77 @@ Not captured — this session's standing policy is to never log in as any user, 
 ---
 
 **HOME DASHBOARD UI REDESIGN COMPLETE**
+
+---
+
+## P0 Follow-up — Bottom Sheet Safe-Area / Tab Bar Overlap Fix
+
+A critical layout bug was reported after the redesign above shipped: the class-detail Bottom Sheet's participant list rendered underneath the bottom navigation bar, and the sheet extended past it to the true bottom of the viewport.
+
+### Root cause
+
+`BottomSheet` (`src/components.jsx`) used `position: 'fixed', inset: 0` for its backdrop. `position: fixed` always anchors to the true browser viewport (or the nearest ancestor with a `transform`/`filter`/similar property establishing a new containing block — no such ancestor exists here), **regardless of where NavBar sits in the document**. NavBar itself is deliberately **not** `position: fixed` — its own code comment (`App.jsx`, `NavBar`) documents that this was removed on 2026-07-02 after a prior incident with measuring iOS standalone viewport height incorrectly (see `[[project-navbar-safe-area]]`); NavBar is a normal flex child, last in `.app-frame`'s column, sized by its own content plus `env(safe-area-inset-bottom)` padding.
+
+Because the sheet had no way to know NavBar existed at all, its `inset: 0` backdrop — and therefore its bottom-anchored white panel — extended all the way to the literal bottom of the screen, physically overlapping NavBar's real on-screen position. This both visually hid the last participant row behind the tab bar and made the tab bar itself unreachable to taps while the sheet was open (the backdrop, being one continuous element on top in stacking order, intercepted the touch).
+
+### Fix
+
+Rather than hardcoding a pixel value for NavBar's height (which varies by device — different safe-area-inset-bottom on notch vs. non-notch iPhones, different Android gesture-nav vs. 3-button-nav insets), NavBar now **measures its own real rendered height** via `ResizeObserver` and publishes it as a CSS custom property:
+
+```js
+// App.jsx, inside NavBar
+useEffect(() => {
+  const el = navRef.current
+  if (!el || typeof ResizeObserver === 'undefined') return
+  const publish = () => {
+    document.documentElement.style.setProperty('--navbar-height', `${el.getBoundingClientRect().height}px`)
+  }
+  publish()
+  const ro = new ResizeObserver(publish)
+  ro.observe(el)
+  return () => ro.disconnect()
+}, [])
+```
+
+Since NavBar's own rendered height already includes whatever safe-area inset the platform applied to its `paddingBottom`, this sidesteps needing any iOS-vs-Android branching entirely — one measurement, correct on both. `ResizeObserver` (not a one-time measurement) keeps it correct across orientation changes and Android's live-resizing gesture-nav inset.
+
+`BottomSheet`'s backdrop then stops exactly at that height instead of the viewport's true bottom:
+
+```js
+// components.jsx, BottomSheet
+<div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--navbar-height, 64px)', ... }}>
+```
+
+`maxHeight` (the sheet's own cap on how tall it can grow) changed from `'85vh'` (85% of the *full* viewport, which could still exceed the now-shorter available space) to `'85%'` (85% of the backdrop's own, now-correctly-bounded box). A `64px` fallback default is set on `:root` in `index.css` for the brief window before the `ResizeObserver`'s first callback fires (NavBar and the Home screen mount together, so in practice this window never elapses before a user could open a sheet).
+
+### Requirements checklist
+
+- **Sheet stops above the tab bar** — backdrop `bottom: var(--navbar-height)`, not `0`.
+- **Tab bar stays fully visible and interactive** — it's now entirely outside the backdrop's own DOM box, so nothing dims it and nothing intercepts taps meant for it.
+- **Last participant never hidden** — the sheet's own box no longer extends behind NavBar at all, so there's no region for a participant row to be hidden in; existing internal `overflowY: 'auto'` plus the sheet's own bottom padding (28px) still applies for scrolling within the now-correctly-bounded space.
+- **iOS safe-area insets / Android navigation insets respected** — by construction: the fix reads NavBar's actual rendered geometry (which already resolved whichever inset applies) rather than reimplementing inset math a second time.
+- **Scrolling continues to the final participant** — unaffected by this fix; the sheet's internal scroll region and its content were never changed, only the outer bounding box.
+- **NavBar not hidden or moved** — confirmed: no change to `NavBar`'s own JSX, styling, or position in the DOM; only a new `useEffect` was added inside it, and its render output is byte-identical to before.
+
+### Testing
+
+- ESLint: 0 new errors (same 11 pre-existing `Unused eslint-disable directive` warnings).
+- Full test suite: 495/495 passing (same 9 pre-existing, unrelated Deno Edge-Function failures).
+- Production build: clean.
+
+### Cross-device verification
+
+This app has no dedicated component-rendering test harness (single-file `App.jsx`, no React Testing Library setup anywhere in this codebase, consistent with how every other Home-screen UI mission this session was verified), and this session's standing policy is to never log in as any user — so a literal tap-through on four physical/emulated device+browser combinations was not performed. What **was** verified, and what the fix's own design guarantees:
+
+- **The mechanism is platform-agnostic by construction.** The fix does not special-case iOS or Android anywhere — it measures one DOM element's real rendered height, which is where the values `env(safe-area-inset-bottom)` (iOS Safari/PWA) and Android's `WindowInsets`-derived CSS environment values already land after the browser resolves them into NavBar's own box. There is no separate iOS code path and Android code path to verify independently; there is one measurement that is correct wherever the browser correctly reports `env(safe-area-inset-bottom)`, which `viewport-fit=cover` (already present in `index.html`) enables on both platforms.
+- **PWA vs. browser-tab distinction**: the fix is identical in both contexts — `ResizeObserver` and `getBoundingClientRect()` are standard DOM APIs with no PWA-specific behavior difference; the only thing that changes between a PWA (standalone) and a browser tab (Safari/Chrome, with their own chrome/toolbar) is the *value* `env(safe-area-inset-bottom)` resolves to, which is exactly the variable this fix reads live off the real box rather than assuming.
+- **Not verified**: the actual visual/tactile experience on a real iPhone (notch and non-notch), a real Android device with gesture navigation, and the same in each platform's installed-PWA mode. This remains the user's own next step, same disclosed limitation as every prior UI mission on this codebase this session.
+
+### Deployment verification
+
+- WOD-SIMPLE: commit `3d553b1`, pushed to `main`, live at `forge-delta-ivory.vercel.app`.
+- Vercel MCP/API access remained down for this mission (6th consecutive occurrence this session). Verified via the established direct-fetch fallback: the live bundle's filename changed after the push, and a content grep against the new bundle confirms the literal string `--navbar-height` is present — which can only be true if the deployed code includes this fix.
+
+---
+
+**BOTTOM SHEET SAFE-AREA / TAB BAR OVERLAP FIX VERIFIED**
