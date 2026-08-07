@@ -101,7 +101,7 @@ export function Modal({ title, onClose, children, maxWidth = '360px' }) {
 // composed, since the two differ in backdrop opacity, positioning, and
 // have no other shared JSX), reused verbatim rather than reinvented - this
 // is a presentation-only addition, no new data flow.
-export function BottomSheet({ onClose, children, maxHeight = '85vh' }) {
+export function BottomSheet({ onClose, children, maxHeight = '85%' }) {
   const sheetRef = useRef(null)
 
   useEffect(() => {
@@ -134,8 +134,28 @@ export function BottomSheet({ onClose, children, maxHeight = '85vh' }) {
     }
   }, [onClose])
 
+  // Bottom Sheet safe-area / tab bar overlap fix
+  // (HOME_DASHBOARD_UI_REDESIGN_REPORT.md, P0 follow-up) - the backdrop used
+  // to be inset:0 (full viewport height), so both the dark backdrop and the
+  // sheet's own white panel physically extended behind NavBar (a normal-flow
+  // flex child of .app-frame, deliberately NOT position:fixed - see NavBar's
+  // own comment in App.jsx). A position:fixed overlay always escapes that
+  // flow and anchors to the real viewport, so inset:0 had no way to know
+  // NavBar was there at all - the last participant row (and the tab bar
+  // itself) ended up underneath the sheet, unclickable.
+  //
+  // Fix: stop the backdrop's own box exactly at NavBar's top edge, using the
+  // real measured height NavBar publishes via ResizeObserver
+  // (--navbar-height, App.jsx) rather than a hardcoded pixel guess - this is
+  // what makes the fix correct on both iOS (home-indicator safe-area-inset-
+  // bottom) and Android (gesture-nav/3-button inset) without any
+  // platform-specific branching, since it reads NavBar's actual rendered
+  // box, which already accounts for whichever inset applies. maxHeight is
+  // now a % of this shorter box (not vh), so "85% of the space above the
+  // tab bar" instead of "85% of the full screen, plus NavBar covering
+  // whatever peeked out the bottom."
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end' }}>
+    <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--navbar-height, 64px)', background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', alignItems: 'flex-end' }}>
       <div ref={sheetRef} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: '24px 24px 0 0', width: '100%', maxHeight, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '10px 20px 28px', boxSizing: 'border-box' }}>
         <div style={{ width: '36px', height: '4px', background: '#E5E5E5', borderRadius: '2px', margin: '0 auto 18px' }} />

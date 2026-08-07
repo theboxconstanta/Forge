@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Bottom Sheet safe-area / tab bar overlap fix
+   (HOME_DASHBOARD_UI_REDESIGN_REPORT.md) - fallback only, used until
+   NavBar's own ResizeObserver (App.jsx) publishes the real measured
+   height on mount. 64px is a reasonable estimate of NavBar's own content
+   height with no safe-area inset (10px+10px vertical padding, 22px icon,
+   ~14px label+gap) - close enough that no visible jump happens in the
+   near-instant window before the real value overwrites it. */
+:root {
+  --navbar-height: 64px;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

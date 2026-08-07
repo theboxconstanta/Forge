@@ -634,6 +634,30 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
   // vreunei masuratori gresite de viewport.
   const navRef = useRef(null)
   const showDebug = typeof window !== 'undefined' && localStorage.getItem('navDebug') === '1'
+
+  // Bottom Sheet safe-area / tab bar overlap fix (BOTTOM_SHEET_SAFE_AREA_FIX
+  // section, HOME_DASHBOARD_UI_REDESIGN_REPORT.md) - NavBar is the ONLY
+  // element in the app that actually knows its own real rendered height,
+  // including whatever safe-area-inset-bottom/Android gesture-nav inset the
+  // device applied to its own paddingBottom. Publishing that measured height
+  // as a CSS custom property lets any position:fixed overlay (BottomSheet
+  // today, others later) reserve exactly that much space without
+  // duplicating platform-specific env()/inset logic - measuring the real DOM
+  // box sidesteps iOS-vs-Android differences entirely instead of trying to
+  // guess them. ResizeObserver (not a one-time measurement) so orientation
+  // changes, dynamic type/font-size, and Android nav-bar show/hide (which
+  // resizes the safe-area inset live) all stay correct.
+  useEffect(() => {
+    const el = navRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const publish = () => {
+      document.documentElement.style.setProperty('--navbar-height', `${el.getBoundingClientRect().height}px`)
+    }
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const tabs = (isAdmin || isCoach) ? [...NAV_TABS, { id: 'admin', labelKey: isAdmin ? 'navAdmin' : 'navCoach', icon: Settings }] : NAV_TABS
   return (
     <>
