@@ -17,7 +17,7 @@ import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
-  localeFor, authErrorMessage, RESET_LINK_ERROR_CODES,
+  localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions } from './components'
 import { getT } from './translations'
@@ -2132,6 +2132,22 @@ function MiniSwitch({ checked, onChange }) {
   )
 }
 
+// Class Operations - Instant Coach Check-in: THE single canonical
+// check-in mutation, module-scope (not a component's own closure) so both
+// `Admin`'s Clase tab and `App`'s own Acasa class card can call the exact
+// same function - they're separate top-level components (Admin receives
+// its own props, has no access to App's state or vice versa), so this
+// cannot itself be a shared piece of component state the way it is in
+// forge-admin-web's single-component TodayCommandCenter; a plain
+// module-level function is this file's own equivalent of "one shared
+// import" - each caller still owns its own local optimistic patch/rollback
+// around this one write, exactly mirroring how forge-admin-web's
+// AttendanceList and TodayCommandCenter both import one setCheckedIn but
+// each keep their own optimistic state.
+async function checkInBooking(bookingId, checkedIn) {
+  return supabase.from('bookings').update({ checked_in: checkedIn }).eq('id', bookingId)
+}
+
 function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
@@ -2212,6 +2228,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [savingMembruNou, setSavingMembruNou] = useState(false)
 
   const [rezervariClasa, setRezervariClasa] = useState({})
+  // Class Operations - Instant Coach Check-in: booking ids with a
+  // checked_in toggle in flight, local to this component's own roster
+  // (App's Acasa card keeps its own separate copy - see checkInBooking's
+  // own doc comment for why these can't be one shared state).
+  const [pendingCheckins, setPendingCheckins] = useState(new Set())
   const [clasaDeschisa, setClasaDeschisa] = useState(null)
   const [clientSelectat, setClientSelectat] = useState(null)
   const [sortClienti, setSortClienti] = useState('toti')
@@ -2400,9 +2421,9 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const fetchRezervariClasa = async (classId) => {
-    let { data: bookData, error } = await supabase.from('bookings').select('member_id, checked_in').eq('class_id', classId)
+    let { data: bookData, error } = await supabase.from('bookings').select('id, member_id, checked_in').eq('class_id', classId)
     if (error) {
-      const { data: fallback } = await supabase.from('bookings').select('member_id').eq('class_id', classId)
+      const { data: fallback } = await supabase.from('bookings').select('id, member_id').eq('class_id', classId)
       bookData = (fallback || []).map(b => ({ ...b, checked_in: false }))
     }
     const memberIds = (bookData || []).map(b => b.member_id)
@@ -2410,14 +2431,15 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const { data: profsData } = await supabase.from('members').select('id, full_name, email, avatar_url').in('id', [...new Set(memberIds)])
     const profsMap = {}
     ;(profsData || []).forEach(p => { profsMap[p.id] = p })
-    const checkinMap = {}
-    ;(bookData || []).forEach(b => { checkinMap[b.member_id] = b.checked_in })
+    const bookingByMember = {}
+    ;(bookData || []).forEach(b => { bookingByMember[b.member_id] = b })
     const rezultat = memberIds.map(mid => ({
+      booking_id: bookingByMember[mid]?.id,
       member_id: mid,
       full_name: profsMap[mid]?.full_name,
       email: profsMap[mid]?.email,
       avatar_url: profsMap[mid]?.avatar_url,
-      checked_in: checkinMap[mid] || false,
+      checked_in: bookingByMember[mid]?.checked_in || false,
     }))
     setRezervariClasa(prev => ({ ...prev, [classId]: rezultat }))
   }
@@ -2590,15 +2612,28 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     fetchClase()
   }
 
-  const adminToggleCheckIn = async (classId, memberId, currentValue) => {
-    const { error } = await supabase.from('bookings')
-      .update({ checked_in: !currentValue })
-      .eq('class_id', classId).eq('member_id', memberId)
-    if (error) { showToast(t.toastGenericError); console.error(error); return }
-    setRezervariClasa(prev => ({
-      ...prev,
-      [classId]: (prev[classId] || []).map(r => r.member_id === memberId ? { ...r, checked_in: !currentValue } : r),
-    }))
+  // Class Operations - Instant Coach Check-in: optimistic wrapper around
+  // the shared checkInBooking mutation (module scope, see its own doc
+  // comment) - apply-before-network with a symmetric rollback on failure,
+  // mirroring forge-admin-web's identical TodayCommandCenter pattern. Only
+  // patches this component's own rezervariClasa roster; App's Acasa card
+  // has its own equivalent wrapper for its own rezervariPerClasa state -
+  // the existing 'bookings' realtime subscription reconciles both with
+  // server truth regardless (fetchRezervariClasa/fetchRezervariZi on any
+  // change), exactly like every other realtime screen in this codebase.
+  const adminToggleCheckIn = async (classId, memberId, bookingId, currentValue) => {
+    if (!bookingId || pendingCheckins.has(bookingId)) return
+    const nextValue = !currentValue
+    setPendingCheckins(prev => new Set(prev).add(bookingId))
+    setRezervariClasa(prev => (prev[classId] ? { ...prev, [classId]: prev[classId].map(r => r.member_id === memberId ? { ...r, checked_in: nextValue } : r) } : prev))
+
+    const { error } = await checkInBooking(bookingId, nextValue)
+
+    setPendingCheckins(prev => { const next = new Set(prev); next.delete(bookingId); return next })
+    if (error) {
+      showToast(t.toastGenericError); console.error(error)
+      setRezervariClasa(prev => (prev[classId] ? { ...prev, [classId]: prev[classId].map(r => r.member_id === memberId ? { ...r, checked_in: currentValue } : r) } : prev))
+    }
   }
 
   const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
@@ -3888,9 +3923,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                               </div>
                               {(() => {
                                 const clasaInceput = new Date(`${c.date}T${c.start_time}`) <= new Date()
+                                const sePonteaza = pendingCheckins.has(r.booking_id)
                                 return (
-                                  <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.checked_in)}
-                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #0E0E0E' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#FFFFFF', color: r.checked_in ? '#0E0E0E' : '#aaa', fontSize: '11px', cursor: 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400' }}>
+                                  <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.booking_id, r.checked_in)}
+                                    disabled={sePonteaza}
+                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #0E0E0E' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#FFFFFF', color: r.checked_in ? '#0E0E0E' : '#aaa', fontSize: '11px', cursor: sePonteaza ? 'wait' : 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400', opacity: sePonteaza ? 0.5 : 1 }}>
                                     {r.checked_in ? t.adminClassPresentLabel : clasaInceput ? t.adminClassAbsentLabel : t.adminClassMarkLabel}
                                   </button>
                                 )
@@ -5125,6 +5162,12 @@ function App() {
   const homeCalTodayRef = useRef(null)
   const [rezervariMele, setRezervariMele] = useState([])
   const [rezervariPerClasa, setRezervariPerClasa] = useState({})
+  // Class Operations - Instant Coach Check-in: booking ids with a
+  // checked_in toggle currently in flight - disables only that one chip
+  // (both on Acasa's class card and the separate admin Clase tab, since
+  // adminToggleCheckIn below is the single canonical mutation both share),
+  // mirrors forge-admin-web's identical pendingBookingIds guard.
+  const [pendingCheckins, setPendingCheckins] = useState(new Set())
   const [waitlistMea, setWaitlistMea] = useState([])
   const [clasaHomeSelectata, setClasaHomeSelectata] = useState(null)
   const [toast, setToast] = useState('')
@@ -6546,11 +6589,11 @@ function App() {
 
   const fetchRezervariZi = async (classIds) => {
     if (!classIds || classIds.length === 0) return
-    const { data } = await supabase.from('bookings').select('class_id, member_id').in('class_id', classIds)
+    const { data } = await supabase.from('bookings').select('id, class_id, member_id, checked_in').in('class_id', classIds)
     if (!data) return
     const grouped = {}
     classIds.forEach(id => { grouped[id] = [] })
-    data.forEach(b => { if (grouped[b.class_id] !== undefined) grouped[b.class_id].push(b.member_id) })
+    data.forEach(b => { if (grouped[b.class_id] !== undefined) grouped[b.class_id].push(b) })
     const allIds = [...new Set(data.map(b => b.member_id))]
     let profilesMap = {}
     if (allIds.length > 0) {
@@ -6561,7 +6604,13 @@ function App() {
     classIds.forEach(id => {
       result[id] = {
         count: grouped[id].length,
-        membri: grouped[id].map(mid => ({ name: profilesMap[mid]?.full_name || 'Membru', avatarUrl: profilesMap[mid]?.avatar_url || null })),
+        membri: grouped[id].map(b => ({
+          bookingId: b.id,
+          memberId: b.member_id,
+          name: profilesMap[b.member_id]?.full_name || 'Membru',
+          avatarUrl: profilesMap[b.member_id]?.avatar_url || null,
+          checkedIn: b.checked_in || false,
+        })),
       }
     })
     setRezervariPerClasa(prev => ({ ...prev, ...result }))
@@ -7139,6 +7188,29 @@ function App() {
     setPrDate(prev => prev.filter(r => r.movement !== movement))
     if (prSelectat === movement) setPrSelectat(null)
     showToast(t.toastExerciseDeleted)
+  }
+
+  // Class Operations - Instant Coach Check-in: Acasa class card's own
+  // optimistic wrapper around the shared checkInBooking mutation - same
+  // pattern as Admin's own adminToggleCheckIn (see checkInBooking's doc
+  // comment for why App/Admin each need their own wrapper rather than one
+  // shared function: they're separate top-level components). Patches only
+  // rezervariPerClasa (this component's own state); the existing 'bookings'
+  // realtime subscription (fetchRezervariZi on any change) reconciles with
+  // server truth regardless.
+  const handleHomeCheckIn = async (classId, memberId, bookingId, currentValue) => {
+    if (!bookingId || pendingCheckins.has(bookingId)) return
+    const nextValue = !currentValue
+    setPendingCheckins(prev => new Set(prev).add(bookingId))
+    setRezervariPerClasa(prev => (prev[classId] ? { ...prev, [classId]: { ...prev[classId], membri: prev[classId].membri.map(m => m.bookingId === bookingId ? { ...m, checkedIn: nextValue } : m) } } : prev))
+
+    const { error } = await checkInBooking(bookingId, nextValue)
+
+    setPendingCheckins(prev => { const next = new Set(prev); next.delete(bookingId); return next })
+    if (error) {
+      showToast(t.toastGenericError); console.error(error)
+      setRezervariPerClasa(prev => (prev[classId] ? { ...prev, [classId]: { ...prev[classId], membri: prev[classId].membri.map(m => m.bookingId === bookingId ? { ...m, checkedIn: currentValue } : m) } } : prev))
+    }
   }
 
   const toggleWaitlist = async (clasaId) => {
@@ -7890,17 +7962,56 @@ function App() {
                               {(() => {
                                 const membri = rezervariPerClasa[c.id]?.membri || []
                                 const cnt = rezervariPerClasa[c.id]?.count ?? nrRez
+                                // Class Operations - Instant Coach Check-in: Owner/Admin/Coach get
+                                // interactive chips directly on this same card members already see -
+                                // "no Dashboard, no Attendance page, no extra navigation" is the
+                                // mission's own point. Members get exactly the read-only chip this
+                                // screen already rendered - canToggle false means the chip branch
+                                // below is never reached for them, so their own view is unchanged.
+                                const canToggleAtt = isAdmin || isCoach
+                                const attInteractive = isInAttendanceGraceWindow(c.date, c.end_time)
+                                const nrPrezenti = membri.filter(m => m.checkedIn).length
                                 return membri.length > 0 ? (
                                   <div style={{ marginBottom: '10px' }}>
-                                    <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                      {membri.map((m, mi) => (
-                                        <span key={mi} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', background: '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', padding: '3px 8px 3px 3px', borderRadius: '20px', fontWeight: '500' }}>
-                                          <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={18} />
-                                          {m.name}
-                                        </span>
-                                      ))}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                      <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', fontWeight: '700', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
+                                      {canToggleAtt && nrPrezenti > 0 && (
+                                        <div style={{ fontSize: '10px', fontWeight: '600', color: '#0E0E0E', background: rezervat ? 'rgba(14,14,14,0.08)' : '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
+                                      )}
                                     </div>
+                                    {canToggleAtt && attInteractive && (
+                                      <div style={{ fontSize: '10px', color: rezervat ? '#0E0E0E' : '#aaa', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Users size={11} /> {t.homeAttendanceTapHint}
+                                      </div>
+                                    )}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                      {membri.map((m, mi) => {
+                                        const interactive = canToggleAtt && attInteractive
+                                        const pending = pendingCheckins.has(m.bookingId)
+                                        const chipStyle = m.checkedIn
+                                          ? { background: '#E7F6EA', color: '#1E6B36', border: '1px solid #BFE6C8', fontWeight: '600' }
+                                          : { background: rezervat ? 'rgba(255,255,255,0.7)' : '#f0f0f0', color: rezervat ? '#0E0E0E' : '#555', border: '1px solid transparent', fontWeight: '500' }
+                                        const content = (
+                                          <>
+                                            {m.checkedIn ? <CheckCircle2 size={14} color="#1E6B36" /> : <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={18} />}
+                                            {m.name}
+                                          </>
+                                        )
+                                        const sharedStyle = { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', padding: '3px 8px 3px 3px', borderRadius: '20px', opacity: pending ? 0.55 : 1, ...chipStyle }
+                                        return interactive ? (
+                                          <button key={mi} type="button" disabled={pending}
+                                            onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
+                                            style={{ ...sharedStyle, border: m.checkedIn ? chipStyle.border : '1px solid #d0d0d0', cursor: pending ? 'wait' : 'pointer' }}>
+                                            {content}
+                                          </button>
+                                        ) : (
+                                          <span key={mi} style={sharedStyle}>{content}</span>
+                                        )
+                                      })}
+                                    </div>
+                                    {canToggleAtt && !attInteractive && (
+                                      <div style={{ fontSize: '10px', color: '#aaa', marginTop: '6px' }}>{t.homeAttendanceReadOnly}</div>
+                                    )}
                                   </div>
                                 ) : cnt > 0 ? (
                                   <div style={{ fontSize: '11px', color: rezervat ? '#0E0E0E' : '#aaa', marginBottom: '10px' }}>{t.homeParticipantsCount(cnt)}</div>

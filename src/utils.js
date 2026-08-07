@@ -32,6 +32,17 @@ export function dateWithCurrentTime(dateStr) {
   return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
 }
 
+// Class Operations - Instant Coach Check-in: atendanta ramane editabila pana
+// la ora de final a clasei + 2 ore (aceeasi fereastra de gratie ca
+// forge-admin-web's isInAttendanceGraceWindow, portata disciplinat aici -
+// cele doua repo-uri nu au niciun mecanism de cod comun). `${date}T${endTime}`
+// se interpreteaza ca ora LOCALA (acelasi mod in care restul codebase-ului
+// combina date+timp, ex. adminAdaugaInClasa mai jos in App.jsx), nu UTC.
+export const ATTENDANCE_GRACE_WINDOW_MS = 2 * 60 * 60 * 1000
+export function isInAttendanceGraceWindow(date, endTime, now = new Date()) {
+  return now.getTime() <= new Date(`${date}T${endTime}`).getTime() + ATTENDANCE_GRACE_WINDOW_MS
+}
+
 // Adauga `months` luni calendaristice la `startDate`, pastrand aceeasi zi a
 // lunii - si daca luna tinta nu are acea zi (ex: 31 ianuarie + 1 luna),
 // clampeaza la ultima zi a lunii tinta (28/29 februarie), in loc sa lase

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
-  authErrorMessage, RESET_LINK_ERROR_CODES,
+  authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
 
 afterEach(() => {
@@ -262,5 +262,32 @@ describe('RESET_LINK_ERROR_CODES', () => {
   it('nu contine coduri nelegate de recuperare parola (ex. weak_password) - n-ar trebui sa arate ecranul de link invalid', () => {
     expect(RESET_LINK_ERROR_CODES.has('weak_password')).toBe(false)
     expect(RESET_LINK_ERROR_CODES.has('invalid_credentials')).toBe(false)
+  })
+})
+
+describe('isInAttendanceGraceWindow', () => {
+  it('interactiva inainte de finalul clasei', () => {
+    const now = new Date('2026-08-07T18:00:00')
+    expect(isInAttendanceGraceWindow('2026-08-07', '19:00:00', now)).toBe(true)
+  })
+
+  it('interactiva imediat dupa finalul clasei', () => {
+    const now = new Date('2026-08-07T19:00:01')
+    expect(isInAttendanceGraceWindow('2026-08-07', '19:00:00', now)).toBe(true)
+  })
+
+  it('interactiva exact la limita ferestrei de 2 ore', () => {
+    const now = new Date('2026-08-07T21:00:00')
+    expect(isInAttendanceGraceWindow('2026-08-07', '19:00:00', now)).toBe(true)
+  })
+
+  it('read-only dupa ce a trecut fereastra de 2 ore', () => {
+    const now = new Date('2026-08-07T21:00:01')
+    expect(isInAttendanceGraceWindow('2026-08-07', '19:00:00', now)).toBe(false)
+  })
+
+  it('gestioneaza corect o fereastra care trece de miezul noptii', () => {
+    const now = new Date('2026-08-08T00:30:00')
+    expect(isInAttendanceGraceWindow('2026-08-07', '23:00:00', now)).toBe(true)
   })
 })
