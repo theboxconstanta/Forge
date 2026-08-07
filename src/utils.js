@@ -151,7 +151,15 @@ export function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
-export const NIVEL_DOT_COLORS = { RX: '#E8591A', Intermediate: '#F0B429', Beginner: '#2FA84F', OnRamp: '#2F6FED' }
+// P0 UI refinement (WORKOUT_VARIANT_UI_REFINEMENT_REPORT.md) - canonical
+// color per scaling level, single source of truth for the dot AND the
+// Home accordion's own text/border color (VARIANTE_CONFIG.culoare in
+// App.jsx), which previously used a third, different set of hex values -
+// having the dot and the label next to it disagree on RX's exact shade of
+// orange read as sloppy, not premium. Chosen to read clearly as their
+// named hue (true orange/yellow/green/blue) while staying legible as text
+// on a white card, not just as a small dot.
+export const NIVEL_DOT_COLORS = { RX: '#EA580C', Intermediate: '#D97706', Beginner: '#16A34A', OnRamp: '#2563EB' }
 
 // Mapeaza codurile de eroare OFICIALE Supabase Auth (@supabase/auth-js
 // error-codes.ts - error.code, nu potrivire fragila pe error.message) la

@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban,
+  Archive, Ban, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -17,7 +17,7 @@ import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
   todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
-  localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
+  localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog } from './components'
 import { getT } from './translations'
@@ -7368,11 +7368,16 @@ function App() {
   const _azi = new Date()
   const aziStr = `${_azi.getFullYear()}-${String(_azi.getMonth()+1).padStart(2,'0')}-${String(_azi.getDate()).padStart(2,'0')}`
 
+  // culoare acum citit din NIVEL_DOT_COLORS (utils.js) - aceeasi sursa
+  // folosita de LevelDot, ca punctul colorat si textul de langa el sa nu
+  // mai difere niciodata (WORKOUT_VARIANT_UI_REFINEMENT_REPORT.md). `bg`
+  // ramane propriu acestui fisier - folosit doar de ecranul Log-WOD
+  // (rezumatul variantei alese), neschimbat de aceasta misiune.
   const VARIANTE_CONFIG = [
-    { nivel: 'RX', culoare: '#C45000', bg: '#FFF3EC', key: 'movements_rx', notesKey: 'notes_rx' },
-    { nivel: 'Intermediate', culoare: '#633806', bg: '#FAEEDA', key: 'movements_intermediate', notesKey: 'notes_intermediate' },
-    { nivel: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0', key: 'movements_beginner', notesKey: 'notes_beginner' },
-    { nivel: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB', key: 'movements_onramp', notesKey: 'notes_onramp' },
+    { nivel: 'RX', culoare: NIVEL_DOT_COLORS.RX, bg: '#FFF3EC', key: 'movements_rx', notesKey: 'notes_rx' },
+    { nivel: 'Intermediate', culoare: NIVEL_DOT_COLORS.Intermediate, bg: '#FAEEDA', key: 'movements_intermediate', notesKey: 'notes_intermediate' },
+    { nivel: 'Beginner', culoare: NIVEL_DOT_COLORS.Beginner, bg: '#f0f0f0', key: 'movements_beginner', notesKey: 'notes_beginner' },
+    { nivel: 'OnRamp', culoare: NIVEL_DOT_COLORS.OnRamp, bg: '#E6F1FB', key: 'movements_onramp', notesKey: 'notes_onramp' },
   ]
 
   // Faza 7 - Workout Engine V2 daca exista deja pt gym+data curenta, altfel
@@ -8223,44 +8228,58 @@ function App() {
                         loggable={skill2Section?.loggingMode !== 'none'} t={t} />
                     )
                   })()}
+                  {/* P0 UI refinement (WORKOUT_VARIANT_UI_REFINEMENT_REPORT.md) -
+                      white-card accordion. Selection/expand state
+                      (variantaAleasa) and the click handler are byte-identical
+                      to before - this block is a pure restyle, no logic
+                      change. Gray content boxes are gone: the metadata line
+                      and each movement now sit directly on the white card,
+                      separated by typography hierarchy and spacing/hairline
+                      dividers instead of background blocks. The colored
+                      border + colored title + small check icon replace the
+                      old black "Selected" pill. */}
                   {metconVariantsForDisplay(primarySectionV).map((v, i) => {
                     const miscari = v.movements
                     const notaVarianta = v.notes
+                    const isSelected = variantaAleasa === i
                     return (
                       <div key={i} onClick={() => {
                         const dejaSelectata = variantaAleasa === i
                         setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
                         setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
                       }}
-                        style={{ border: variantaAleasa === i ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', cursor: 'pointer', background: variantaAleasa === i ? '#fff' : '#fafafa' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: variantaAleasa === i && miscari.length > 0 ? '10px' : '0' }}>
+                        style={{ background: '#fff', border: isSelected ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: isSelected ? '18px' : '14px', padding: isSelected ? '18px' : '14px 16px', marginBottom: '12px', cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <LevelDot nivel={v.nivel} />
-                          <span style={{ fontSize: '13px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                          {variantaAleasa === i && <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', background: '#0E0E0E', color: '#fff', borderRadius: '20px' }}>{t.homeVariantSelected}</span>}
+                          <span style={{ fontSize: isSelected ? '16px' : '14px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
+                          {isSelected && <CheckCircle2 size={15} color={v.culoare} strokeWidth={2} />}
+                          {isSelected
+                            ? <ChevronUp size={18} color="#999" strokeWidth={2} style={{ marginLeft: 'auto' }} />
+                            : <ChevronDown size={18} color="#999" strokeWidth={2} style={{ marginLeft: 'auto' }} />}
                         </div>
-                        {variantaAleasa === i && (miscari.length > 0 || notaVarianta) && (
+                        {isSelected && (miscari.length > 0 || notaVarianta) && (
                           <>
-                            <div style={{ background: '#f0f0f0', borderRadius: '8px', padding: '7px 10px', marginBottom: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{primarySectionV?.format}</span>
-                                <span style={{ fontSize: '12px', color: '#888' }}>{formatWodDurata(wodZiData?.duration)}</span>
+                            <div style={{ marginTop: '16px', marginBottom: '14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                <span style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{primarySectionV?.format}</span>
+                                <span style={{ fontSize: '13px', color: '#888', fontWeight: '500' }}>{formatWodDurata(wodZiData?.duration)}</span>
                               </div>
-                              {workoutForDisplay?.title && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>"{workoutForDisplay.title}"</div>}
+                              {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
                               {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                                <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                               )}
                             </div>
                             {miscari.length > 0 && (
                               <div>
                                 {miscari.map((m, mi) => (
-                                  <div key={mi} style={{ padding: '7px 10px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '6px' }}>
-                                    <span style={{ fontSize: '13px', color: '#0E0E0E' }}>• {m}</span>
+                                  <div key={mi} style={{ paddingTop: '3px', paddingBottom: mi < miscari.length - 1 ? '9px' : '3px', fontSize: '14px', color: '#0E0E0E', lineHeight: '1.5', borderBottom: mi < miscari.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                                    {m}
                                   </div>
                                 ))}
                               </div>
                             )}
                             {notaVarianta && (
-                              <div style={{ padding: '8px 10px', background: '#FFF6DA', border: '1px solid #F3DE9C', borderRadius: '8px', marginTop: '6px' }}>
+                              <div style={{ padding: '10px 12px', background: '#FFF9EC', border: '1px solid #F3DE9C', borderRadius: '12px', marginTop: '14px' }}>
                                 <div style={{ fontSize: '10px', fontWeight: '700', color: '#8A6D1D', letterSpacing: '0.06em', marginBottom: '2px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                                 <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{notaVarianta}</span>
                               </div>
