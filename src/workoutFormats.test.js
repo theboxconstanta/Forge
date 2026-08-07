@@ -208,6 +208,13 @@ describe('isNotRxd', () => {
   it('loggedMovements/prescribedMovements omise (apelanti vechi) -> nu afecteaza rezultatul', () => {
     expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
   })
+  it('Faza 3 (rxEngine.js) - greutate LOGATA MAI MARE decat prescrisa -> tot RXd (bug-ul real reparat, nu mai egalitate exacta)', () => {
+    expect(isNotRxd({ weight_logged: '70kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  })
+  it('Faza 3 - greutate nenumerica pastreaza fallback-ul vechi (egalitate exacta de text)', () => {
+    expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'bodyweight', 'For Time')).toBe(false)
+    expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'vest', 'For Time')).toBe(true)
+  })
 })
 
 describe('movementsChanged', () => {
@@ -247,6 +254,9 @@ describe('isMixedCategory', () => {
   })
   it('nimic prescris (WOD vechi) -> nu poate fi Mixed', () => {
     expect(isMixedCategory('24kg', null, ['orice'], null)).toBe(false)
+  })
+  it('Faza 3 - greutate LOGATA MAI MARE decat prescrisa -> tot in categoria normala, nu Mixed', () => {
+    expect(isMixedCategory('70kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(false)
   })
 })
 

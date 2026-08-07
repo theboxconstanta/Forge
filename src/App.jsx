@@ -29,6 +29,7 @@ import {
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
+import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
 import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
 import {
@@ -7418,6 +7419,24 @@ function App() {
   const prescribedWeightPentruLog = editLogId
     ? editLogPrescribedWeight
     : (variantaAleasa !== null ? (wodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
+  // Faza 3 (rxEngine.js) - clasificare RX/Not Rx in timp real, derivata la
+  // citire din acelasi text folosit mai sus pt prescribedWeightPentruLog,
+  // niciodata dintr-un selector manual de gen. standardKg poate fi null
+  // (nicio greutate prescrisa - niciodata Not Rx fortat) sau semnalul
+  // "multi" (mai multe miscari cu greutati distincte - fara clasificare,
+  // vezi isMixedCategory mai jos in fisier pt tratamentul existent al
+  // acestui caz).
+  const activeAthleteGenderKey = resolveAthleteGenderKey(userProfile?.gender)
+  const activeRxStandardKg = resolveSectionStandardKg({
+    movements: miscariPentruLog,
+    legacyWeightText: prescribedWeightPentruLog,
+    genderKey: activeAthleteGenderKey,
+  })
+  const liveRxStatus = classifyRxStatus({
+    enteredWeightText: wodWeightLogged,
+    standardKg: activeRxStandardKg,
+    athleteUnit: userProfile?.weight_unit,
+  })
 
   // Acelasi tratament AMRAP (runde + repetari partiale) si pentru Hero WOD-uri, la logarea unui PR.
   // FORMAT-ul unui Hero WOD (built-in sau custom) e mereu "TIP restul textului" pe prima linie
@@ -8293,7 +8312,7 @@ function App() {
                                 <div>
                                   {miscari.map((m, mi) => (
                                     <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                      {m}
+                                      {resolveMovementDisplayText(m, activeAthleteGenderKey)}
                                     </div>
                                   ))}
                                 </div>
@@ -8791,6 +8810,7 @@ function App() {
               config={activeLogFormatConfig}
               movements={miscariPentruLog}
               prescribedWeight={prescribedWeightPentruLog}
+              rxStatus={liveRxStatus}
               value={{
                 result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
                 partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,

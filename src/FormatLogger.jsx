@@ -122,18 +122,38 @@ function TimeResultFields({ result, time, onChange, t, hideResult }) {
 // catre App.jsx la alegerea variantei (seed in state-ul real, nu fallback la
 // render) - acelasi motiv ca la bug-ul de reps: fallback-ul la render
 // impiedica editarea libera a campului.
-function WeightField({ weightLogged, onChange, t }) {
+// Faza 3 (rxEngine.js) - rxStatus e recalculat live la fiecare tasta de
+// App.jsx (clasifyRxStatus, derivat la citire, niciodata dintr-un selector
+// manual de gen) si doar afisat aici ca insigna mica, langa camp - "trebuie
+// sa se actualizeze instant in timp ce editezi", fara toggle manual.
+function RxBadge({ rxStatus, t }) {
+  if (!rxStatus) return null
+  const isRx = rxStatus === 'rx'
+  return (
+    <span style={{
+      fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '999px',
+      color: isRx ? '#3D8B3D' : '#9A6B00', background: isRx ? '#EAF6EA' : '#FDF3DC',
+    }}>
+      {isRx ? (t?.logWodRxBadge || 'RX') : (t?.logWodNotRxBadge || 'Not Rx')}
+    </span>
+  )
+}
+
+function WeightField({ weightLogged, onChange, t, rxStatus }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <div style={smallLabelStyle}>{t?.logWodWeightLabel || 'Greutate'}</div>
+      <div style={{ ...smallLabelStyle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span>{t?.logWodWeightLabel || 'Greutate'}</span>
+        <RxBadge rxStatus={rxStatus} t={t} />
+      </div>
       <input value={weightLogged || ''} onChange={e => onChange({ weightLogged: e.target.value })}
         placeholder={t?.logWodWeightPlaceholder || 'ex. 61kg'} style={inputStyle} />
     </div>
   )
 }
 
-function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight, finishedRounds }) {
-  const greutateField = prescribedWeight ? <WeightField weightLogged={value.weightLogged} onChange={onChange} t={t} /> : null
+function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight, finishedRounds, rxStatus }) {
+  const greutateField = prescribedWeight ? <WeightField weightLogged={value.weightLogged} onChange={onChange} t={t} rxStatus={rxStatus} /> : null
   if (scoreMode === 'amrap') {
     return <>{greutateField}<RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} /></>
   }
@@ -250,7 +270,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
@@ -285,7 +305,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
-        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} sequentialPartial={isSequentialFormat(formatId, config)} />
+        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus} sequentialPartial={isSequentialFormat(formatId, config)} />
         {hasCashOut && (
           <>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
@@ -368,7 +388,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   const efectiveMovements = format.ascending
     ? ascendingMovementsForRound(movements || [], (parseInt(v.roundsCompleted) || 0) + 1, config?.startReps, config?.incrementReps)
     : (movements || [])
-  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} finishedRounds={config?.rounds} />
+  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} rxStatus={rxStatus} finishedRounds={config?.rounds} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

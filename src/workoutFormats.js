@@ -18,6 +18,7 @@
 // - 'nft'     - Not For Time: doar completat + nota, fara scor
 
 import { convertWeight, secToTime } from './utils'
+import { classifyRxStatus } from './rxEngine'
 
 // Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
 // FormatConfigEditor peste campul de text liber - nu limiteaza ce se poate
@@ -598,8 +599,32 @@ export function weightMatches(a, b) {
   return canonicalWeightKey(a) === canonicalWeightKey(b)
 }
 
-// "Not RXd" = greutatea logata difera de cea prescrisa a variantei (vezi
-// weightMatches), SAU miscarile logate difera de cele prescrise (vezi
+// Faza 3 (rxEngine.js) - inlocuieste egalitatea exacta (weightMatches) cu
+// regula RX corecta: enteredWeight >= standard => RX, altfel Not RX. Bug-ul
+// real reparat aici: cineva care logheaza MAI MULT decat prescris (ex. 70kg
+// cand standardul e 61kg) era gresit marcat "Not RXd" de vechea egalitate
+// exacta (70 !== 61) - motivul aproape sigur al bug-ului raportat de membri
+// pe Clasament. classifyRxStatus intoarce null cand oricare text nu are un
+// numar la inceput (ex. "bodyweight") - in acel caz pastram fallback-ul
+// vechi (weightMatches, comparatie de text canonic) neschimbat, asa cum era
+// inainte de aceasta faza, pt orice greutate scrisa fara cifre.
+// Nu converteste unitati (la fel ca weightMatches inainte) - prescribedWeight
+// aici e deja rezolvat pe genul membrului de catre apelanti (weightKeyForVariant),
+// nu textul brut cu ambele standarde.
+function greutateEsteSubStandard(weightLogged, prescribedWeight) {
+  if (!prescribedWeight?.trim() || !weightLogged?.trim()) return false
+  const rxClassification = classifyRxStatus({
+    enteredWeightText: weightLogged,
+    standardKg: greutateNumerica(prescribedWeight),
+    athleteUnit: null,
+  })
+  if (rxClassification != null) return rxClassification === 'not_rx'
+  return !weightMatches(weightLogged, prescribedWeight)
+}
+
+// "Not RXd" = greutatea logata e SUB standardul prescris al variantei (vezi
+// greutateEsteSubStandard - Faza 3, regula enteredWeight >= standard, nu mai
+// egalitate exacta), SAU miscarile logate difera de cele prescrise (vezi
 // movementsChanged), SAU (la formatele cu time cap real - For Time/RFT/
 // Ladder, scoreMode 'fortime_or_amrap') nu s-a terminat in time cap (fara
 // time_result). AMRAP nu are concept de "neterminat" (scorul e mereu cat ai
@@ -614,7 +639,7 @@ export function weightMatches(a, b) {
 // greutatea) trebuie sa apara la fel de "Not RXd" oriunde, nu doar in
 // gruparea Mixed Categories de pe Clasament.
 export function isNotRxd(log, prescribedWeight, formatId, config, loggedMovements, prescribedMovements) {
-  const greutateDiferita = !!prescribedWeight?.trim() && !!log?.weight_logged?.trim() && !weightMatches(log.weight_logged, prescribedWeight)
+  const greutateDiferita = greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
   const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
   const miscariSchimbate = movementsChanged(loggedMovements, prescribedMovements)
   return greutateDiferita || neterminatInTimp || miscariSchimbate
@@ -635,13 +660,14 @@ export function movementsChanged(loggedMovements, prescribedMovements) {
 }
 
 // "Mixed Categories" (Clasament) = compozitia antrenamentului difera de cea
-// prescrisa variantei - greutate diferita SAU miscari schimbate. Diferit de
+// prescrisa variantei - greutate sub standard (vezi greutateEsteSubStandard)
+// SAU miscari schimbate. Diferit de
 // isNotRxd (care include si "neterminat in time cap" - o chestiune de
 // performanta, nu de compozitie): cineva care a facut EXACT miscarile si
 // greutatea prescrisa dar n-a terminat in time cap ramane in categoria lui
 // normala (doar cu badge-ul "Not RXd"), nu e mutat la Mixed Categories.
 export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements) {
-  const greutateDiferita = !!prescribedWeight?.trim() && !!weightLogged?.trim() && !weightMatches(weightLogged, prescribedWeight)
+  const greutateDiferita = greutateEsteSubStandard(weightLogged, prescribedWeight)
   return greutateDiferita || movementsChanged(loggedMovements, prescribedMovements)
 }
 
