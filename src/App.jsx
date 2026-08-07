@@ -8238,6 +8238,15 @@ function App() {
                       dividers instead of background blocks. The colored
                       border + colored title + small check icon replace the
                       old black "Selected" pill. */}
+                  {/* P0 UI refinement (WORKOUT_VARIANT_MINIMAL_UI_REFINEMENT_REPORT.md) -
+                      minimal white-card pass. The LevelDot is now the ONLY
+                      colored element in this block - title, border, and
+                      chevron are all neutral regardless of selection state,
+                      "equally important" per the approved mockup. Selection
+                      is communicated purely by whether the content below is
+                      open and by chevron orientation - no colored border, no
+                      colored title, no badge/checkmark. Selection state and
+                      the click handler are unchanged from before. */}
                   {metconVariantsForDisplay(primarySectionV).map((v, i) => {
                     const miscari = v.movements
                     const notaVarianta = v.notes
@@ -8248,38 +8257,37 @@ function App() {
                         setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
                         setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
                       }}
-                        style={{ background: '#fff', border: isSelected ? `2px solid ${v.culoare}` : '1px solid #f0f0f0', borderRadius: isSelected ? '18px' : '14px', padding: isSelected ? '18px' : '14px 16px', marginBottom: '12px', cursor: 'pointer' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '20px', padding: '20px', marginBottom: '20px', cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <LevelDot nivel={v.nivel} />
-                          <span style={{ fontSize: isSelected ? '16px' : '14px', fontWeight: '600', color: v.culoare }}>{v.nivel}</span>
-                          {isSelected && <CheckCircle2 size={15} color={v.culoare} strokeWidth={2} />}
+                          <span style={{ fontSize: '19px', fontWeight: '600', color: '#0E0E0E' }}>{v.nivel}</span>
                           {isSelected
-                            ? <ChevronUp size={18} color="#999" strokeWidth={2} style={{ marginLeft: 'auto' }} />
-                            : <ChevronDown size={18} color="#999" strokeWidth={2} style={{ marginLeft: 'auto' }} />}
+                            ? <ChevronUp size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />
+                            : <ChevronDown size={18} color="#9CA3AF" strokeWidth={2} style={{ marginLeft: 'auto' }} />}
                         </div>
                         {isSelected && (miscari.length > 0 || notaVarianta) && (
                           <>
-                            <div style={{ marginTop: '16px', marginBottom: '14px' }}>
+                            <div style={{ marginTop: '16px', marginBottom: '16px' }}>
                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                <span style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{primarySectionV?.format}</span>
-                                <span style={{ fontSize: '13px', color: '#888', fontWeight: '500' }}>{formatWodDurata(wodZiData?.duration)}</span>
+                                <span style={{ fontSize: '16px', fontWeight: '600', color: '#4B5563' }}>{primarySectionV?.format}</span>
+                                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '400' }}>{formatWodDurata(wodZiData?.duration)}</span>
                               </div>
-                              {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
+                              {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
                               {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                                <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                                <div style={{ fontSize: '14px', color: '#6B7280', fontWeight: '400', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                               )}
                             </div>
                             {miscari.length > 0 && (
                               <div>
                                 {miscari.map((m, mi) => (
-                                  <div key={mi} style={{ paddingTop: '3px', paddingBottom: mi < miscari.length - 1 ? '9px' : '3px', fontSize: '14px', color: '#0E0E0E', lineHeight: '1.5', borderBottom: mi < miscari.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                                  <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
                                     {m}
                                   </div>
                                 ))}
                               </div>
                             )}
                             {notaVarianta && (
-                              <div style={{ padding: '10px 12px', background: '#FFF9EC', border: '1px solid #F3DE9C', borderRadius: '12px', marginTop: '14px' }}>
+                              <div style={{ padding: '10px 12px', background: '#FFF9EC', border: '1px solid #F3DE9C', borderRadius: '12px', marginTop: '16px' }}>
                                 <div style={{ fontSize: '10px', fontWeight: '700', color: '#8A6D1D', letterSpacing: '0.06em', marginBottom: '2px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                                 <span style={{ fontSize: '13px', color: '#8A6D1D' }}>{notaVarianta}</span>
                               </div>
