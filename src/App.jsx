@@ -7990,11 +7990,11 @@ function App() {
                 unchanged. */}
             <div style={{ padding: '20px 20px 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.4, color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
+                <div style={{ fontSize: '14px', fontWeight: '400', lineHeight: '20px', color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
-                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', letterSpacing: '0.08em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
                     style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
@@ -8025,7 +8025,7 @@ function App() {
             <div style={{ padding: '10px 20px 4px' }}>
               <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                 style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '9px', padding: '10px 12px 10px 4px', margin: '-10px -12px -10px -4px' }}>
-                <span style={{ fontSize: '28px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: '26px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: '30px', fontVariantNumeric: 'tabular-nums' }}>
                   {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
                 </span>
                 <ChevronDown size={19} color="#111111" strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
@@ -8060,8 +8060,8 @@ function App() {
                         // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                      <span style={{ fontSize: '22px', fontWeight: '600', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '400', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '20px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
                       <span style={{ fontSize: '11px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
                       {(areWod || areRez) && (
                         <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? '#111111' : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
@@ -8095,15 +8095,15 @@ function App() {
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
                         <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '16px', width: '56px', height: '56px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '22px', fontWeight: '700', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
+                          <div style={{ fontSize: '21px', fontWeight: '600', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '20px', fontWeight: '600', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '18px', fontWeight: '500', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
                           <div style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           {rezervat
-                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#B7E63A', padding: '3px 9px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
+                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#B7E63A', padding: '3px 9px', borderRadius: '20px', fontWeight: '600' }}>{t.homeReserved}</span>
                             : peWaitlist
                             ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                             : plin
@@ -8141,7 +8141,7 @@ function App() {
                 <BottomSheet onClose={() => setClasaHomeSelectata(null)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                     <div>
-                      <div style={{ fontSize: '19px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
+                      <div style={{ fontSize: '19px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
                       <div style={{ fontSize: '13px', color: '#888', marginTop: '3px' }}>{c.coach}</div>
                     </div>
                     <button type="button" onClick={() => setClasaHomeSelectata(null)} aria-label={t.homeClassDetailClose}
@@ -8159,7 +8159,7 @@ function App() {
                     return membri.length > 0 ? (
                       <div style={{ marginBottom: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
+                          <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '600', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
                           {canToggleAtt && nrPrezenti > 0 && (
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', background: '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
                           )}
@@ -8180,12 +8180,12 @@ function App() {
                                 {interactive ? (
                                   <button type="button" disabled={pending}
                                     onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
-                                    style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
+                                    style={{ fontSize: '14px', fontWeight: m.checkedIn ? '500' : '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
                                       background: m.checkedIn ? '#E7F6EA' : '#0E0E0E', color: m.checkedIn ? '#1E6B36' : '#ABE73C', border: m.checkedIn ? '1px solid #BFE6C8' : 'none' }}>
                                     {m.checkedIn ? `✓ ${t.homeCheckedInAction}` : t.homeCheckInAction}
                                   </button>
                                 ) : m.checkedIn ? (
-                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                     <CheckCircle2 size={14} color="#1E6B36" /> {t.homeCheckedInAction}
                                   </span>
                                 ) : (
@@ -8223,7 +8223,7 @@ function App() {
                       </button>
                     ) : (
                       <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                         {t.homeBookSpot}
                       </button>
                     )
@@ -8244,7 +8244,7 @@ function App() {
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '22px', fontWeight: '600', color: '#111111' }}>
+                  <div style={{ fontSize: '20px', fontWeight: '500', color: '#111111' }}>
                     {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
                   {/* Durata ramane cititA din wodZiData (legacy) - modelul de
@@ -8254,15 +8254,15 @@ function App() {
                       mapLegacyWodToWorkout n-a calculat niciodata asta din
                       wods.duration). Exceptie documentata, ca la Logare -
                       vezi raportul Fazei 7. */}
-                  {workoutForDisplay?.title && <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
+                  {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '1px', lineHeight: 1.5 }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
                   {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '2px', lineHeight: 1.5 }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                   )}
                   {!wodDeschis && primarySectionV && (primarySectionV.movements || []).length > 0 && (
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{primarySectionV.movements.map(m => m.name).join(' · ')}</div>
                   )}
                   {logZiWod && (
-                    <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
                       <span style={{ color: '#0E0E0E' }}>{t.homeWorkoutDone}</span>
                       {logZiWod.variant_level && (
@@ -8274,7 +8274,7 @@ function App() {
                     </div>
                   )}
                   {logZiSkill && (
-                    <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
                       <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
                       {wodZiData.skill_name && (
@@ -8439,7 +8439,7 @@ function App() {
                     })}
                   </div>
                   <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
-                    style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                    style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
                 </div>
@@ -8465,13 +8465,13 @@ function App() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
-                      <div style={{ fontSize: '20px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ fontSize: '17px', fontWeight: '500', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: '#111111' }}>{sessUsed}</span>
                         <span style={{ color: '#D1D5DB', fontWeight: '400' }}> / </span>
                         <span style={{ color: '#111111' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '20px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '18px', color: '#111111', fontWeight: '500' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>

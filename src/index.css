@@ -56,7 +56,14 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   background: #FFFFFF;
-  font-family: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  /* Typography 2.0 (TYPOGRAPHY_2_0_REFINEMENT_REPORT.md) - -apple-system /
+     BlinkMacSystemFont resolve to the real SF Pro on Apple devices (Safari
+     iOS/macOS, Chrome on macOS) with zero extra request, since Apple does
+     not license SF Pro for @font-face distribution outside its own
+     platforms - this is the standard, only correct way to "use SF Pro if
+     available" on the web. Everywhere else (Android, Windows, Linux) falls
+     through to the self-hosted Inter Variable from Typography 1.0. */
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter Variable', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
