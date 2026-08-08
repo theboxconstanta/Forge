@@ -6211,18 +6211,29 @@ function App() {
   // time. Fixed by measuring the real rendered chip width + gap from the
   // DOM instead of a hardcoded constant, so this can never silently drift
   // out of sync with a future chip-size change again.
+  // Calendar Header Polish + Date Selection Fix - homeCalendarChips (the
+  // strip this scrolls) is always built for the CURRENT real-world year
+  // (see its own [actualToday, ...] deps below), so a ds whose year
+  // differs from "now" simply has no chip to scroll to at all - guard
+  // against that instead of computing an index against the wrong year's
+  // Jan 1 (the previous version derived `year` from `new Date()`, i.e.
+  // today's year, rather than from `ds` itself - harmless for same-year
+  // taps, but would silently no-op the scroll for a date picked in an
+  // adjacent year via the month picker's ‹ › navigation).
   const scrollChipToDate = (ds) => {
     setTimeout(() => {
       const container = homeCalScrollRef.current
       if (!container) return
       const firstChip = container.firstElementChild
       if (!firstChip) return
+      const dsYear = parseInt(ds.slice(0, 4), 10)
+      const currentYear = new Date().getFullYear()
+      if (dsYear !== currentYear) return
       const chipWidth = firstChip.getBoundingClientRect().width
       const gapPx = parseFloat(getComputedStyle(container).columnGap || getComputedStyle(container).gap) || 0
       const stride = chipWidth + gapPx
-      const year = new Date().getFullYear()
-      const startOfYear = new Date(`${year}-01-01T00:00:00`)
-      const totalDays = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365
+      const startOfYear = new Date(`${currentYear}-01-01T00:00:00`)
+      const totalDays = (currentYear % 4 === 0 && (currentYear % 100 !== 0 || currentYear % 400 === 0)) ? 366 : 365
       const idx = Math.round((new Date(ds + 'T00:00:00') - startOfYear) / 86400000)
       if (idx >= 0 && idx < totalDays) container.scrollLeft = Math.max(0, idx * stride - container.offsetWidth / 2 + chipWidth / 2)
     }, 50)
@@ -7999,22 +8010,29 @@ function App() {
               </div>
             </div>
 
-            {/* ── Month title (Visual Polish v2) - now the primary headline
-                of the screen (34-36px). Same tap-to-open-year-picker
-                function as before (setCalPickerYear/setCalPickerMonth/
-                setShowCalPicker), only relocated and enlarged; "back to
-                today" keeps its own setDataAcasa/scrollChipToDate call. */}
+            {/* ── Month title (Calendar Header Polish) - sized down from the
+                v2 pass's 35px/700 (which "dominated the screen") to
+                27px/600 per this pass's explicit target; still the same
+                tap-to-open-year-picker function (setCalPickerYear/
+                setCalPickerMonth/setShowCalPicker), unchanged. Chevron
+                swapped from a plain "▾" glyph (had no real stroke weight
+                to "increase") to a proper ChevronDown icon, sized up and
+                darkened so the header clearly reads as tappable. The
+                negative margin trick below enlarges the actual touch
+                target (padding) without shifting anything visually -
+                "back to today" keeps its own setDataAcasa/
+                scrollChipToDate call, unchanged. */}
             <div style={{ padding: '10px 20px 4px' }}>
               <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
-                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ fontSize: '35px', fontWeight: '700', color: '#111111', letterSpacing: '-0.8px', lineHeight: 1.1 }}>
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '9px', padding: '10px 12px 10px 4px', margin: '-10px -12px -10px -4px' }}>
+                <span style={{ fontSize: '27px', fontWeight: '600', color: '#111111', letterSpacing: '-0.5px', lineHeight: 1.15 }}>
                   {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
                 </span>
-                <span style={{ fontSize: '15px', color: '#D1D5DB' }}>▾</span>
+                <ChevronDown size={19} color="#111111" strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
               </div>
               {!esteAzi && (
                 <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                  style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', marginTop: '6px' }}>{t.homeBackToToday}</div>
+                  style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}>{t.homeBackToToday}</div>
               )}
             </div>
 
