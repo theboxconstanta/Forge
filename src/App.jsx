@@ -11,6 +11,7 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from './supabase'
+import { TYPO } from './typography'
 import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
@@ -1198,7 +1199,7 @@ function Timer({ onBack, defaultFortime, t }) {
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>Timer <TimerIcon size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+        <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>Timer <TimerIcon size={20} color="#0E0E0E" strokeWidth={2} /></h1>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
         {moduri.map(m => (
@@ -1642,7 +1643,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.clasamentTitle} <Medal size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+        <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.clasamentTitle} <Medal size={20} color="#0E0E0E" strokeWidth={2} /></h1>
         <button onClick={onRefresh} style={{ background: '#f0f0f0', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#FFFFFF', borderRadius: '12px', padding: '8px 12px' }}>
@@ -1763,11 +1764,11 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
-                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888', fontVariantNumeric: 'tabular-nums' }}>#{i + 1}</span>}
+                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ ...TYPO.numeric, color: '#888' }}>#{i + 1}</span>}
                             </div>
                             <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ ...TYPO.primary, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {name}
                                 {notRxdLog && <NotRxdBadge t={t} compact />}
                               </div>
@@ -1777,7 +1778,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare, fontVariantNumeric: 'tabular-nums' }}>{result}</div>
+                              <div style={{ ...TYPO.numericLarge, color: nivel.culoare }}>{result}</div>
                               {log.time_result && log.result && (
                                 <div style={{ fontSize: '11px', color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
                               )}
@@ -2017,7 +2018,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.feedTitle} <MessageCircle size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+      <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.feedTitle} <MessageCircle size={20} color="#0E0E0E" strokeWidth={2} /></h1>
 
       {/* Membrii comunitatii */}
       {membriComunitate.length > 0 && (
@@ -3343,7 +3344,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminHeaderTitle}</h1>
+        <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.adminHeaderTitle}</h1>
         <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>{isAdmin ? t.adminBadgeAdmin : t.adminBadgeCoach}</span>
       </div>
 
@@ -7993,7 +7994,7 @@ function App() {
                 <div style={{ fontSize: '14px', fontWeight: '400', lineHeight: '20px', color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '600', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', letterSpacing: '0.08em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
@@ -8061,7 +8062,7 @@ function App() {
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
                       <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                      <span style={{ fontSize: '20px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
+                      <span style={{ fontSize: '18px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
                       <span style={{ fontSize: '11px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
                       {(areWod || areRez) && (
                         <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? '#111111' : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
@@ -8095,11 +8096,11 @@ function App() {
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
                         <div style={{ background: '#111111', color: '#fff', borderRadius: '16px', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '18px', fontWeight: '600', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
-                          <div style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '13px', fontWeight: '400', lineHeight: '18px', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           {rezervat
@@ -8108,7 +8109,7 @@ function App() {
                             ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                             : plin
                             ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
-                            : <span style={{ fontSize: '15px', color: '#6B7280', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>{nrRez}/{c.max_spots}</span>}
+                            : <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>{nrRez}/{c.max_spots}</span>}
                           <ChevronRight size={16} color="#D1D5DB" strokeWidth={2} />
                         </div>
                       </div>
@@ -8176,20 +8177,20 @@ function App() {
                             return (
                               <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
                                 <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={34} />
-                                <div style={{ flex: 1, fontSize: '17px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
+                                <div style={{ flex: 1, fontSize: '16px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
                                 {interactive ? (
                                   <button type="button" disabled={pending}
                                     onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
-                                    style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
+                                    style={{ fontSize: '14px', fontWeight: '500', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
                                       background: m.checkedIn ? '#E7F6EA' : '#0E0E0E', color: m.checkedIn ? '#1E6B36' : '#ABE73C', border: m.checkedIn ? '1px solid #BFE6C8' : 'none' }}>
                                     {m.checkedIn ? `✓ ${t.homeCheckedInAction}` : t.homeCheckInAction}
                                   </button>
                                 ) : m.checkedIn ? (
-                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                     <CheckCircle2 size={14} color="#1E6B36" /> {t.homeCheckedInAction}
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#ccc', flexShrink: 0 }}>{t.homeCheckInAction}</span>
+                                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#ccc', flexShrink: 0 }}>{t.homeCheckInAction}</span>
                                 )}
                               </div>
                             )
@@ -8244,7 +8245,7 @@ function App() {
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '20px', fontWeight: '600', color: '#111111' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>
                     {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
                   {/* Durata ramane cititA din wodZiData (legacy) - modelul de
@@ -8465,13 +8466,13 @@ function App() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
-                      <div style={{ fontSize: '17px', fontWeight: '500', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ fontSize: '16px', fontWeight: '500', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: '#111111' }}>{sessUsed}</span>
                         <span style={{ color: '#D1D5DB', fontWeight: '400' }}> / </span>
                         <span style={{ color: '#111111' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '18px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '16px', color: '#111111', fontWeight: '500' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
@@ -8494,7 +8495,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.subMyTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.subMyTitle}</h1>
           </div>
           {!abonamentReal ? (
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
@@ -8629,7 +8630,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen('home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.catalogTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.catalogTitle}</h1>
           </div>
           {catalogLoading ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: '13px' }}>{t.catalogLoading}</div>
@@ -8639,7 +8640,7 @@ function App() {
             catalogPlans.map(p => (
               <button key={p.id} onClick={() => startCheckout(p.id)} disabled={checkoutLoading}
                 style={{ display: 'block', width: '100%', textAlign: 'left', background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1 }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{p.name}</div>
+                <div style={{ ...TYPO.primary, color: '#0E0E0E', marginBottom: '4px' }}>{p.name}</div>
                 <div style={{ fontSize: '12px', color: '#888' }}>
                   {p.sessions ? t.adminPlansSessionsCount(p.sessions) : t.adminPlansUnlimited} · {p.price != null ? t.adminPlansPriceSet(p.price) : t.adminPlansPriceUnset} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? t.adminPlansMonthSingular : t.adminPlansMonthPlural}
                 </div>
@@ -8654,7 +8655,7 @@ function App() {
 
       {screen === 'log' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>Log</h1>
+          <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
             <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('log'); setScreen('logWOD') }}
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
@@ -8806,7 +8807,7 @@ function App() {
               else if (logWodStep === 'score') { setLogWodStep('compose') }
               else { setScreen(prevScreen || 'home') }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
           </div>
 
           {editLogId ? (
@@ -8965,7 +8966,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>
               {wodZiData && skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === skillLogSlot) ? t.skillLogEditTitle : t.skillLogNewTitle}
               {esteSlot2 ? ` · ${t.homeWodSkill2Title}` : ''}
             </h1>
@@ -9016,7 +9017,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => { setEditHeroWodId(null); resetNewHeroWodForm(); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editHeroWodId ? t.heroWodEditTitle : t.heroWodNewTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editHeroWodId ? t.heroWodEditTitle : t.heroWodNewTitle}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodNameLabel}</div>
@@ -9048,7 +9049,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => { setEditPrId(null); setScreen(prevScreen || 'pr') }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{editPrId ? t.prLogEditTitle(miscarePR) : logPentruPR ? t.prLogWithMovementTitle(logPentruPR.movement) : t.prLogNewTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editPrId ? t.prLogEditTitle(miscarePR) : logPentruPR ? t.prLogWithMovementTitle(logPentruPR.movement) : t.prLogNewTitle}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <CautareMiscare preFill={miscarePR} onAleage={(m) => setMiscarePR(m)} t={t} />
@@ -9341,7 +9342,7 @@ function App() {
         return (
           <div style={{ padding: '20px', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.prScreenTitle} <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
+              <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.prScreenTitle} <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
               <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
                 style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
                 {t.prNewButton}
@@ -9533,7 +9534,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{t.profileTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.profileTitle}</h1>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}>
