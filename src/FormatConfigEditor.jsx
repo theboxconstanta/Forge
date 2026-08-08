@@ -73,7 +73,7 @@ function TextField({ label, value, onChange, placeholder, quickOptions }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
           {quickOptions.map(opt => (
             <div key={opt} onClick={() => onChange(opt)}
-              style={{ padding: '5px 10px', borderRadius: '20px', border: value === opt ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: value === opt ? '#f0f0f0' : '#fafafa', color: value === opt ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: value === opt ? '700' : '400', cursor: 'pointer' }}>
+              style={{ padding: '5px 10px', borderRadius: '20px', border: value === opt ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: value === opt ? '#f0f0f0' : '#fafafa', color: value === opt ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: value === opt ? '600' : '400', cursor: 'pointer' }}>
               {opt}
             </div>
           ))}
@@ -129,7 +129,7 @@ function RepsSchemeListField({ label, value, onChange, quickOptions }) {
             const isActive = items.join('-') === opt
             return (
               <div key={opt} onClick={() => pickQuickOption(opt)}
-                style={{ padding: '5px 10px', borderRadius: '20px', border: isActive ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: isActive ? '#f0f0f0' : '#fafafa', color: isActive ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: isActive ? '700' : '400', cursor: 'pointer' }}>
+                style={{ padding: '5px 10px', borderRadius: '20px', border: isActive ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: isActive ? '#f0f0f0' : '#fafafa', color: isActive ? '#0E0E0E' : '#555', fontSize: '11px', fontWeight: isActive ? '600' : '400', cursor: 'pointer' }}>
                 {opt}
               </div>
             )

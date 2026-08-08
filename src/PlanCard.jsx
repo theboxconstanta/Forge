@@ -6,7 +6,7 @@
 const cardStyle = { border: '1.5px solid #e0e0e0', borderRadius: '16px', padding: '28px 24px', textAlign: 'center' }
 const nameStyle = { fontSize: '15px', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }
 const priceRowStyle = { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', marginBottom: '18px' }
-const priceStyle = { fontSize: '40px', fontWeight: '900', color: '#0E0E0E' }
+const priceStyle = { fontSize: '40px', fontWeight: '600', color: '#0E0E0E' }
 const cadenceStyle = { fontSize: '15px', fontWeight: '600', color: '#888' }
 const badgeStyle = { fontSize: '13px', color: '#0E0E0E', background: '#F3FBE0', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px' }
 const noteStyle = { fontSize: '13px', color: '#888' }
