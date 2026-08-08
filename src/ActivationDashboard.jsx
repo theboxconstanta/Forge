@@ -236,10 +236,10 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
               <div>
                 <label htmlFor="activation-waiver-title" style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>{t.activationWaiverTitleFieldLabel}</label>
                 <input id="activation-waiver-title" value={waiverTitle} onChange={e => setWaiverTitle(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px', fontFamily: 'system-ui' }} />
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px', fontFamily: 'inherit' }} />
                 <label htmlFor="activation-waiver-content" style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>{t.activationWaiverContentFieldLabel}</label>
                 <textarea id="activation-waiver-content" value={waiverContent} onChange={e => setWaiverContent(e.target.value)} rows={8}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'system-ui', resize: 'vertical', marginBottom: '8px' }} />
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: '8px' }} />
                 {waiverError && <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '8px' }}>{waiverError}</div>}
                 <button onClick={publishWaiver} disabled={savingWaiver}
                   style={{ padding: '9px 16px', background: savingWaiver ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: savingWaiver ? 'not-allowed' : 'pointer', marginRight: '8px' }}>
@@ -274,7 +274,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
                   <label htmlFor="activation-invite-email" style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '4px' }}>{t.activationInviteEmailLabel}</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input id="activation-invite-email" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder={t.activationInviteEmailPlaceholder}
-                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'system-ui' }} />
+                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit' }} />
                     <button onClick={sendInvite} disabled={sendingInvite}
                       style={{ padding: '9px 16px', background: sendingInvite ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: sendingInvite ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
                       {sendingInvite ? t.activationInviteSending : t.activationInviteButton}
@@ -307,7 +307,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
               ) : (
                 <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                   <input type="email" aria-label={t.activationOptionalCoachItem} value={coachInviteEmail} onChange={e => setCoachInviteEmail(e.target.value)} placeholder={t.activationCoachInviteEmailPlaceholder}
-                    style={{ flex: 1, padding: '7px 8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'system-ui' }} />
+                    style={{ flex: 1, padding: '7px 8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'inherit' }} />
                   <button onClick={sendCoachInvite} disabled={sendingCoachInvite}
                     style={{ padding: '7px 10px', background: sendingCoachInvite ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: sendingCoachInvite ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
                     {sendingCoachInvite ? t.activationCoachInviteSending : t.activationCoachInviteButton}

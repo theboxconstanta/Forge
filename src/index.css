@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Typography System Refinement (TYPOGRAPHY_SYSTEM_REFINEMENT_REPORT.md) -
+   self-hosted variable font (no external network dependency, works
+   offline once precached by the service worker like the rest of this
+   PWA's assets - unlike a Google Fonts CDN link, which would add a
+   render-blocking cross-origin request and fail entirely offline).
+   wght.css only (not the full index.css) - non-italic, weight-axis-only,
+   the smallest subset that covers the 400/500/600/700 weights this app
+   actually uses; no italic anywhere in this UI. */
+@import "@fontsource-variable/inter/wght.css";
+
 /* Bottom Sheet safe-area / tab bar overlap fix
    (HOME_DASHBOARD_UI_REDESIGN_REPORT.md) - fallback only, used until
    NavBar's own ResizeObserver (App.jsx) publishes the real measured
@@ -46,7 +56,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   background: #FFFFFF;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter Variable', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;

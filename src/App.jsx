@@ -63,7 +63,7 @@ class ErrorBoundary extends Component {
       const lang = (storedLang === 'ro' || storedLang === 'en') ? storedLang : (navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'ro')
       const t = getT(lang)
       return (
-        <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'system-ui' }}>
+        <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'inherit' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AlertTriangle size={40} color="#E24B4A" strokeWidth={1.75} /></div>
             <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px' }}>{t.errorBoundaryTitle}</div>
@@ -937,7 +937,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
               placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
             <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
               placeholder={t.adminWodVariantPastePlaceholder} rows={3}
-              style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+              style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
             {sv.paste.trim() && (
               <button onClick={() => {
                 const linii = sv.paste.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
@@ -1052,7 +1052,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
           {isPlainText ? (
             <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
               placeholder={t.adminWodWarmupPlaceholder} rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
           ) : section.isPrimary ? (
             <PrimarySectionBody section={section} onChange={onChange} updateVariant={updateVariant} t={t} />
           ) : (
@@ -1067,7 +1067,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
               )}
               <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
                 placeholder={t.adminWodSkillPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
             </>
           )}
 
@@ -1763,7 +1763,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
-                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888' }}>#{i + 1}</span>}
+                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ fontSize: '13px', fontWeight: '700', color: '#888', fontVariantNumeric: 'tabular-nums' }}>#{i + 1}</span>}
                             </div>
                             <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                             <div style={{ flex: 1 }}>
@@ -1771,15 +1771,15 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                                 {name}
                                 {notRxdLog && <NotRxdBadge t={t} compact />}
                               </div>
-                              <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
                                 <Clock size={10} strokeWidth={2} />
                                 {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare }}>{result}</div>
+                              <div style={{ fontSize: '16px', fontWeight: '700', color: nivel.culoare, fontVariantNumeric: 'tabular-nums' }}>{result}</div>
                               {log.time_result && log.result && (
-                                <div style={{ fontSize: '11px', color: '#aaa' }}>{log.result}</div>
+                                <div style={{ fontSize: '11px', color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
                               )}
                             </div>
                             <span style={{ fontSize: '13px', color: '#ccc', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
@@ -2039,7 +2039,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <AvatarCircle name={myName} avatarUrl={myAvatar} size={36} />
           <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder={t.feedComposePlaceholder}
-            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#0E0E0E', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'system-ui' }} />
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#0E0E0E', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'inherit' }} />
         </div>
         {postText.trim() && (
           <button onClick={posteaza} disabled={posting}
@@ -4057,7 +4057,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodAiParseLabel}</div>
             <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
               placeholder={t.adminWodAiParsePlaceholder} rows={4}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'system-ui', outline: 'none' }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
             <button onClick={analyzeWorkout} disabled={aiAnalyzing}
               style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: aiAnalyzing ? 'not-allowed' : 'pointer', opacity: aiAnalyzing ? 0.7 : 1 }}>
               {aiAnalyzing ? t.adminWodAiParseButtonLoading : t.adminWodAiParseButton}
@@ -7553,7 +7553,7 @@ function App() {
   }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (resetMode) return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', boxShadow: '0 60px 0 0 #0E0E0E' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', boxShadow: '0 60px 0 0 #0E0E0E' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
       <div style={{ width: '100%', background: '#0E0E0E', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
         {resetLinkError ? (
@@ -7562,7 +7562,7 @@ function App() {
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>{t.resetLinkInvalidTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>{t.resetLinkInvalidMessage}</div>
             <button onClick={handleExitResetMode}
-              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'system-ui' }}>
+              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
               {t.resetLinkInvalidCta}
             </button>
           </div>
@@ -7575,12 +7575,12 @@ function App() {
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetNewPasswordLabel}</div>
               <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.resetNewPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
             </div>
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetConfirmPasswordLabel}</div>
               <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder={t.resetConfirmPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
             </div>
             {authError && (
               <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
@@ -7588,7 +7588,7 @@ function App() {
               </div>
             )}
             <button onClick={handleSetNewPassword} disabled={authSubmitting}
-              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+              style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'inherit' }}>
               {authSubmitting ? t.resetSavingButton : t.resetSaveButton}
             </button>
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
@@ -7604,7 +7604,7 @@ function App() {
   )
 
   if (authLoading) return (
-    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><Dumbbell size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
         <div style={{ fontSize: '14px', color: '#888' }}>{t.authLoadingText}</div>
@@ -7613,7 +7613,7 @@ function App() {
   )
 
   if (!user || ownerBootstrapping) return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'system-ui', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', overflowY: 'auto', boxShadow: '0 60px 0 0 #0E0E0E' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', overflowY: 'auto', boxShadow: '0 60px 0 0 #0E0E0E' }}>
       {installDismissed && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxShadow: '0 60px 0 0 rgba(0,0,0,0.75)' }} onClick={() => setInstallDismissed(false)}>
         <div style={{ background: '#1c1c1e', borderRadius: '24px 24px 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: '430px' }} onClick={e => e.stopPropagation()}>
           <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px', margin: '0 auto 24px' }} />
@@ -7686,11 +7686,11 @@ function App() {
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
               <button type="button" onClick={() => setRegisterMode('member')}
-                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'member' ? '#ABE73C' : '#222', color: registerMode === 'member' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'system-ui' }}>
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'member' ? '#ABE73C' : '#222', color: registerMode === 'member' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' }}>
                 {t.authJoinGymTab}
               </button>
               <button type="button" onClick={() => setRegisterMode('owner')}
-                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'owner' ? '#ABE73C' : '#222', color: registerMode === 'owner' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'system-ui' }}>
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: registerMode === 'owner' ? '#ABE73C' : '#222', color: registerMode === 'owner' ? '#0E0E0E' : '#aaa', fontSize: '12px', fontWeight: '600', fontFamily: 'inherit' }}>
                 {t.authStartGymTab}
               </button>
             </div>
@@ -7704,13 +7704,13 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authFindGymLabel}</div>
                 <input value={gymQuery} onChange={e => searchGyms(e.target.value)} placeholder={t.authFindGymPlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
                 {selectedGym && (
                   <div>
                     <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '12px', color: '#ABE73C', fontWeight: '600' }}>✓ {selectedGym.name}</div>
                     <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymCodeLabel}</div>
                     <input value={joinCodeInput} onChange={e => setJoinCodeInput(e.target.value.toUpperCase())} placeholder={t.authGymCodePlaceholder}
-                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff', letterSpacing: '1px' }} />
+                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff', letterSpacing: '1px' }} />
                   </div>
                 )}
                 {!selectedGym && gymResults.length > 0 && (
@@ -7729,11 +7729,11 @@ function App() {
         )}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authEmailLabel}</div>
-          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
         </div>
         <div style={{ marginBottom: authScreen === 'login' ? '12px' : '20px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authPasswordLabel}</div>
-          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={t.authPasswordPlaceholder} type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#222', color: '#fff' }} />
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={t.authPasswordPlaceholder} type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
         </div>
         {authScreen === 'login' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -7754,7 +7754,7 @@ function App() {
           </div>
         )}
         <button onClick={authScreen === 'login' ? handleLogin : handleRegister} disabled={authSubmitting}
-          style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'system-ui' }}>
+          style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: authSubmitting ? 'not-allowed' : 'pointer', opacity: authSubmitting ? 0.7 : 1, fontFamily: 'inherit' }}>
           {authSubmitting ? t.authLoadingButton : authScreen === 'login' ? t.authLoginButton : t.authRegisterButton}
         </button>
         <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: '#888' }}>
@@ -7768,7 +7768,7 @@ function App() {
   )
 
   return (
-    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', height: '100%', background: '#FFFFFF', fontFamily: 'system-ui', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="app-frame" style={{ maxWidth: '430px', width: '100%', margin: '0 auto', height: '100%', background: '#FFFFFF', fontFamily: 'inherit', position: 'relative', boxShadow: 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -7808,7 +7808,7 @@ function App() {
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.noGymMembershipText}</div>
             <input value={noGymJoinCode} onChange={e => { setNoGymJoinCode(e.target.value.toUpperCase()); setNoGymJoinError('') }}
               placeholder={t.authGymCodePlaceholder}
-              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#fafafa', letterSpacing: '1px', textAlign: 'center', marginBottom: '10px' }} />
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fafafa', letterSpacing: '1px', textAlign: 'center', marginBottom: '10px' }} />
             {noGymJoinError && (
               <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{noGymJoinError}</div>
             )}
@@ -7829,7 +7829,7 @@ function App() {
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.ownerBootstrapTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.ownerBootstrapText}</div>
             <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
-              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'system-ui', background: '#fafafa', marginBottom: '10px' }} />
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fafafa', marginBottom: '10px' }} />
             {authError && (
               <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{authError}</div>
             )}
@@ -7990,10 +7990,10 @@ function App() {
                 unchanged. */}
             <div style={{ padding: '20px 20px 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.4, color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#111111', lineHeight: 1 }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
@@ -8025,7 +8025,7 @@ function App() {
             <div style={{ padding: '10px 20px 4px' }}>
               <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                 style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '9px', padding: '10px 12px 10px 4px', margin: '-10px -12px -10px -4px' }}>
-                <span style={{ fontSize: '27px', fontWeight: '600', color: '#111111', letterSpacing: '-0.5px', lineHeight: 1.15 }}>
+                <span style={{ fontSize: '28px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
                   {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
                 </span>
                 <ChevronDown size={19} color="#111111" strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
@@ -8060,9 +8060,9 @@ function App() {
                         // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '600', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                      <span style={{ fontSize: '19px', fontWeight: '700', color: '#111111', lineHeight: 1 }}>{dayNum}</span>
-                      <span style={{ fontSize: '10px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '500' }}>{luna}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '22px', fontWeight: '600', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
+                      <span style={{ fontSize: '11px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
                       {(areWod || areRez) && (
                         <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? '#111111' : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
                       )}
@@ -8079,7 +8079,7 @@ function App() {
                 styling only (border/radius/time-block/text colors). */}
             <div style={{ padding: '0 20px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.1em', color: '#111111' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', color: '#111111' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
                 <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
               </div>
               {claseZi.length === 0 ? (
@@ -8095,11 +8095,11 @@ function App() {
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
                         <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '16px', width: '56px', height: '56px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '14px', fontWeight: '800', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center' }}>{c.start_time?.slice(0, 5)}</div>
+                          <div style={{ fontSize: '22px', fontWeight: '700', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
-                          <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
+                          <div style={{ fontSize: '20px', fontWeight: '600', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           {rezervat
@@ -8108,7 +8108,7 @@ function App() {
                             ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                             : plin
                             ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
-                            : <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600' }}>{nrRez}/{c.max_spots}</span>}
+                            : <span style={{ fontSize: '15px', color: '#6B7280', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>{nrRez}/{c.max_spots}</span>}
                           <ChevronRight size={16} color="#D1D5DB" strokeWidth={2} />
                         </div>
                       </div>
@@ -8141,7 +8141,7 @@ function App() {
                 <BottomSheet onClose={() => setClasaHomeSelectata(null)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                     <div>
-                      <div style={{ fontSize: '19px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '-0.2px' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
+                      <div style={{ fontSize: '19px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
                       <div style={{ fontSize: '13px', color: '#888', marginTop: '3px' }}>{c.coach}</div>
                     </div>
                     <button type="button" onClick={() => setClasaHomeSelectata(null)} aria-label={t.homeClassDetailClose}
@@ -8176,20 +8176,20 @@ function App() {
                             return (
                               <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
                                 <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={34} />
-                                <div style={{ flex: 1, fontSize: '14px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
+                                <div style={{ flex: 1, fontSize: '17px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
                                 {interactive ? (
                                   <button type="button" disabled={pending}
                                     onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
-                                    style={{ fontSize: '12px', fontWeight: '700', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
+                                    style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
                                       background: m.checkedIn ? '#E7F6EA' : '#0E0E0E', color: m.checkedIn ? '#1E6B36' : '#ABE73C', border: m.checkedIn ? '1px solid #BFE6C8' : 'none' }}>
                                     {m.checkedIn ? `✓ ${t.homeCheckedInAction}` : t.homeCheckInAction}
                                   </button>
                                 ) : m.checkedIn ? (
-                                  <span style={{ fontSize: '12px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                     <CheckCircle2 size={14} color="#1E6B36" /> {t.homeCheckedInAction}
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '12px', color: '#ccc', flexShrink: 0 }}>{t.homeCheckInAction}</span>
+                                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#ccc', flexShrink: 0 }}>{t.homeCheckInAction}</span>
                                 )}
                               </div>
                             )
@@ -8243,8 +8243,8 @@ function App() {
             <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#111111', fontWeight: '700', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '17px', fontWeight: '600', color: '#111111' }}>
+                  <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
+                  <div style={{ fontSize: '22px', fontWeight: '600', color: '#111111' }}>
                     {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
                   {/* Durata ramane cititA din wodZiData (legacy) - modelul de
@@ -8461,17 +8461,17 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CreditCard size={17} color="#6B7280" strokeWidth={1.75} />
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#111111' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#111111' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
-                      <div style={{ fontSize: '14px', fontWeight: '700', lineHeight: 1 }}>
+                      <div style={{ fontSize: '20px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: '#111111' }}>{sessUsed}</span>
                         <span style={{ color: '#D1D5DB', fontWeight: '400' }}> / </span>
                         <span style={{ color: '#111111' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '20px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
@@ -8481,7 +8481,7 @@ function App() {
                       <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#0E0E0E', borderRadius: '3px' }} />
                     </div>
                   ) : <div />}
-                  <div style={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{t.homeDaysLeft(zileRamase)}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '400', color: '#6B7280', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.homeDaysLeft(zileRamase)}</div>
                 </div>
               </div>
             )}
