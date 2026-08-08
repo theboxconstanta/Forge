@@ -8095,7 +8095,7 @@ function App() {
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
                         <div style={{ background: '#111111', color: '#fff', borderRadius: '16px', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '17px', fontWeight: '600', lineHeight: '20px', letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '18px', fontWeight: '600', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
