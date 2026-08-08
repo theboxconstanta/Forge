@@ -683,7 +683,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
                   black, per the mission's explicit "keep the bar visually
                   light" instruction. Same isActive/onClick mechanism. */}
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#B7E63A' : '#9CA3AF'} />
-              <span className="text-[10px]" style={{ color: isActive ? '#111111' : '#9CA3AF', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}>
+              <span className="text-[11px]" style={{ color: isActive ? '#111111' : '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap' }}>
                 {t[labelKey]}
               </span>
               {badge != null && (
@@ -8025,7 +8025,7 @@ function App() {
             <div style={{ padding: '10px 20px 4px' }}>
               <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                 style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '9px', padding: '10px 12px 10px 4px', margin: '-10px -12px -10px -4px' }}>
-                <span style={{ fontSize: '26px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: '30px', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: '24px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: '28px', fontVariantNumeric: 'tabular-nums' }}>
                   {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
                 </span>
                 <ChevronDown size={19} color="#111111" strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
@@ -8060,7 +8060,7 @@ function App() {
                         // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '400', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
                       <span style={{ fontSize: '20px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
                       <span style={{ fontSize: '11px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
                       {(areWod || areRez) && (
@@ -8095,10 +8095,10 @@ function App() {
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
                         <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '16px', width: '56px', height: '56px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ fontSize: '21px', fontWeight: '600', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
+                          <div style={{ fontSize: '20px', fontWeight: '600', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '18px', fontWeight: '500', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '18px', fontWeight: '600', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
                           <div style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -8180,12 +8180,12 @@ function App() {
                                 {interactive ? (
                                   <button type="button" disabled={pending}
                                     onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
-                                    style={{ fontSize: '14px', fontWeight: m.checkedIn ? '500' : '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
+                                    style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', borderRadius: '20px', flexShrink: 0, cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.5 : 1,
                                       background: m.checkedIn ? '#E7F6EA' : '#0E0E0E', color: m.checkedIn ? '#1E6B36' : '#ABE73C', border: m.checkedIn ? '1px solid #BFE6C8' : 'none' }}>
                                     {m.checkedIn ? `✓ ${t.homeCheckedInAction}` : t.homeCheckInAction}
                                   </button>
                                 ) : m.checkedIn ? (
-                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '14px', color: '#1E6B36', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                     <CheckCircle2 size={14} color="#1E6B36" /> {t.homeCheckedInAction}
                                   </span>
                                 ) : (
@@ -8244,7 +8244,7 @@ function App() {
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '20px', fontWeight: '500', color: '#111111' }}>
+                  <div style={{ fontSize: '20px', fontWeight: '600', color: '#111111' }}>
                     {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
                   {/* Durata ramane cititA din wodZiData (legacy) - modelul de
@@ -8254,9 +8254,9 @@ function App() {
                       mapLegacyWodToWorkout n-a calculat niciodata asta din
                       wods.duration). Exceptie documentata, ca la Logare -
                       vezi raportul Fazei 7. */}
-                  {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '1px', lineHeight: 1.5 }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
+                  {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '1px', lineHeight: '18px' }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
                   {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '2px', lineHeight: 1.5 }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '2px', lineHeight: '18px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
                   )}
                   {!wodDeschis && primarySectionV && (primarySectionV.movements || []).length > 0 && (
                     <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{primarySectionV.movements.map(m => m.name).join(' · ')}</div>
@@ -8471,7 +8471,7 @@ function App() {
                         <span style={{ color: '#111111' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '18px', color: '#111111', fontWeight: '500' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '18px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
