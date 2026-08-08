@@ -202,7 +202,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
   if (activationState === 'first_value_reached') {
     return (
       <div style={card} role="region" aria-label={t.activationGettingStartedTitle}>
-        <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.activationGettingStartedTitle}</div>
+        <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.activationGettingStartedTitle}</div>
         <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>{t.activationGettingStartedText}</div>
       </div>
     )
@@ -211,7 +211,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
   // ── Pre-First-Value: full checklist ──
   return (
     <div style={card} role="region" aria-label={t.activationHeaderTitle}>
-      <div style={{ fontSize: '17px', fontWeight: '800', color: '#0E0E0E', marginBottom: '2px' }}>
+      <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', marginBottom: '2px' }}>
         🎉 {gymName}
       </div>
       <div style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
@@ -222,7 +222,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
       <div style={requiredCard}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '14px' }}>{hasCurrentWaiver ? '✅' : '1️⃣'}</span>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E' }}>{t.activationWaiverTitle}</span>
+          <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{t.activationWaiverTitle}</span>
         </div>
         <div style={{ fontSize: '12px', color: '#888', marginTop: '4px', marginLeft: '22px' }}>{t.activationWaiverDesc}</div>
         {!hasCurrentWaiver && (
@@ -259,7 +259,7 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
       <div style={requiredCard}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '14px' }}>2️⃣</span>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: hasCurrentWaiver ? '#0E0E0E' : '#bbb' }}>{t.activationInviteTitle}</span>
+          <span style={{ fontSize: '14px', fontWeight: '600', color: hasCurrentWaiver ? '#0E0E0E' : '#bbb' }}>{t.activationInviteTitle}</span>
         </div>
         {!hasCurrentWaiver ? (
           <div style={{ fontSize: '12px', color: '#aaa', marginTop: '4px', marginLeft: '22px' }}>{t.activationInviteBlockedReason}</div>

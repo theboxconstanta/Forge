@@ -262,7 +262,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           weightUnit={weightUnit} t={t} />
       ))}
       {score != null && (
-        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
           {config?.scoringMode === 'Total Reps' ? (t?.fmtTotalRepsScoreLabel || 'Total reps') : (t?.fmtLowestRepsScoreLabel || 'Cea mai slabă rundă')}: {score}
         </div>
       )}
@@ -298,17 +298,17 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     // un singur input de reps, fara greutate, fara "+ Adauga set".
     return (
       <>
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
         {Object.entries(buyInRows).map(([key, rows]) => (
           <SimpleRepsRow key={key} rowKey={key} rows={rows}
             onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })}
             weightUnit={weightUnit} t={t} />
         ))}
-        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
         <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus} sequentialPartial={isSequentialFormat(formatId, config)} />
         {hasCashOut && (
           <>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
             {Object.entries(cashOutRows).map(([key, rows]) => (
               <SimpleRepsRow key={key} rowKey={key} rows={rows}
                 onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
@@ -354,7 +354,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             : null
           return (
             <div key={i} style={{ marginBottom: '18px', paddingBottom: '14px', borderBottom: i < stages.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '8px' }}>{stageTitle}</div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '8px' }}>{stageTitle}</div>
               {stage.kind === 'interval'
                 ? Object.entries(rowsByKey).map(([key, rows]) => (
                   <SetsRows key={key} rowKey={key} rows={rows}
@@ -395,7 +395,7 @@ export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, 
   if (!candidates || candidates.length === 0) return null
   return (
     <div style={{ marginTop: '14px', background: '#F5FBEA', border: '1px solid #ABE73C', borderRadius: '12px', padding: '14px' }}>
-      <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{t?.skillPrConfirmTitle || 'PR nou?'}</div>
+      <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px' }}>{t?.skillPrConfirmTitle || 'PR nou?'}</div>
       {candidates.map(c => (
         <div key={`${c.movement}-${c.reps}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #ddeec4' }}>
           <span style={{ fontSize: '13px', color: '#0E0E0E' }}>{c.movement} · {t?.prRepCountLabel ? t.prRepCountLabel(c.reps) : `${c.reps} reps`} — {c.weight}{c.unit}</span>
@@ -403,7 +403,7 @@ export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, 
             <button onClick={() => onDismiss(c)}
               style={{ fontSize: '11px', padding: '5px 10px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer' }}>{t?.skillPrConfirmDismissButton || 'renunță'}</button>
             <button onClick={() => onConfirm(c)}
-              style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', background: '#ABE73C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t?.skillPrConfirmSaveButton || 'salvează ca PR'}</button>
+              style={{ fontSize: '11px', fontWeight: '600', padding: '5px 10px', background: '#ABE73C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t?.skillPrConfirmSaveButton || 'salvează ca PR'}</button>
           </div>
         </div>
       ))}

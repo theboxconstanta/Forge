@@ -52,13 +52,13 @@ function RepMaxStepperField({ label, value, onChange }) {
   const match = (value || '').match(/^(\d+)/)
   const n = match ? parseInt(match[1]) : 1
   const setN = (next) => onChange(`${Math.min(30, Math.max(1, next))}RM`)
-  const btnStyle = (disabled) => ({ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '20px', fontWeight: '700', color: '#0E0E0E', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1, lineHeight: 1 })
+  const btnStyle = (disabled) => ({ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '20px', fontWeight: '600', color: '#0E0E0E', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1, lineHeight: 1 })
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <button type="button" onClick={() => setN(n - 1)} disabled={n <= 1} style={btnStyle(n <= 1)}>−</button>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: '16px', fontWeight: '700', color: '#0E0E0E', padding: '9px 12px', background: '#fafafa', borderRadius: '10px', border: '1px solid #e0e0e0' }}>{n}RM</div>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: '16px', fontWeight: '600', color: '#0E0E0E', padding: '9px 12px', background: '#fafafa', borderRadius: '10px', border: '1px solid #e0e0e0' }}>{n}RM</div>
         <button type="button" onClick={() => setN(n + 1)} disabled={n >= 30} style={btnStyle(n >= 30)}>+</button>
       </div>
     </div>
@@ -170,7 +170,7 @@ function StageListField({ label, value, onChange, t }) {
       {stages.map((stage, i) => (
         <div key={i} style={{ border: '1px solid #e0e0e0', borderRadius: '10px', padding: '10px', marginBottom: '10px', background: '#fff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E' }}>{(t?.fmtStageLabel ? t.fmtStageLabel(i + 1) : `Etapa ${i + 1}`)}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{(t?.fmtStageLabel ? t.fmtStageLabel(i + 1) : `Etapa ${i + 1}`)}</div>
             <button type="button" onClick={() => removeStage(i)}
               style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '12px', cursor: 'pointer' }}>×</button>
           </div>

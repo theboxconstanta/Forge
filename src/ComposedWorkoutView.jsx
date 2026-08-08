@@ -21,12 +21,12 @@ const SCORE_NOTE_KEY = {
 }
 
 const containerStyle = { display: 'flex', flexDirection: 'column', gap: '4px' }
-const identityStyle = { fontSize: '13px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em' }
-const primaryTextStyle = { fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '6px' }
-const transitionStyle = { fontSize: '11px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '6px 0' }
-const roleLabelStyle = { fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }
-const schemeStylePrimary = { fontSize: '20px', fontWeight: '800', color: '#0E0E0E', marginBottom: '2px' }
-const schemeStyleSecondary = { fontSize: '14px', fontWeight: '700', color: '#555', marginBottom: '2px' }
+const identityStyle = { fontSize: '13px', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em' }
+const primaryTextStyle = { fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }
+const transitionStyle = { fontSize: '11px', fontWeight: '600', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '6px 0' }
+const roleLabelStyle = { fontSize: '11px', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }
+const schemeStylePrimary = { fontSize: '20px', fontWeight: '600', color: '#0E0E0E', marginBottom: '2px' }
+const schemeStyleSecondary = { fontSize: '14px', fontWeight: '600', color: '#555', marginBottom: '2px' }
 const movementLineStylePrimary = { fontSize: '16px', color: '#0E0E0E' }
 const movementLineStyleSecondary = { fontSize: '13px', color: '#666' }
 const primaryBlockStyle = { padding: '4px 0' }

@@ -24,7 +24,7 @@ export default function TrialExpiredPaywall({ isOwner, gymId, t, lang, showToast
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
       <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '360px', width: '100%' }}>
-        <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.trialExpiredTitle}</div>
+        <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.trialExpiredTitle}</div>
         <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
           {isOwner ? t.trialExpiredOwnerText : t.trialExpiredNonOwnerText}
         </div>

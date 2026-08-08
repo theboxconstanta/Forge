@@ -1,6 +1,7 @@
 // Componente prezentaționale mici, fără dependințe de Supabase - testabile izolat.
 import { useEffect, useRef } from 'react'
 import { getInitiale, NIVEL_DOT_COLORS } from './utils'
+import { TYPO } from './typography'
 
 export function AvatarCircle({ name, avatarUrl, size = 38 }) {
   const culori = ['#f0f0f0', '#f0f0f0', '#FAEEDA', '#E6F1FB', '#FCE8E8']
@@ -33,7 +34,7 @@ export function MovementSuggestions({ suggestions, onSelect, rightOffset = 0 }) 
     <div style={{ position: 'absolute', top: '100%', left: 0, right: rightOffset, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
       {suggestions.map((s, i) => (
         <div key={i} onMouseDown={e => e.preventDefault()} onClick={() => onSelect(s)}
-          style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
+          style={{ padding: '10px 14px', cursor: 'pointer', ...TYPO.secondary, borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none' }}>{s}</div>
       ))}
     </div>
   )
@@ -88,7 +89,7 @@ export function Modal({ title, onClose, children, maxWidth = '360px' }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth, width: '100%' }}>
-        <div id="modal-title" style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{title}</div>
+        <div id="modal-title" style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{title}</div>
         {children}
       </div>
     </div>
@@ -186,12 +187,12 @@ export function BottomSheet({ onClose, children, maxHeight = '85%' }) {
 export function MembershipCoverageDialog({ t, onClose }) {
   return (
     <Modal title={t.membershipCoverageDialogTitle} onClose={onClose}>
-      <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
+      <div style={{ ...TYPO.secondary, color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
         <p style={{ margin: '0 0 10px' }}>{t.membershipCoverageDialogBody1}</p>
         <p style={{ margin: 0 }}>{t.membershipCoverageDialogBody2}</p>
       </div>
       <button onClick={onClose}
-        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', ...TYPO.buttonPrimary, cursor: 'pointer' }}>
         {t.membershipCoverageDialogButton}
       </button>
     </Modal>

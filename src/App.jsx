@@ -67,7 +67,7 @@ class ErrorBoundary extends Component {
         <div className="app-frame" style={{ maxWidth: '430px', margin: '0 auto', minHeight: '100%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', fontFamily: 'inherit' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><AlertTriangle size={40} color="#E24B4A" strokeWidth={1.75} /></div>
-            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '6px' }}>{t.errorBoundaryTitle}</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{t.errorBoundaryTitle}</div>
             <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>{t.errorBoundarySubtitle}</div>
             <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               {t.errorBoundaryButton}
@@ -858,7 +858,7 @@ function ComposedWorkoutPreview({ section, t }) {
   if (!composed || composed.blocks.length === 0) return null
   return (
     <div style={{ background: '#F7F7F5', border: '1px solid #eee', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
-      <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t.adminWodComposedPreviewLabel}</div>
+      <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t.adminWodComposedPreviewLabel}</div>
       <ComposedWorkoutView composed={composed} t={t} />
     </div>
   )
@@ -1020,8 +1020,8 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
         <div onClick={() => onChange({ open: !section.open })} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
             {section.title.trim() || typeLabel}
-            {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '700' }}>★ {t.wodSectionPrimaryBadge}</span>}
-            {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '700' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
+            {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '600' }}>★ {t.wodSectionPrimaryBadge}</span>}
+            {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '600' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -1285,7 +1285,7 @@ function Timer({ onBack, defaultFortime, t }) {
       {countdown !== null && (
         <div style={{ background: '#0E0E0E', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
           <div style={{ fontSize: '13px', color: '#ABE73C', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t.timerGetReady}</div>
-          <div style={{ fontSize: '80px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>{countdown}</div>
+          <div style={{ fontSize: '80px', fontWeight: '600', color: '#fff', lineHeight: 1 }}>{countdown}</div>
           <div style={{ fontSize: '14px', color: '#ABE73C', marginTop: '8px' }}>
             {countdown <= 3 ? ['', '🔴', '🟡', '🟢'][countdown] + ' ' : ''}{countdown === 1 ? t.timerCountdownGo : countdown <= 3 ? countdown : t.timerCountdownSeconds}
           </div>
@@ -1311,7 +1311,7 @@ function Timer({ onBack, defaultFortime, t }) {
                 strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }} />
             </svg>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-              <div style={{ fontSize: '44px', fontWeight: '700', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
+              <div style={{ fontSize: '44px', fontWeight: '600', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
               {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>{t.timerDoneLabel} <Dumbbell size={15} color="#0E0E0E" /></div>}
               {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t.timerInProgress}</div>}
               {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? t.timerPressStart : t.timerPaused}</div>}
@@ -1325,10 +1325,10 @@ function Timer({ onBack, defaultFortime, t }) {
           {mod === 'amrap' && (
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.timerRoundsCounterLabel}</div>
-              <div style={{ fontSize: '42px', fontWeight: '700', color: '#0E0E0E' }}>{runde}</div>
+              <div style={{ fontSize: '42px', fontWeight: '600', color: '#0E0E0E' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
                 <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '18px', cursor: 'pointer' }}>−</button>
-                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #0E0E0E', background: '#f0f0f0', fontSize: '18px', color: '#0E0E0E', fontWeight: '700', cursor: 'pointer' }}>+</button>
+                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #0E0E0E', background: '#f0f0f0', fontSize: '18px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
@@ -1338,7 +1338,7 @@ function Timer({ onBack, defaultFortime, t }) {
               {gata ? '✓' : running ? '⏸' : '▶'}
             </button>
             {mod === 'amrap'
-              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>+1</button>
+              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>+1</button>
               : <div style={{ width: '48px' }} />
             }
           </div>
@@ -1649,7 +1649,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#FFFFFF', borderRadius: '12px', padding: '8px 12px' }}>
         <button onClick={() => goDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>
             {isToday ? t.clasamentToday : new Date(selectedDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })}
           </div>
           {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>{t.clasamentNoWod}</div>}
@@ -1664,7 +1664,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
           { id: 'feminin', label: t.clasamentFilterFemale, icon: Venus },
         ].map(g => (
           <div key={g.id} onClick={() => setGenderTab(g.id)}
-            style={{ padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: genderTab === g.id ? '700' : '400', background: genderTab === g.id ? '#0E0E0E' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#0E0E0E' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{ padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: genderTab === g.id ? '600' : '400', background: genderTab === g.id ? '#0E0E0E' : '#fff', color: genderTab === g.id ? '#fff' : '#888', border: `1px solid ${genderTab === g.id ? '#0E0E0E' : '#e0e0e0'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
             <g.icon size={13} color={genderTab === g.id ? '#fff' : '#888'} /> {g.label}
           </div>
         ))}
@@ -1688,7 +1688,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
                 {/* Header secțiune */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '800', color: nivel.culoare, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '600', color: nivel.culoare, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <LevelDot nivel={nivel.id} /> {nivel.id}
                   </div>
                   <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
@@ -1707,7 +1707,7 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                 {weightGroups.map((group, gi) => (
                   <div key={group.weight ?? gi} style={{ marginBottom: gi < weightGroups.length - 1 ? '10px' : '0' }}>
                     {group.label && (
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#aaa', margin: '4px 0 6px' }}>{group.label}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#aaa', margin: '4px 0 6px' }}>{group.label}</div>
                     )}
                     {group.logs.map((log, i) => {
                       const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
@@ -1790,15 +1790,15 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               {log.variant_level && (
                                 <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                                   <div>
-                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
-                                    <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
+                                    <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                       <LevelDot nivel={log.variant_level} /> {log.variant_level}
                                     </div>
                                   </div>
                                   {log.weight_logged?.trim() && (
                                     <div>
-                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
-                                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '700' }}>
+                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
+                                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600' }}>
                                         {log.weight_logged.trim()}
                                         {log._prescribedWeight && !weightMatches(log.weight_logged, log._prescribedWeight) && (
                                           <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '500', marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
@@ -1817,8 +1817,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                               )}
                               {areRezultatFinal && (
                                 <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: miscariAfisate.length > 0 ? '10px' : '0', borderTop: miscariAfisate.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                                  <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                                  <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{rezultatBucati.join(' · ')}</div>
                                 </div>
                               )}
                               {wHasSets && (
@@ -2078,7 +2078,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
               {isAdmin && (
                 confirmDeletePost === post.id ? (
                   <button onClick={() => stergePost(post.id)}
-                    style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
+                    style={{ fontSize: '11px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
                     {t.feedDeletePostConfirm}
                   </button>
                 ) : (
@@ -2120,7 +2120,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
                         {isAdmin && (
                           confirmDeleteComment === c.id ? (
                             <button onClick={() => stergeComentariu(c.id)}
-                              style={{ fontSize: '10px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', flexShrink: 0, height: 'fit-content' }}>
+                              style={{ fontSize: '10px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', flexShrink: 0, height: 'fit-content' }}>
                               {t.feedDeleteCommentConfirm}
                             </button>
                           ) : (
@@ -3460,7 +3460,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                     {/* Profil complet */}
                     <div style={{ background: '#f8f8f8', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>{t.adminClientsProfileLabel}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>{t.adminClientsProfileLabel}</div>
                       {(c.first_name || c.last_name) && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                           <span style={{ color: '#888' }}>{t.adminClientsFirstLastName}</span>
@@ -3511,9 +3511,9 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                               <span style={{ fontWeight: '600', color: sedinteEpuizate ? '#E24B4A' : '#0E0E0E' }}>{abo.sessions_used || 0} / {abo.sessions_total}</span>
                               <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, +1)}
-                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '600', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 <button onClick={() => adminAjusteazaSedinte(abo.id, abo.sessions_used, abo.sessions_total, -1)}
-                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                  style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '600', fontSize: '14px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                               </div>
                             </div>
                           </div>
@@ -3523,7 +3523,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                     ) : null}
                     {aboQueued && (
                       <div style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', borderLeft: '3px solid #5B7FCC' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminClientsSubScheduled}</div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#5B7FCC', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminClientsSubScheduled}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                           <span style={{ color: '#888' }}>{t.adminClientsPlanLabel}</span>
                           <span style={{ fontWeight: '600' }}>{aboQueued.subscription_plans?.name || '—'}</span>
@@ -3566,7 +3566,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                     <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #f0c0c0' }} onClick={e => e.stopPropagation()}>
                       {deleteClientConfirm === c.id ? (
                         <div style={{ background: '#FCEBEB', borderRadius: '10px', padding: '12px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsDeleteTitle}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsDeleteTitle}</div>
                           <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>
                             {t.adminClientsDeleteWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsDeleteWarnSuffix}{' '}
                             {t.adminClientsDeleteConfirmEmailPrompt} <strong>{c.email}</strong>
@@ -3581,7 +3581,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                             </button>
                             <button disabled={deletingClient || deleteClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
                               onClick={() => adminEliminaMembru(c)}
-                              style={{ flex: 1, padding: '8px', background: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#E24B4A' : '#f0b8b8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
+                              style={{ flex: 1, padding: '8px', background: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#E24B4A' : '#f0b8b8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: deleteClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
                               {deletingClient ? t.adminClientsDeleting : t.adminClientsDeletePermanently}
                             </button>
                           </div>
@@ -3595,7 +3595,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
 
                       {transferClientConfirm === c.id ? (
                         <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '12px', marginTop: '8px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#633806', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsTransferTitle}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#633806', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={12} /> {t.adminClientsTransferTitle}</div>
                           <div style={{ fontSize: '11px', color: '#633806', marginBottom: '8px' }}>
                             {t.adminClientsTransferWarnPrefix} <strong>{c.full_name || c.email}</strong>{t.adminClientsTransferWarnSuffix}{' '}
                             {t.adminClientsTransferConfirmEmailPrompt} <strong>{c.email}</strong>
@@ -3610,7 +3610,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                             </button>
                             <button disabled={transferringClient || transferClientEmailInput.trim().toLowerCase() !== c.email?.toLowerCase()}
                               onClick={() => adminTransferaMembru(c)}
-                              style={{ flex: 1, padding: '8px', background: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#BA7517' : '#f0dba8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
+                              style={{ flex: 1, padding: '8px', background: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? '#BA7517' : '#f0dba8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: transferClientEmailInput.trim().toLowerCase() === c.email?.toLowerCase() ? 'pointer' : 'default' }}>
                               {transferringClient ? t.adminClientsTransferring : t.adminClientsTransferConfirm}
                             </button>
                           </div>
@@ -3754,7 +3754,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                         <div style={{ borderTop: '1px solid #f0f0f0', padding: '10px 14px 14px' }}>
                           {activ ? (
                             <div style={{ background: expirat ? '#FFF5F5' : neinceput ? '#FFFBF0' : '#FFFFFF', borderRadius: '10px', padding: '10px 12px', marginBottom: queued.length > 0 ? '8px' : '0', borderLeft: `3px solid ${statusColor}` }}>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: statusColor, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '600', color: statusColor, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {expirat ? <><AlertTriangle size={11} /> {t.adminSubsExpiredBadge}</> : neinceput ? <><Calendar size={11} /> {t.adminSubsNotStartedBadge}</> : t.adminSubsActiveBadge}
                               </div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{activ.subscription_plans?.name}</div>
@@ -3764,16 +3764,16 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                                   <span style={{ fontSize: '11px', color: epuizat ? '#E24B4A' : '#888' }}>{t.adminSubsSessionsLabel(activ.sessions_used || 0, activ.sessions_total)}</span>
                                   <div style={{ display: 'flex', gap: '4px' }}>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, +1) }}
-                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '600', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                     <button onClick={e => { e.stopPropagation(); adminAjusteazaSedinte(activ.id, activ.sessions_used, activ.sessions_total, -1) }}
-                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                      style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid #E24B4A', background: '#FCEBEB', color: '#E24B4A', fontWeight: '600', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                                   </div>
                                 </div>
                               )}
                               {activ.notes && <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px' }}>{activ.notes}</div>}
                               {confirmCancelAbo === activ.id ? (
                                 <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px', background: '#FCEBEB', borderRadius: '10px', padding: '10px' }}>
-                                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>{t.adminSubsCancelConfirmTitle}</div>
+                                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '4px' }}>{t.adminSubsCancelConfirmTitle}</div>
                                   <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px', whiteSpace: 'pre-line' }}>{t.adminSubsCancelConfirmBody}</div>
                                   <div style={{ display: 'flex', gap: '8px' }}>
                                     <button onClick={() => setConfirmCancelAbo(null)}
@@ -3781,7 +3781,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                                       {t.adminSubsCancelConfirmKeepButton}
                                     </button>
                                     <button onClick={() => { setConfirmCancelAbo(null); stergeAbonament(activ.id) }}
-                                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
                                       {t.adminSubsCancelConfirmConfirmButton}
                                     </button>
                                   </div>
@@ -3798,7 +3798,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                           )}
                           {queued.map(q => (
                             <div key={q.id} style={{ background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginTop: '8px', borderLeft: '3px solid #5B7FCC' }}>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#5B7FCC', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminSubsScheduledBadge}</div>
+                              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5B7FCC', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {t.adminSubsScheduledBadge}</div>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{q.subscription_plans?.name}</div>
                               {q.sessions_total != null && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.adminSubsSessionsTotal(q.sessions_total)}</div>}
                               {q.notes && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{q.notes}</div>}
@@ -3891,7 +3891,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
                   {t.adminClassWeekDayLetters.map((z, i) => (
                     <div key={i} onClick={() => toggleZiRepetare(i)}
-                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '700', background: zileRepetare.includes(i) ? '#0E0E0E' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #0E0E0E' : '1px solid #C5C2F5' }}>
+                      style={{ flex: 1, height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: zileRepetare.includes(i) ? '#0E0E0E' : '#fff', color: zileRepetare.includes(i) ? '#fff' : '#888', border: zileRepetare.includes(i) ? '2px solid #0E0E0E' : '1px solid #C5C2F5' }}>
                       {z}
                     </div>
                   ))}
@@ -3907,7 +3907,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 {!laInfinit && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <button onClick={() => setSaptamaniRepetare(s => Math.max(1, s - 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                    <span style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', minWidth: '80px', textAlign: 'center' }}>{t.adminClassWeeksAbbrev(saptamaniRepetare)}</span>
+                    <span style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', minWidth: '80px', textAlign: 'center' }}>{t.adminClassWeeksAbbrev(saptamaniRepetare)}</span>
                     <button onClick={() => setSaptamaniRepetare(s => Math.min(52, s + 1))} style={{ width: '34px', height: '34px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '16px', cursor: 'pointer' }}>+</button>
                   </div>
                 )}
@@ -3951,8 +3951,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#0E0E0E' : eTrecut ? '#f0f0f0' : '#0E0E0E', borderRadius: '20px', padding: '5px 14px' }}>
-                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '800', letterSpacing: '0.08em' }}>{t.adminClassTodayBadge}</span>}
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
+                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '600', letterSpacing: '0.08em' }}>{t.adminClassTodayBadge}</span>}
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
                     </div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                   </div>
@@ -4010,7 +4010,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                             </div>
                           ))}
                           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #FFFFFF' }}>
-                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
+                            <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
                             <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
                               placeholder={t.adminClassSearchMemberPlaceholder}
                               style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
@@ -4176,7 +4176,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               </div>
               {confirmArchivePlan === p.id && (
                 <div style={{ marginTop: '10px', background: '#FCEBEB', borderRadius: '10px', padding: '10px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#791F1F', marginBottom: '4px' }}>{t.adminPlansArchiveConfirmTitle}</div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '4px' }}>{t.adminPlansArchiveConfirmTitle}</div>
                   <div style={{ fontSize: '11px', color: '#791F1F', marginBottom: '8px' }}>{t.adminPlansArchiveConfirmBody}</div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => setConfirmArchivePlan(null)}
@@ -4184,7 +4184,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                       {t.adminClientsCancel}
                     </button>
                     <button onClick={() => { setConfirmArchivePlan(null); stergePlan(p.id) }}
-                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                      style={{ flex: 1, padding: '7px', background: '#E24B4A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                       <Archive size={13} /> {t.adminPlansArchiveButton}
                     </button>
                   </div>
@@ -4200,7 +4200,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> {t.adminSettingsReportsTitle}</div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> {t.adminSettingsReportsTitle}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ fontSize: '11px', color: '#888' }}>{new Date().toLocaleDateString(localeFor(lang), { month: 'long', year: 'numeric' })}</div>
               <button onClick={fetchRapoarte} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', background: '#f0f0f0', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>↻</button>
@@ -4215,7 +4215,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               ].map(({ label, value, icon: Icon, color, bg }) => (
                 <div key={label} style={{ background: bg, borderRadius: '12px', padding: '12px 10px', textAlign: 'center' }}>
                   <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Icon size={20} color={color} strokeWidth={1.75} /></div>
-                  <div style={{ fontSize: '22px', fontWeight: '800', color, lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: '22px', fontWeight: '600', color, lineHeight: 1 }}>{value}</div>
                   <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', lineHeight: '1.3' }}>{label}</div>
                 </div>
               ))}
@@ -4225,17 +4225,17 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           )}
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCancelWindowTitle}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCancelWindowTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>{t.adminSettingsCancelWindowSubtitle}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <button onClick={() => setCancelWindowSetting(prev => Math.max(0, prev - 0.5))}
-              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>−</button>
+              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600' }}>−</button>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: '#0E0E0E', lineHeight: 1 }}>{cancelWindowSetting}</div>
+              <div style={{ fontSize: '32px', fontWeight: '600', color: '#0E0E0E', lineHeight: 1 }}>{cancelWindowSetting}</div>
               <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{t.adminSettingsHoursLabel}</div>
             </div>
             <button onClick={() => setCancelWindowSetting(prev => prev + 0.5)}
-              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>+</button>
+              style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#f9f9f9', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600' }}>+</button>
           </div>
           {cancelWindowSetting === 0 && (
             <div style={{ fontSize: '11px', color: '#0E0E0E', background: '#f0f0f0', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>{t.adminSettingsNoRestriction}</div>
@@ -4247,7 +4247,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={16} /> {t.adminOnlinePaymentsTitle}</div>
+            <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={16} /> {t.adminOnlinePaymentsTitle}</div>
             <button onClick={toggleOnlinePayments} disabled={savingOnlinePayments}
               style={{ width: '48px', height: '28px', borderRadius: '14px', border: 'none', background: onlinePaymentsEnabled ? '#ABE73C' : '#e0e0e0', cursor: savingOnlinePayments ? 'not-allowed' : 'pointer', position: 'relative', flexShrink: 0, opacity: savingOnlinePayments ? 0.6 : 1 }}>
               <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '3px', left: onlinePaymentsEnabled ? '23px' : '3px', transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
@@ -4259,7 +4259,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </div>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymNameLabel}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymNameLabel}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminGymNameHint}</div>
           <input value={gymNameInput} onChange={e => setGymNameInput(e.target.value)}
             style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
@@ -4269,9 +4269,9 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymCodeLabel}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymCodeLabel}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.adminGymCodeHint}</div>
-          <div style={{ fontSize: '28px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '3px', textAlign: 'center', background: '#f9f9f9', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '28px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '3px', textAlign: 'center', background: '#f9f9f9', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
             {gymJoinCode || '······'}
           </div>
           <button onClick={regenerateGymJoinCode} disabled={regeneratingCode}
@@ -4280,7 +4280,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminRedeemTransferCodeTitle}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminRedeemTransferCodeTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.adminRedeemTransferCodeHint}</div>
           <input value={redeemCodeInput} onChange={e => setRedeemCodeInput(e.target.value)}
             placeholder={t.adminRedeemTransferCodePlaceholder}
@@ -4291,7 +4291,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </button>
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCoachTitle}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCoachTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminSettingsCoachSubtitle}</div>
           <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
             placeholder={t.adminSettingsCoachSearchPlaceholder}
@@ -4337,7 +4337,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {adminTab === 'platforma' && isPlatformAdmin && (
         <>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminGymsTitle}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminGymsTitle}</div>
           {allGymsPlatform.map(g => {
             const todayISO = new Date().toISOString().slice(0, 10)
             const expired = g.paid_until && g.paid_until < todayISO
@@ -4375,7 +4375,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           )})}
         </div>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminCodesTitle}</div>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminCodesTitle}</div>
           <button onClick={generateSignupCode} disabled={generatingSignupCode}
             style={{ width: '100%', padding: '13px', background: generatingSignupCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: generatingSignupCode ? 'not-allowed' : 'pointer', marginBottom: '14px' }}>
             {t.platformAdminGenerateCode}
@@ -4384,7 +4384,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '10px 0' }}>{t.platformAdminNoCodes}</div>
           ) : signupCodes.map(c => (
             <div key={c.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', letterSpacing: '1px' }}>{c.code}</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '1px' }}>{c.code}</span>
               <span style={{ fontSize: '11px', color: c.used_at ? '#888' : '#5C8A2E', fontWeight: '600' }}>
                 {c.used_at ? `${t.platformAdminUsedLabel} · ${c.used_by_gym_name || ''}` : t.platformAdminUnusedLabel}
               </span>
@@ -4397,14 +4397,14 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {postTransferPanel && (
         <div onClick={closePostTransferPanel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', padding: '24px', maxWidth: '340px', width: '100%' }}>
-            <div style={{ fontSize: '16px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminTransferCodeTitle}</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminTransferCodeTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '18px' }}>
               {t.adminTransferCodeIntro(postTransferPanel.clientName)}
             </div>
             {postTransferCode ? (
               <>
                 <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '14px', textAlign: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '22px', fontWeight: '700', color: '#633806', letterSpacing: '2px' }}>{postTransferCode.code}</div>
+                  <div style={{ fontSize: '22px', fontWeight: '600', color: '#633806', letterSpacing: '2px' }}>{postTransferCode.code}</div>
                 </div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px', textAlign: 'center' }}>{t.adminTransferCodeValidityNote}</div>
                 <button disabled={revokingTransferCode} onClick={revokePostTransferCode}
@@ -4617,7 +4617,7 @@ function PerformanceOverviewPanel({ gymId, memberId }) {
   if (!summary) return null
   const stat = (value, label) => (
     <div>
-      <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E' }}>{value}</div>
+      <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E' }}>{value}</div>
       <div style={{ fontSize: '11px', color: '#888' }}>{label}</div>
     </div>
   )
@@ -4740,7 +4740,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
                       {notRxdLog && <NotRxdBadge t={t} compact />}
                     </div>
@@ -4748,7 +4748,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       {onDeleteWod && (
                         confirmDelete === logKey ? (
                           <button onClick={(e) => { e.stopPropagation(); onDeleteWod(w.id); setConfirmDelete(null) }}
-                            style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                            style={{ fontSize: '11px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
                             {t.jurnalDeleteConfirm}
                           </button>
                         ) : (
@@ -4791,8 +4791,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       )}
                       {areRezultatFinal && (
                         <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{rezultatBucati.join(' · ')}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{rezultatBucati.join(' · ')}</div>
                         </div>
                       )}
                       {wHasSets && (
@@ -4858,12 +4858,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 <div key={sl.id} onClick={() => { toggleClosed(skillKey); setConfirmDeleteSkill(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteSkill && (
                         confirmDeleteSkill === skillKey ? (
                           <button onClick={(e) => { e.stopPropagation(); onDeleteSkill(sl.id); setConfirmDeleteSkill(null) }}
-                            style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                            style={{ fontSize: '11px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
                             {t.jurnalDeleteConfirm}
                           </button>
                         ) : (
@@ -4890,8 +4890,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {skillScor != null && (
                         <div style={{ marginBottom: '12px' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '700' }}>{skillScor}{unitLabel}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{skillScor}{unitLabel}</div>
                         </div>
                       )}
                       {hasSets ? (
@@ -4941,7 +4941,7 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
   return (
     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
       <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em' }}>
           {titleLabel}
           {hiddenFromMembers && (
             <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
@@ -4956,7 +4956,7 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
         <>
           {skillType === 'Complex' && skillFormatConfig?.complexMovements?.length > 0 ? (
             <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#0E0E0E' }}>COMPLEX</div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>COMPLEX</div>
               {skillFormatConfig.rounds && (
                 <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.fmtRoundsAttempts}: {skillFormatConfig.rounds}</div>
               )}
@@ -5021,7 +5021,7 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
 // Clasament (langa numele participantului).
 function NotRxdBadge({ t, compact }) {
   return (
-    <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '700', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
+    <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '600', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
       {t.notRxdBadge}
     </span>
   )
@@ -5061,16 +5061,16 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
         </button>
         <div style={{ background: '#0E0E0E', padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '30px', width: '30px', borderRadius: '8px', objectFit: 'cover' }} />
-          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+          <span style={{ color: '#fff', fontWeight: '600', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
           <span style={{ fontSize: '13px', fontWeight: '600' }}>
             <span style={{ color: '#888' }}> · </span><span style={{ color: gym.primaryColor }}>{gym.name}</span>
           </span>
         </div>
         <div style={{ padding: '26px 24px', textAlign: 'center' }}>
-          {wodName && <div style={{ fontSize: '18px', fontWeight: '800', color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
+          {wodName && <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
           {variantLevel && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
-              <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '700' }}>
+              <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
                 {variantLevel}
               </div>
               {notRxd && <NotRxdBadge t={t} />}
@@ -5081,7 +5081,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
               {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
             </div>
           )}
-          <div style={{ fontSize: '30px', fontWeight: '800', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
+          <div style={{ fontSize: '30px', fontWeight: '600', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
             {scoreParts.length > 0 ? scoreParts.join(' · ') : '—'}
           </div>
           <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '18px' }}>
@@ -5089,7 +5089,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
           </div>
           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '22px' }}>{t.shareCardCongrats}</div>
           <button onClick={handleShare}
-            style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
           </button>
         </div>
@@ -7560,7 +7560,7 @@ function App() {
         {resetLinkError ? (
           <div style={{ textAlign: 'center' }}>
             <Lock size={40} color="#ff7070" strokeWidth={1.5} style={{ marginBottom: '12px' }} />
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>{t.resetLinkInvalidTitle}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: '8px' }}>{t.resetLinkInvalidTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>{t.resetLinkInvalidMessage}</div>
             <button onClick={handleExitResetMode}
               style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -7570,7 +7570,7 @@ function App() {
         ) : (
           <>
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.resetTitle}</div>
+              <div style={{ fontSize: '20px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>{t.resetTitle}</div>
               <div style={{ fontSize: '13px', color: '#888' }}>{t.resetSubtitle}</div>
             </div>
             <div style={{ marginBottom: '12px' }}>
@@ -7621,7 +7621,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
             <img src="/forge.png" alt="Forge" style={{ width: '56px', height: '56px', borderRadius: '12px' }} />
             <div>
-              <div style={{ fontSize: '17px', fontWeight: '700', color: '#fff' }}>{t.installTitle}</div>
+              <div style={{ fontSize: '17px', fontWeight: '600', color: '#fff' }}>{t.installTitle}</div>
               <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{t.installSubtitle}</div>
             </div>
           </div>
@@ -7680,7 +7680,7 @@ function App() {
       )}
       <div style={{ width: '100%', background: '#0E0E0E', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{t.authAppName}</h1>
+          <h1 style={{ fontSize: '20px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>{t.authAppName}</h1>
           <p style={{ fontSize: '13px', color: '#888' }}>{authScreen === 'login' ? t.authWelcomeBack : t.authCreateAccount}</p>
         </div>
         {authScreen === 'register' && (
@@ -7774,7 +7774,7 @@ function App() {
       <div style={{ position: 'sticky', top: 0, zIndex: 90, background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'max(10px, env(safe-area-inset-top))', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="/forge.png" alt="Forge" style={{ height: '32px', width: '32px', borderRadius: '8px', objectFit: 'cover' }} />
-          <span style={{ color: '#fff', fontWeight: '700', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+          <span style={{ color: '#fff', fontWeight: '600', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
           <span onClick={() => { debugTapRef.current += 1; if (debugTapRef.current >= 5) { localStorage.setItem('navDebug', '1'); window.location.reload() } }} style={{ color: '#444', fontSize: '10px' }}>v2</span>
         </div>
         <span style={{ fontSize: '14px', fontWeight: '600', color: myGym.primaryColor }}>
@@ -7788,7 +7788,7 @@ function App() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
           </div>
         </div>
@@ -7805,7 +7805,7 @@ function App() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.noGymMembershipTitle}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.noGymMembershipTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.noGymMembershipText}</div>
             <input value={noGymJoinCode} onChange={e => { setNoGymJoinCode(e.target.value.toUpperCase()); setNoGymJoinError('') }}
               placeholder={t.authGymCodePlaceholder}
@@ -7827,7 +7827,7 @@ function App() {
       {pendingOwnerBootstrap && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>{t.ownerBootstrapTitle}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.ownerBootstrapTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.ownerBootstrapText}</div>
             <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
               style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fafafa', marginBottom: '10px' }} />
@@ -7856,7 +7856,7 @@ function App() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>
               {abonamentReal && !abonamentInceput ? t.subScheduled
                 : onlinePaymentsAvailable ? t.noMembershipTitle
                 : !abonamentReal ? t.paywallNoSubscription
@@ -7903,7 +7903,7 @@ function App() {
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
               {checkoutStatus === 'confirmed' ? <CheckCircle2 size={48} color="#2F6600" strokeWidth={1.5} /> : <RotateCw size={48} color="#0E0E0E" strokeWidth={1.5} />}
             </div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>
               {checkoutStatus === 'waiting' ? t.checkoutWaitingTitle
                 : checkoutStatus === 'confirmed' ? t.checkoutConfirmedTitle
                 : t.checkoutTimeoutTitle}
@@ -7937,7 +7937,7 @@ function App() {
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
               {platformCheckoutStatus === 'confirmed' ? <CheckCircle2 size={48} color="#2F6600" strokeWidth={1.5} /> : <RotateCw size={48} color="#0E0E0E" strokeWidth={1.5} />}
             </div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>
               {platformCheckoutStatus === 'waiting' ? t.platformCheckoutWaitingTitle
                 : platformCheckoutStatus === 'confirmed' ? t.platformCheckoutConfirmedTitle
                 : t.platformCheckoutTimeoutTitle}
@@ -8004,7 +8004,7 @@ function App() {
                     ) : userProfile?.avatar_url ? (
                       <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#B7E63A', letterSpacing: '-0.5px' }}>{initiale}</span>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#B7E63A', letterSpacing: '-0.5px' }}>{initiale}</span>
                     )}
                   </div>
                 </div>
@@ -8317,7 +8317,7 @@ function App() {
                     if (!warmupVisible || warmupMovements.length === 0) return null
                     return (
                       <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
                           {t.homeWodWarmupTitle}
                           {wodZiData?.warmup_visible === false && (isAdmin || isCoach) && (
                             <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
@@ -8514,7 +8514,7 @@ function App() {
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
                 {!abonamentInceput ? <Calendar size={36} color="#0E0E0E" strokeWidth={1.5} /> : sedinteLimitate && sedinteRamase === 0 ? <Flag size={36} color="#0E0E0E" strokeWidth={1.5} /> : <Lock size={36} color="#0E0E0E" strokeWidth={1.5} />}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? t.subScheduled
                   : onlinePaymentsAvailable ? t.noMembershipTitle
                   : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
@@ -8581,15 +8581,15 @@ function App() {
             if (viitoare.length === 0 && trecute.length === 0) return null
             return (
               <div style={{ marginTop: '20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
                 {viitoare.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
+                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
                     {viitoare.map(c => (
                       <div key={c.id} style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #0E0E0E' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
                             <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
@@ -8606,7 +8606,7 @@ function App() {
                 )}
                 {trecute.length > 0 && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '700', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
+                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '600', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
                     {trecute.map(c => (
                       <div key={c.id} style={{ background: '#fafafa', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #e0e0e0' }}>
                         <div style={{ fontSize: '13px', fontWeight: '600', color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
@@ -8662,11 +8662,11 @@ function App() {
               {t.logNewEntry}
             </div>
             <div onClick={() => setLogTab('liber')}
-              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'liber' ? '700' : '400', background: logTab === 'liber' ? '#fff' : 'transparent', color: logTab === 'liber' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'liber' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'liber' ? '600' : '400', background: logTab === 'liber' ? '#fff' : 'transparent', color: logTab === 'liber' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'liber' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
               {t.logFreeTextTab}
             </div>
             <div onClick={() => setLogTab('jurnal')}
-              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'jurnal' ? '700' : '400', background: logTab === 'jurnal' ? '#fff' : 'transparent', color: logTab === 'jurnal' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'jurnal' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+              style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: logTab === 'jurnal' ? '600' : '400', background: logTab === 'jurnal' ? '#fff' : 'transparent', color: logTab === 'jurnal' ? '#0E0E0E' : '#888', cursor: 'pointer', boxShadow: logTab === 'jurnal' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
               {t.logJournalTab}
             </div>
           </div>
@@ -8681,7 +8681,7 @@ function App() {
                 placeholder={t.logFreeTextPlaceholder} rows={6}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
               <button onClick={saveFreeTextLog} disabled={freeLogSaving}
-                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: freeLogSaving ? 'default' : 'pointer', opacity: freeLogSaving ? 0.6 : 1 }}>
+                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: freeLogSaving ? 'default' : 'pointer', opacity: freeLogSaving ? 0.6 : 1 }}>
                 {freeLogSaving ? t.logFreeTextSaving : t.logFreeTextSaveButton}
               </button>
             </div>
@@ -8691,7 +8691,7 @@ function App() {
             <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#fff', borderRadius: '12px', padding: '8px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <button onClick={() => goJurnalDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
-              <div style={{ flex: 1, textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>
                 {jurnalDate === jurnalTodayISO ? t.clasamentToday : new Date(jurnalDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
               <button onClick={() => goJurnalDay(1)} disabled={jurnalDate >= jurnalTodayISO} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: jurnalDate >= jurnalTodayISO ? '#e0e0e0' : '#0E0E0E', color: jurnalDate >= jurnalTodayISO ? '#bbb' : '#fff', fontSize: '16px', cursor: jurnalDate >= jurnalTodayISO ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
@@ -8813,7 +8813,7 @@ function App() {
           {editLogId ? (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               {editLogHeader ? (
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
               ) : null}
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
               <SortableList
@@ -8877,7 +8877,7 @@ function App() {
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                     <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(dataAcasa + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: describeFormatConfig(wodZiData.type, wodZiData.format_config, t) ? '2px' : '10px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: describeFormatConfig(wodZiData.type, wodZiData.format_config, t) ? '2px' : '10px' }}>
                       {wodZiData.type} {formatWodDurata(wodZiData.duration)}
                     </div>
                     {describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
@@ -8908,7 +8908,7 @@ function App() {
                 </div>
               )}
               <button onClick={() => setLogWodStep('score')}
-                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                 {t.logWodContinueToScoreButton}
               </button>
             </>
@@ -8973,7 +8973,7 @@ function App() {
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             {skillNameCurent && (
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{skillNameCurent}</div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px' }}>{skillNameCurent}</div>
             )}
             {getFormat(skillTypeCurent).family !== 'sets' && skillMiscariCurente.map((m, mi) => (
               <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
@@ -9110,7 +9110,7 @@ function App() {
                         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                           {[{ val: 'm', label: t.prUnitMeters }, { val: 'cal', label: t.prUnitCalories }].map(o => (
                             <div key={o.val} onClick={() => setPrCardioUnit(o.val)}
-                              style={{ flex: 1, padding: '9px', textAlign: 'center', borderRadius: '10px', border: prCardioUnit === o.val ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: prCardioUnit === o.val ? '#f0f0f0' : '#fafafa', color: prCardioUnit === o.val ? '#0E0E0E' : '#888', fontSize: '13px', fontWeight: prCardioUnit === o.val ? '700' : '400', cursor: 'pointer' }}>
+                              style={{ flex: 1, padding: '9px', textAlign: 'center', borderRadius: '10px', border: prCardioUnit === o.val ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: prCardioUnit === o.val ? '#f0f0f0' : '#fafafa', color: prCardioUnit === o.val ? '#0E0E0E' : '#888', fontSize: '13px', fontWeight: prCardioUnit === o.val ? '600' : '400', cursor: 'pointer' }}>
                               {o.label}
                             </div>
                           ))}
@@ -9220,11 +9220,11 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: collapsedRecord ? '#0E0E0E' : '#ccc' }}>{collapsedRecord ? formatPR(collapsedRecord, preferredUnit) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: collapsedRecord ? '#0E0E0E' : '#ccc' }}>{collapsedRecord ? formatPR(collapsedRecord, preferredUnit) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                   {isConfirmingDelete ? (
                     <button onClick={(e) => { e.stopPropagation(); deleteMiscarePR(movement) }}
-                      style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
+                      style={{ fontSize: '11px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
                       {t.prDeleteConfirm}
                     </button>
                   ) : (
@@ -9250,7 +9250,7 @@ function App() {
                       {wodInfo.split('\n').map((line, li) => (
                         <div key={li} style={{
                           fontSize: li === 0 ? '11px' : '13px',
-                          fontWeight: li === 0 ? '800' : '400',
+                          fontWeight: li === 0 ? '600' : '400',
                           color: li === 0 ? '#ABE73C' : '#e0e0e0',
                           marginBottom: li === 0 ? '8px' : '3px',
                           letterSpacing: li === 0 ? '0.8px' : '0',
@@ -9281,14 +9281,14 @@ function App() {
                   )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
                         {PCT_BARA.map(pct => {
                           const w = Math.round(bestKg * pct / 100 * 2) / 2
                           return (
                             <div key={pct} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: '#f8f8f8', borderRadius: '8px' }}>
                               <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '600' }}>{pct}%</span>
-                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E' }}>{w} {preferredUnit}</span>
+                              <span style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{w} {preferredUnit}</span>
                             </div>
                           )
                         })}
@@ -9297,7 +9297,7 @@ function App() {
                   )}
                   {cat === 'WEIGHTLIFTING' && repRows && repRows.length > 0 ? (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {repRows.map(({ reps, record }) => (
                         <div key={reps}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid #FFFFFF' }}>
@@ -9314,7 +9314,7 @@ function App() {
                     </div>
                   ) : records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {records.slice(0, 5).map((r, j) => (
                         <div key={j}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #FFFFFF' : 'none' }}>
@@ -9344,7 +9344,7 @@ function App() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.prScreenTitle} <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
               <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
-                style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
+                style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
                 {t.prNewButton}
               </button>
             </div>
@@ -9365,7 +9365,7 @@ function App() {
                 <div key={cat} style={{ marginBottom: '20px' }}>
                   <div onClick={() => { setCatDeschise(prev => ({ ...prev, [cat]: !prev[cat] })); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '600', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                     <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#0E0E0E' ? '#ABE73C' : '#fff', flexShrink: 0 }}>
@@ -9408,7 +9408,7 @@ function App() {
                   {/* Header clickabil */}
                   <div onClick={() => { setHeroWodsDeschis(v => !v); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '600', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                     <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
@@ -9431,7 +9431,7 @@ function App() {
                       }
                       {/* Linie separator + formular WOD nou */}
                       <div style={{ borderTop: '2px dashed #f0f0f0', padding: '14px' }}>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
                             value={heroWodNouInput}
@@ -9442,7 +9442,7 @@ function App() {
                           />
                           <button
                             onClick={() => { if (!heroWodNouInput.trim()) return; setNewHeroWodName(heroWodNouInput.trim()); setNewHeroWodTip('AMRAP'); setNewHeroWodFormatConfig({}); setNewHeroWodMiscari([]); setNewHeroWodMiscareCurenta(''); setPrevScreen('pr'); setScreen('newHeroWod'); setHeroWodNouInput('') }}
-                            style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#ABE73C' : '#f0f0f0', color: heroWodNouInput.trim() ? '#0E0E0E' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '700', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
+                            style={{ padding: '10px 14px', borderRadius: '10px', background: heroWodNouInput.trim() ? '#ABE73C' : '#f0f0f0', color: heroWodNouInput.trim() ? '#0E0E0E' : '#bbb', border: 'none', fontSize: '20px', fontWeight: '600', cursor: heroWodNouInput.trim() ? 'pointer' : 'default', lineHeight: 1, flexShrink: 0 }}>
                             →
                           </button>
                         </div>
@@ -9455,7 +9455,7 @@ function App() {
             {miscariFaraCat.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
+                  <div style={{ fontSize: '10px', fontWeight: '600', color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
                   <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                 </div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -9497,7 +9497,7 @@ function App() {
               style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
               ‹ {t.prHistoryLabel}
             </button>
-            <div style={{ fontSize: '18px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.benchmarkDetailTitle(benchmarkDetailName)}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.benchmarkDetailTitle(benchmarkDetailName)}</div>
             <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px' }}>{t.benchmarkDetailApproxNote}</div>
             {entries.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.benchmarkDetailEmpty}</div>
@@ -9510,10 +9510,10 @@ function App() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
                         {log.variant_level && (
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#888', textTransform: 'uppercase' }}>{log.variant_level}</span>
+                          <span style={{ fontSize: '10px', fontWeight: '600', color: '#888', textTransform: 'uppercase' }}>{log.variant_level}</span>
                         )}
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginTop: '2px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>
                         {rezultatBucati.length > 0 ? rezultatBucati.join(' · ') : '—'}
                       </div>
                     </div>
@@ -9545,7 +9545,7 @@ function App() {
               ) : userProfile?.avatar_url ? (
                 <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: '26px', fontWeight: '800', color: '#ABE73C', letterSpacing: '-0.5px' }}>
+                <span style={{ fontSize: '26px', fontWeight: '600', color: '#ABE73C', letterSpacing: '-0.5px' }}>
                   {[profileFirstName, profileLastName].map(w => w[0]).filter(Boolean).join('').toUpperCase() || 'U'}
                 </span>
               )}
@@ -9556,19 +9556,19 @@ function App() {
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Email</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>Email</div>
               <div style={{ fontSize: '15px', color: '#888' }}>{user?.email}</div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileFirstNameLabel}</div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileFirstNameLabel}</div>
                 <input value={profileFirstName} onChange={e => setProfileFirstName(e.target.value)}
                   placeholder={t.profileFirstNamePlaceholder}
                   style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileLastNameLabel}</div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileLastNameLabel}</div>
                 <input value={profileLastName} onChange={e => setProfileLastName(e.target.value)}
                   placeholder={t.profileLastNamePlaceholder}
                   style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
@@ -9576,33 +9576,33 @@ function App() {
             </div>
 
             <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileBirthDateLabel}</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileBirthDateLabel}</div>
               <input type="date" value={profileBirthDate} onChange={e => setProfileBirthDate(e.target.value)}
                 max={todayLocalStr()}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileGenderLabel}</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileGenderLabel}</div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 {[{ val: 'masculin', label: '♂', sub: t.profileGenderMale }, { val: 'feminin', label: '♀', sub: t.profileGenderFemale }].map(g => (
                   <div key={g.val} onClick={() => setProfileGender(g.val)}
                     style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${profileGender === g.val ? '#0E0E0E' : '#e0e0e0'}`, background: profileGender === g.val ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                     <div style={{ fontSize: '22px', marginBottom: '4px', color: profileGender === g.val ? '#ABE73C' : '#888' }}>{g.label}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: profileGender === g.val ? '#ABE73C' : '#888' }}>{g.sub}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: profileGender === g.val ? '#ABE73C' : '#888' }}>{g.sub}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             <button onClick={saveMyProfile} disabled={profileSaving}
-              style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
               {profileSaving ? t.profileSaving : t.profileSaveButton}
             </button>
           </div>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileWeightUnitTitle}</div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileWeightUnitTitle}</div>
             <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.profileWeightUnitSubtitle}</div>
             <div style={{ display: 'flex', gap: '12px' }}>
               {[{ val: 'kg', label: t.profileWeightUnitKg }, { val: 'lbs', label: t.profileWeightUnitLbs }].map(u => {
@@ -9610,7 +9610,7 @@ function App() {
                 return (
                   <div key={u.val} onClick={() => changeWeightUnit(u.val)}
                     style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${active ? '#0E0E0E' : '#e0e0e0'}`, background: active ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{u.val}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{u.val}</div>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: active ? '#ABE73C' : '#888', marginTop: '2px' }}>{u.label}</div>
                   </div>
                 )
@@ -9619,7 +9619,7 @@ function App() {
           </div>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileLanguageTitle}</div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileLanguageTitle}</div>
             <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.profileLanguageSubtitle}</div>
             <div style={{ display: 'flex', gap: '12px' }}>
               {[{ val: 'ro', label: 'Română' }, { val: 'en', label: 'English' }].map(l => {
@@ -9627,7 +9627,7 @@ function App() {
                 return (
                   <div key={l.val} onClick={() => changeLanguage(l.val)}
                     style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${active ? '#0E0E0E' : '#e0e0e0'}`, background: active ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '800', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{l.val}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{l.val}</div>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: active ? '#ABE73C' : '#888', marginTop: '2px' }}>{l.label}</div>
                   </div>
                 )
@@ -9635,24 +9635,24 @@ function App() {
             </div>
           </div>
 
-          <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginTop: '16px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <button onClick={goTimer} style={{ width: '100%', padding: '16px', marginTop: '16px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <TimerIcon size={18} color="#ABE73C" strokeWidth={2} /> Timer
           </button>
 
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E', marginBottom: '16px' }}>{t.profileChangePasswordTitle}</div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '16px' }}>{t.profileChangePasswordTitle}</div>
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileNewPasswordLabel}</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileNewPasswordLabel}</div>
               <input value={profileNewPassword} onChange={e => setProfileNewPassword(e.target.value)} type="password" placeholder={t.profileNewPasswordPlaceholder}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileConfirmPasswordLabel}</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileConfirmPasswordLabel}</div>
               <input value={profileNewPasswordConfirm} onChange={e => setProfileNewPasswordConfirm(e.target.value)} type="password" placeholder={t.profileConfirmPasswordPlaceholder}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <button onClick={changeMyPassword} disabled={passwordSaving}
-              style={{ width: '100%', padding: '16px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '16px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.6 : 1 }}>
               {passwordSaving ? t.profileSaving : t.profileChangePasswordButton}
             </button>
           </div>
@@ -9687,7 +9687,7 @@ function App() {
               {/* Header luna */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <span onClick={prevLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>‹</span>
-                <span style={{ fontSize: '15px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.02em' }}>
+                <span style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '0.02em' }}>
                   {numeLunaCalendar.toUpperCase()} {calPickerYear}
                 </span>
                 <span onClick={nextLuna} style={{ fontSize: '22px', cursor: 'pointer', color: '#888', padding: '2px 10px', userSelect: 'none' }}>›</span>
@@ -9695,7 +9695,7 @@ function App() {
               {/* Zile header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
                 {ziuaLitereCalendar.map((z, zi) => (
-                  <div key={zi} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
+                  <div key={zi} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '600', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
                 ))}
               </div>
               {/* Grid zile */}
@@ -9712,7 +9712,7 @@ function App() {
                       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '1', borderRadius: '10px', cursor: 'pointer',
                         background: selectat ? '#0E0E0E' : 'transparent',
                         border: selectat ? 'none' : esteAzi ? '2px solid #0E0E0E' : 'none' }}>
-                      <span style={{ fontSize: '14px', fontWeight: selectat || esteAzi ? '800' : '400', color: selectat ? '#ABE73C' : '#0E0E0E', lineHeight: 1 }}>{d.getDate()}</span>
+                      <span style={{ fontSize: '14px', fontWeight: selectat || esteAzi ? '600' : '400', color: selectat ? '#ABE73C' : '#0E0E0E', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{d.getDate()}</span>
                       {(areWod || areRez) && <span style={{ fontSize: '7px', color: areRez ? '#0E0E0E' : '#ABE73C', lineHeight: 1, marginTop: '1px' }}>{areRez ? '✓' : '⚡'}</span>}
                     </div>
                   )
@@ -9741,30 +9741,30 @@ function App() {
             {/* PASUL 1 — Date personale */}
             {onboardingStep === 1 && (
               <>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingWelcome}</div>
+                <div style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingWelcome}</div>
                 <div style={{ fontSize: '14px', color: '#888', marginBottom: '24px' }}>{t.onboardingStep1Subtitle}</div>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingFirstNameLabel}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingFirstNameLabel}</div>
                     <input value={onboardingFirstName} onChange={e => setOnboardingFirstName(e.target.value)}
                       placeholder={t.onboardingFirstNamePlaceholder}
                       style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingLastNameLabel}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingLastNameLabel}</div>
                     <input value={onboardingLastName} onChange={e => setOnboardingLastName(e.target.value)}
                       placeholder={t.onboardingLastNamePlaceholder}
                       style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingBirthDateLabel}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingBirthDateLabel}</div>
                   <input type="date" value={onboardingBirthDate} onChange={e => setOnboardingBirthDate(e.target.value)}
                     max={todayLocalStr()}
                     style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
                 </div>
                 <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast(t.onboardingFillRequired); return }; setOnboardingStep(2) }}
-                  style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '800', cursor: 'pointer' }}>
+                  style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
                   {t.onboardingContinue}
                 </button>
               </>
@@ -9773,14 +9773,14 @@ function App() {
             {/* PASUL 2 — Gen */}
             {onboardingStep === 2 && (
               <>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingGenderTitle}</div>
+                <div style={{ fontSize: '22px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.onboardingGenderTitle}</div>
                 <div style={{ fontSize: '14px', color: '#888', marginBottom: '28px' }}>{t.onboardingGenderSubtitle}</div>
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
                   {[{ val: 'masculin', label: '♂', sub: t.onboardingGenderMale }, { val: 'feminin', label: '♀', sub: t.onboardingGenderFemale }].map(g => (
                     <div key={g.val} onClick={() => setOnboardingGender(g.val)}
                       style={{ flex: 1, padding: '20px 14px', borderRadius: '16px', border: `2px solid ${onboardingGender === g.val ? '#0E0E0E' : '#e0e0e0'}`, background: onboardingGender === g.val ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                       <div style={{ fontSize: '28px', marginBottom: '6px', color: onboardingGender === g.val ? '#ABE73C' : '#888' }}>{g.label}</div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: onboardingGender === g.val ? '#ABE73C' : '#888' }}>{g.sub}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: onboardingGender === g.val ? '#ABE73C' : '#888' }}>{g.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -9788,7 +9788,7 @@ function App() {
                   <button onClick={() => setOnboardingStep(1)}
                     style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>{t.onboardingBack}</button>
                   <button onClick={() => { if (!onboardingGender) { showToast(t.onboardingSelectGender); return }; setOnboardingStep(3) }}
-                    style={{ flex: 2, padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>{t.onboardingContinue}</button>
+                    style={{ flex: 2, padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>{t.onboardingContinue}</button>
                 </div>
               </>
             )}
@@ -9796,14 +9796,14 @@ function App() {
             {/* PASUL 3 — Waiver */}
             {onboardingStep === 3 && (
               <>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#0E0E0E', marginBottom: '4px' }}>
+                <div style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>
                   {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalTitle(new Date().getFullYear()) : t.onboardingWaiverTitle}
                 </div>
                 <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>
                   {onboardingFirstName && onboardingGender ? t.onboardingWaiverRenewalSubtitle : t.onboardingWaiverSubtitle}
                 </div>
                 <div style={{ background: '#f8f8f8', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', maxHeight: '220px', overflowY: 'auto', fontSize: '12px', color: '#444', lineHeight: '1.7' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading(myGym.name)}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '0.5px', marginBottom: '10px' }}>{t.onboardingWaiverHeading(myGym.name)}</div>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver1Title}</strong><br />{t.onboardingWaiver1Text}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver2Title}</strong><br />{t.onboardingWaiver2Text}</p>
                   <p style={{ marginBottom: '8px' }}><strong>{t.onboardingWaiver3Title}</strong><br />{t.onboardingWaiver3Text(myGym.name)}</p>
@@ -9819,7 +9819,7 @@ function App() {
                   <button onClick={() => setOnboardingStep(2)}
                     style={{ flex: 1, padding: '14px', background: '#FFFFFF', color: '#888', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>{t.onboardingBack}</button>
                   <button onClick={saveOnboarding} disabled={!onboardingWaiverAccepted}
-                    style={{ flex: 2, padding: '14px', background: onboardingWaiverAccepted ? '#ABE73C' : '#e0e0e0', color: onboardingWaiverAccepted ? '#0E0E0E' : '#aaa', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: onboardingWaiverAccepted ? 'pointer' : 'default' }}>
+                    style={{ flex: 2, padding: '14px', background: onboardingWaiverAccepted ? '#ABE73C' : '#e0e0e0', color: onboardingWaiverAccepted ? '#0E0E0E' : '#aaa', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: onboardingWaiverAccepted ? 'pointer' : 'default' }}>
                     {t.onboardingConfirm}
                   </button>
                 </div>

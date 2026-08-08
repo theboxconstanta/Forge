@@ -177,7 +177,7 @@ export default function PlatformBilling({ gymId, t, lang, showToast }) {
 
         {otherVersions.length > 0 && (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '14px' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', marginBottom: '10px' }}>{t.billingChangePlanTitle}</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px' }}>{t.billingChangePlanTitle}</div>
             {otherVersions.map((v) => {
               const isUpgrade = v.price_amount >= activeSubscription.price_amount
               const versionPrice = new Intl.NumberFormat(locale, { style: 'currency', currency: v.currency, minimumFractionDigits: 0 }).format(v.price_amount / 100)

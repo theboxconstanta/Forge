@@ -4,7 +4,7 @@
 // this milestone's - "Completion definition: ... no purchase action
 // available yet").
 const cardStyle = { border: '1.5px solid #e0e0e0', borderRadius: '16px', padding: '28px 24px', textAlign: 'center' }
-const nameStyle = { fontSize: '15px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }
+const nameStyle = { fontSize: '15px', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }
 const priceRowStyle = { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', marginBottom: '18px' }
 const priceStyle = { fontSize: '40px', fontWeight: '900', color: '#0E0E0E' }
 const cadenceStyle = { fontSize: '15px', fontWeight: '600', color: '#888' }
