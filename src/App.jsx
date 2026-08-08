@@ -676,8 +676,14 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
               onClick={() => setScreen(id)}
               className="relative flex flex-col items-center gap-1 px-2 py-1"
             >
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#afe607' : '#000000'} />
-              <span className="text-[10px]" style={{ color: '#000000', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}>
+              {/* Visual Polish v2 - active tab now uses Forge lime
+                  (#B7E63A, matching the rest of this pass's palette,
+                  replacing the slightly different #afe607 that was only
+                  ever used here); inactive tabs are gray instead of
+                  black, per the mission's explicit "keep the bar visually
+                  light" instruction. Same isActive/onClick mechanism. */}
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#B7E63A' : '#9CA3AF'} />
+              <span className="text-[10px]" style={{ color: isActive ? '#111111' : '#9CA3AF', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}>
                 {t[labelKey]}
               </span>
               {badge != null && (
@@ -7948,90 +7954,100 @@ function App() {
               <ActivationDashboard gymId={userProfile.gym_id} gymName={myGym?.name} t={t} lang={lang} showToast={showToast} />
             )}
 
-            {/* ── Header (Home Dashboard Visual Redesign) - greeting only,
-                no additional controls. Sessions counter + avatar stay (an
-                existing nav affordance to /profile, not a new control);
-                the date-tap-to-calendar trigger and "back to today" link
-                move down into the Date selector section below, right next
-                to the chip strip they govern - same setShowCalPicker/
-                setDataAcasa/scrollChipToDate calls, unchanged. */}
-            <div style={{ padding: '28px 20px 8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '18px', fontWeight: '900', color: '#0E0E0E', lineHeight: 1 }}>{wodLogs.length}</div>
-                  <div style={{ fontSize: '9px', color: '#aaa', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
-                </div>
-                <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
-                  style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
-                  {avatarUploading ? (
-                    <span style={{ fontSize: '10px', color: '#ABE73C', animation: 'spin 1s linear infinite' }}>⏳</span>
-                  ) : userProfile?.avatar_url ? (
-                    <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#ABE73C', letterSpacing: '-0.5px' }}>{initiale}</span>
-                  )}
+            {/* ── Header (Visual Polish v2) - the greeting is deliberately
+                de-emphasized: small, gray, top-left, no longer the
+                headline (that's now the month title below). Same
+                setPrevScreen/setScreen('profile') nav affordance,
+                unchanged. */}
+            <div style={{ padding: '20px 20px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#111111', lineHeight: 1 }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '700', letterSpacing: '0.1em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
+                  </div>
+                  <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+                    {avatarUploading ? (
+                      <span style={{ fontSize: '10px', color: '#B7E63A', animation: 'spin 1s linear infinite' }}>⏳</span>
+                    ) : userProfile?.avatar_url ? (
+                      <img src={userProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#B7E63A', letterSpacing: '-0.5px' }}>{initiale}</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <p style={{ fontSize: '26px', fontWeight: '800', color: '#0E0E0E', lineHeight: 1.25, letterSpacing: '-0.3px', margin: '14px 0 0' }}>{t.homeGreeting(prenume)}</p>
             </div>
 
-            {/* ── Date selector - horizontal chip strip, unchanged
-                selection logic (setDataAcasa/homeCalendarChips), refined
-                styling only: white background, subtler borders, larger
-                touch targets, selected day stays lime green. */}
-            <div style={{ padding: '20px 20px 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
-                  style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', letterSpacing: '0.02em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {selData.toLocaleDateString(localeFor(lang), { month: 'long' }).toUpperCase()} {selData.getFullYear()}
-                  <span style={{ fontSize: '11px', color: '#bbb' }}>▾</span>
-                </div>
-                {!esteAzi && (
-                  <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                    style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>{t.homeBackToToday}</div>
-                )}
+            {/* ── Month title (Visual Polish v2) - now the primary headline
+                of the screen (34-36px). Same tap-to-open-year-picker
+                function as before (setCalPickerYear/setCalPickerMonth/
+                setShowCalPicker), only relocated and enlarged; "back to
+                today" keeps its own setDataAcasa/scrollChipToDate call. */}
+            <div style={{ padding: '10px 20px 4px' }}>
+              <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '8px' }}>
+                <span style={{ fontSize: '35px', fontWeight: '700', color: '#111111', letterSpacing: '-0.8px', lineHeight: 1.1 }}>
+                  {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
+                </span>
+                <span style={{ fontSize: '15px', color: '#D1D5DB' }}>▾</span>
               </div>
-              <div ref={homeCalScrollRef} className="hide-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+              {!esteAzi && (
+                <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
+                  style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', marginTop: '6px' }}>{t.homeBackToToday}</div>
+              )}
+            </div>
+
+            {/* ── Date selector (Visual Polish v2) - perfect 64x64 squares,
+                unchanged selection logic (setDataAcasa/homeCalendarChips).
+                The reservation/WOD indicator moved from a 4th stacked row
+                to a tiny corner glyph so the square can stay a true square
+                with only day-letter/day-number/month-abbrev inside, per
+                the mission's explicit 3-row spec - same signal
+                (areRez/areWod), same meaning, smaller footprint. */}
+            <div style={{ padding: '8px 16px 20px' }}>
+              <div ref={homeCalScrollRef} className="hide-scrollbar" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', paddingLeft: '4px', paddingRight: '4px', scrollbarWidth: 'none' }}>
                 {homeCalendarChips.map(({ ds, dayNum, ziuaLitera, luna, eAzi, areRez, areWod }) => {
                   const selectat = ds === dataAcasa
                   return (
                     <div key={ds}
                       ref={eAzi ? homeCalTodayRef : null}
                       onClick={() => setDataAcasa(ds)}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', width: '60px', height: '72px', borderRadius: '18px', flexShrink: 0, cursor: 'pointer', boxSizing: 'border-box',
-                        background: selectat ? '#ABE73C' : '#fff',
-                        border: selectat ? 'none' : eAzi ? '2px solid #0E0E0E' : '1px solid #ECECEC',
+                      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', width: '64px', height: '64px', borderRadius: '20px', flexShrink: 0, cursor: 'pointer', boxSizing: 'border-box',
+                        background: selectat ? '#B7E63A' : '#fff',
+                        border: selectat ? 'none' : eAzi ? '2px solid #111111' : '1px solid #E5E7EB',
                         // translateZ(0) forteaza cardul pe propriul layer GPU - fara asta, pe iOS
                         // Safari, schimbarea de background la selectare/deselectare lasa pixeli
                         // "fantoma" din vechea culoare la colturile rotunjite (raportat: linie lime
                         // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: selectat ? '#0E0E0E' : '#bbb', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                      <span style={{ fontSize: '21px', fontWeight: selectat || eAzi ? '900' : '500', color: '#0E0E0E', lineHeight: 1 }}>{dayNum}</span>
-                      <span style={{ fontSize: '10px', color: selectat ? '#0E0E0E' : '#aaa', fontWeight: '500' }}>{luna}</span>
-                      <span style={{ fontSize: '9px', lineHeight: 1, color: selectat ? '#0E0E0E' : '#ABE73C', visibility: (areWod || areRez) ? 'visible' : 'hidden' }}>{areRez ? '✓' : '⚡'}</span>
+                      <span style={{ fontSize: '10px', fontWeight: '600', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '19px', fontWeight: '700', color: '#111111', lineHeight: 1 }}>{dayNum}</span>
+                      <span style={{ fontSize: '10px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '500' }}>{luna}</span>
+                      {(areWod || areRez) && (
+                        <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? '#111111' : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
+                      )}
                     </div>
                   )
                 })}
               </div>
             </div>
 
-            {/* ── Today schedule - Home Dashboard Visual Redesign: the
-                "N classes available" dropdown is gone, classes render
-                immediately. Same claseZi/rezervariMele/rezervariPerClasa/
-                waitlistMea/sedinteLimitate/sedinteRamase/isAdmin reads as
-                the dropdown used - only the JSX changed. clasaHomeSelectata
-                now means "which class's detail sheet is open" instead of
-                "which card is inline-expanded" - same state, new render
-                target (BottomSheet instead of an inline reveal). */}
+            {/* ── Today schedule - unchanged claseZi/rezervariMele/
+                rezervariPerClasa/waitlistMea/sedinteLimitate/sedinteRamase/
+                isAdmin reads; clasaHomeSelectata still means "which
+                class's detail sheet is open". Visual Polish v2: card
+                styling only (border/radius/time-block/text colors). */}
             <div style={{ padding: '0 20px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em', color: '#0E0E0E' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
-                <div style={{ fontSize: '13px', color: '#888', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
+                <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.1em', color: '#111111' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
+                <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
               </div>
               {claseZi.length === 0 ? (
-                <div style={{ padding: '20px 0', textAlign: 'center', color: '#bbb', fontSize: '13px' }}>{t.homeNoClasses(esteAzi)}</div>
+                <div style={{ padding: '20px 0', textAlign: 'center', color: '#9CA3AF', fontSize: '13px' }}>{t.homeNoClasses(esteAzi)}</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {claseZi.map(c => {
@@ -8041,23 +8057,23 @@ function App() {
                     const peWaitlist = !rezervat && waitlistMea.includes(c.id)
                     return (
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #ABE73C' : '1px solid #ECECEC', borderRadius: '22px', padding: '14px 16px', cursor: 'pointer' }}>
-                        <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '14px', padding: '10px 12px', textAlign: 'center', minWidth: '60px', flexShrink: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: '800', lineHeight: 1.1, letterSpacing: '-0.2px' }}>{c.start_time?.slice(0, 5)}</div>
+                        style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
+                        <div style={{ background: '#0E0E0E', color: '#fff', borderRadius: '16px', width: '56px', height: '56px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '800', lineHeight: 1.1, letterSpacing: '-0.2px', textAlign: 'center' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
-                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{c.coach}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           {rezervat
-                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#ABE73C', padding: '3px 9px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
+                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#B7E63A', padding: '3px 9px', borderRadius: '20px', fontWeight: '700' }}>{t.homeReserved}</span>
                             : peWaitlist
                             ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
                             : plin
                             ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
-                            : <span style={{ fontSize: '12px', color: '#888', fontWeight: '600' }}>{nrRez}/{c.max_spots}</span>}
-                          <ChevronRight size={16} color="#ccc" strokeWidth={2} />
+                            : <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600' }}>{nrRez}/{c.max_spots}</span>}
+                          <ChevronRight size={16} color="#D1D5DB" strokeWidth={2} />
                         </div>
                       </div>
                     )
@@ -8188,11 +8204,11 @@ function App() {
                 skill/variant-picker/log-button logic below is untouched,
                 having already been through 4 dedicated visual passes this
                 session, see WORKOUT_VARIANT_ULTRA_MINIMAL_UI_REPORT.md) */}
-            <div style={{ background: '#fff', border: '1px solid #ECECEC', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
+            <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '800', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '17px', fontWeight: '700', color: '#0E0E0E' }}>
+                  <div style={{ fontSize: '10px', color: '#111111', fontWeight: '700', letterSpacing: '0.12em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
+                  <div style={{ fontSize: '17px', fontWeight: '600', color: '#111111' }}>
                     {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
                   </div>
                   {/* Durata ramane cititA din wodZiData (legacy) - modelul de
@@ -8234,7 +8250,11 @@ function App() {
                     </div>
                   )}
                 </div>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: wodDeschis ? '#0E0E0E' : '#f0f0f0', color: wodDeschis ? '#ABE73C' : '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                {/* Visual Polish v2 - the toggle stays a light gray circle in
+                    both states (was a heavy full-black fill when expanded);
+                    a subtle border communicates "expanded" instead of an
+                    inverted dark fill. Same onClick/wodDeschis toggle. */}
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F3F4F6', border: wodDeschis ? '1.5px solid #D1D5DB' : 'none', color: '#111111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
                   {wodDeschis ? '−' : '+'}
                 </div>
               </div>
@@ -8401,21 +8421,21 @@ function App() {
                 abonamentReal/sessTotal/sessUsed/zileRamase/progres reads,
                 same tap-to-/abonament navigation, unchanged.) ── */}
             {abonamentReal && (
-              <div onClick={() => setScreen('abonament')} style={{ background: '#fff', border: '1px solid #ECECEC', borderRadius: '18px', margin: '0 20px 12px', padding: '14px 16px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div onClick={() => setScreen('abonament')} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '20px', margin: '0 20px 12px', padding: '18px 20px', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CreditCard size={17} color="#888" strokeWidth={1.75} />
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
+                    <CreditCard size={17} color="#6B7280" strokeWidth={1.75} />
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#111111' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
                       <div style={{ fontSize: '14px', fontWeight: '700', lineHeight: 1 }}>
-                        <span style={{ color: '#0E0E0E' }}>{sessUsed}</span>
-                        <span style={{ color: '#ccc', fontWeight: '400' }}> / </span>
-                        <span style={{ color: '#0E0E0E' }}>{sessTotal}</span>
+                        <span style={{ color: '#111111' }}>{sessUsed}</span>
+                        <span style={{ color: '#D1D5DB', fontWeight: '400' }}> / </span>
+                        <span style={{ color: '#111111' }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
@@ -8425,7 +8445,7 @@ function App() {
                       <div style={{ height: '100%', width: `${progres * 100}%`, background: progres >= 1 ? '#E24B4A' : progres > 0.8 ? '#BA7517' : '#0E0E0E', borderRadius: '3px' }} />
                     </div>
                   ) : <div />}
-                  <div style={{ fontSize: '11px', color: '#aaa', whiteSpace: 'nowrap' }}>{t.homeDaysLeft(zileRamase)}</div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{t.homeDaysLeft(zileRamase)}</div>
                 </div>
               </div>
             )}
