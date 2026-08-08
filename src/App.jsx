@@ -6198,15 +6198,33 @@ function App() {
     }
   }
 
+  // Calendar Date Selection Bug (CALENDAR_DATE_SELECTION_BUG_REPORT.md) -
+  // root cause was here, not in date selection itself: idx*70-32 hardcoded
+  // the chip's pixel width+gap and half-width from whatever the strip
+  // looked like when this was written. Two later visual-polish passes
+  // resized the chips (width/gap changed twice) without anyone updating
+  // these magic numbers, so by the time a chip was ~74px+gap apart instead
+  // of 70px, the accumulated per-day drift (up to ~4px x day-of-year) could
+  // scroll the strip hundreds of pixels off target - centering a WRONG
+  // chip in view while the actually-selected date (dataAcasa, the lime
+  // highlight, and the loaded classes) were already 100% correct the whole
+  // time. Fixed by measuring the real rendered chip width + gap from the
+  // DOM instead of a hardcoded constant, so this can never silently drift
+  // out of sync with a future chip-size change again.
   const scrollChipToDate = (ds) => {
     setTimeout(() => {
       const container = homeCalScrollRef.current
       if (!container) return
+      const firstChip = container.firstElementChild
+      if (!firstChip) return
+      const chipWidth = firstChip.getBoundingClientRect().width
+      const gapPx = parseFloat(getComputedStyle(container).columnGap || getComputedStyle(container).gap) || 0
+      const stride = chipWidth + gapPx
       const year = new Date().getFullYear()
       const startOfYear = new Date(`${year}-01-01T00:00:00`)
       const totalDays = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365
       const idx = Math.round((new Date(ds + 'T00:00:00') - startOfYear) / 86400000)
-      if (idx >= 0 && idx < totalDays) container.scrollLeft = Math.max(0, idx * 70 - container.offsetWidth / 2 + 32)
+      if (idx >= 0 && idx < totalDays) container.scrollLeft = Math.max(0, idx * stride - container.offsetWidth / 2 + chipWidth / 2)
     }, 50)
   }
 
