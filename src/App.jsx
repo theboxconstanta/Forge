@@ -4499,40 +4499,78 @@ function SortableList({ items, onReorder, onRemove }) {
   const [editIdx, setEditIdx] = useState(null)
   const [editVal, setEditVal] = useState('')
 
+  // Miscarea propriu-zisa (reordonare pe pasi de STEP px) - factorizata
+  // separat de sursa evenimentului (touchmove vs mousemove), ca sa fie
+  // identica pe ambele cai.
+  const movePointer = (y) => {
+    if (drag.current.idx === null) return
+    const totalDy = y - drag.current.initialY
+    if (!drag.current.on) {
+      if (Math.abs(totalDy) < 8) return
+      drag.current.on = true
+    }
+    const dy = y - drag.current.startY
+    const STEP = 48
+    if (Math.abs(dy) < STEP / 2) return
+    const dir = dy > 0 ? 1 : -1
+    const from = drag.current.idx
+    const to = from + dir
+    if (to < 0 || to >= items.length) return
+    const next = [...items]
+    ;[next[from], next[to]] = [next[to], next[from]]
+    onReorder(next)
+    drag.current.idx = to
+    drag.current.startY = y
+    setActiveIdx(to)
+  }
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const onMove = (e) => {
+    const onTouchMove = (e) => {
       if (drag.current.idx === null) return
-      const y = e.touches[0].clientY
-      const totalDy = y - drag.current.initialY
-      if (!drag.current.on) {
-        if (Math.abs(totalDy) < 8) return
-        drag.current.on = true
-      }
       e.preventDefault()
-      const dy = y - drag.current.startY
-      const STEP = 48
-      if (Math.abs(dy) < STEP / 2) return
-      const dir = dy > 0 ? 1 : -1
-      const from = drag.current.idx
-      const to = from + dir
-      if (to < 0 || to >= items.length) return
-      const next = [...items]
-      ;[next[from], next[to]] = [next[to], next[from]]
-      onReorder(next)
-      drag.current.idx = to
-      drag.current.startY = y
-      setActiveIdx(to)
+      movePointer(e.touches[0].clientY)
     }
-    el.addEventListener('touchmove', onMove, { passive: false })
-    return () => el.removeEventListener('touchmove', onMove)
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [items, onReorder])
+
+  // Fallback mouse (bug real gasit: reordonarea prin drag nu functiona
+  // deloc pe desktop cu mouse - handlerele existente erau doar touch*).
+  // Listener-ele merg pe window (nu pe container), fiindca mouse-ul poate
+  // iesi din limitele randului/containerului in timpul drag-ului, spre
+  // deosebire de touch (care ramane "capturat" de elementul de start).
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (drag.current.idx === null) return
+      movePointer(e.clientY)
+    }
+    const onMouseUp = () => {
+      if (drag.current.idx === null) return
+      endDrag(drag.current.idx)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
   }, [items, onReorder])
 
   const startDrag = (e, i) => {
     if (editIdx !== null) return
     e.stopPropagation()
     const y = e.touches[0].clientY
+    drag.current = { on: false, idx: i, startY: y, initialY: y }
+    setActiveIdx(i)
+  }
+
+  const startDragMouse = (e, i) => {
+    if (editIdx !== null) return
+    e.stopPropagation()
+    e.preventDefault()
+    const y = e.clientY
     drag.current = { on: false, idx: i, startY: y, initialY: y }
     setActiveIdx(i)
   }
@@ -4574,7 +4612,8 @@ function SortableList({ items, onReorder, onRemove }) {
         <div key={i}
           onTouchStart={(e) => startDrag(e, i)}
           onTouchEnd={() => endDrag(i)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none' }}>
+          onMouseDown={(e) => startDragMouse(e, i)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px', background: activeIdx === i ? '#ABE73C' : '#f0f0f0', borderRadius: '8px', marginBottom: '6px', boxShadow: activeIdx === i ? '0 4px 14px rgba(0,0,0,0.13)' : 'none', transition: 'box-shadow 0.1s, background 0.1s', touchAction: 'none', userSelect: 'none', cursor: 'grab' }}>
           <span style={{ fontSize: '16px', color: '#bbb', padding: '0 6px', flexShrink: 0 }}>☰</span>
           {editIdx === i ? (
             <div style={{ position: 'relative', flex: 1 }}>
