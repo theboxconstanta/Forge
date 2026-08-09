@@ -2191,7 +2191,7 @@ async function checkInBooking(bookingId, checkedIn) {
 // of matching on the exception's own message text.
 const MEMBERSHIP_COVERAGE_ERROR_CODE = 'FRG01'
 
-function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
+function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, onWodDirtyChange, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
   const [paidUntilEdits, setPaidUntilEdits] = useState({})
@@ -2248,6 +2248,15 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // data (fetchSectionTypes).
   const [wodSections, setWodSections] = useState(() => DEFAULT_NEW_WOD_SECTIONS())
   const [sectionTypes, setSectionTypes] = useState([])
+  // Unsaved-changes guard (mirrors forge-admin-web's EditWorkoutDialog) -
+  // snapshot-ul e "starea curata" cunoscuta (WOD-ul incarcat din DB, sau
+  // sectiunile implicite goale) - se actualizeaza DOAR la incarcare/salvare/
+  // anulare/start-empty, NICIODATA la Generate/Use Template (acolo continutul
+  // proaspat generat trebuie sa ramana "dirty" fata de starea goala de
+  // dinainte, altfel parasirea ecranului imediat dupa Generate n-ar avertiza
+  // deloc, desi exact acolo e riscul cel mai mare de pierdere de continut).
+  const [wodCleanSnapshot, setWodCleanSnapshot] = useState(() => JSON.stringify(DEFAULT_NEW_WOD_SECTIONS()))
+  const isWodDirty = JSON.stringify(wodSections) !== wodCleanSnapshot
 
   const [emailAbonament, setEmailAbonament] = useState('')
   const [_numeAbonament, setNumeAbonament] = useState('')
@@ -3111,6 +3120,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       // logheaza (vizibila in Sentry), fara sa afecteze coach-ul.
       syncWorkoutEngineV2FromLegacyWod(data)
       showToast(sectionLabel ? t.toastSectionSaved(sectionLabel) : (editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin))
+      setWodCleanSnapshot(JSON.stringify(flushed))
       await fetchWods(); onWodChanged?.()
       if (sectionLabel) {
         if (!editWodId) setEditWodId(data.id)
@@ -3129,9 +3139,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // silentioasa de mai jos (cand data aleasa coincide cu un WOD deja
   // existent, fara sa fi apasat explicit "editeaza").
   const syncWodFormFromRow = (w, opts) => {
+    const sections = sectionsFromLegacyWod(w, opts)
     setEditWodId(w.id)
     setDataWod(w.date)
-    setWodSections(sectionsFromLegacyWod(w, opts))
+    setWodSections(sections)
+    setWodCleanSnapshot(JSON.stringify(sections))
   }
 
   const startEditWod = (w) => {
@@ -3168,18 +3180,41 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     if (editWodId) setShowQuickCreate(false)
   }, [editWodId])
 
+  // Browser/PWA close, refresh sau tab-close cat timp exista continut
+  // nesalvat - navigarea IN app (NavBar, alte adminTab-uri) e gestionata
+  // separat mai jos (onWodDirtyChange), fiindca beforeunload nu se declanseaza
+  // pentru schimbari de stare React (Admin nu se demonteaza real la ele).
+  useEffect(() => {
+    if (!isWodDirty) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isWodDirty])
+
+  // Raporteaza starea "dirty" in sus catre App - Admin se demonteaza complet
+  // (fara avertisment) daca userul apasa un tab din NavBar de jos (Home/Log/
+  // etc, vezi `{screen === 'admin' && <Admin .../>}`), spre deosebire de
+  // schimbarea intre sub-tab-urile proprii ale Admin-ului (clienti/wod/...),
+  // care NU demonteaza acest state. App tine ultima valoare intr-un ref
+  // (fara re-render) si intercepteaza taste NavBar cat timp e adevarata.
+  useEffect(() => {
+    onWodDirtyChange?.(isWodDirty)
+  }, [isWodDirty, onWodDirtyChange])
+
   // Reseteaza toate campurile formularului la implicit, FARA sa atinga
   // dataWod si editWodId - folosita de cancelEditWod (care le reseteaza
   // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
   // noua aleasa, nu s-o resetaze la azi).
   const resetWodFormFields = () => {
-    setWodSections(DEFAULT_NEW_WOD_SECTIONS())
+    const blank = DEFAULT_NEW_WOD_SECTIONS()
+    setWodSections(blank)
+    setWodCleanSnapshot(JSON.stringify(blank))
   }
 
   // Quick Create - "Start Empty" intra direct in builder cu sectiunile
   // implicite (identic cu formularul de dinainte de Quick Create).
   const startEmptyWod = () => {
-    setWodSections(DEFAULT_NEW_WOD_SECTIONS())
+    resetWodFormFields()
     setShowQuickCreate(false)
   }
 
@@ -3205,6 +3240,16 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     setEditWodId(null); setDataWod(todayLocalStr())
     resetWodFormFields()
     setShowQuickCreate(true)
+  }
+
+  // "Cancel" din builder - identic ca efect cu cancelEditWod (editare
+  // existenta) sau intoarcerea la Quick Create (WOD nou), dar cere
+  // confirmare intai daca exista continut nesalvat (acelasi tipar ca
+  // stergerea unei serii de clase, vezi window.confirm mai jos in fisier).
+  const requestCancelWod = () => {
+    if (isWodDirty && !window.confirm(t.adminWodDiscardConfirm)) return
+    if (editWodId) cancelEditWod()
+    else setShowQuickCreate(true)
   }
 
   const stergeWod = async (id) => {
@@ -4127,7 +4172,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodDateLabel}</div>
-                <div onClick={editWodId ? cancelEditWod : () => setShowQuickCreate(true)} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
+                <div onClick={requestCancelWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
               </div>
               <input type="date" value={dataWod} onChange={e => {
                 // Schimbarea manuala a datei paraseste orice editare curenta -
@@ -5200,6 +5245,16 @@ function App() {
   const [feedUnread, setFeedUnread] = useState(0)
   const screenRef = useRef('home')
   const prevScreenRef = useRef('home')
+  // Unsaved-changes guard pt builder-ul WOD din Admin - Admin se demonteaza
+  // complet cand `screen` paraseste 'admin' (vezi randarea conditionala mai
+  // jos), asa ca un draft de WOD nesalvat s-ar pierde silentios la un tap pe
+  // NavBar. Ref (nu state) - Admin il actualizeaza foarte des (la fiecare
+  // apasare de tasta din builder) si n-are nevoie sa re-randeze App.
+  const wodDirtyRef = useRef(false)
+  const guardedSetScreen = (next) => {
+    if (screenRef.current === 'admin' && wodDirtyRef.current && !window.confirm(t.adminWodLeaveConfirm)) return
+    setScreen(next)
+  }
   const mainScrollRef = useRef(null)
   const debugTapRef = useRef(0)
   const [wodDeschis, setWodDeschis] = useState(false)
@@ -9624,7 +9679,7 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
-      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
+      {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
       {screen === 'profile' && (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -9931,7 +9986,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={setScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} t={t} />
+      <NavBar screen={screen} setScreen={guardedSetScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} t={t} />
     </div>
   )
 }
