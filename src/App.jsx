@@ -49,6 +49,7 @@ import {
   sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
+import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
 
@@ -2258,6 +2259,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [wodCleanSnapshot, setWodCleanSnapshot] = useState(() => JSON.stringify(DEFAULT_NEW_WOD_SECTIONS()))
   const isWodDirty = JSON.stringify(wodSections) !== wodCleanSnapshot
 
+  // Duplicate/Clone WOD (porta duplicateWorkout.js/forge-admin-web, doar
+  // "Duplicate to..." - vezi comentariul din duplicateWorkout.js). Sheet-ul
+  // e deschis cand duplicateSourceWod !== null.
+  const [duplicateSourceWod, setDuplicateSourceWod] = useState(null)
+  const [duplicateRows, setDuplicateRows] = useState([])
+  const [duplicateSaving, setDuplicateSaving] = useState(false)
+
   const [emailAbonament, setEmailAbonament] = useState('')
   const [_numeAbonament, setNumeAbonament] = useState('')
   const [planSelectat, setPlanSelectat] = useState('')
@@ -3270,6 +3278,44 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     showToast(t.toastWodDeletedAdmin); await fetchWods(); onWodChanged?.()
   }
 
+  // Duplicate/Clone WOD (porta duplicateWorkout.js/forge-admin-web) - vezi
+  // butonul 📋 din lista de WOD-uri mai jos. "Duplicate to..." pe date alese
+  // manual, nu "Copy Week" (vezi comentariul din duplicateWorkout.js).
+  const openDuplicateWod = (w) => { setDuplicateSourceWod(w); setDuplicateRows([]) }
+  const closeDuplicateWod = () => { setDuplicateSourceWod(null); setDuplicateRows([]) }
+
+  const addDuplicateTargetDate = (dateStr) => {
+    // Input nativ <input type="date"> - onChange poate declansa cu o
+    // valoare inca incompleta in timp ce userul tasteaza ziua/luna/anul
+    // (mai ales anul, scris cifra cu cifra) - garda de format complet
+    // (YYYY-MM-DD, an rezonabil) evita adaugarea unui rand cu data
+    // invalida/trunchiata inainte ca userul sa termine de tastat.
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || dateStr.slice(0, 4) < '2000') return
+    if (duplicateRows.some(r => r.targetDate === dateStr)) return
+    const hasExistingWod = wods.some(w => w.date === dateStr)
+    const [option] = resolveTargetDateOptions([dateStr], new Set(hasExistingWod ? [dateStr] : []))
+    setDuplicateRows(prev => [...prev, ...buildDuplicateRows(duplicateSourceWod, [option])])
+  }
+
+  const submitDuplicateWod = async () => {
+    const selected = duplicateRows.filter(r => r.selected)
+    if (!duplicateSourceWod || selected.length === 0) return
+    setDuplicateSaving(true)
+    const sections = sectionsFromLegacyWod(duplicateSourceWod)
+    const payloadBase = legacyPayloadFromSections(sections)
+    let anyError = false
+    for (const row of selected) {
+      const payload = { gym_id: gymId, date: row.targetDate, ...payloadBase }
+      const { data, error } = await supabase.from('wods').upsert(payload, { onConflict: 'gym_id,date' }).select().single()
+      if (error) { anyError = true; console.error(error); continue }
+      syncWorkoutEngineV2FromLegacyWod(data)
+    }
+    setDuplicateSaving(false)
+    showToast(anyError ? t.toastGenericError : t.adminWodDuplicateSuccess(selected.length))
+    await fetchWods(); onWodChanged?.()
+    closeDuplicateWod()
+  }
+
   // M9 Increment 1 - Manual Member Enrollment. Calls admin-add-member (Edge
   // Function, not a plain RPC - members.id/profiles.id both cascade from
   // auth.users, so creating a genuinely new identity requires the Auth
@@ -4230,11 +4276,39 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                   <button onClick={() => startEditWod(w)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>✎</button>
+                  <button onClick={() => openDuplicateWod(w)} title={t.adminWodDuplicateButton} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>📋</button>
                   <button onClick={() => stergeWod(w.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                 </div>
               </div>
             </div>
           ))}
+
+          {duplicateSourceWod && (
+            <BottomSheet onClose={closeDuplicateWod}>
+              <div style={{ padding: '4px 20px 20px' }}>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminWodDuplicateTitle}</div>
+                <div style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
+                  {t.adminWodDuplicateSubtitle(duplicateSourceWod.name || duplicateSourceWod.type, new Date(duplicateSourceWod.date + 'T00:00:00').toLocaleDateString(localeFor(lang)))}
+                </div>
+                <input type="date" onChange={e => { addDuplicateTargetDate(e.target.value); e.target.value = '' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                {duplicateRows.map(row => (
+                  <div key={row.targetDate} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: row.targetHasExistingWod ? '#FCEBEB' : '#f0f0f0', borderRadius: '10px', marginTop: '8px' }}>
+                    <input type="checkbox" checked={row.selected} onChange={() => setDuplicateRows(toggleRowSelected(duplicateRows, row.targetDate))} />
+                    <div style={{ flex: 1, fontSize: '13px', color: '#0E0E0E' }}>
+                      {new Date(row.targetDate + 'T00:00:00').toLocaleDateString(localeFor(lang))}
+                      {row.targetHasExistingWod && <span style={{ color: '#791F1F', marginLeft: '6px' }}>{t.adminWodDuplicateOverwriteWarning}</span>}
+                    </div>
+                    <button onClick={() => setDuplicateRows(removeDuplicateRow(duplicateRows, row.targetDate))} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={submitDuplicateWod} disabled={duplicateSaving || duplicateRows.filter(r => r.selected).length === 0}
+                  style={{ width: '100%', marginTop: '16px', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: (duplicateSaving || duplicateRows.filter(r => r.selected).length === 0) ? 'not-allowed' : 'pointer', opacity: (duplicateSaving || duplicateRows.filter(r => r.selected).length === 0) ? 0.5 : 1 }}>
+                  {duplicateSaving ? t.adminWodSaving : t.adminWodDuplicateSubmit(duplicateRows.filter(r => r.selected).length)}
+                </button>
+              </div>
+            </BottomSheet>
+          )}
         </>
       )}
 
