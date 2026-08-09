@@ -2231,6 +2231,12 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [aiAnalyzing, setAiAnalyzing] = useState(false)
   const [savingWod, setSavingWod] = useState(false)
   const [editWodId, setEditWodId] = useState(null)
+  // Quick Create (30-Second Rule) - poarta afisata inaintea builder-ului
+  // existent la crearea unui WOD nou: paste/type + Generate/Use Template/
+  // Start Empty. Randata DOAR cand nu exista deja un WOD real incarcat
+  // (editWodId null) - editarea unui WOD existent (explicit sau prin
+  // sincronizarea silentioasa de mai jos) sare mereu direct la builder.
+  const [showQuickCreate, setShowQuickCreate] = useState(true)
   // Faza 6 (Native Workout Section Editor) - vezi createSection/
   // sectionsFromLegacyWod/legacyPayloadFromSections/validateSectionsForLegacy
   // (scope de modul, definite langa SectionCard). `wodSections` inlocuieste
@@ -3061,6 +3067,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       // un WOD nou trebuie sa schimbe data sau sa apese "anuleaza" inainte
       // de analiza, nu sa se bazeze pe un reset implicit aici.
       setWodSections(mapped.map((s, i) => ({ ...s, open: true, reviewFlags: flags.filter(f => f.sectionIndex === i) })))
+      setShowQuickCreate(false)
       showToast(t.toastAnalyzeWorkoutSuccess)
     } catch (e) {
       console.error('analyzeWorkout failed:', e)
@@ -3109,6 +3116,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         if (!editWodId) setEditWodId(data.id)
       } else {
         setEditWodId(null); setDataWod(todayLocalStr()); resetWodFormFields()
+        setShowQuickCreate(true)
       }
     }
     setSavingWod(false)
@@ -3153,6 +3161,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataWod, wods, editWodId])
 
+  // Un WOD real incarcat (editWodId setat, explicit sau prin sincronizarea de
+  // mai sus) inseamna ca nu mai suntem in fluxul de creare - inchide Quick
+  // Create si arata builder-ul direct, cu continutul real.
+  useEffect(() => {
+    if (editWodId) setShowQuickCreate(false)
+  }, [editWodId])
+
   // Reseteaza toate campurile formularului la implicit, FARA sa atinga
   // dataWod si editWodId - folosita de cancelEditWod (care le reseteaza
   // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
@@ -3161,9 +3176,35 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     setWodSections(DEFAULT_NEW_WOD_SECTIONS())
   }
 
+  // Quick Create - "Start Empty" intra direct in builder cu sectiunile
+  // implicite (identic cu formularul de dinainte de Quick Create).
+  const startEmptyWod = () => {
+    setWodSections(DEFAULT_NEW_WOD_SECTIONS())
+    setShowQuickCreate(false)
+  }
+
+  // Quick Create - "Use Template" produce un WOD complet, gata de Publish,
+  // FARA sa treaca prin AI (spre deosebire de "Generate Workout") - un
+  // singur template determinist (For Time, 5 runde, exact exemplul din
+  // placeholder-ul casetei de text), aplicat pe toate cele 4 nivele de
+  // scalare (miscari cu greutate corporala, fara greutate prescrisa).
+  const useTemplateWod = () => {
+    const primary = createSection('metcon', true)
+    primary.format = 'RFT'
+    primary.formatConfig = { rounds: 5, timeCapSec: 18 * 60 }
+    primary.open = true
+    const movements = ['10 pull-ups', '15 push-ups', '20 air squats'].map(parseMiscareLinePasta)
+    primary.variants = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [
+      v.key, { movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' },
+    ]))
+    setWodSections([primary])
+    setShowQuickCreate(false)
+  }
+
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(todayLocalStr())
     resetWodFormFields()
+    setShowQuickCreate(true)
   }
 
   const stergeWod = async (id) => {
@@ -4050,28 +4091,43 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {/* WOD */}
       {adminTab === 'wod' && (
         <>
-          {/* "Paste your workout" - apeleaza Edge Function-ul analyze-workout
-              (vezi analyzeWorkout() mai sus), care deocamdata raspunde cu JSON
-              MOCK. Raspunsul e doar afisat in consola - nu atinge inca niciun
-              camp existent din formular, nu schimba fluxul de creare WOD. */}
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.adminWodAiParseLabel}</div>
-            <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
-              placeholder={t.adminWodAiParsePlaceholder} rows={4}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
-            <button onClick={analyzeWorkout} disabled={aiAnalyzing}
-              style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: aiAnalyzing ? 'not-allowed' : 'pointer', opacity: aiAnalyzing ? 0.7 : 1 }}>
-              {aiAnalyzing ? t.adminWodAiParseButtonLoading : t.adminWodAiParseButton}
-            </button>
-          </div>
+          {showQuickCreate ? (
+            // Quick Create (30-Second Rule) - primul ecran vazut la crearea
+            // unui WOD nou: paste/type + Generate/Use Template/Start Empty.
+            // "Generate Workout" refoloseste analyzeWorkout() (acelasi AI
+            // Workout Parser ca inainte, doar mutat aici ca prim pas, nu ca
+            // optiune inline langa builder-ul mereu vizibil) - AI-ul nu e o
+            // feature separata, e doar calea cea mai rapida catre acelasi
+            // DraftWorkout (wodSections) pe care il produce si editarea manuala.
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '20px 16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminWodQuickCreateTitle}</div>
+              <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>{t.adminWodQuickCreateSubtitle}</div>
+              <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
+                placeholder={t.adminWodQuickCreatePlaceholder} rows={8}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none', lineHeight: '1.5' }} />
+              <button onClick={analyzeWorkout} disabled={aiAnalyzing || !aiParseText.trim()}
+                style={{ marginTop: '10px', width: '100%', padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: (aiAnalyzing || !aiParseText.trim()) ? 'not-allowed' : 'pointer', opacity: (aiAnalyzing || !aiParseText.trim()) ? 0.5 : 1 }}>
+                {aiAnalyzing ? t.adminWodQuickCreateGenerateButtonLoading : t.adminWodQuickCreateGenerateButton}
+              </button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <button onClick={useTemplateWod} disabled={aiAnalyzing}
+                  style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: aiAnalyzing ? 'not-allowed' : 'pointer' }}>
+                  {t.adminWodQuickCreateTemplateButton}
+                </button>
+                <button onClick={startEmptyWod} disabled={aiAnalyzing}
+                  style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: aiAnalyzing ? 'not-allowed' : 'pointer' }}>
+                  {t.adminWodQuickCreateEmptyButton}
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '12px', textAlign: 'center' }}>{t.adminWodQuickCreateFooter}</div>
+            </div>
+          ) : (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             {/* Panoul cu data - fix, mereu vizibil, deasupra listei de Workout Sections */}
             <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodDateLabel}</div>
-                {editWodId && (
-                  <div onClick={cancelEditWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
-                )}
+                <div onClick={editWodId ? cancelEditWod : () => setShowQuickCreate(true)} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
               </div>
               <input type="date" value={dataWod} onChange={e => {
                 // Schimbarea manuala a datei paraseste orice editare curenta -
@@ -4114,6 +4170,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               {savingWod ? t.adminWodSaving : editWodId ? t.adminWodSaveEdit : t.adminWodCreateButton}
             </button>
           </div>
+          )}
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminWodListHeader(wods.length)}</div>
           {wods.map(w => (
             <div key={w.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
