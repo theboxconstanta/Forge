@@ -52,6 +52,7 @@ import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
+import { generateVariantsFromRx } from './scalingEngine'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -83,6 +84,27 @@ class ErrorBoundary extends Component {
 
 const VAPID_PUBLIC_KEY = 'BOmGoF0pRvdf35liFRcCqT5XJbS9BE5ZDAkIAmgumLCSDkQSA2KKJ0AkZ9ELnI-GJ62PVYmBb4nOvMot7h7eWQ4'
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+
+// Coach Quick Create Phase 1 (Automatic Variant Generation) - thin wrapper
+// around the new regenerate-variant Edge Function, same
+// fetch+Authorization-header pattern as analyzeWorkout above (no
+// supabase.functions.invoke() precedent in this file). One LLM call, one
+// specific tier only - the caller already knows the section/format, see
+// PrimarySectionBody's regenerateWithAi. No `formatConfig` in the request or
+// response - `wods.format_config` is one value shared by all 4 variants,
+// nothing per-tier to send or apply (same disclosed constraint as
+// forge-admin-web's regenerateVariant.ts).
+async function regenerateVariantApi(request) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch(`${EDGE_BASE}/regenerate-variant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+    body: JSON.stringify(request),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || json.error) throw new Error(json.error || 'regenerate-variant failed')
+  return json
+}
 
 // Fallback inainte ca sala reala sa fie incarcata din DB (userProfile.gym_id
 // -> gyms) sau daca fetch-ul esueaza - vezi myGym mai jos, care e sursa
@@ -865,7 +887,145 @@ function ComposedWorkoutPreview({ section, t }) {
   )
 }
 
+// Rendering for a single scaling variant's editable body (weight/movements/
+// quick-add/paste/notes) - factored out of the old VARIANT_LEVELS.map stack
+// so PrimarySectionBody can render exactly one active tab's variant instead
+// of all four stacked vertically. Behavior/markup unchanged from before the
+// tab-bar conversion (Coach Quick Create Phase 1).
+function VariantEditorBody({ v, sv, section, updateVariant, t }) {
+  return (
+    <div style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
+      <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
+      {['scored', 'mixed'].includes(getFormat(section.format)?.family) ? (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <input value={sv.weight.male} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, male: e.target.value } })}
+            placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+          <input value={sv.weight.female} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, female: e.target.value } })}
+            placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+        </div>
+      ) : (
+        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
+      )}
+      <SortableList
+        items={sv.movements}
+        onReorder={(items) => updateVariant(v.key, { movements: items })}
+        onRemove={(i) => updateVariant(v.key, (cv) => ({ movements: cv.movements.filter((_, j) => j !== i) }))}
+      />
+      <MiscareQuickAdd value={sv.quickAdd} onChange={(val) => updateVariant(v.key, { quickAdd: val })}
+        onAdd={(text) => {
+          // Forma functie (nu obiect simplu) - vezi comentariul din
+          // updateVariant (SectionCard) - MiscareQuickAdd.add() cheama
+          // onAdd si apoi onChange('') (golirea inputului) sincron,
+          // in aceeasi tranzactie; fara forma functie aici, al doilea
+          // apel ar suprascrie miscarea abia adaugata (bug real gasit
+          // in aceeasi sesiune).
+          updateVariant(v.key, (cv) => {
+            const gasita = extractGreutateDinMiscare(text)
+            return {
+              movements: [...cv.movements, text],
+              weight: (cv.weight.male || cv.weight.female) || !gasita ? cv.weight : gasita,
+            }
+          })
+        }}
+        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
+      <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
+        placeholder={t.adminWodVariantPastePlaceholder} rows={3}
+        style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+      {sv.paste.trim() && (
+        <button onClick={() => {
+          const linii = sv.paste.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
+          const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
+          updateVariant(v.key, {
+            movements: [...sv.movements, ...linii], paste: '',
+            weight: (sv.weight.male || sv.weight.female) || !gasita ? sv.weight : gasita,
+          })
+        }}
+          style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
+          {t.adminWodVariantPasteButton}
+        </button>
+      )}
+      <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+      <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
+        placeholder={t.adminWodNotesPlaceholder}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+    </div>
+  )
+}
+
+const REGENERATABLE_TIERS = ['intermediate', 'beginner', 'onramp']
+
+// Coach Quick Create Phase 1 (Automatic Variant Generation) - RX ->
+// Intermediate -> Beginner -> On-Ramp tab bar, replacing the old
+// VARIANT_LEVELS.map flat stack. VariantEditorBody is reused unmodified,
+// one instance per active tab.
+//
+// "Generate Variants" (RX tab only) is the default, instant path
+// (scalingEngine.js, pure/synchronous - fits the 30-second
+// create-to-publish rule by construction). "Regenerate with AI" per
+// non-RX tab is optional and additive (one LLM call, that tab only) -
+// never part of the default path, never touches the other tabs' state.
+// Mirrors forge-admin-web's VariantTabs.tsx (same repo pair as
+// scalingEngine.js/scalingEngine.ts).
+//
+// No new draft/publish state machine here either: this is still just the
+// section's existing `variants` field, covered by the same
+// unsaved-changes guard and single Save action as before - "Publish All
+// Variants" is the existing saveWod/saveSection, unchanged.
 function PrimarySectionBody({ section, onChange, updateVariant, t }) {
+  const [activeTab, setActiveTab] = useState('rx')
+  const [regenerating, setRegenerating] = useState(null)
+  const [regenerateError, setRegenerateError] = useState(null)
+
+  const orderedLevels = [...VARIANT_LEVELS].reverse() // rx, intermediate, beginner, onramp
+  const activeLevel = orderedLevels.find(v => v.key === activeTab) || orderedLevels[0]
+  const rxHasMovements = section.variants.rx.movements.length > 0
+
+  const generateVariants = () => {
+    const rx = section.variants.rx
+    const generated = generateVariantsFromRx({
+      movements: rx.movements, weight: rx.weight, note: rx.note,
+      format: section.format || '', formatConfig: section.formatConfig,
+    })
+    // generated.<tier>.formatConfig (o ajustare de time-cap per-tier) nu se
+    // aplica deliberat aici - wods.format_config e o singura valoare
+    // comuna tuturor celor 4 variante (section.formatConfig, un singur
+    // camp, nu unul per nivel de scalare), deci nu exista un slot per-tier
+    // in care sa fie salvata azi. Engine-ul tot o calculeaza si o
+    // testeaza (scalingEngine.test.js) fiindca e corecta independent si ar
+    // putea sta la baza unei viitoare sugestii de time-cap - doar ca nu e
+    // inca persistata (acelasi compromis disclosed ca in forge-admin-web).
+    onChange((s) => ({
+      variants: {
+        ...s.variants,
+        intermediate: { ...s.variants.intermediate, movements: generated.intermediate.movements, weight: generated.intermediate.weight },
+        beginner: { ...s.variants.beginner, movements: generated.beginner.movements, weight: generated.beginner.weight },
+        onramp: { ...s.variants.onramp, movements: generated.onramp.movements, weight: generated.onramp.weight },
+      },
+    }))
+  }
+
+  const regenerateWithAi = async (tier) => {
+    if (regenerating) return
+    setRegenerating(tier)
+    setRegenerateError(null)
+    try {
+      const rx = section.variants.rx
+      const result = await regenerateVariantApi({
+        rxSection: { movements: rx.movements, weight: rx.weight, note: rx.note, format: section.format || '' },
+        targetTier: tier,
+      })
+      onChange((s) => ({
+        variants: { ...s.variants, [tier]: { ...s.variants[tier], movements: result.movements, weight: result.weight, note: result.note } },
+      }))
+    } catch (e) {
+      console.error('regenerateVariant failed:', e)
+      setRegenerateError(t.adminWodRegenerateAiError)
+    }
+    setRegenerating(null)
+  }
+
   return (
     <div>
       <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
@@ -898,68 +1058,48 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
       <ComposedWorkoutPreview section={section} t={t} />
-      {VARIANT_LEVELS.map(v => {
-        const sv = section.variants[v.key]
-        return (
-          <div key={v.key} style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-            {['scored', 'mixed'].includes(getFormat(section.format)?.family) ? (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input value={sv.weight.male} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, male: e.target.value } })}
-                  placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
-                  style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-                <input value={sv.weight.female} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, female: e.target.value } })}
-                  placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
-                  style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-              </div>
-            ) : (
-              <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
-            )}
-            <SortableList
-              items={sv.movements}
-              onReorder={(items) => updateVariant(v.key, { movements: items })}
-              onRemove={(i) => updateVariant(v.key, (cv) => ({ movements: cv.movements.filter((_, j) => j !== i) }))}
-            />
-            <MiscareQuickAdd value={sv.quickAdd} onChange={(val) => updateVariant(v.key, { quickAdd: val })}
-              onAdd={(text) => {
-                // Forma functie (nu obiect simplu) - vezi comentariul din
-                // updateVariant (SectionCard) - MiscareQuickAdd.add() cheama
-                // onAdd si apoi onChange('') (golirea inputului) sincron,
-                // in aceeasi tranzactie; fara forma functie aici, al doilea
-                // apel ar suprascrie miscarea abia adaugata (bug real gasit
-                // in aceeasi sesiune).
-                updateVariant(v.key, (cv) => {
-                  const gasita = extractGreutateDinMiscare(text)
-                  return {
-                    movements: [...cv.movements, text],
-                    weight: (cv.weight.male || cv.weight.female) || !gasita ? cv.weight : gasita,
-                  }
-                })
-              }}
-              placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
-            <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
-              placeholder={t.adminWodVariantPastePlaceholder} rows={3}
-              style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
-            {sv.paste.trim() && (
-              <button onClick={() => {
-                const linii = sv.paste.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
-                const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
-                updateVariant(v.key, {
-                  movements: [...sv.movements, ...linii], paste: '',
-                  weight: (sv.weight.male || sv.weight.female) || !gasita ? sv.weight : gasita,
-                })
-              }}
-                style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-                {t.adminWodVariantPasteButton}
-              </button>
-            )}
-            <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-            <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
-              placeholder={t.adminWodNotesPlaceholder}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-          </div>
-        )
-      })}
+
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #e0e0e0', marginBottom: '10px' }}>
+        {orderedLevels.map(v => (
+          <button key={v.key} onClick={() => setActiveTab(v.key)}
+            style={{
+              padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '600',
+              color: activeTab === v.key ? '#0E0E0E' : '#999',
+              borderBottom: activeTab === v.key ? '2px solid #0E0E0E' : '2px solid transparent',
+              marginBottom: '-1px',
+            }}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'rx' && (
+        <div style={{ marginBottom: '10px' }}>
+          <button onClick={generateVariants} disabled={!rxHasMovements}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: 'none', background: rxHasMovements ? '#0E0E0E' : '#ccc', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: rxHasMovements ? 'pointer' : 'not-allowed' }}>
+            {t.adminWodGenerateVariantsButton}
+          </button>
+          {!rxHasMovements && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{t.adminWodGenerateVariantsHint}</div>}
+        </div>
+      )}
+
+      {regenerateError && (
+        <div style={{ background: '#FCEBEB', border: '1px solid #f0c0c0', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', fontSize: '12px', color: '#8A2020' }}>
+          {regenerateError}
+        </div>
+      )}
+
+      {REGENERATABLE_TIERS.includes(activeTab) && (
+        <div style={{ marginBottom: '10px' }}>
+          <button onClick={() => regenerateWithAi(activeTab)} disabled={!rxHasMovements || regenerating !== null}
+            style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '12px', fontWeight: '600', color: '#555', cursor: (!rxHasMovements || regenerating !== null) ? 'not-allowed' : 'pointer', opacity: (!rxHasMovements || regenerating !== null) ? 0.6 : 1 }}>
+            {regenerating === activeTab ? t.adminWodRegenerateAiButtonLoading : t.adminWodRegenerateAiButton}
+          </button>
+        </div>
+      )}
+
+      <VariantEditorBody v={activeLevel} sv={section.variants[activeTab]} section={section} updateVariant={updateVariant} t={t} />
     </div>
   )
 }
@@ -6039,6 +6179,22 @@ function App() {
     if (user && userProfile?.gym_id) fetchWodZiWorkoutV2(dataAcasa)
   }, [dataAcasa, userProfile?.gym_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Coach Quick Create Phase 1 - Usual Level e un DEFAULT moale (preferinta),
+  // niciodata o restrictie: cand WOD-ul zilei se incarca si membrul inca n-a
+  // ales manual o varianta in aceasta sesiune (variantaAleasa === null),
+  // pre-selecteaza automat varianta din userProfile.usual_level. Membrul tot
+  // poate schimba varianta oricand inainte de logare (click pe alt card mai
+  // jos, exact ca inainte) - variantaAleasa ramane sursa de adevar pt ce se
+  // logheaza (Mixed Categories neatins), acest efect doar seteaza starea
+  // initiala. Nu ruleaza deloc daca membrul a ales deja ceva (variantaAleasa
+  // !== null) - nu suprascrie o alegere manuala facuta intre timp.
+  useEffect(() => {
+    if (variantaAleasa !== null) return
+    if (!wodZiData || !userProfile?.usual_level) return
+    const idx = VARIANTE_WEIGHT_BASE.findIndex(v => v.key === userProfile.usual_level)
+    if (idx !== -1) setVariantaAleasa(idx)
+  }, [wodZiData, userProfile?.usual_level])
+
   useEffect(() => {
     if (!user || claseDB.length === 0) return
     const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
@@ -6270,7 +6426,11 @@ function App() {
     // efect async pornit in acelasi tick, care ar putea sa nu fi ajuns inca
     // la raspuns cand se evalueaza ramura de mai jos).
     const [{ data: profileRow }, { data: memberRow }, { data: adminRow }] = await Promise.all([
-      supabase.from('profiles').select('gym_id, waiver_accepted, waiver_accepted_at').eq('id', user.id).maybeSingle(),
+      // usual_level (Coach Quick Create Phase 1) e gym-scoped (o preferinta de
+      // workout consumata strict in Programming), deci sta pe profiles, alaturi
+      // de gym_id - NU pe members (deliberat gym-independent, vezi comentariul
+      // de mai sus despre identitate).
+      supabase.from('profiles').select('gym_id, waiver_accepted, waiver_accepted_at, usual_level').eq('id', user.id).maybeSingle(),
       supabase.from('members').select('id, email, full_name, avatar_url, created_at, gender, first_name, last_name, birth_date, weight_unit, language').eq('id', user.id).maybeSingle(),
       supabase.from('admins').select('id').eq('id', user.id).maybeSingle(),
     ])
@@ -6279,6 +6439,7 @@ function App() {
       gym_id: profileRow.gym_id,
       waiver_accepted: profileRow.waiver_accepted,
       waiver_accepted_at: profileRow.waiver_accepted_at,
+      usual_level: profileRow.usual_level,
     } : null
     setUserProfile(data)
     // Blocare acces sala (neplata catre platforma) - gyms_select_public
@@ -6531,6 +6692,18 @@ function App() {
     setUserProfile(prev => prev ? { ...prev, language: newLang } : prev)
     const { error } = await supabase.from('members').update({ language: newLang }).eq('id', user.id)
     if (error) { showToast(t.toastLanguageSaveError); console.error(error) }
+  }
+
+  // Coach Quick Create Phase 1 - self-service Usual Level (spre deosebire de
+  // weight_unit/language, sta pe profiles nu pe members, vezi fetchUserProfile
+  // mai sus) - un DEFAULT moale (preferinta), niciodata o restrictie: doar
+  // pre-selecteaza varianta pe Home la incarcare (vezi efectul de langa
+  // fetchWodZi), membrul poate oricand alege alta varianta inainte de logare.
+  const changeUsualLevel = async (val) => {
+    if (val === (userProfile?.usual_level || null)) return
+    setUserProfile(prev => prev ? { ...prev, usual_level: val } : prev)
+    const { error } = await supabase.from('profiles').update({ usual_level: val }).eq('id', user.id)
+    if (error) { showToast(t.toastProfileSaveError); console.error(error) }
   }
 
   const changeMyPassword = async () => {
@@ -9837,6 +10010,22 @@ function App() {
                     style={{ flex: 1, padding: '16px 14px', borderRadius: '16px', border: `2px solid ${active ? '#0E0E0E' : '#e0e0e0'}`, background: active ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                     <div style={{ fontSize: '15px', fontWeight: '600', color: active ? '#ABE73C' : '#888', textTransform: 'uppercase' }}>{u.val}</div>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: active ? '#ABE73C' : '#888', marginTop: '2px' }}>{u.label}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.profileUsualLevelTitle}</div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{t.profileUsualLevelSubtitle}</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {VARIANTE_WEIGHT_BASE.map(v => {
+                const active = (userProfile?.usual_level || null) === v.key
+                return (
+                  <div key={v.key} onClick={() => changeUsualLevel(v.key)}
+                    style={{ flex: '1 1 auto', minWidth: '80px', padding: '12px 10px', borderRadius: '14px', border: `2px solid ${active ? '#0E0E0E' : '#e0e0e0'}`, background: active ? '#0E0E0E' : '#fafafa', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: active ? '#ABE73C' : '#888' }}>{v.nivel}</div>
                   </div>
                 )
               })}
