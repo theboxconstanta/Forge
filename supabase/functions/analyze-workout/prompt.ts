@@ -79,7 +79,19 @@ const PARAMETER_RULES = `
 const BENCHMARK_GUIDANCE = `
 Cateva WOD-uri sunt cunoscute ("Girls" si Hero WODs, ex. Fran, Grace, Helen, Annie, Cindy, Karen, Nancy, Diane, Elizabeth, Isabel, Jackie, Murph, DT, Randy, Michael) - daca titlul/textul numeste clar unul dintre ele SI nu contrazice structura standard cunoscuta, completeaza campurile sectiunii (format/movements/scoreType etc.) cu structura standard prescrisa a acelui WOD, si seteaza benchmarkMetadata: { name: "<numele exact>", isBenchmark: true, isHero: <true pt Hero WODs> }. DACA textul contine o varianta EVIDENT modificata (alte miscari, alte reps, alta greutate) fata de structura standard, foloseste STRICT ce scrie in text, nu structura standard - textul scris de coach are mereu prioritate fata de ce "ar trebui" sa fie WOD-ul. Pt sectiunile care NU sunt un benchmark cunoscut: benchmarkMetadata: { name: null, isBenchmark: false, isHero: false }.`.trim()
 
-export const SYSTEM_PROMPT = `Esti un antrenor CrossFit expert care analizeaza un antrenament (WOD) lipit de un coach si il transforma intr-un array ordonat de sectiuni, conform schemei JSON impuse.
+// Coach Quick Create Phase 2 (Movement Catalog Consolidation) - the
+// prompt is now built per-request so a gym's own `movements` (name +
+// aliases, seen only by that gym's coaches) can be appended to the
+// canonical-movements block for THIS request only, without baking gym
+// data into a module-level constant shared across every gym. Called with
+// no argument (or []), buildSystemPrompt() produces exactly the prompt
+// this file always had - SYSTEM_PROMPT below stays as a stable default
+// export for any caller that doesn't need gym context.
+export function buildSystemPrompt(extraMovementNames: string[] = []): string {
+  const gymMovementsBlock = extraMovementNames.length
+    ? `\n\nMiscari suplimentare, specifice acestei sali (foloseste-le si pe astea pt "canonicalName" cand se potrivesc, la fel ca lista principala de mai sus):\n${extraMovementNames.join(', ')}`
+    : ''
+  return `Esti un antrenor CrossFit expert care analizeaza un antrenament (WOD) lipit de un coach si il transforma intr-un array ordonat de sectiuni, conform schemei JSON impuse.
 
 Formate cunoscute (camp "format" pe sectiunea cu munca principala - alege exact unul din aceste nume, foloseste "Unrecognized" doar daca textul chiar nu se incadreaza in niciunul):
 ${FORMAT_HINTS}
@@ -97,7 +109,7 @@ WOD-uri cunoscute (benchmark/hero):
 ${BENCHMARK_GUIDANCE}
 
 Miscari canonice cunoscute (camp "canonicalName" pe fiecare miscare detectata - potriveste EXACT unul din numele astea daca textul se refera clar la o miscare din lista, altfel foloseste null; nu inventa o potrivire aproximativa):
-${CANONICAL_MOVEMENTS.join(', ')}
+${CANONICAL_MOVEMENTS.join(', ')}${gymMovementsBlock}
 
 Abrevieri/prescurtari uzuale in CrossFit (foloseste-le pt "canonicalName" cand "name" e scris prescurtat - name ramane textul original/prescurtat, doar canonicalName devine forma completa):
 ${Object.entries(MOVEMENT_ALIASES).map(([abbr, full]) => `${abbr.toUpperCase()} -> ${full}`).join(', ')}
@@ -109,3 +121,6 @@ Reguli:
 - "scalingVersions" (pe fiecare sectiune) contine DOAR variantele care apar explicit in text pt ACEA sectiune (RX/Intermediate/Beginner/Masters/etc, orice nume foloseste textul) - nu genera variante care nu sunt mentionate. "level" e text liber, lowercase, cu underscore (ex. "on_ramp"), nu doar RX/Intermediate/Beginner.
 - "title" (la nivelul intregului WOD, nu al unei sectiuni) e numele antrenamentului daca apare explicit (ex. "Fran", "Monday Metcon") - null daca nu are nume.
 - Raspunde DOAR cu date derivate din textul dat - nu copia exemple din acest prompt.`
+}
+
+export const SYSTEM_PROMPT = buildSystemPrompt()

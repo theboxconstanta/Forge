@@ -8,7 +8,7 @@
 // `admins`/`coaches`, acelasi tipar ca admin-remove-member.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { WORKOUT_ANALYSIS_JSON_SCHEMA } from "./openaiSchema.ts";
-import { SYSTEM_PROMPT } from "./prompt.ts";
+import { buildSystemPrompt } from "./prompt.ts";
 import { toWorkoutAnalysis, validateWorkoutAnalysis } from "./transform.ts";
 import { matchBenchmark } from "./benchmarks.ts";
 import { CORS, OpenAiHttpError, callOpenAiWithRetry, errorResponse } from "../_shared/openai.ts";
@@ -38,6 +38,10 @@ Deno.serve(async (req) => {
     if (!workout || typeof workout !== "string" || !workout.trim()) {
       return errorResponse(400, "Lipsește textul antrenamentului");
     }
+    // Coach Quick Create Phase 2 (Movement Catalog Consolidation) - optional,
+    // backward compatible: a caller that doesn't send gymId gets exactly the
+    // pre-Phase-2 prompt (buildSystemPrompt([])).
+    const gymId = typeof body?.gymId === "string" ? body.gymId : null;
 
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data: { user: caller }, error: callerErr } = await anonClient.auth.getUser(token);
@@ -70,12 +74,25 @@ Deno.serve(async (req) => {
       return errorResponse(500, "Configurare server incompletă (cheie AI lipsă)");
     }
 
+    // Coach Quick Create Phase 2 - gym-scoped + platform-global movement
+    // names appended to the prompt for THIS request only (see
+    // buildSystemPrompt in prompt.ts). Best-effort: a query failure here
+    // degrades to the static-only prompt, never blocks analysis.
+    let gymMovementNames: string[] = [];
+    if (gymId) {
+      const { data: movementRows } = await admin
+        .from("movements")
+        .select("name")
+        .or(`gym_id.eq.${gymId},gym_id.is.null`);
+      gymMovementNames = (movementRows ?? []).map((m: { name: string }) => m.name);
+    }
+
     let raw: any;
     try {
       raw = await callOpenAiWithRetry({
         apiKey: OPENAI_API_KEY!,
         model: OPENAI_MODEL,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: buildSystemPrompt(gymMovementNames),
         userContent: workout,
         schemaName: "workout_analysis",
         jsonSchema: WORKOUT_ANALYSIS_JSON_SCHEMA,

@@ -224,6 +224,22 @@ export function adjustFormatConfigForTier(format, config, tier) {
   return next
 }
 
+/**
+ * Coach Quick Create Phase 2 (Movement Catalog Consolidation) - folds a
+ * gym's own `movements` rows (movementsApi.js) into the `overrides` shape
+ * generateVariantsFromRx already accepts. A movement with no
+ * default_substitutions set contributes nothing here and falls through to
+ * SCALING_SUBSTITUTIONS/defaultLoadRatio exactly as before - purely
+ * additive, zero behavior change for movements without a DB entry.
+ */
+export function buildScalingOverrides(movements) {
+  const overrides = {}
+  for (const m of movements || []) {
+    if (m.default_substitutions) overrides[m.name] = m.default_substitutions
+  }
+  return overrides
+}
+
 /** Pure. Never mutates `rx`; never touches Supabase. */
 export function generateVariantsFromRx(rx, overrides) {
   const tiers = ['intermediate', 'beginner', 'onramp']

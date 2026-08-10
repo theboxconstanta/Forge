@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scaleMovementLine, generateVariantsFromRx, adjustFormatConfigForTier, TIER_RULES } from './scalingEngine'
+import { scaleMovementLine, generateVariantsFromRx, adjustFormatConfigForTier, buildScalingOverrides, TIER_RULES } from './scalingEngine'
 
 describe('scaleMovementLine', () => {
   it('reduces a rep scheme by the tier volume percentage, preserving the dash-separated shape', () => {
@@ -112,5 +112,27 @@ describe('TIER_RULES', () => {
     expect(TIER_RULES.beginner.volumeReductionPct).toBeGreaterThan(TIER_RULES.intermediate.volumeReductionPct)
     expect(TIER_RULES.onramp.defaultLoadRatio).toBeLessThan(TIER_RULES.beginner.defaultLoadRatio)
     expect(TIER_RULES.beginner.defaultLoadRatio).toBeLessThan(TIER_RULES.intermediate.defaultLoadRatio)
+  })
+})
+
+describe('buildScalingOverrides', () => {
+  it('includes only movements with a default_substitutions entry', () => {
+    const overrides = buildScalingOverrides([
+      { name: 'Bulgarian Bag Swing', default_substitutions: { onramp: { loadStrategy: 'bodyweight' } } },
+      { name: 'Sandbag Bear Hug Carry', default_substitutions: null },
+    ])
+    expect(Object.keys(overrides)).toEqual(['Bulgarian Bag Swing'])
+  })
+
+  it('returns an empty table for an empty or missing list', () => {
+    expect(buildScalingOverrides([])).toEqual({})
+    expect(buildScalingOverrides(undefined)).toEqual({})
+  })
+
+  it('a DB override for a movement already in SCALING_SUBSTITUTIONS takes precedence over the static entry', () => {
+    const overrides = buildScalingOverrides([
+      { name: 'Deadlift', default_substitutions: { onramp: { loadStrategy: 'bodyweight', substituteName: 'Good Mornings' } } },
+    ])
+    expect(scaleMovementLine('10 Deadlifts @ 100kg', 'onramp', overrides)).toBe('7 Good Mornings')
   })
 })

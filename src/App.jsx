@@ -52,7 +52,8 @@ import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
-import { generateVariantsFromRx } from './scalingEngine'
+import { generateVariantsFromRx, buildScalingOverrides } from './scalingEngine'
+import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError } from './movementsApi'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -767,7 +768,44 @@ function CautareMiscare({ onAleage, preFill, t, label }) {
 // singura data prin Greutate M/F (per varianta), nu per miscare; celelalte
 // utilizari (logare libera, editare log, Hero WOD) n-au un echivalent de
 // greutate la nivel de WOD, deci pastreaza campul de greutate per miscare.
-function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, hideWeight }) {
+// Coach Quick Create Phase 2 - "+ Create New Movement", offered only when
+// the last word of the quick-add value doesn't match anything in the
+// static list or this gym's own catalog. Mirrors forge-admin-web's own
+// CreateMovementRow (FormatConfigEditor.tsx) exactly, adapted to this
+// file's plain-prop (not Context) catalog wiring - see movementCatalog
+// (Admin component) and MiscareQuickAdd's new `catalog` prop below.
+function CreateMiscareRow({ candidate, catalog, t }) {
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState(null)
+  const [created, setCreated] = useState(null)
+
+  const trimmed = candidate.trim().split(/\s+/).pop() || ''
+  if (!catalog || trimmed.length < 2) return null
+  if (created && created.toLowerCase() === trimmed.toLowerCase()) {
+    return <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t.adminWodCreateMovementSuccess(trimmed)}</div>
+  }
+  const alreadyExists = catalog.suggestions(trimmed).some(s => s.toLowerCase() === trimmed.toLowerCase())
+  if (alreadyExists) return null
+
+  return (
+    <div style={{ marginTop: '4px' }}>
+      <button type="button" disabled={creating}
+        onClick={async () => {
+          setCreating(true); setError(null)
+          const result = await catalog.createMovement(trimmed)
+          setCreating(false)
+          if (result.ok) setCreated(trimmed)
+          else setError(result.error)
+        }}
+        style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: '600', color: '#888', textDecoration: 'underline', cursor: creating ? 'default' : 'pointer', opacity: creating ? 0.6 : 1 }}>
+        {creating ? t.adminWodCreateMovementButtonLoading : t.adminWodCreateMovementButton(trimmed)}
+      </button>
+      {error && <div style={{ fontSize: '11px', color: '#B91C1C', marginTop: '2px' }}>{error}</div>}
+    </div>
+  )
+}
+
+function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, hideWeight, catalog }) {
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
   const [metri, setMetri] = useState('')
@@ -782,7 +820,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
   // Dupa ce alegi o sugestie, nu o mai arata din nou ca sugestie (altfel
   // ramane vizibila peste casutele de reps/greutate) - dispare de indata ce
   // userul mai scrie ceva in campul de miscare.
-  const sugestii = justSelected ? [] : miscareSugestii(value)
+  const sugestii = justSelected ? [] : (catalog ? catalog.suggestions(value) : miscareSugestii(value))
   const compose = (movementName) => {
     const parts = []
     if (isCardio) {
@@ -861,6 +899,7 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
           style={{ padding: '10px 14px', borderRadius: '10px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '20px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>+</button>
       </div>
       <MovementSuggestions suggestions={sugestii} onSelect={alege} rightOffset="46px" />
+      {!justSelected && value.trim() && <CreateMiscareRow candidate={value} catalog={catalog} t={t} />}
     </div>
   )
 }
@@ -892,7 +931,7 @@ function ComposedWorkoutPreview({ section, t }) {
 // so PrimarySectionBody can render exactly one active tab's variant instead
 // of all four stacked vertically. Behavior/markup unchanged from before the
 // tab-bar conversion (Coach Quick Create Phase 1).
-function VariantEditorBody({ v, sv, section, updateVariant, t }) {
+function VariantEditorBody({ v, sv, section, updateVariant, movementCatalog, t }) {
   return (
     <div style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
@@ -929,7 +968,7 @@ function VariantEditorBody({ v, sv, section, updateVariant, t }) {
             }
           })
         }}
-        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight />
+        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight catalog={movementCatalog} />
       <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
         placeholder={t.adminWodVariantPastePlaceholder} rows={3}
         style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
@@ -973,7 +1012,7 @@ const REGENERATABLE_TIERS = ['intermediate', 'beginner', 'onramp']
 // section's existing `variants` field, covered by the same
 // unsaved-changes guard and single Save action as before - "Publish All
 // Variants" is the existing saveWod/saveSection, unchanged.
-function PrimarySectionBody({ section, onChange, updateVariant, t }) {
+function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog, t }) {
   const [activeTab, setActiveTab] = useState('rx')
   const [regenerating, setRegenerating] = useState(null)
   const [regenerateError, setRegenerateError] = useState(null)
@@ -984,10 +1023,15 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
 
   const generateVariants = () => {
     const rx = section.variants.rx
+    // Coach Quick Create Phase 2 - gym-created movements with a
+    // default_substitutions entry (movementsApi.js) take precedence over
+    // the static SCALING_SUBSTITUTIONS table via generateVariantsFromRx's
+    // overrides param; movements with no DB entry fall through to the
+    // static table exactly as before (zero behavior change for those).
     const generated = generateVariantsFromRx({
       movements: rx.movements, weight: rx.weight, note: rx.note,
       format: section.format || '', formatConfig: section.formatConfig,
-    })
+    }, buildScalingOverrides(movementCatalog?.movements || []))
     // generated.<tier>.formatConfig (o ajustare de time-cap per-tier) nu se
     // aplica deliberat aici - wods.format_config e o singura valoare
     // comuna tuturor celor 4 variante (section.formatConfig, un singur
@@ -1015,6 +1059,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
       const result = await regenerateVariantApi({
         rxSection: { movements: rx.movements, weight: rx.weight, note: rx.note, format: section.format || '' },
         targetTier: tier,
+        gymMovementContext: (movementCatalog?.movements || []).map(m => m.name),
       })
       onChange((s) => ({
         variants: { ...s.variants, [tier]: { ...s.variants[tier], movements: result.movements, weight: result.weight, note: result.note } },
@@ -1099,7 +1144,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, t }) {
         </div>
       )}
 
-      <VariantEditorBody v={activeLevel} sv={section.variants[activeTab]} section={section} updateVariant={updateVariant} t={t} />
+      <VariantEditorBody v={activeLevel} sv={section.variants[activeTab]} section={section} updateVariant={updateVariant} movementCatalog={movementCatalog} t={t} />
     </div>
   )
 }
@@ -1141,7 +1186,7 @@ function ReviewFlagsList({ flags, t }) {
   )
 }
 
-function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, onMove, onMakePrimary, onSave, savingWod, t }) {
+function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, onMove, onMakePrimary, onSave, savingWod, movementCatalog, t }) {
   // `patch` poate fi un obiect simplu SAU o functie `(variantaCurenta) =>
   // patch` - vezi comentariul din updateSection (App()) pentru motiv (doi
   // handlere onChange declansati sincron, al doilea trebuie sa vada
@@ -1196,7 +1241,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
               placeholder={t.adminWodWarmupPlaceholder} rows={3}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
           ) : section.isPrimary ? (
-            <PrimarySectionBody section={section} onChange={onChange} updateVariant={updateVariant} t={t} />
+            <PrimarySectionBody section={section} onChange={onChange} updateVariant={updateVariant} movementCatalog={movementCatalog} t={t} />
           ) : (
             <>
               <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
@@ -2340,6 +2385,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [generatingSignupCode, setGeneratingSignupCode] = useState(false)
   const [clase, setClase] = useState([])
   const [wods, setWods] = useState([])
+  // Coach Quick Create Phase 2 (Movement Catalog Consolidation) - this
+  // gym's own catalog rows + the platform-global tier, fetched once on
+  // mount (mirrors forge-admin-web's MovementCatalogProvider). Feeds
+  // autocomplete (movementCatalog.suggestions below), deterministic
+  // scaling overrides (buildScalingOverrides, PrimarySectionBody), and
+  // Regenerate-with-AI's gymMovementContext.
+  const [gymMovements, setGymMovements] = useState([])
   const [clienti, setClienti] = useState([])
   const [planuri, setPlanuri] = useState([])
   const [abonamente, setAbonamente] = useState([])
@@ -2480,7 +2532,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // lista in sine (nume/email, profiles_select_all e deja RLS-open oricui) e folosita si de
     // adminAdaugaInClasa/adminScoateDinClasa (cautare membru + notificari) din tab-ul Clase,
     // accesibil coach-ului. Fara asta, "Adauga manual" nu gasea pe nimeni pentru un coach.
-    fetchClase(); fetchWods(); fetchSectionTypes()
+    fetchClase(); fetchWods(); fetchSectionTypes(); if (gymId) fetchMovements()
     if (isAdmin) { fetchPlanuri(); fetchSettingsAdmin(); fetchCoaches() }
   }, [])
   // fetchClienti/fetchAbonamente reruleaza si la fetch-ul initial (token-urile
@@ -2544,6 +2596,44 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const { data } = await supabase.from('wods').select('*').order('date', { ascending: false })
     if (data) setWods(data)
   }
+
+  const fetchMovements = async () => {
+    try {
+      const rows = await fetchMovementsForGym(gymId)
+      setGymMovements(rows)
+    } catch {
+      // Autocomplete/scaling-override data only - a fetch failure degrades
+      // silently to the static MISCARI list, never blocks the WOD editor.
+    }
+  }
+
+  // Mirrors forge-admin-web's MovementCatalogProvider value shape
+  // (suggestions/createMovement) - passed as a plain prop here instead of
+  // a Context, since this file's own top-level-state pattern (Admin
+  // already holds ~40 useState pairs) doesn't need a Provider indirection
+  // for a single call site (PrimarySectionBody's MiscareQuickAdd).
+  const movementCatalog = useMemo(() => {
+    const names = Array.from(new Set([...MISCARI, ...gymMovements.map(m => m.name)]))
+    return {
+      suggestions: (text) => {
+        const word = text.trim().split(/\s+/).pop()
+        if (!word || word.length < 2) return []
+        const lower = word.toLowerCase()
+        return names.filter(m => m.toLowerCase().includes(lower)).slice(0, 5)
+      },
+      createMovement: async (name) => {
+        try {
+          const row = await createMovementApi(gymId, { name })
+          setGymMovements(prev => [...prev, row])
+          return { ok: true }
+        } catch (err) {
+          if (err instanceof DuplicateMovementError) return { ok: false, error: err.message }
+          return { ok: false, error: err instanceof Error ? err.message : t.toastGenericError }
+        }
+      },
+      movements: gymMovements,
+    }
+  }, [gymId, gymMovements, t])
 
   // Faza 6 - catalogul de tipuri de sectiune (Faza 0, workout_section_types),
   // folosit de selectorul de tip din SectionCard/AddSectionControl. Doar
@@ -3205,7 +3295,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       const res = await fetch(`${EDGE_BASE}/analyze-workout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ workout: aiParseText }),
+        body: JSON.stringify({ workout: aiParseText, gymId }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json.error) throw new Error(json.error || t.toastGenericError)
