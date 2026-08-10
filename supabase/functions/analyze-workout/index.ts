@@ -11,6 +11,7 @@ import { WORKOUT_ANALYSIS_JSON_SCHEMA } from "./openaiSchema.ts";
 import { SYSTEM_PROMPT } from "./prompt.ts";
 import { toWorkoutAnalysis, validateWorkoutAnalysis } from "./transform.ts";
 import { matchBenchmark } from "./benchmarks.ts";
+import { CORS, OpenAiHttpError, callOpenAiWithRetry, errorResponse } from "../_shared/openai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -23,86 +24,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // ieftin/rapid decat gpt-5 pt un task sincron "click si astepti raspunsul").
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
-
-const OPENAI_TIMEOUT_MS = 45_000;
-const OPENAI_RETRY_DELAY_MS = 800;
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-function errorResponse(status: number, message: string) {
-  return new Response(JSON.stringify({ error: message }), { status, headers: CORS });
-}
-
-class OpenAiHttpError extends Error {
-  status: number;
-  body: string;
-  constructor(status: number, body: string) {
-    super(`OpenAI HTTP ${status}`);
-    this.status = status;
-    this.body = body;
-  }
-}
-
-async function callOpenAiOnce(workout: string, signal: AbortSignal) {
-  return fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    signal,
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      reasoning: { effort: "low" },
-      store: false,
-      input: [
-        { role: "developer", content: SYSTEM_PROMPT },
-        { role: "user", content: workout },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "workout_analysis",
-          strict: true,
-          schema: WORKOUT_ANALYSIS_JSON_SCHEMA,
-        },
-      },
-    }),
-  });
-}
-
-// O singura reincercare, doar pt erori tranzitorii (429/5xx sau
-// timeout/retea) - nu si pt erori 4xx (cerere invalida, nu se rezolva
-// reincercand aceeasi cerere).
-async function callOpenAiWithRetry(workout: string): Promise<any> {
-  for (let attempt = 0; ; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
-    try {
-      const res = await callOpenAiOnce(workout, controller.signal);
-      if (res.ok) return await res.json();
-      const responseBody = await res.text();
-      const retryable = res.status === 429 || res.status >= 500;
-      if (retryable && attempt === 0) {
-        await new Promise((r) => setTimeout(r, OPENAI_RETRY_DELAY_MS));
-        continue;
-      }
-      throw new OpenAiHttpError(res.status, responseBody);
-    } catch (err) {
-      if (err instanceof OpenAiHttpError) throw err;
-      if (attempt === 0) {
-        await new Promise((r) => setTimeout(r, OPENAI_RETRY_DELAY_MS));
-        continue;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -151,7 +72,14 @@ Deno.serve(async (req) => {
 
     let raw: any;
     try {
-      raw = await callOpenAiWithRetry(workout);
+      raw = await callOpenAiWithRetry({
+        apiKey: OPENAI_API_KEY!,
+        model: OPENAI_MODEL,
+        systemPrompt: SYSTEM_PROMPT,
+        userContent: workout,
+        schemaName: "workout_analysis",
+        jsonSchema: WORKOUT_ANALYSIS_JSON_SCHEMA,
+      });
     } catch (err) {
       if (err instanceof OpenAiHttpError) {
         console.error("analyze-workout: OpenAI HTTP error", err.status, err.body?.slice(0, 2000));
