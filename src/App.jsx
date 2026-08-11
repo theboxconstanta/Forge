@@ -37,7 +37,7 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, AUTO_DURATION_FORMAT_IDS,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking,
@@ -9010,11 +9010,15 @@ function App() {
                     const miscari = v.movements
                     const notaVarianta = v.notes
                     const scheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []
+                    const headerTiming = primarySectionV ? formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t) : null
                     return (
                       <div style={{ marginTop: '24px' }}>
-                        <div style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primarySectionV?.format}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <div style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primarySectionV?.format}</div>
+                          {headerTiming && <div style={{ fontSize: '17px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{headerTiming}</div>}
+                        </div>
                         {scheduleLines.map((line, li) => (
-                          <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '4px' : '2px' }}>{line}</div>
+                          <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                         ))}
                         {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '8px' }}>"{workoutForDisplay.title}"</div>}
                         {miscari.length > 0 && (

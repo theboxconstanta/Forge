@@ -731,31 +731,50 @@ export function describeFormatConfig(formatId, config, t) {
   return parts.join(' · ')
 }
 
-// Randuri curate, separate, pt cardul de WOD al membrului (Redesign the
-// Member Workout View) - spre deosebire de describeFormatConfig (folosit de
-// coach/Admin, "eticheta: valoare" alaturate cu " · " - neschimbat, inca
-// folosit acolo), aici time cap si numarul de runde primesc fiecare
-// propriul rand, cu formulare naturala ("Time cap: 20:00", "5 Rounds", nu
-// "Numar runde: 5") - cele doua campuri cerute explicit. Orice alt camp de
-// config (structura, schema de repetari, etape etc.) cade in continuare pe
-// un rand generic "eticheta: valoare", ca sa nu piarda tacut informatie
-// pentru formate mai complexe (Ladder, Buy-In/Cash-Out) care nu au fost
-// cerute explicit sa fie reformulate.
-const MEMBER_TIME_CAP_KEYS = ['timeCapSec', 'durationSec', 'mainDurationSec', 'totalDurationSec']
+// Valoarea de timp aratata in header-ul cardului de WOD al membrului
+// (Improve Member Workout Header), aliniata pe acelasi rand cu numele
+// formatului, colorata distinct (#EF4444 in JSX) - reutilizeaza
+// estimateTotalDurationSec (deja existent, folosit si de Quick Create pt
+// "Durata" auto-calculata la EMOM/Tabata/Intervals), nu recalculeaza nimic
+// nou. Eticheta "Time cap" apare DOAR pt formatele unde timpul e cu-adevarat
+// un plafon opțional peste o incercare care s-ar putea termina mai devreme
+// (For Time/Chipper/Ladder/RFT/Partner WOD, campul timeCapSec) - la AMRAP/
+// EMOM/Tabata/Intervals timpul e chiar durata prescrisa a antrenamentului,
+// nu un "cap", asa ca acolo se arata doar valoarea goala (cerinta explicita -
+// vezi exemplele "AMRAP / 15:00" vs "For Time / Time cap 20:00").
+const TIME_CAP_LABEL_FORMAT_IDS = ['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD']
+
+export function formatMemberHeaderTiming(formatId, config, t) {
+  const seconds = estimateTotalDurationSec(formatId, config)
+  if (seconds == null) return null
+  const value = secToTime(seconds)
+  return TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) ? `${t?.memberWodTimeCapLabel || 'Time cap'} ${value}` : value
+}
+
+// Randuri curate, separate, pt restul cardului de WOD al membrului (sub
+// header) - spre deosebire de describeFormatConfig (folosit de coach/Admin,
+// "eticheta: valoare" alaturate cu " · " - neschimbat, inca folosit acolo),
+// aici numarul de runde primeste propriul rand, cu formulare naturala
+// ("5 Rounds", nu "Numar runde: 5"). Time cap-ul NU mai apare aici - a
+// migrat in header (formatMemberHeaderTiming, mai sus), ca sa nu se
+// repete de doua ori pe acelasi card. Orice alt camp de config (structura,
+// schema de repetari, etape etc.) cade in continuare pe un rand generic
+// "eticheta: valoare", ca sa nu piarda tacut informatie pentru formate mai
+// complexe (Ladder, Buy-In/Cash-Out) care nu au fost cerute explicit sa
+// fie reformulate.
 const MEMBER_ROUNDS_KEYS = ['rounds', 'totalRounds']
+// Aceleasi campuri pe care formatMemberHeaderTiming le poate consuma (direct
+// sau prin estimateTotalDurationSec) - marcate "consumed" fara sa produca un
+// rand propriu aici, altfel ar aparea A DOUA OARA pe randul generic
+// "eticheta: valoare" de mai jos, dupa ce au fost deja aratate in header.
+const MEMBER_HEADER_TIMING_KEYS = ['timeCapSec', 'durationSec', 'mainDurationSec', 'totalDurationSec']
 
 export function formatMemberScheduleLines(formatId, config, t) {
   const fmt = getFormat(formatId)
   const cfg = config || {}
   const fields = fmt.config || {}
   const lines = []
-  const consumed = new Set()
-
-  const timeCapKey = MEMBER_TIME_CAP_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '')
-  if (timeCapKey) {
-    lines.push(`${t?.memberWodTimeCapLabel || 'Time cap'}: ${secToTime(cfg[timeCapKey])}`)
-    consumed.add(timeCapKey)
-  }
+  const consumed = new Set(MEMBER_HEADER_TIMING_KEYS)
 
   const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '')
   if (roundsKey) {

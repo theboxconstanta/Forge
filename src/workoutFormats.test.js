@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -562,16 +562,16 @@ describe('formatMemberScheduleLines', () => {
   const tRo = getT('ro')
   const tEn = getT('en')
 
-  it('RFT: time cap și runde apar pe rânduri separate, cu formulare naturală (nu "Număr runde: N")', () => {
+  it('RFT: rundele apar pe rândul lor, cu formulare naturală (nu "Număr runde: N") - time cap-ul a migrat în header', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tEn))
-      .toEqual(['Time cap: 20:00', '4 Rounds'])
+      .toEqual(['4 Rounds'])
   })
   it('RO: aceeași formulare naturală, doar eticheta rundelor tradusă', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tRo))
-      .toEqual(['Time cap: 20:00', '4 Runde'])
+      .toEqual(['4 Runde'])
   })
-  it('AMRAP: durata proprie e tratată ca time cap (nu are un câmp "rounds")', () => {
-    expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual(['Time cap: 15:00'])
+  it('AMRAP: fără câmpul "rounds", durata proprie nu mai apare aici (e în header)', () => {
+    expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual([])
   })
   it('EMOM: totalRounds mapează pe rândul de runde, intervalSec cade pe rândul generic', () => {
     const lines = formatMemberScheduleLines('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)
@@ -587,6 +587,36 @@ describe('formatMemberScheduleLines', () => {
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberScheduleLines(id, {}, tEn)).not.toThrow())
+  })
+})
+
+describe('formatMemberHeaderTiming', () => {
+  const tRo = getT('ro')
+  const tEn = getT('en')
+
+  it('For Time: eticheta "Time cap" apare (câmpul e cu-adevărat un plafon opțional)', () => {
+    expect(formatMemberHeaderTiming('For Time', { timeCapSec: 1200 }, tEn)).toBe('Time cap 20:00')
+  })
+  it('RFT: aceeași etichetă, aceeași sursă (timeCapSec)', () => {
+    expect(formatMemberHeaderTiming('RFT', { rounds: 4, timeCapSec: 1200 }, tEn)).toBe('Time cap 20:00')
+  })
+  it('AMRAP: fără etichetă - durata proprie e chiar antrenamentul, nu un plafon', () => {
+    expect(formatMemberHeaderTiming('AMRAP', { durationSec: 900 }, tEn)).toBe('15:00')
+  })
+  it('EMOM: durata totală calculată (totalRounds × intervalSec), fără etichetă', () => {
+    expect(formatMemberHeaderTiming('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)).toBe('12:00')
+  })
+  it('Intervals: durata totală calculată (rounds × (work+rest)), fără etichetă', () => {
+    expect(formatMemberHeaderTiming('Intervals', { rounds: 10, workSec: 120, restSec: 60 }, tEn)).toBe('30:00')
+  })
+  it('RO: eticheta tradusă', () => {
+    expect(formatMemberHeaderTiming('For Time', { timeCapSec: 1200 }, tRo)).toBe('Time cap 20:00')
+  })
+  it('un format fără nicio sursă de durată întoarce null (nimic de arătat în header)', () => {
+    expect(formatMemberHeaderTiming('Strength Sets', { setsScheme: [5, 3, 1] }, tEn)).toBe(null)
+  })
+  it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
+    FORMAT_IDS.forEach(id => expect(() => formatMemberHeaderTiming(id, {}, tEn)).not.toThrow())
   })
 })
 
