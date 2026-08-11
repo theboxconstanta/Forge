@@ -1296,6 +1296,71 @@ function AddSectionControl({ sectionTypes, onAdd, t }) {
   )
 }
 
+// Compact accordion pentru lista de WOD-uri trecute (Admin > WOD) - cardurile
+// erau permanent complet expandate (preview + Edit/Duplicate/Delete mereu
+// vizibile), ocupand prea mult spatiu vertical pe mobil pentru ca un coach
+// sa vada mai mult de 4-5 WOD-uri fara scroll excesiv. Colapsat implicit,
+// arata doar titlu/data/preview pe un singur rand + chevron; butoanele de
+// actiune (neschimbate ca logica) apar doar cand e expandat. Animatia de
+// inaltime foloseste grid-template-rows 0fr->1fr (nu height:auto/JS measure)
+// - singura tehnica CSS care anima smooth catre o inaltime necunoscuta
+// dinainte, fara sa "sara" din layout. Doar un card poate fi expandat
+// deodata - controlat din Admin (expandedWodId), nu local aici.
+const PAST_WOD_TIERS = [
+  { nivel: 'RX', key: 'movements_rx', notesKey: 'notes_rx' },
+  { nivel: 'Intermediate', key: 'movements_intermediate', notesKey: 'notes_intermediate' },
+  { nivel: 'Beginner', key: 'movements_beginner', notesKey: 'notes_beginner' },
+  { nivel: 'OnRamp', key: 'movements_onramp', notesKey: 'notes_onramp' },
+]
+
+function PastWodCard({ w, expanded, onToggle, onEdit, onDuplicate, onDelete, t, lang }) {
+  const preview = w.movements_rx?.length > 0 ? w.movements_rx.join(' • ') : ''
+  const formatDescriere = describeFormatConfig(w.type, w.format_config, t)
+  return (
+    <div style={{ background: '#fff', borderRadius: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <button onClick={onToggle}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}
+          </div>
+          <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {new Date(w.date + 'T00:00:00').toLocaleDateString(localeFor(lang))}{preview ? ` · ${preview}` : ''}
+          </div>
+        </div>
+        <ChevronDown size={16} color="#A1A1AA" strokeWidth={1.5}
+          style={{ flexShrink: 0, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }} />
+      </button>
+      <div style={{ display: 'grid', gridTemplateRows: expanded ? '1fr' : '0fr', transition: 'grid-template-rows 220ms ease' }}>
+        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '0 14px 14px', borderTop: '1px solid #f0f0f0', marginTop: '2px', paddingTop: '10px' }}>
+            {formatDescriere && <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>{formatDescriere}</div>}
+            {PAST_WOD_TIERS.map(tier => {
+              const miscari = w[tier.key]
+              const nota = w[tier.notesKey]
+              if (!miscari?.length && !nota) return null
+              return (
+                <div key={tier.nivel} style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>
+                    <LevelDot nivel={tier.nivel} size={7} /> {tier.nivel}
+                  </div>
+                  {miscari?.length > 0 && <div style={{ fontSize: '12px', color: '#555', lineHeight: '1.5' }}>{miscari.join(', ')}</div>}
+                  {nota && <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', fontStyle: 'italic' }}>{nota}</div>}
+                </div>
+              )
+            })}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              <button onClick={onEdit} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>✎</button>
+              <button onClick={onDuplicate} title={t.adminWodDuplicateButton} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>📋</button>
+              <button onClick={onDelete} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Timer({ onBack, defaultFortime, t }) {
   const [mod, setMod] = useState('fortime')
   const [running, setRunning] = useState(false)
@@ -2441,6 +2506,10 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // real si efectul se opreste oricum singur (garda lui existenta), deci
   // flag-ul nu mai e nevoie dupa primul Save.
   const [creatingNewWod, setCreatingNewWod] = useState(false)
+  // Compact accordion (vezi PastWodCard) - un singur WOD trecut expandat
+  // deodata; id-ul WOD-ului, nu un boolean per rand, ca sa garanteze usor
+  // regula "doar unul deschis" fara sa umble prin toata lista la fiecare tap.
+  const [expandedWodId, setExpandedWodId] = useState(null)
   // Faza 6 (Native Workout Section Editor) - vezi createSection/
   // sectionsFromLegacyWod/legacyPayloadFromSections/validateSectionsForLegacy
   // (scope de modul, definite langa SectionCard). `wodSections` inlocuieste
@@ -4526,23 +4595,12 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           )}
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminWodListHeader(wods.length)}</div>
           {wods.map(w => (
-            <div key={w.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}</div>
-                  {describeFormatConfig(w.type, w.format_config, t) && (
-                    <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{describeFormatConfig(w.type, w.format_config, t)}</div>
-                  )}
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} /> {new Date(w.date + 'T00:00:00').toLocaleDateString(localeFor(lang))}</div>
-                  {w.movements_rx?.length > 0 && <div style={{ fontSize: '11px', color: '#791F1F', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><LevelDot nivel="RX" size={8} /> {w.movements_rx.slice(0,2).join(', ')}{w.movements_rx.length > 2 ? '...' : ''}</div>}
-                </div>
-                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                  <button onClick={() => startEditWod(w)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>✎</button>
-                  <button onClick={() => openDuplicateWod(w)} title={t.adminWodDuplicateButton} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fafafa', color: '#0E0E0E', fontSize: '11px', cursor: 'pointer' }}>📋</button>
-                  <button onClick={() => stergeWod(w.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
-                </div>
-              </div>
-            </div>
+            <PastWodCard key={w.id} w={w} lang={lang} t={t}
+              expanded={expandedWodId === w.id}
+              onToggle={() => setExpandedWodId(expandedWodId === w.id ? null : w.id)}
+              onEdit={() => startEditWod(w)}
+              onDuplicate={() => openDuplicateWod(w)}
+              onDelete={() => { if (expandedWodId === w.id) setExpandedWodId(null); stergeWod(w.id) }} />
           ))}
 
           {duplicateSourceWod && (
