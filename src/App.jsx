@@ -31,6 +31,7 @@ import {
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
+import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
 import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
@@ -3436,6 +3437,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       // un WOD nou trebuie sa schimbe data sau sa apese "anuleaza" inainte
       // de analiza, nu sa se bazeze pe un reset implicit aici.
       setWodSections(mapped.map((s, i) => ({ ...s, open: true, reviewFlags: flags.filter(f => f.sectionIndex === i) })))
+      if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
       setShowQuickCreate(false)
       showToast(t.toastAnalyzeWorkoutSuccess)
     } catch (e) {
@@ -3565,18 +3567,49 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
 
   // Reseteaza toate campurile formularului la implicit, FARA sa atinga
   // dataWod si editWodId - folosita de cancelEditWod (care le reseteaza
-  // separat) si de schimbarea manuala a datei (care vrea sa pastreze data
-  // noua aleasa, nu s-o resetaze la azi).
+  // separat).
   const resetWodFormFields = () => {
     const blank = DEFAULT_NEW_WOD_SECTIONS()
     setWodSections(blank)
     setWodCleanSnapshot(JSON.stringify(blank))
   }
 
+  // Quick Create Date-First Flow - data e metadata despre CAND va fi
+  // programat antrenamentul, nu un punct de navigare. Bug raportat: data
+  // input-ului din builder facea `setEditWodId(null); resetWodFormFields()`
+  // inainte sa schimbe data, distrugand orice text lipit/analizat/generat/
+  // editat manual doar pt ca antrenorul a schimbat ziua tinta. Singura
+  // schimbare reala necesara: NU mai atinge nimic in afara de dataWod.
+  // `creatingNewWod(true)` (doar cand nu editam deja un WOD real incarcat)
+  // garanteaza ca efectul de sincronizare pasiva de mai sus ramane suprimat
+  // pt tot restul sesiunii curente, indiferent daca antrenorul a intrat in
+  // Quick Create explicit (+ Antrenament nou) sau implicit (nicio zi
+  // curenta cu WOD la montare) - fara asta, o schimbare de data catre o zi
+  // cu WOD deja existent ar declansa acel efect si ar inlocui silentios
+  // draftul cu WOD-ul existent.
+  const handleDataWodChange = (newDate) => {
+    if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
+    setDataWod(newDate)
+  }
+
+  // WOD deja existent pe data aleasa (exclus WOD-ul pe care il editam chiar
+  // acum, daca e cazul) - folosit DOAR ca sa avertizam antrenorul inainte sa
+  // apese Salveaza (care oricum face upsert pe (gym_id,date) si l-ar
+  // suprascrie silentios, comportament deja existent, neschimbat aici) -
+  // nu introduce un al doilea pipeline de salvare, doar o iesire explicita.
+  const existingWodOnSelectedDate = findExistingWodOnDate(wods, dataWod, editWodId)
+
+  const openExistingWodInstead = (w) => {
+    const hasUnsavedDraft = isWodDirty || aiParseText.trim().length > 0
+    if (hasUnsavedDraft && !window.confirm(t.adminWodDiscardConfirm)) return
+    startEditWod(w)
+  }
+
   // Quick Create - "Start Empty" intra direct in builder cu sectiunile
   // implicite (identic cu formularul de dinainte de Quick Create).
   const startEmptyWod = () => {
     resetWodFormFields()
+    if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
     setShowQuickCreate(false)
   }
 
@@ -3595,6 +3628,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       v.key, { movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' },
     ]))
     setWodSections([primary])
+    if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
     setShowQuickCreate(false)
   }
 
@@ -4564,7 +4598,25 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             // feature separata, e doar calea cea mai rapida catre acelasi
             // DraftWorkout (wodSections) pe care il produce si editarea manuala.
             <div style={{ background: '#fff', borderRadius: '14px', padding: '20px 16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminWodQuickCreateTitle}</div>
+              {/* Quick Create Date-First Flow - data apare INAINTE de
+                  continutul antrenamentului, ca antrenorul sa stie pt ce zi
+                  programeaza inainte sa inceapa sa scrie. Compact deliberat -
+                  fara card nou, fara text explicativ, fara casuta verde (cerinta
+                  explicita) - reutilizeaza exact eticheta/stilul date-input-ului
+                  deja existent in builder (t.adminWodDateLabel). */}
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{t.adminWodDateLabel}</div>
+              <input type="date" value={dataWod} onChange={e => handleDataWodChange(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+              {existingWodOnSelectedDate && (
+                <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: '#791F1F' }}>{t.adminWodDateConflictWarning}</span>
+                  <button onClick={() => openExistingWodInstead(existingWodOnSelectedDate)}
+                    style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                    {t.adminWodDateConflictOpenExisting}
+                  </button>
+                </div>
+              )}
+              <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', margin: '16px 0 4px' }}>{t.adminWodQuickCreateTitle}</div>
               <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>{t.adminWodQuickCreateSubtitle}</div>
               <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
                 placeholder={t.adminWodQuickCreatePlaceholder} rows={8}
@@ -4593,14 +4645,17 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodDateLabel}</div>
                 <div onClick={requestCancelWod} style={{ fontSize: '12px', color: '#888', cursor: 'pointer' }}>{t.adminWodCancel}</div>
               </div>
-              <input type="date" value={dataWod} onChange={e => {
-                // Schimbarea manuala a datei paraseste orice editare curenta -
-                // fara asta, editWodId ramanea legat de WOD-ul vechi si
-                // efectul de sincronizare de mai jos refuza sa incarce WOD-ul
-                // zilei noi (garda "if (editWodId) return"), lasand sectiunile
-                // neschimbate.
-                setEditWodId(null); resetWodFormFields(); setDataWod(e.target.value)
-              }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+              <input type="date" value={dataWod} onChange={e => handleDataWodChange(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+              {existingWodOnSelectedDate && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: '#791F1F' }}>{t.adminWodDateConflictWarning}</span>
+                  <button onClick={() => openExistingWodInstead(existingWodOnSelectedDate)}
+                    style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                    {t.adminWodDateConflictOpenExisting}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Faza 6 (Native Workout Section Editor) - lista ordonata de
