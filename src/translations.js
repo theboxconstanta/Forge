@@ -1013,7 +1013,7 @@ export const TRANSLATIONS = {
     adminWodSaveEdit: 'Salvează modificările',
     adminWodSaveSectionButton: 'Salvează',
     adminWodCreateButton: '+ Creează WOD',
-    adminWodListHeader: (n) => `WOD-URI (${n})`,
+    adminWodListHeader: (n) => `Istoric WOD-uri (${n})`,
 
     // Admin - tab WOD - Faza 6, editor nativ de Workout Sections
     wodSectionPrimaryBadge: 'sectiune principala',
@@ -2114,7 +2114,7 @@ export const TRANSLATIONS = {
     adminWodSaveEdit: 'Save changes',
     adminWodSaveSectionButton: 'Save',
     adminWodCreateButton: '+ Create WOD',
-    adminWodListHeader: (n) => `WODS (${n})`,
+    adminWodListHeader: (n) => `Past WODs (${n})`,
 
     // Admin - tab WOD - Phase 6, native Workout Section editor
     wodSectionPrimaryBadge: 'primary section',

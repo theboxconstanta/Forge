@@ -2510,6 +2510,24 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // deodata; id-ul WOD-ului, nu un boolean per rand, ca sa garanteze usor
   // regula "doar unul deschis" fara sa umble prin toata lista la fiecare tap.
   const [expandedWodId, setExpandedWodId] = useState(null)
+  // Container-ul "Istoric WOD-uri" (lista intreaga) e el insusi un accordion
+  // separat, deasupra listei de carduri - colapsat implicit (ecranul WOD
+  // ramane concentrat pe Azi + Antrenament nou), dar starea deschis/inchis
+  // se tine in sessionStorage (nu doar React state) ca sa supravietuiasca
+  // demontarii Admin la schimbarea de tab din NavBar (Admin se remonteaza
+  // complet la fiecare intrare - vezi comentariul lui startEditWod) - "tine
+  // minte cat timp dureaza sesiunea" cere exact atat, nu persistenta peste
+  // un tab/browser inchis (de-aia sessionStorage, nu localStorage).
+  const [pastWodsOpen, setPastWodsOpen] = useState(() => {
+    try { return sessionStorage.getItem('pastWodsOpen') === '1' } catch { return false }
+  })
+  const togglePastWodsOpen = () => {
+    setPastWodsOpen(prev => {
+      const next = !prev
+      try { sessionStorage.setItem('pastWodsOpen', next ? '1' : '0') } catch {}
+      return next
+    })
+  }
   // Faza 6 (Native Workout Section Editor) - vezi createSection/
   // sectionsFromLegacyWod/legacyPayloadFromSections/validateSectionsForLegacy
   // (scope de modul, definite langa SectionCard). `wodSections` inlocuieste
@@ -4593,15 +4611,28 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             </button>
           </div>
           )}
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminWodListHeader(wods.length)}</div>
-          {wods.map(w => (
-            <PastWodCard key={w.id} w={w} lang={lang} t={t}
-              expanded={expandedWodId === w.id}
-              onToggle={() => setExpandedWodId(expandedWodId === w.id ? null : w.id)}
-              onEdit={() => startEditWod(w)}
-              onDuplicate={() => openDuplicateWod(w)}
-              onDelete={() => { if (expandedWodId === w.id) setExpandedWodId(null); stergeWod(w.id) }} />
-          ))}
+          <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+            <button onClick={togglePastWodsOpen}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box' }}>
+              <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminWodListHeader(wods.length)}</div>
+              <ChevronDown size={16} color="#A1A1AA" strokeWidth={1.5}
+                style={{ flexShrink: 0, transform: pastWodsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }} />
+            </button>
+            <div style={{ display: 'grid', gridTemplateRows: pastWodsOpen ? '1fr' : '0fr', transition: 'grid-template-rows 220ms ease' }}>
+              <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '0 14px 14px' }}>
+                  {wods.map(w => (
+                    <PastWodCard key={w.id} w={w} lang={lang} t={t}
+                      expanded={expandedWodId === w.id}
+                      onToggle={() => setExpandedWodId(expandedWodId === w.id ? null : w.id)}
+                      onEdit={() => startEditWod(w)}
+                      onDuplicate={() => openDuplicateWod(w)}
+                      onDelete={() => { if (expandedWodId === w.id) setExpandedWodId(null); stergeWod(w.id) }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {duplicateSourceWod && (
             <BottomSheet onClose={closeDuplicateWod}>
