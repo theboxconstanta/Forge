@@ -6,6 +6,7 @@ import {
   isMultiMovementStandard,
   classifyRxStatus,
   resolveMovementDisplayText,
+  cleanMovementDisplayText,
 } from './rxEngine'
 
 describe('resolveAthleteGenderKey', () => {
@@ -198,5 +199,39 @@ describe('resolveMovementDisplayText', () => {
   })
   it('leaves text unchanged when nothing parseable exists', () => {
     expect(resolveMovementDisplayText('25 Pull-ups', 'male')).toBe('25 Pull-ups')
+  })
+})
+
+describe('cleanMovementDisplayText', () => {
+  it('strips a "not specified" debug parenthetical', () => {
+    expect(cleanMovementDisplayText('10 deficit strict handstand push-ups (deficit (height not specified))'))
+      .toBe('10 deficit strict handstand push-ups')
+  })
+  it('strips a "text gives no height here" debug parenthetical', () => {
+    expect(cleanMovementDisplayText('15 deficit strict handstand push-ups (deficit (height as above if same) - text gives no height here)'))
+      .toBe('15 deficit strict handstand push-ups')
+  })
+  it('strips a "performed as part of a scheme" debug parenthetical', () => {
+    expect(cleanMovementDisplayText('Thrusters @ 42kg (Performed as part of a 21-15-9 scheme)'))
+      .toBe('Thrusters @ 42kg')
+  })
+  it('collapses a distance repeated in parens and bare in the same line', () => {
+    expect(cleanMovementDisplayText('Single-DB walking lunge (61 m) 61m'))
+      .toBe('Single-DB walking lunge (61 m)')
+  })
+  it('collapses a weight repeated in parens and after @ in the same line', () => {
+    expect(cleanMovementDisplayText('15 DB Snatches (22.5 kg) @ 22.5kg'))
+      .toBe('15 DB Snatches (22.5 kg)')
+  })
+  it('leaves an already-clean line untouched', () => {
+    expect(cleanMovementDisplayText('15 DB Snatches (22.5/15 kg)')).toBe('15 DB Snatches (22.5/15 kg)')
+  })
+  it('chained after resolveMovementDisplayText (real pipeline order), collapses the leftover duplicate distance', () => {
+    const afterGenderResolve = resolveMovementDisplayText('Single-DB walking lunge (61 m) 61m @ 22.5/15kg', 'male')
+    expect(cleanMovementDisplayText(afterGenderResolve)).toBe('Single-DB walking lunge (61 m) @ 15kg')
+  })
+  it('returns falsy input unchanged', () => {
+    expect(cleanMovementDisplayText('')).toBe('')
+    expect(cleanMovementDisplayText(null)).toBe(null)
   })
 })

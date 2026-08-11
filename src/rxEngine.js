@@ -238,3 +238,42 @@ export function resolveMovementDisplayText(text, genderKey) {
   const rounded = Number.isInteger(kg) ? kg : Math.round(kg * 10) / 10
   return text.slice(0, match.index) + `${rounded}kg` + text.slice(match.index + match[0].length)
 }
+
+// ---------------------------------------------------------------------
+// Member-facing text cleanup (Redesign the Member Workout View, WOD-SIMPLE
+// only - forge-admin-web has no member-facing display, so this is
+// deliberately NOT ported there). movements_rx/etc store whatever text the
+// AI parser or a coach produced verbatim (there is no separate "clean
+// name" + "clean reps" + "clean weight" field - see PARSER_EDGE_CASES.md
+// and this same free-text model resolveMovementDisplayText already relies
+// on above) - some of that text carries the AI's own reasoning as
+// parenthetical asides (ex. "(height not specified)", "(text gives no
+// height here)") or repeats the same distance/weight twice in different
+// notations (ex. "(61 m) ... 61m @ 22.5/15kg"). This is a best-effort
+// display-time cleanup, not a real parser - it targets the concrete
+// artifact patterns actually observed, it cannot guarantee every possible
+// free-form AI phrasing. Call AFTER resolveMovementDisplayText (that
+// function already collapses a male/female pair to one value; this one
+// then removes a second, now-redundant restatement of that same value).
+// -----------------------------------------------------------------------
+// Un grup de paranteze echilibrat, cu maxim un nivel de imbricare (tiparul
+// real observat - ex. "(deficit (height not specified))") - captureaza
+// intreg grupul exterior ca sa poata fi eliminat DEODATA daca oriunde in
+// interior apare un cuvant de debug, in loc sa lase parantezele exterioare
+// goale/orfane in urma unei eliminari partiale doar a celei interioare.
+const BALANCED_PAREN_RE = /\s*\(([^()]|\([^()]*\))*\)/g
+const DEBUG_KEYWORDS_RE = /not specified|as above|text gives|performed as part of|scheme/i
+const NUMERIC_TOKEN_RE = /(\d+(?:\.\d+)?)\s?(kg|lbs|m|cm|in)\b/gi
+
+export function cleanMovementDisplayText(text) {
+  if (!text) return text
+  let out = text.replace(BALANCED_PAREN_RE, (match) => (DEBUG_KEYWORDS_RE.test(match) ? '' : match))
+  const seen = new Set()
+  out = out.replace(NUMERIC_TOKEN_RE, (match, num, unit) => {
+    const key = `${parseFloat(num)}${unit.toLowerCase()}`
+    if (seen.has(key)) return ''
+    seen.add(key)
+    return match
+  })
+  return out.replace(/\(\s*\)/g, '').replace(/@\s*$/, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,)])/g, '$1').trim()
+}

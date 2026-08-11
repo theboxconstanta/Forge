@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -555,6 +555,38 @@ describe('describeFormatConfig', () => {
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => describeFormatConfig(id, {}, tRo)).not.toThrow())
+  })
+})
+
+describe('formatMemberScheduleLines', () => {
+  const tRo = getT('ro')
+  const tEn = getT('en')
+
+  it('RFT: time cap și runde apar pe rânduri separate, cu formulare naturală (nu "Număr runde: N")', () => {
+    expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tEn))
+      .toEqual(['Time cap: 20:00', '4 Rounds'])
+  })
+  it('RO: aceeași formulare naturală, doar eticheta rundelor tradusă', () => {
+    expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tRo))
+      .toEqual(['Time cap: 20:00', '4 Runde'])
+  })
+  it('AMRAP: durata proprie e tratată ca time cap (nu are un câmp "rounds")', () => {
+    expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual(['Time cap: 15:00'])
+  })
+  it('EMOM: totalRounds mapează pe rândul de runde, intervalSec cade pe rândul generic', () => {
+    const lines = formatMemberScheduleLines('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)
+    expect(lines[0]).toBe('12 Rounds')
+    expect(lines.some(l => l.includes('1:00'))).toBe(true)
+  })
+  it('câmpuri fără time cap/runde nu produc rânduri goale sau lipsă', () => {
+    expect(formatMemberScheduleLines('For Time', {}, tEn)).toEqual([])
+  })
+  it('un format fără time cap/runde dar cu alt câmp păstrează acel câmp pe rândul generic', () => {
+    const lines = formatMemberScheduleLines('Ladder', { ladderType: 'Ascending' }, tEn)
+    expect(lines.some(l => l.includes('Ascending'))).toBe(true)
+  })
+  it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
+    FORMAT_IDS.forEach(id => expect(() => formatMemberScheduleLines(id, {}, tEn)).not.toThrow())
   })
 })
 

@@ -31,13 +31,13 @@ import {
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
-import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText } from './rxEngine'
+import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
 import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, AUTO_DURATION_FORMAT_IDS,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking,
@@ -8992,6 +8992,53 @@ function App() {
                       previous pass, just retargeted to 52px exactly instead
                       of a 60-64px range. Selection state and the click
                       handler are unchanged. */}
+                  {/* Redesign the Member Workout View - un membru cu usual_level
+                      setat (isAdmin/isCoach exclusi - ei tot au nevoie sa vada
+                      toate cele 4 variante, pt programare/coaching) vede DOAR
+                      propriul nivel, curatat de artefacte de parsare AI
+                      (cleanMovementDisplayText) si cu time cap/runde pe randuri
+                      separate (formatMemberScheduleLines) - nu mai atinge
+                      accordion-ul cu toate cele 4 variante de mai jos, pastrat
+                      neschimbat ca fallback pt admin/coach si pt membrii care
+                      n-au ales inca un nivel (nu putem alege unul in locul lor).
+                      variantaAleasa e deja indexul corect (pre-selectat din
+                      usual_level, vezi efectul de sincronizare de mai sus) -
+                      refolosit direct, nicio logica noua de potrivire. */}
+                  {!isAdmin && !isCoach && userProfile?.usual_level && variantaAleasa !== null ? (() => {
+                    const v = metconVariantsForDisplay(primarySectionV)[variantaAleasa]
+                    if (!v) return null
+                    const miscari = v.movements
+                    const notaVarianta = v.notes
+                    const scheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []
+                    return (
+                      <div style={{ marginTop: '24px' }}>
+                        <div style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primarySectionV?.format}</div>
+                        {scheduleLines.map((line, li) => (
+                          <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '4px' : '2px' }}>{line}</div>
+                        ))}
+                        {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '8px' }}>"{workoutForDisplay.title}"</div>}
+                        {miscari.length > 0 && (
+                          <div style={{ marginTop: '16px' }}>
+                            {miscari.map((m, mi) => (
+                              <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                {cleanMovementDisplayText(resolveMovementDisplayText(m, activeAthleteGenderKey))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {notaVarianta && (
+                          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
+                            <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
+                          </div>
+                        )}
+                        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <LevelDot nivel={v.nivel} size={7} />
+                          <span style={{ fontSize: '13px', color: '#6B7280' }}>{t.memberWodYourVersion(v.nivel)}</span>
+                        </div>
+                      </div>
+                    )
+                  })() : (
                   <div style={{ marginTop: '24px' }}>
                     {metconVariantsForDisplay(primarySectionV).map((v, i) => {
                       const miscari = v.movements
@@ -9031,7 +9078,7 @@ function App() {
                                 <div>
                                   {miscari.map((m, mi) => (
                                     <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                      {resolveMovementDisplayText(m, activeAthleteGenderKey)}
+                                      {cleanMovementDisplayText(resolveMovementDisplayText(m, activeAthleteGenderKey))}
                                     </div>
                                   ))}
                                 </div>
@@ -9048,6 +9095,7 @@ function App() {
                       )
                     })}
                   </div>
+                  )}
                   <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
                     style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}

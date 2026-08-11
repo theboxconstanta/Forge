@@ -731,6 +731,55 @@ export function describeFormatConfig(formatId, config, t) {
   return parts.join(' · ')
 }
 
+// Randuri curate, separate, pt cardul de WOD al membrului (Redesign the
+// Member Workout View) - spre deosebire de describeFormatConfig (folosit de
+// coach/Admin, "eticheta: valoare" alaturate cu " · " - neschimbat, inca
+// folosit acolo), aici time cap si numarul de runde primesc fiecare
+// propriul rand, cu formulare naturala ("Time cap: 20:00", "5 Rounds", nu
+// "Numar runde: 5") - cele doua campuri cerute explicit. Orice alt camp de
+// config (structura, schema de repetari, etape etc.) cade in continuare pe
+// un rand generic "eticheta: valoare", ca sa nu piarda tacut informatie
+// pentru formate mai complexe (Ladder, Buy-In/Cash-Out) care nu au fost
+// cerute explicit sa fie reformulate.
+const MEMBER_TIME_CAP_KEYS = ['timeCapSec', 'durationSec', 'mainDurationSec', 'totalDurationSec']
+const MEMBER_ROUNDS_KEYS = ['rounds', 'totalRounds']
+
+export function formatMemberScheduleLines(formatId, config, t) {
+  const fmt = getFormat(formatId)
+  const cfg = config || {}
+  const fields = fmt.config || {}
+  const lines = []
+  const consumed = new Set()
+
+  const timeCapKey = MEMBER_TIME_CAP_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '')
+  if (timeCapKey) {
+    lines.push(`${t?.memberWodTimeCapLabel || 'Time cap'}: ${secToTime(cfg[timeCapKey])}`)
+    consumed.add(timeCapKey)
+  }
+
+  const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '')
+  if (roundsKey) {
+    lines.push(`${cfg[roundsKey]} ${t?.memberWodRoundsLabel || 'Rounds'}`)
+    consumed.add(roundsKey)
+  }
+
+  Object.entries(fields).forEach(([key, field]) => {
+    if (consumed.has(key)) return
+    const value = cfg[key]
+    if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return
+    const label = t?.[field.labelKey] || field.labelKey
+    let displayValue
+    if (field.type === 'duration') displayValue = secToTime(value)
+    else if (field.type === 'movementList' || field.type === 'intervalList') displayValue = value.join(', ')
+    else if (field.type === 'repsSchemeList') displayValue = value.join('-')
+    else if (field.type === 'stageList') displayValue = `${value.length} etape`
+    else displayValue = String(value)
+    lines.push(`${label}: ${displayValue}`)
+  })
+
+  return lines
+}
+
 // Eticheta scurta a formatului, cu numarul de runde inclus acolo unde e
 // conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time), nu doar
 // "RFT" urmat separat de "Numar runde: 5" (redundant si mai putin natural
