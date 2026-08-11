@@ -37,7 +37,7 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, resolveMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking,
@@ -1306,6 +1306,30 @@ function AddSectionControl({ sectionTypes, onAdd, t }) {
 // - singura tehnica CSS care anima smooth catre o inaltime necunoscuta
 // dinainte, fara sa "sara" din layout. Doar un card poate fi expandat
 // deodata - controlat din Admin (expandedWodId), nu local aici.
+// Universal Member Workout Format Header - un singur widget reutilizat
+// identic pt cardul cu o singura varianta (membru cu usual_level) SI pt
+// accordion-ul cu toate cele 4 variante (admin/coach) - "Do not special-case
+// RX". Nu hardcodeaza niciun format/eticheta: intreaga logica traieste in
+// getWorkoutFormatDisplay (workoutFormats.js), acesta doar aseaza
+// primary/secondaryLabel/secondaryValue pe un rand (stivuite automat pe
+// ecrane inguste prin flexWrap, fara breakpoint explicit). Daca formatul nu
+// are nicio metadata secundara reala, secondaryValue e null si widgetul
+// arata doar formatul - nu inventeaza nimic ca sa umple partea dreapta.
+function WorkoutFormatHeader({ formatId, formatConfig, legacyDuration, t }) {
+  if (!formatId) return null
+  const { primary, secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, formatConfig, legacyDuration, t)
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: '12px', rowGap: '2px' }}>
+      <span style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primary}</span>
+      {secondaryValue && (
+        <span style={{ fontSize: '16px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>
+          {secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue}
+        </span>
+      )}
+    </div>
+  )
+}
+
 const PAST_WOD_TIERS = [
   { nivel: 'RX', key: 'movements_rx', notesKey: 'notes_rx' },
   { nivel: 'Intermediate', key: 'movements_intermediate', notesKey: 'notes_intermediate' },
@@ -8854,24 +8878,16 @@ function App() {
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
+                  {/* Universal Member Workout Format Header - cardul de Acasa
+                      ramane strict un punct de intrare minimal: doar nume +
+                      buton. Formatul/time cap-ul/preview-ul de miscari NU mai
+                      apar aici deloc - au o singura locatie autoritara acum,
+                      headerul de format din interiorul cardului de varianta
+                      expandat (WorkoutFormatHeader, vezi mai jos). */}
                   {workoutForDisplay ? (
-                    <>
-                      {workoutForDisplay.title && (
-                        <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>"{workoutForDisplay.title}"</div>
-                      )}
-                      {/* Simplify the Member Home Screen Workout Card - miscarile/
-                          reps/loads/descrierile parser-generate au fost mutate
-                          exclusiv pe ecranul de detaliu (RX/Intermediate/Beginner/
-                          OnRamp, vezi headerul de mai jos din acordeon). Cardul de
-                          Acasa ramane doar un rezumat: nume + format + timing,
-                          refolosind acelasi formatMemberHeaderTiming deja testat. */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: workoutForDisplay.title ? '4px' : '0' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{primarySectionV?.format}</span>
-                        {primarySectionV && resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t) && (
-                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t)}</span>
-                        )}
-                      </div>
-                    </>
+                    workoutForDisplay.title && (
+                      <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>"{workoutForDisplay.title}"</div>
+                    )
                   ) : (
                     <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>{t.homeNoWodToday}</div>
                   )}
@@ -9014,17 +9030,23 @@ function App() {
                     const miscari = v.movements
                     const notaVarianta = v.notes
                     const scheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []
-                    const headerTiming = primarySectionV ? resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t) : null
                     return (
                       <div style={{ marginTop: '24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                          <div style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primarySectionV?.format}</div>
-                          {headerTiming && <div style={{ fontSize: '17px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{headerTiming}</div>}
+                        {/* Universal Member Workout Format Header - ierarhia
+                            ceruta: VARIANTA -> FORMAT+METADATA DE TIMP ->
+                            CONTINUT. Eticheta variantei (fost footer "Varianta
+                            ta: X") a urcat aici ca header, aceeasi pozitie ca
+                            randul-toggle din accordion-ul admin/coach de mai
+                            jos - acelasi widget WorkoutFormatHeader, nicio
+                            logica speciala pt RX. */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                          <LevelDot nivel={v.nivel} size={6} />
+                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#0E0E0E' }}>{v.nivel}</span>
                         </div>
+                        <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
                         {scheduleLines.map((line, li) => (
                           <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                         ))}
-                        {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '8px' }}>"{workoutForDisplay.title}"</div>}
                         {miscari.length > 0 && (
                           <div style={{ marginTop: '16px' }}>
                             {miscari.map((m, mi) => (
@@ -9040,10 +9062,6 @@ function App() {
                             <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
                           </div>
                         )}
-                        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <LevelDot nivel={v.nivel} size={7} />
-                          <span style={{ fontSize: '13px', color: '#6B7280' }}>{t.memberWodYourVersion(v.nivel)}</span>
-                        </div>
                       </div>
                     )
                   })() : (
@@ -9072,11 +9090,17 @@ function App() {
                           </div>
                           {isSelected && (miscari.length > 0 || notaVarianta) && (
                             <>
-                              {/* Eliminate Redundant Workout Header Information - formatul
-                                  si time cap-ul se vad deja o singura data, in headerul
-                                  cardului "Workout of the Day" de mai sus (curatare
-                                  presentation-layer) - cardul de varianta incepe direct cu
-                                  lista de miscari, fara sa repete format/durata/titlu. */}
+                              {/* Universal Member Workout Format Header - aceeasi
+                                  ierarhie ca la membrul cu o singura varianta:
+                                  VARIANTA (randul-toggle de mai sus) -> FORMAT +
+                                  metadata de timp relevanta (WorkoutFormatHeader,
+                                  identic reutilizat, nicio logica speciala pt RX)
+                                  -> continut. Format/timp nu mai apar nicaieri
+                                  altundeva pe acest ecran (cardul "Workout of the
+                                  Day" de deasupra ramane doar nume + buton). */}
+                              <div style={{ marginTop: '16px' }}>
+                                <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
+                              </div>
                               {miscari.length > 0 && (
                                 <div style={{ marginTop: '16px' }}>
                                   {miscari.map((m, mi) => (

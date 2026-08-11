@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -587,6 +587,45 @@ describe('formatMemberScheduleLines', () => {
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberScheduleLines(id, {}, tEn)).not.toThrow())
+  })
+})
+
+describe('getWorkoutFormatDisplay', () => {
+  const tRo = getT('ro')
+  const tEn = getT('en')
+
+  it('For Time + time cap: primary e formatul, secondary are eticheta "Time cap"', () => {
+    expect(getWorkoutFormatDisplay('For Time', { timeCapSec: 1200 }, null, tEn)).toEqual({ primary: 'For Time', secondaryLabel: 'Time cap', secondaryValue: '20:00' })
+  })
+  it('AMRAP + durata: fara eticheta - durata e chiar antrenamentul, nu un plafon', () => {
+    expect(getWorkoutFormatDisplay('AMRAP', { durationSec: 900 }, null, tEn)).toEqual({ primary: 'AMRAP', secondaryLabel: null, secondaryValue: '15:00' })
+  })
+  it('EMOM: durata totala calculata (totalRounds x intervalSec), fara eticheta', () => {
+    expect(getWorkoutFormatDisplay('EMOM', { totalRounds: 12, intervalSec: 60 }, null, tEn)).toEqual({ primary: 'EMOM', secondaryLabel: null, secondaryValue: '12:00' })
+  })
+  it('RFT + time cap: aceeasi sursa/eticheta ca For Time (timeCapSec)', () => {
+    expect(getWorkoutFormatDisplay('RFT', { rounds: 4, timeCapSec: 1500 }, null, tEn)).toEqual({ primary: 'RFT', secondaryLabel: 'Time cap', secondaryValue: '25:00' })
+  })
+  it('format stil interval (Intervals): durata totala calculata (rounds x (work+rest)), fara eticheta', () => {
+    expect(getWorkoutFormatDisplay('Intervals', { rounds: 10, workSec: 120, restSec: 60 }, null, tEn)).toEqual({ primary: 'Intervals', secondaryLabel: null, secondaryValue: '30:00' })
+  })
+  it('format bazat pe seturi/greutate (Strength Sets): nicio metadata secundara reala - doar formatul, nimic inventat', () => {
+    expect(getWorkoutFormatDisplay('Strength Sets', { setsScheme: [5, 3, 1] }, null, tEn)).toEqual({ primary: 'Strength Sets', secondaryLabel: null, secondaryValue: null })
+  })
+  it('format fara nicio sursa de durata SI fara duration legacy: nicio metadata inventata', () => {
+    expect(getWorkoutFormatDisplay('Not For Time', {}, null, tEn)).toEqual({ primary: 'Not For Time', secondaryLabel: null, secondaryValue: null })
+  })
+  it('WOD legacy fara format_config (confirmat live: coloana e null) cade pe duration-ul vechi, cu aceeasi eticheta "Time cap"', () => {
+    expect(getWorkoutFormatDisplay('For Time', {}, '20:00', tEn)).toEqual({ primary: 'For Time', secondaryLabel: 'Time cap', secondaryValue: '20:00' })
+  })
+  it('fallback legacy fara eticheta pt un format fara plafon (AMRAP)', () => {
+    expect(getWorkoutFormatDisplay('AMRAP', {}, '15:00', tEn)).toEqual({ primary: 'AMRAP', secondaryLabel: null, secondaryValue: '15:00' })
+  })
+  it('RO: eticheta tradusa', () => {
+    expect(getWorkoutFormatDisplay('For Time', { timeCapSec: 1200 }, null, tRo).secondaryLabel).toBe('Time cap')
+  })
+  it('nu crapa pentru niciun format din catalog, cu orice config gol', () => {
+    FORMAT_IDS.forEach(id => expect(() => getWorkoutFormatDisplay(id, {}, null, tEn)).not.toThrow())
   })
 })
 

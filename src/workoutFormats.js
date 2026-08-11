@@ -744,11 +744,31 @@ export function describeFormatConfig(formatId, config, t) {
 // vezi exemplele "AMRAP / 15:00" vs "For Time / Time cap 20:00").
 const TIME_CAP_LABEL_FORMAT_IDS = ['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD']
 
-export function formatMemberHeaderTiming(formatId, config, t) {
+// Universal Member Workout Format Header - singura sursa de adevar pt
+// perechea "format + metadata de timp/structura relevanta", derivata
+// exclusiv din estimateTotalDurationSec (deja canonic, folosit si de Quick
+// Create) - nu introduce o a doua taxonomie de formate. Intoarce forma
+// structurata {primary, secondaryLabel, secondaryValue} in loc de un string
+// concatenat, ca UI-ul sa poata pune primary/secondary pe aceeasi linie (sau
+// sa le stivuiasca pe ecrane inguste) fara sa parseze un string. Cade pe
+// legacyDuration (coloana veche wods.duration, deja normalizata de apelant
+// prin formatWodDurata) cand estimateTotalDurationSec nu are nimic de
+// calculat din format_config - multe WOD-uri legacy nu au niciodata
+// format_config populat (confirmat live). Daca niciuna dintre cele doua
+// surse nu are o valoare, secondaryValue ramane null si UI-ul arata DOAR
+// formatul, fara sa inventeze o metadata secundara.
+export function getWorkoutFormatDisplay(formatId, config, legacyDuration, t) {
   const seconds = estimateTotalDurationSec(formatId, config)
-  if (seconds == null) return null
-  const value = secToTime(seconds)
-  return TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) ? `${t?.memberWodTimeCapLabel || 'Time cap'} ${value}` : value
+  const value = seconds != null ? secToTime(seconds) : (legacyDuration || null)
+  if (!value) return { primary: formatId, secondaryLabel: null, secondaryValue: null }
+  const isCap = TIME_CAP_LABEL_FORMAT_IDS.includes(formatId)
+  return { primary: formatId, secondaryLabel: isCap ? (t?.memberWodTimeCapLabel || 'Time cap') : null, secondaryValue: value }
+}
+
+export function formatMemberHeaderTiming(formatId, config, t) {
+  const { secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, config, null, t)
+  if (!secondaryValue) return null
+  return secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue
 }
 
 // Multe WOD-uri legacy (create inainte de Workout Engine V2 / Quick Create)
@@ -759,10 +779,9 @@ export function formatMemberHeaderTiming(formatId, config, t) {
 // prin formatWodDurata) cand config-ul n-are nimic, pastrand aceeasi eticheta
 // "Time cap" doar pt formatele cu plafon.
 export function resolveMemberHeaderTiming(formatId, config, legacyDuration, t) {
-  const fromConfig = formatMemberHeaderTiming(formatId, config, t)
-  if (fromConfig) return fromConfig
-  if (!legacyDuration) return null
-  return TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) ? `${t?.memberWodTimeCapLabel || 'Time cap'} ${legacyDuration}` : legacyDuration
+  const { secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, config, legacyDuration, t)
+  if (!secondaryValue) return null
+  return secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue
 }
 
 // Randuri curate, separate, pt restul cardului de WOD al membrului (sub
