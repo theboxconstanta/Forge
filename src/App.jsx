@@ -8854,22 +8854,26 @@ function App() {
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
-                  <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>
-                    {workoutForDisplay ? (workoutForDisplay.title ? `"${workoutForDisplay.title}"` : `${primarySectionV?.format} ${formatWodDurata(wodZiData?.duration)}`) : t.homeNoWodToday}
-                  </div>
-                  {/* Durata ramane cititA din wodZiData (legacy) - modelul de
-                      domeniu nu duce inca o durata utilizabila pt sectiunea
-                      primara (section.duration e mereu null, atat pt calea
-                      legacy cat si pt randurile V2 deja sincronizate -
-                      mapLegacyWodToWorkout n-a calculat niciodata asta din
-                      wods.duration). Exceptie documentata, ca la Logare -
-                      vezi raportul Fazei 7. */}
-                  {workoutForDisplay?.title && <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '1px', lineHeight: '18px' }}>{primarySectionV?.format} {formatWodDurata(wodZiData?.duration)}</div>}
-                  {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#888', marginTop: '2px', lineHeight: '18px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
-                  )}
-                  {!wodDeschis && primarySectionV && (primarySectionV.movements || []).length > 0 && (
-                    <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px' }}>{primarySectionV.movements.map(m => m.name).join(' · ')}</div>
+                  {workoutForDisplay ? (
+                    <>
+                      {workoutForDisplay.title && (
+                        <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>"{workoutForDisplay.title}"</div>
+                      )}
+                      {/* Simplify the Member Home Screen Workout Card - miscarile/
+                          reps/loads/descrierile parser-generate au fost mutate
+                          exclusiv pe ecranul de detaliu (RX/Intermediate/Beginner/
+                          OnRamp, vezi headerul de mai jos din acordeon). Cardul de
+                          Acasa ramane doar un rezumat: nume + format + timing,
+                          refolosind acelasi formatMemberHeaderTiming deja testat. */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: workoutForDisplay.title ? '4px' : '0' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{primarySectionV?.format}</span>
+                        {primarySectionV && formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t) && (
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t)}</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>{t.homeNoWodToday}</div>
                   )}
                   {logZiWod && (
                     <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
