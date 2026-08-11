@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -617,6 +617,24 @@ describe('formatMemberHeaderTiming', () => {
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberHeaderTiming(id, {}, tEn)).not.toThrow())
+  })
+})
+
+describe('resolveMemberHeaderTiming', () => {
+  const tEn = getT('en')
+
+  it('preferă valoarea din formatConfig cand exista (nu atinge fallback-ul legacy)', () => {
+    expect(resolveMemberHeaderTiming('For Time', { timeCapSec: 1200 }, '99:00', tEn)).toBe('Time cap 20:00')
+  })
+  it('WOD legacy fara format_config (confirmat live: coloana e null) cade pe duration-ul vechi, cu aceeasi eticheta "Time cap"', () => {
+    expect(resolveMemberHeaderTiming('For Time', {}, '20:00', tEn)).toBe('Time cap 20:00')
+  })
+  it('acelasi fallback, fara eticheta, pt un format fara plafon (AMRAP)', () => {
+    expect(resolveMemberHeaderTiming('AMRAP', {}, '15:00', tEn)).toBe('15:00')
+  })
+  it('fara formatConfig si fara duration legacy, intoarce null (nimic de arătat)', () => {
+    expect(resolveMemberHeaderTiming('For Time', {}, '', tEn)).toBe(null)
+    expect(resolveMemberHeaderTiming('For Time', {}, null, tEn)).toBe(null)
   })
 })
 

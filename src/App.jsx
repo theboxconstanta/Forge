@@ -37,7 +37,7 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, resolveMemberHeaderTiming, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking,
@@ -8867,8 +8867,8 @@ function App() {
                           refolosind acelasi formatMemberHeaderTiming deja testat. */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: workoutForDisplay.title ? '4px' : '0' }}>
                         <span style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{primarySectionV?.format}</span>
-                        {primarySectionV && formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t)}</span>
+                        {primarySectionV && resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t) && (
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>{resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t)}</span>
                         )}
                       </div>
                     </>
@@ -9014,7 +9014,7 @@ function App() {
                     const miscari = v.movements
                     const notaVarianta = v.notes
                     const scheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []
-                    const headerTiming = primarySectionV ? formatMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, t) : null
+                    const headerTiming = primarySectionV ? resolveMemberHeaderTiming(primarySectionV.format, primarySectionV.formatConfig, formatWodDurata(wodZiData?.duration), t) : null
                     return (
                       <div style={{ marginTop: '24px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>

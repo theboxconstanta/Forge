@@ -751,6 +751,20 @@ export function formatMemberHeaderTiming(formatId, config, t) {
   return TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) ? `${t?.memberWodTimeCapLabel || 'Time cap'} ${value}` : value
 }
 
+// Multe WOD-uri legacy (create inainte de Workout Engine V2 / Quick Create)
+// n-au niciodata format_config populat in DB (confirmat live: format_config
+// null, dar coloana veche wods.duration = "20:00") - formatMemberHeaderTiming
+// singur intoarce null pt ele, lasand headerul fara nicio valoare de timp.
+// Acest wrapper cade pe duration-ul legacy (deja normalizat de apelant, ex.
+// prin formatWodDurata) cand config-ul n-are nimic, pastrand aceeasi eticheta
+// "Time cap" doar pt formatele cu plafon.
+export function resolveMemberHeaderTiming(formatId, config, legacyDuration, t) {
+  const fromConfig = formatMemberHeaderTiming(formatId, config, t)
+  if (fromConfig) return fromConfig
+  if (!legacyDuration) return null
+  return TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) ? `${t?.memberWodTimeCapLabel || 'Time cap'} ${legacyDuration}` : legacyDuration
+}
+
 // Randuri curate, separate, pt restul cardului de WOD al membrului (sub
 // header) - spre deosebire de describeFormatConfig (folosit de coach/Admin,
 // "eticheta: valoare" alaturate cu " · " - neschimbat, inca folosit acolo),
