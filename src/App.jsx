@@ -9072,18 +9072,13 @@ function App() {
                           </div>
                           {isSelected && (miscari.length > 0 || notaVarianta) && (
                             <>
-                              <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                  <span style={{ fontSize: '13px', fontWeight: '400', color: '#6B7280' }}>{primarySectionV?.format}</span>
-                                  <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '400' }}>{formatWodDurata(wodZiData?.duration)}</span>
-                                </div>
-                                {workoutForDisplay?.title && <div style={{ fontSize: '14px', fontWeight: '500', color: '#6B7280', marginTop: '4px' }}>"{workoutForDisplay.title}"</div>}
-                                {primarySectionV && describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t) && (
-                                  <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '400', marginTop: '2px' }}>{describeFormatConfig(primarySectionV.format, primarySectionV.formatConfig, t)}</div>
-                                )}
-                              </div>
+                              {/* Eliminate Redundant Workout Header Information - formatul
+                                  si time cap-ul se vad deja o singura data, in headerul
+                                  cardului "Workout of the Day" de mai sus (curatare
+                                  presentation-layer) - cardul de varianta incepe direct cu
+                                  lista de miscari, fara sa repete format/durata/titlu. */}
                               {miscari.length > 0 && (
-                                <div>
+                                <div style={{ marginTop: '16px' }}>
                                   {miscari.map((m, mi) => (
                                     <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
                                       {cleanMovementDisplayText(resolveMovementDisplayText(m, activeAthleteGenderKey))}
