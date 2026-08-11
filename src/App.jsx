@@ -2430,6 +2430,17 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // (editWodId null) - editarea unui WOD existent (explicit sau prin
   // sincronizarea silentioasa de mai jos) sare mereu direct la builder.
   const [showQuickCreate, setShowQuickCreate] = useState(true)
+  // Bug real (raportat 2026-08-11): "New Workout" intra direct in builder-ul
+  // manual in loc de Quick Create de fiecare data cand data curenta (implicit
+  // azi) are deja un WOD salvat - cazul obisnuit intr-o sala activa. Cauza:
+  // sincronizarea silentioasa de mai jos (gandita doar sa tina campurile
+  // formularului la zi cu DB, vezi comentariul ei) seteaza editWodId, ceea ce
+  // declanseaza automat inchiderea Quick Create. Acest flag, setat explicit
+  // de startNewWod(), suprima DOAR acea sincronizare pasiva cat timp userul
+  // e activ in fluxul "antrenament nou" - odata salvat, editWodId devine
+  // real si efectul se opreste oricum singur (garda lui existenta), deci
+  // flag-ul nu mai e nevoie dupa primul Save.
+  const [creatingNewWod, setCreatingNewWod] = useState(false)
   // Faza 6 (Native Workout Section Editor) - vezi createSection/
   // sectionsFromLegacyWod/legacyPayloadFromSections/validateSectionsForLegacy
   // (scope de modul, definite langa SectionCard). `wodSections` inlocuieste
@@ -3364,6 +3375,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         if (!editWodId) setEditWodId(data.id)
       } else {
         setEditWodId(null); setDataWod(todayLocalStr()); resetWodFormFields()
+        setCreatingNewWod(false)
         setShowQuickCreate(true)
       }
     }
@@ -3388,6 +3400,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // La editare deschidem toate cardurile automat (altfel adminul nu vede ce
     // e completat deja fara sa dea click pe fiecare titlu pe rand).
     syncWodFormFromRow(w, { open: true })
+    setCreatingNewWod(false)
     setAdminTab('wod')
     // Admin e deja randat doar cand screen === 'admin' (vezi App()), nu are
     // propriul lui setScreen - fara reset explicit aici, editarea unui WOD mai
@@ -3405,11 +3418,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // desi WOD-ul zilei chiar exista (bug raportat: switch-ul lasat OFF aparea
   // din nou ON la reintrarea in Admin).
   useEffect(() => {
-    if (editWodId) return
+    if (editWodId || creatingNewWod) return
     const existing = wods.find(w => w.date === dataWod)
     if (existing) syncWodFormFromRow(existing)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataWod, wods, editWodId])
+  }, [dataWod, wods, editWodId, creatingNewWod])
 
   // Un WOD real incarcat (editWodId setat, explicit sau prin sincronizarea de
   // mai sus) inseamna ca nu mai suntem in fluxul de creare - inchide Quick
@@ -3477,6 +3490,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const cancelEditWod = () => {
     setEditWodId(null); setDataWod(todayLocalStr())
     resetWodFormFields()
+    setCreatingNewWod(false)
     setShowQuickCreate(true)
   }
 
@@ -3487,7 +3501,21 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const requestCancelWod = () => {
     if (isWodDirty && !window.confirm(t.adminWodDiscardConfirm)) return
     if (editWodId) cancelEditWod()
-    else setShowQuickCreate(true)
+    else { setCreatingNewWod(false); setShowQuickCreate(true) }
+  }
+
+  // "+ New Workout" - punctul de intrare explicit cerut (regresie raportata
+  // 2026-08-11): garanteaza Quick Create indiferent daca data curenta are
+  // deja un WOD salvat (vezi comentariul de la creatingNewWod si de la
+  // efectul de sincronizare pasiva de mai jos, care altfel ar sari peste
+  // Quick Create direct in editarea WOD-ului existent al zilei).
+  const startNewWod = () => {
+    if (isWodDirty && !window.confirm(t.adminWodDiscardConfirm)) return
+    setEditWodId(null)
+    setDataWod(todayLocalStr())
+    resetWodFormFields()
+    setCreatingNewWod(true)
+    setShowQuickCreate(true)
   }
 
   const stergeWod = async (id) => {
@@ -4412,6 +4440,10 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {/* WOD */}
       {adminTab === 'wod' && (
         <>
+          <button onClick={startNewWod}
+            style={{ width: '100%', marginBottom: '14px', padding: '12px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            {t.adminWodNewButton}
+          </button>
           {showQuickCreate ? (
             // Quick Create (30-Second Rule) - primul ecran vazut la crearea
             // unui WOD nou: paste/type + Generate/Use Template/Start Empty.
