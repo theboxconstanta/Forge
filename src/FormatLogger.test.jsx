@@ -139,6 +139,53 @@ describe('FormatLogger - Partner WOD respectă baseFormat', () => {
   })
 })
 
+// LEADERBOARD_FINISH_TIME_INVESTIGATION.md - Timp si Runde complete erau
+// afisate simultan la RFT/For Time (Repeated Rounds)/Partner WOD, un membru
+// care termina putea completa firesc ambele si pierdea silentios Timpul la
+// salvare (vezi App.jsx composeWodLogFields / shouldLogRoundsInsteadOfTime).
+// Mutual exclusivitate reala in UI: campul de Runde complete dispare de
+// indata ce Timpul are o valoare, ca cele doua cai sa nu mai poata fi
+// completate contradictoriu.
+describe('FormatLogger - RFT: Timp si Runde complete se exclud reciproc', () => {
+  it('nimic completat -> ambele campuri vizibile (starea initiala)', () => {
+    render(
+      <FormatLogger formatId="RFT" config={{ rounds: 5 }} movements={['Pull-ups']}
+        value={{}} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+  })
+  it('doar Runde completate (capped/neterminat) -> Timp ramane vizibil, Runde ramane vizibil', () => {
+    render(
+      <FormatLogger formatId="RFT" config={{ rounds: 5 }} movements={['Pull-ups']}
+        value={{ roundsCompleted: '4' }} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+  })
+  it('Timp completat -> Runde complete dispare complet din UI (nu doar hint text)', () => {
+    render(
+      <FormatLogger formatId="RFT" config={{ rounds: 5 }} movements={['Pull-ups']}
+        value={{ time: '18:42' }} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+    expect(screen.queryByText('Runde complete')).not.toBeInTheDocument()
+  })
+  it('trece de la "Runde completate" la "Timp SI Runde completate" -> Runde dispare la re-render (fara sa piarda valoarea, doar ascunsa)', () => {
+    const { rerender } = render(
+      <FormatLogger formatId="RFT" config={{ rounds: 5 }} movements={['Pull-ups']}
+        value={{ roundsCompleted: '5' }} onChange={() => {}} t={{}} />
+    )
+    expect(screen.getByText('Runde complete')).toBeInTheDocument()
+    rerender(
+      <FormatLogger formatId="RFT" config={{ rounds: 5 }} movements={['Pull-ups']}
+        value={{ roundsCompleted: '5', time: '18:42' }} onChange={() => {}} t={{}} />
+    )
+    expect(screen.queryByText('Runde complete')).not.toBeInTheDocument()
+    expect(screen.getByText('Timp')).toBeInTheDocument()
+  })
+})
+
 describe('FormatLogger - Intervals (simpleReps ca Tabata)', () => {
   it('nu are câmp de greutate și nu are buton de adăugat set', () => {
     render(

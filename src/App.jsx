@@ -43,7 +43,8 @@ import {
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
-  effectiveScoreMode, composeFinishedRoundsText, composeStageResult, totalRepsChained,
+  composeStageResult, totalRepsChained,
+  composeFortimeOrAmrapFields,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -7712,23 +7713,31 @@ function App() {
         log_meta: { stages: stageLogMeta, totalReps: totalRepsChained(stages, wodChainedStages) },
       }
     }
-    // La RFT/Partner WOD (scoreMode 'fortime_or_amrap'), FormatLogger arata
-    // AMBELE seturi de campuri (timp SI runde+reps partiale) - membrul
-    // completeaza doar unul, dupa cum a terminat sau nu in time cap. Fara
-    // verificarea wodRoundsCompleted aici, ramura AMRAP nu se activa NICIODATA
-    // pentru aceste formate (scoreMode nu e strict 'amrap'), iar runde+reps
-    // partiale completate de membru se pierdeau silentios la salvare.
-    //
     // La For Time/Ladder (sequentialPartial - secvente, nu runde repetate),
     // nu mai exista camp de "runde complete" separat - semnalul ca membrul
     // n-a terminat e absenta Timpului; in acel caz compunem direct din
     // repetarile per miscare (cu fallback la prescris pt cele netouched).
     const isSequential = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
+    // LEADERBOARD_FINISH_TIME_INVESTIGATION.md - RFT/For Time (Repeated
+    // Rounds)/Partner WOD sunt exact subsetul NEsecvential, scoreMode
+    // 'fortime_or_amrap' - pt acest subset isSequential e mereu fals si
+    // format.ascending nu exista niciodata (doar 'Ascending AMRAP', scoreMode
+    // 'amrap', il are), deci lantul generic de mai jos s-ar fi comportat
+    // identic - extras intr-o functie pura testabila (workoutFormats.js) ca
+    // sa garanteze, cu un test dedicat, ca un Timp valid introdus nu mai e
+    // niciodata sters silentios de campul de Runde completate (bug real
+    // gasit - vezi raportul).
+    if (!isSequential && format.scoreMode === 'fortime_or_amrap') {
+      const { result, time_result } = composeFortimeOrAmrapFields({
+        wodTime, wodRoundsCompleted, wodPartialReps, movements: miscariPentruLog,
+        rounds: activeLogFormatConfig?.rounds, wodResult,
+      })
+      return { result, time_result, sets: null, log_meta: null, weight_logged: wodWeightLogged.trim() || null }
+    }
     const useReps = isSequential
       ? !wodTime.trim()
       : (format.scoreMode === 'amrap'
-        || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP')
-        || (format.scoreMode === 'fortime_or_amrap' && wodRoundsCompleted.trim() !== ''))
+        || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP'))
     let rezultatFinal
     if (useReps && isSequential) {
       rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, miscariPentruLog), miscariPentruLog)
@@ -7742,18 +7751,12 @@ function App() {
         : miscariPentruLog
       rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
     } else {
-      // RFT (mereu) sau For Time/Partner WOD cu runde repetate configurate -
-      // a termina (Timp completat) inseamna prin definitie ca ai facut toate
-      // rundele prescrise, nu trebuie retipat de mana (bug real gasit:
-      // cineva a scris doar "5" in campul liber, in loc de "5 runde
-      // complete" - vezi comentariul de la 'RFT'.rounds in workoutFormats.js
-      // si ScoredFields in FormatLogger.jsx, unde campul liber e ascuns in
-      // acest caz). Fallback la textul liber doar cand rundele nu sunt
-      // configurate (ex. For Time/Partner WOD fara acel camp completat).
-      const finishedRoundsText = (!isSequential && effectiveScoreMode(activeLogFormatId, activeLogFormatConfig) === 'fortime_or_amrap')
-        ? composeFinishedRoundsText(activeLogFormatConfig?.rounds)
-        : null
-      rezultatFinal = finishedRoundsText ?? wodResult.trim()
+      // Ramas doar pt sequentialPartial terminat (For Time-Sequence/Chipper/
+      // Ladder, cu Timp completat) si pt 'mixed' family cu mainFormat AMRAP
+      // (nu ajunge niciodata aici, useReps e mereu true acolo) - RFT/For Time
+      // Repeated Rounds/Partner WOD sunt tratate integral mai sus, in
+      // composeFortimeOrAmrapFields (nu mai trec pe aici deloc).
+      rezultatFinal = wodResult.trim()
     }
     return {
       result: rezultatFinal || null, time_result: useReps ? null : (wodTime.trim() || null),

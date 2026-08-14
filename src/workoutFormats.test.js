@@ -11,6 +11,7 @@ import {
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
   composeStageResult, totalRepsChained, totalRepsAmrapStage,
   isWeightScoredSetsFormat, toKgForRanking,
+  shouldLogRoundsInsteadOfTime, composeFortimeOrAmrapFields,
 } from './workoutFormats'
 import { getT, TRANSLATIONS } from './translations'
 
@@ -291,6 +292,97 @@ describe('composeAmrapResult / parseAmrapResult', () => {
   })
   it('string gol dacă nu sunt runde completate', () => {
     expect(composeAmrapResult('', ['', ''], movements)).toBe('')
+  })
+})
+
+// LEADERBOARD_FINISH_TIME_INVESTIGATION.md - un Timp valid introdus la RFT/
+// For Time (Repeated Rounds)/Partner WOD nu mai trebuie sters silentios de
+// campul de Runde completate, oricare ar fi payload-ul (bug real gasit,
+// confirmat pe date live - vezi raportul, sectiunea 5).
+describe('shouldLogRoundsInsteadOfTime', () => {
+  it('doar Timp completat -> Timpul castiga (nu loga pe runde)', () => {
+    expect(shouldLogRoundsInsteadOfTime('18:42', '')).toBe(false)
+  })
+  it('doar Runde completate, fara Timp -> capped/neterminat, loga pe runde', () => {
+    expect(shouldLogRoundsInsteadOfTime('', '4')).toBe(true)
+  })
+  it('AMBELE completate (payload contradictoriu) -> Timpul tot castiga, NU rundele', () => {
+    expect(shouldLogRoundsInsteadOfTime('18:42', '5')).toBe(false)
+  })
+  it('niciunul completat -> nu loga pe runde (cade pe fallback text liber)', () => {
+    expect(shouldLogRoundsInsteadOfTime('', '')).toBe(false)
+  })
+  it('tolereaza whitespace pur ca "gol"', () => {
+    expect(shouldLogRoundsInsteadOfTime('  ', '4')).toBe(true)
+    expect(shouldLogRoundsInsteadOfTime('18:42', '  ')).toBe(false)
+  })
+})
+
+describe('composeFortimeOrAmrapFields (RFT/For Time Repeated Rounds/Partner WOD)', () => {
+  const movements = ['Pull-ups', 'Push-ups']
+
+  it('WOD completat, doar Timp introdus -> scorul canonic e timpul', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '18:42', wodRoundsCompleted: '', wodPartialReps: ['', ''], movements, rounds: 5, wodResult: '',
+    })
+    expect(out.time_result).toBe('18:42')
+    expect(out.result).toBe('5 runde complete')
+  })
+
+  it('WOD completat, Timp SI toate rundele prescrise introduse -> rundele NU inlocuiesc timpul', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '18:42', wodRoundsCompleted: '5', wodPartialReps: ['', ''], movements, rounds: 5, wodResult: '',
+    })
+    expect(out.time_result).toBe('18:42')
+    expect(out.result).toBe('5 runde complete')
+  })
+
+  it('RFT terminat (5 runde prescrise, 5 completate manual + timp) -> 18:42, nu "5 runde complete" fara timp', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '18:42', wodRoundsCompleted: '5', wodPartialReps: [], movements, rounds: 5, wodResult: '',
+    })
+    expect(out).toEqual({ result: '5 runde complete', time_result: '18:42' })
+  })
+
+  it('RFT capped (4 runde + 12 reps, fara timp valid) -> reprezentarea canonica existenta de capped, nu timp inventat', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '', wodRoundsCompleted: '4', wodPartialReps: ['12', ''], movements, rounds: 5, wodResult: '',
+    })
+    expect(out.time_result).toBe(null)
+    expect(out.result).toBe('4 runde + 12 Pull-ups')
+  })
+
+  it('payload contradictoriu (Timp valid + Runde/reps completate) -> precedenta corectata: Timpul castiga', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '17:05', wodRoundsCompleted: '3', wodPartialReps: ['8', ''], movements, rounds: 5, wodResult: '',
+    })
+    expect(out.time_result).toBe('17:05')
+    expect(out.result).toBe('5 runde complete')
+  })
+
+  it('fara rounds prescris (Partner WOD fara config.rounds), terminat -> cade pe textul liber wodResult', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '22:10', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: undefined, wodResult: '18 runde complete',
+    })
+    expect(out).toEqual({ result: '18 runde complete', time_result: '22:10' })
+  })
+
+  it('nimic completat, rounds prescris cunoscut -> comportament pre-existent NESCHIMBAT (presupune terminat, fara timp)', () => {
+    // Nu parte din fix-ul curent (LEADERBOARD_FINISH_TIME_INVESTIGATION.md
+    // e scopat strict la payload-uri CONTRADICTORII, cu ambele campuri
+    // completate) - acest caz (nimic completat deloc) se comporta identic
+    // inainte si dupa fix, documentat aici ca sa nu fie confundat cu bug-ul
+    // reparat.
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: 5, wodResult: '',
+    })
+    expect(out).toEqual({ result: '5 runde complete', time_result: null })
+  })
+  it('nimic completat, fara rounds prescris -> fara scor', () => {
+    const out = composeFortimeOrAmrapFields({
+      wodTime: '', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: undefined, wodResult: '',
+    })
+    expect(out).toEqual({ result: null, time_result: null })
   })
 })
 

@@ -372,6 +372,42 @@ export function composeAmrapResult(roundsCompleted, partialArr, movements) {
   return `${roundsCompleted.toString().trim()} runde${partialStr ? ' + ' + partialStr : ' complete'}`
 }
 
+// LEADERBOARD_FINISH_TIME_INVESTIGATION.md - la formatele scoreMode
+// 'fortime_or_amrap' NEsecventiale (RFT, For Time cu structure 'Repeated
+// Rounds', Partner WOD), FormatLogger arata simultan campul de Timp SI campul
+// de Runde complete - un membru care a terminat scrie firesc numarul de runde
+// SI timpul lui. Bug real gasit (confirmat pe date live): campul de Runde
+// avea prioritate necontitionata, stergand silentios un Timp valid introdus
+// in acelasi log (time_result salvat null desi membrul chiar terminase).
+// Timpul introdus e mereu autoritar - Runde complete ramane calea de logare
+// DOAR cat timp Timpul e gol (membru neterminat/capped). Aplicata atat in
+// calea de scriere (composeWodLogFields), ca protectie indiferent de sursa
+// payload-ului (client vechi, bundle cache stricat), cat si in UI
+// (FormatLogger.ScoredFields), care acum ascunde campul de Runde complete de
+// indata ce Timpul are o valoare, in loc sa se bazeze doar pe un text de hint.
+export function shouldLogRoundsInsteadOfTime(wodTime, wodRoundsCompleted) {
+  return !(wodTime || '').toString().trim() && !!(wodRoundsCompleted || '').toString().trim()
+}
+
+// Compune result/time_result pt un log 'fortime_or_amrap' NEsecvential (RFT,
+// For Time cu structure 'Repeated Rounds', Partner WOD) - extras din
+// composeWodLogFields (App.jsx) ca sa fie testabil izolat de restul
+// formularului React, per LEADERBOARD_FINISH_TIME_INVESTIGATION.md sectiunea
+// 9. Comportament IDENTIC cu ramurile echivalente ale lantului useReps
+// generic pt acest subset de formate (isSequential e mereu fals si
+// format.ascending nu exista niciodata la scoreMode 'fortime_or_amrap', deci
+// nimic din logica generica se aplica diferit aici) - singura schimbare reala
+// e ca Timpul introdus e acum garantat autoritar peste Runde completate
+// manual (shouldLogRoundsInsteadOfTime), indiferent de sursa payload-ului.
+export function composeFortimeOrAmrapFields({ wodTime, wodRoundsCompleted, wodPartialReps, movements, rounds, wodResult }) {
+  if (shouldLogRoundsInsteadOfTime(wodTime, wodRoundsCompleted)) {
+    return { result: composeAmrapResult(wodRoundsCompleted, wodPartialReps, movements) || null, time_result: null }
+  }
+  const finishedRoundsText = composeFinishedRoundsText(rounds)
+  const time = (wodTime || '').toString().trim()
+  return { result: (finishedRoundsText ?? (wodResult || '').toString().trim()) || null, time_result: time || null }
+}
+
 // Text de rezultat pt un log 'fortime_or_amrap' TERMINAT (are Timp) la un
 // format cu config.rounds cunoscut (RFT, sau For Time/Partner WOD cu runde
 // repetate) - vezi comentariul de la 'RFT'.rounds mai sus. null (nu string

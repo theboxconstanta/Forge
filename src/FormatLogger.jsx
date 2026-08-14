@@ -188,17 +188,30 @@ function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPart
     // compunem automat textul la salvare (vezi composeFinishedRoundsText in
     // App.jsx) - membrul nu mai trebuie sa scrie de mana ceva deja stiut.
     const roundsCunoscute = parseInt(finishedRounds) > 0
+    // LEADERBOARD_FINISH_TIME_INVESTIGATION.md - campul de Runde complete si
+    // campul de Timp erau afisate simultan, distinse doar printr-un text de
+    // hint ("completează în loc") - un membru care termina scria firesc si
+    // numarul de runde, pierzand silentios Timpul la salvare (vezi
+    // shouldLogRoundsInsteadOfTime in workoutFormats.js, aceeasi sursa de
+    // adevar folosita si la scriere). Mutual exclusivitate reala, nu doar
+    // text explicativ: campul de Runde dispare de indata ce Timpul are o
+    // valoare, in loc sa ramana disponibil pt o intrare contradictorie.
+    const hasTime = !!(value.time || '').trim()
     return (
       <>
         {greutateField}
         <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult={roundsCunoscute} />
-        {roundsCunoscute && (
+        {roundsCunoscute && !hasTime && (
           <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>
             {t?.logWodFinishedRoundsHint ? t.logWodFinishedRoundsHint(finishedRounds) : `Dacă termini, se înregistrează automat ${finishedRounds} runde complete.`}
           </div>
         )}
-        <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
-        <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
+        {!hasTime && (
+          <>
+            <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
+            <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
+          </>
+        )}
       </>
     )
   }
