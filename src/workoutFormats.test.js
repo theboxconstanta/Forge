@@ -12,6 +12,7 @@ import {
   composeStageResult, totalRepsChained, totalRepsAmrapStage,
   isWeightScoredSetsFormat, toKgForRanking,
   shouldLogRoundsInsteadOfTime, composeFortimeOrAmrapFields,
+  deriveDurationCompletionState, normalizeCompletionState,
 } from './workoutFormats'
 import { getT, TRANSLATIONS } from './translations'
 
@@ -321,68 +322,112 @@ describe('shouldLogRoundsInsteadOfTime', () => {
 describe('composeFortimeOrAmrapFields (RFT/For Time Repeated Rounds/Partner WOD)', () => {
   const movements = ['Pull-ups', 'Push-ups']
 
-  it('WOD completat, doar Timp introdus -> scorul canonic e timpul', () => {
+  it('WOD completat, doar Timp introdus -> scorul canonic e timpul, completionState "completed"', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '18:42', wodRoundsCompleted: '', wodPartialReps: ['', ''], movements, rounds: 5, wodResult: '',
     })
     expect(out.time_result).toBe('18:42')
     expect(out.result).toBe('5 runde complete')
+    expect(out.completionState).toBe('completed')
   })
 
-  it('WOD completat, Timp SI toate rundele prescrise introduse -> rundele NU inlocuiesc timpul', () => {
+  it('WOD completat, Timp SI toate rundele prescrise introduse -> rundele NU inlocuiesc timpul, tot "completed"', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '18:42', wodRoundsCompleted: '5', wodPartialReps: ['', ''], movements, rounds: 5, wodResult: '',
     })
     expect(out.time_result).toBe('18:42')
     expect(out.result).toBe('5 runde complete')
+    expect(out.completionState).toBe('completed')
   })
 
-  it('RFT terminat (5 runde prescrise, 5 completate manual + timp) -> 18:42, nu "5 runde complete" fara timp', () => {
+  it('RFT terminat (5 runde prescrise, 5 completate manual + timp) -> 18:42, "completed", nu "5 runde complete" fara timp', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '18:42', wodRoundsCompleted: '5', wodPartialReps: [], movements, rounds: 5, wodResult: '',
     })
-    expect(out).toEqual({ result: '5 runde complete', time_result: '18:42' })
+    expect(out).toEqual({ result: '5 runde complete', time_result: '18:42', completionState: 'completed' })
   })
 
-  it('RFT capped (4 runde + 12 reps, fara timp valid) -> reprezentarea canonica existenta de capped, nu timp inventat', () => {
+  it('RFT capped (4 runde + 12 reps, fara timp valid) -> reprezentarea canonica existenta de capped, completionState "capped"', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '', wodRoundsCompleted: '4', wodPartialReps: ['12', ''], movements, rounds: 5, wodResult: '',
     })
     expect(out.time_result).toBe(null)
     expect(out.result).toBe('4 runde + 12 Pull-ups')
+    expect(out.completionState).toBe('capped')
   })
 
-  it('payload contradictoriu (Timp valid + Runde/reps completate) -> precedenta corectata: Timpul castiga', () => {
+  it('payload contradictoriu (Timp valid + Runde/reps completate) -> precedenta corectata: Timpul castiga, "completed" niciodata "capped"', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '17:05', wodRoundsCompleted: '3', wodPartialReps: ['8', ''], movements, rounds: 5, wodResult: '',
     })
     expect(out.time_result).toBe('17:05')
     expect(out.result).toBe('5 runde complete')
+    expect(out.completionState).toBe('completed')
   })
 
-  it('fara rounds prescris (Partner WOD fara config.rounds), terminat -> cade pe textul liber wodResult', () => {
+  it('fara rounds prescris (Partner WOD fara config.rounds), terminat -> cade pe textul liber wodResult, "completed"', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '22:10', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: undefined, wodResult: '18 runde complete',
     })
-    expect(out).toEqual({ result: '18 runde complete', time_result: '22:10' })
+    expect(out).toEqual({ result: '18 runde complete', time_result: '22:10', completionState: 'completed' })
   })
 
-  it('nimic completat, rounds prescris cunoscut -> comportament pre-existent NESCHIMBAT (presupune terminat, fara timp)', () => {
+  it('nimic completat, rounds prescris cunoscut -> comportament pre-existent NESCHIMBAT (presupune terminat, fara timp), "completed"', () => {
     // Nu parte din fix-ul curent (LEADERBOARD_FINISH_TIME_INVESTIGATION.md
     // e scopat strict la payload-uri CONTRADICTORII, cu ambele campuri
     // completate) - acest caz (nimic completat deloc) se comporta identic
     // inainte si dupa fix, documentat aici ca sa nu fie confundat cu bug-ul
-    // reparat.
+    // reparat. completionState "completed" e consecvent cu presupunerea
+    // pre-existenta (campul de runde ascuns => se presupune terminat).
     const out = composeFortimeOrAmrapFields({
       wodTime: '', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: 5, wodResult: '',
     })
-    expect(out).toEqual({ result: '5 runde complete', time_result: null })
+    expect(out).toEqual({ result: '5 runde complete', time_result: null, completionState: 'completed' })
   })
-  it('nimic completat, fara rounds prescris -> fara scor', () => {
+  it('nimic completat, fara rounds prescris -> fara scor, dar completionState tot "completed" (nu a semnalat capped)', () => {
     const out = composeFortimeOrAmrapFields({
       wodTime: '', wodRoundsCompleted: '', wodPartialReps: [], movements, rounds: undefined, wodResult: '',
     })
-    expect(out).toEqual({ result: null, time_result: null })
+    expect(out).toEqual({ result: null, time_result: null, completionState: 'completed' })
+  })
+})
+
+// SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11 (Completion State, Faza 0)
+describe('deriveDurationCompletionState', () => {
+  it('capped -> "capped"', () => {
+    expect(deriveDurationCompletionState(true)).toBe('capped')
+  })
+  it('nu capped -> "completed"', () => {
+    expect(deriveDurationCompletionState(false)).toBe('completed')
+  })
+})
+
+// SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 8 (Defensive Validation) -
+// normalizeCompletionState e granita de scriere care garanteaza ca
+// completion_state ajunge mereu in DB consecvent cu time_result, indiferent
+// de ramura care l-a produs sau de un eventual client vechi.
+describe('normalizeCompletionState', () => {
+  it('completion_state null (format fara dualitate finished/capped) -> trece neschimbat', () => {
+    const fields = { result: '120kg', time_result: null, completion_state: null }
+    expect(normalizeCompletionState(fields)).toBe(fields)
+  })
+  it('completed + time_result prezent (consecvent) -> neschimbat', () => {
+    const fields = { result: '5 runde complete', time_result: '18:42', completion_state: 'completed' }
+    expect(normalizeCompletionState(fields)).toEqual(fields)
+  })
+  it('capped + time_result absent (consecvent) -> neschimbat', () => {
+    const fields = { result: '4 runde + 12 reps', time_result: null, completion_state: 'capped' }
+    expect(normalizeCompletionState(fields)).toEqual(fields)
+  })
+  it('DEZACORD: completed dar time_result absent (client vechi/bundle stricat) -> corectat silentios la "capped"', () => {
+    const fields = { result: '5 runde complete', time_result: null, completion_state: 'completed' }
+    expect(normalizeCompletionState(fields).completion_state).toBe('capped')
+  })
+  it('DEZACORD: capped dar time_result prezent (client vechi/bundle stricat) -> corectat silentios la "completed", timpul NU se pierde', () => {
+    const fields = { result: '5 runde complete', time_result: '18:42', completion_state: 'capped' }
+    const out = normalizeCompletionState(fields)
+    expect(out.completion_state).toBe('completed')
+    expect(out.time_result).toBe('18:42')
   })
 })
 

@@ -389,23 +389,59 @@ export function shouldLogRoundsInsteadOfTime(wodTime, wodRoundsCompleted) {
   return !(wodTime || '').toString().trim() && !!(wodRoundsCompleted || '').toString().trim()
 }
 
-// Compune result/time_result pt un log 'fortime_or_amrap' NEsecvential (RFT,
-// For Time cu structure 'Repeated Rounds', Partner WOD) - extras din
-// composeWodLogFields (App.jsx) ca sa fie testabil izolat de restul
-// formularului React, per LEADERBOARD_FINISH_TIME_INVESTIGATION.md sectiunea
-// 9. Comportament IDENTIC cu ramurile echivalente ale lantului useReps
-// generic pt acest subset de formate (isSequential e mereu fals si
+// SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11 (Completion State, Faza 0)
+// - starea de finalizare a unui rezultat Duration-based (a terminat sau a
+// fost oprit de time cap) nu mai e doar o regula implicita (dedusa la citire
+// din prezenta/absenta lui time_result) - e calculata O SINGURA DATA, chiar
+// la punctul unde scrierea decide oricum intre "a terminat" si "capped/
+// neterminat" (acelasi `hasTime` boolean care alege deja intre cele doua
+// ramuri mai jos SI in ramura secventiala din App.jsx), niciodata re-dedusa
+// separat dintr-un payload deja compus - asta face imposibil structural ca
+// completion_state sa contrazica time_result, fara nicio validare separata.
+// Doar 'completed'/'capped' sunt scrise de vreo cale de cod curenta - 'dnf'/
+// 'dns' raman in vocabular doar pt compatibilitate inainte (nu exista azi un
+// flux UI care sa produca un log complet gol, vezi `areContiut` in App.jsx).
+// Parametrul e boolean-ul de ramura DEJA calculat la locul de apel
+// (shouldLogRoundsInsteadOfTime pt nesecvential, useReps pt secvential) - nu
+// re-verifica time_result separat, ca sa nu existe a doua sursa de adevar
+// care ar putea vreodata sa contrazica ramura care a compus deja rezultatul.
+export function deriveDurationCompletionState(isCapped) {
+  return isCapped ? 'capped' : 'completed'
+}
+
+// LEADERBOARD_FINISH_TIME_INVESTIGATION.md / SCORING_MODEL_ARCHITECTURE_
+// VNEXT.md sectiunea 8 (Defensive Validation) - normalizeaza completion_state
+// la granita de scriere (nu respinge salvarea - un membru nu trebuie
+// niciodata blocat de o verificare interna). Aplicata dupa TOATE ramurile
+// din composeWodLogFields, indiferent care a produs rezultatul - protectie
+// impotriva unui client vechi/bundle cache stricat care ar putea vreodata
+// trimite time_result si completion_state in dezacord; corecteaza silentios
+// completion_state sa fie mereu consecvent cu time_result (singura sursa
+// reala de adevar pt "a terminat" la formatele Duration-based), fara sa
+// modifice scorul propriu-zis.
+export function normalizeCompletionState(fields) {
+  if (fields.completion_state == null) return fields
+  const consistent = deriveDurationCompletionState(!fields.time_result)
+  return fields.completion_state === consistent ? fields : { ...fields, completion_state: consistent }
+}
+
+// Compune result/time_result/completion_state pt un log 'fortime_or_amrap'
+// NEsecvential (RFT, For Time cu structure 'Repeated Rounds', Partner WOD) -
+// extras din composeWodLogFields (App.jsx) ca sa fie testabil izolat de
+// restul formularului React, per LEADERBOARD_FINISH_TIME_INVESTIGATION.md
+// sectiunea 9. Comportament IDENTIC cu ramurile echivalente ale lantului
+// useReps generic pt acest subset de formate (isSequential e mereu fals si
 // format.ascending nu exista niciodata la scoreMode 'fortime_or_amrap', deci
 // nimic din logica generica se aplica diferit aici) - singura schimbare reala
 // e ca Timpul introdus e acum garantat autoritar peste Runde completate
 // manual (shouldLogRoundsInsteadOfTime), indiferent de sursa payload-ului.
 export function composeFortimeOrAmrapFields({ wodTime, wodRoundsCompleted, wodPartialReps, movements, rounds, wodResult }) {
   if (shouldLogRoundsInsteadOfTime(wodTime, wodRoundsCompleted)) {
-    return { result: composeAmrapResult(wodRoundsCompleted, wodPartialReps, movements) || null, time_result: null }
+    return { result: composeAmrapResult(wodRoundsCompleted, wodPartialReps, movements) || null, time_result: null, completionState: deriveDurationCompletionState(true) }
   }
   const finishedRoundsText = composeFinishedRoundsText(rounds)
   const time = (wodTime || '').toString().trim()
-  return { result: (finishedRoundsText ?? (wodResult || '').toString().trim()) || null, time_result: time || null }
+  return { result: (finishedRoundsText ?? (wodResult || '').toString().trim()) || null, time_result: time || null, completionState: deriveDurationCompletionState(false) }
 }
 
 // Text de rezultat pt un log 'fortime_or_amrap' TERMINAT (are Timp) la un

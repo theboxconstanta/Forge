@@ -44,7 +44,7 @@ import {
   isWeightScoredSetsFormat, toKgForRanking,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
-  composeFortimeOrAmrapFields,
+  composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -1779,7 +1779,12 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
       })
       return Object.values(byMemberChained).sort(comparaChained)
     }
-    const finished = (log) => !!log.time_result
+    // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11/19 - logurile noi
+    // (post-Faza 0) au completion_state scris explicit la salvare, citit
+    // direct aici; logurile vechi (completion_state NULL, scrise inainte de
+    // aceasta migratie) cad pe inferenta veche (!!time_result), byte-identic
+    // cu comportamentul de dinainte - niciun ranking existent nu se schimba.
+    const finished = (log) => log.completion_state != null ? log.completion_state === 'completed' : !!log.time_result
     // La formate secventiale (For Time/Ladder), rezultatul non-finisherilor
     // nu are un numar de "runde" real de comparat (parseScore ar extrage
     // doar numarul primei miscari din text, irelevant) - departajarea se
@@ -7676,7 +7681,13 @@ function App() {
     return prescrisMatch ? prescrisMatch[1] : ''
   })
 
-  const composeWodLogFields = () => {
+  // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 8 - granita defensiva de
+  // scriere: normalizeCompletionState ruleaza dupa ORICE ramura din functia
+  // interna, garantand ca completion_state ajunge mereu in DB consecvent cu
+  // time_result, indiferent de ramura care l-a produs sau de un eventual
+  // client vechi care ar ocoli ramurile actuale.
+  const composeWodLogFields = () => normalizeCompletionState(composeWodLogFieldsInner())
+  const composeWodLogFieldsInner = () => {
     const format = getFormat(activeLogFormatId)
     const setsCurate = () => {
       const cleaned = {}
@@ -7687,10 +7698,10 @@ function App() {
       return Object.keys(cleaned).length > 0 ? cleaned : null
     }
     if (format.family === 'sets') {
-      return { result: null, time_result: null, sets: setsCurate(), log_meta: null }
+      return { result: null, time_result: null, sets: setsCurate(), log_meta: null, completion_state: null }
     }
     if (format.family === 'nft') {
-      return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted } }
+      return { result: null, time_result: null, sets: null, log_meta: { completed: wodCompleted }, completion_state: null }
     }
     // WOD-uri inlantuite ("straight into") - result/time_result raman null
     // (ca la 'sets'/'nft'), rezultatul real e in log_meta: textul compus +
@@ -7711,6 +7722,7 @@ function App() {
       return {
         result: null, time_result: null, sets: null,
         log_meta: { stages: stageLogMeta, totalReps: totalRepsChained(stages, wodChainedStages) },
+        completion_state: null,
       }
     }
     // La For Time/Ladder (sequentialPartial - secvente, nu runde repetate),
@@ -7728,19 +7740,28 @@ function App() {
     // niciodata sters silentios de campul de Runde completate (bug real
     // gasit - vezi raportul).
     if (!isSequential && format.scoreMode === 'fortime_or_amrap') {
-      const { result, time_result } = composeFortimeOrAmrapFields({
+      const { result, time_result, completionState } = composeFortimeOrAmrapFields({
         wodTime, wodRoundsCompleted, wodPartialReps, movements: miscariPentruLog,
         rounds: activeLogFormatConfig?.rounds, wodResult,
       })
-      return { result, time_result, sets: null, log_meta: null, weight_logged: wodWeightLogged.trim() || null }
+      return { result, time_result, completion_state: completionState, sets: null, log_meta: null, weight_logged: wodWeightLogged.trim() || null }
     }
     const useReps = isSequential
       ? !wodTime.trim()
       : (format.scoreMode === 'amrap'
         || (format.family === 'mixed' && activeLogFormatConfig?.mainFormat === 'AMRAP'))
-    let rezultatFinal
+    // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11 - completion_state e
+    // relevant DOAR pt formatele cu dualitate finished/capped (Duration
+    // primitive cu time cap optional) - sequentialPartial (For Time-Sequence/
+    // Chipper/Ladder). AMRAP (pur sau mixed-mainFormat-AMRAP) nu are niciun
+    // concept de "neterminat" separat (clock-ul expira mereu) si Max Effort
+    // (scoreMode 'single_value', singurul alt caz care ajunge in ramura
+    // finala) nu are nicio dualitate de completare - raman null in ambele,
+    // per mission's own "do not invent artificial states".
+    let rezultatFinal, completionState
     if (useReps && isSequential) {
       rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, miscariPentruLog), miscariPentruLog)
+      completionState = deriveDurationCompletionState(true)
     } else if (useReps) {
       // Ascending AMRAP: reps-urile partiale intra in runda CURENTA
       // (roundsCompleted + 1, prima neterminata) - miscariPentruLog trebuie
@@ -7750,16 +7771,18 @@ function App() {
         ? ascendingMovementsForRound(miscariPentruLog, (parseInt(wodRoundsCompleted) || 0) + 1, activeLogFormatConfig?.startReps, activeLogFormatConfig?.incrementReps)
         : miscariPentruLog
       rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
+      completionState = null
     } else {
       // Ramas doar pt sequentialPartial terminat (For Time-Sequence/Chipper/
-      // Ladder, cu Timp completat) si pt 'mixed' family cu mainFormat AMRAP
-      // (nu ajunge niciodata aici, useReps e mereu true acolo) - RFT/For Time
-      // Repeated Rounds/Partner WOD sunt tratate integral mai sus, in
-      // composeFortimeOrAmrapFields (nu mai trec pe aici deloc).
+      // Ladder, cu Timp completat) si pt Max Effort (scoreMode single_value)
+      // - RFT/For Time Repeated Rounds/Partner WOD sunt tratate integral mai
+      // sus, in composeFortimeOrAmrapFields (nu mai trec pe aici deloc).
       rezultatFinal = wodResult.trim()
+      completionState = isSequential ? deriveDurationCompletionState(false) : null
     }
     return {
       result: rezultatFinal || null, time_result: useReps ? null : (wodTime.trim() || null),
+      completion_state: completionState,
       sets: format.family === 'mixed' ? setsCurate() : null, log_meta: null,
       weight_logged: wodWeightLogged.trim() || null,
     }
