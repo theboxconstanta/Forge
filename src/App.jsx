@@ -8853,7 +8853,15 @@ function App() {
         const numeFull = user?.user_metadata?.full_name || user?.email || ''
         const initiale = numeFull.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase() || 'U'
         const esteAzi = dataAcasa === actualToday
-        const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id) : null
+        // Layer 2a bug fix (found live, before deploy could reach real coach
+        // use): matched ANY log with this wod_id, including one linked to a
+        // non-primary independently-scored section (Layer 1) - the top-level
+        // "WORKOUT DONE" badge lit up after logging ONLY the Skill section,
+        // while the primary section's own "Log Score" button correctly
+        // still showed unlogged. Must exclude a log explicitly linked to a
+        // different (non-primary) section; workout_section_id == null stays
+        // matched (legacy rows predating Faza 8, or V2 not yet synced).
+        const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id && (l.workout_section_id == null || l.workout_section_id === primarySectionV?.id)) : null
         const logZiSkill = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === 1) : null
         const logZiSkill2 = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && l.slot === 2) : null
         // Layer 2a - acelasi tipar ca logZiSkill/logZiSkill2 de mai sus, dar
