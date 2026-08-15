@@ -49,7 +49,7 @@ import {
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
-  sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy,
+  sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy, legacySlotAssignmentAfterSave,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
@@ -3387,6 +3387,14 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       await fetchWods(); onWodChanged?.()
       if (sectionLabel) {
         if (!editWodId) setEditWodId(data.id)
+        // Layer 2b.1 - o sectiune noua (legacySlot inca null) tocmai a
+        // primit un rand real in `wods`, la slotul calculat mai sus pt
+        // payload. Fara asta, identitatea ei ar ramane dependenta de
+        // pozitie pana la urmatoarea reincarcare a editorului
+        // (sectionsFromLegacyWod e singurul alt loc care seteaza
+        // legacySlot) - vezi legacySlotAssignmentAfterSave.
+        const slotMap = legacySlotAssignmentAfterSave(flushed)
+        if (slotMap.size > 0) setWodSections(prev => prev.map(s => slotMap.has(s.id) ? { ...s, legacySlot: slotMap.get(s.id) } : s))
       } else {
         setEditWodId(null); setDataWod(todayLocalStr()); resetWodFormFields()
         setCreatingNewWod(false)

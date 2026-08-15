@@ -189,8 +189,13 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
 // de protejat) ocupa sloturile ramase libere, in ordinea lor curenta din
 // lista - acelasi comportament pozitional de dinainte, dar acum limitat
 // STRICT la cazul in care chiar nu exista nimic de stricat.
-export const legacyPayloadFromSections = (sections) => {
-  const primary = sections.find(s => s.isPrimary) || sections[0] || createSection('metcon', true)
+// Layer 2b.1 (PROGRAMMING_SKILL_SECTION_FORMAT_INHERITANCE_FIX_REPORT.md) -
+// extras din fostul corp al legacyPayloadFromSections, ca ambele "directii"
+// (ce se scrie in payload ACUM, si ce legacySlot ar trebui sa poarte
+// sectiunile in memorie DUPA un salvare reusit) sa foloseasca EXACT acelasi
+// calcul, o singura data - niciodata doua implementari separate care ar
+// putea diverge intre ele.
+export const assignNonPrimarySlots = (sections) => {
   const nonPrimary = sections.filter(s => !s.isPrimary)
   const bySlot = { warmup: null, skill: null, skill2: null }
   const unassigned = []
@@ -213,7 +218,34 @@ export const legacyPayloadFromSections = (sections) => {
   for (const slot of ['warmup', 'skill', 'skill2']) {
     if (!bySlot[slot] && restCandidati.length > 0) bySlot[slot] = restCandidati.shift()
   }
-  const { warmup: warmupS, skill: skillS, skill2: skill2S } = bySlot
+  return bySlot
+}
+
+// Sectiunile deja existente (legacySlot != null) isi pastreaza slotul prin
+// constructie (assignNonPrimarySlots de mai sus le respecta primele) - doar
+// sectiunile INCA null au nevoie sa fie "stampilate" dupa un salvare reusit.
+// Fara asta, o sectiune noua ramane legacySlot:null la nesfarsit CAT TIMP
+// coach-ul nu paraseste/reincarca editorul (sectionsFromLegacyWod e singurul
+// alt loc care seteaza legacySlot) - o fereastra reala, desi neconfirmata sa
+// fi produs vreodata un rezultat gresit (investigatie PROGRAMMING_SKILL_
+// SECTION_FORMAT_INHERITANCE_FIX_REPORT.md: 5 reproduceri directe, toate
+// corecte), in care identitatea unei sectiuni noi ramane dependenta de
+// pozitie in loc sa fie ferm stabilita imediat ce exista un rand real in DB
+// careia ii corespunde. Returneaza un Map id->slot, aplicat de apelant
+// (App.jsx) peste starea locala dupa succesul salvarii.
+export const legacySlotAssignmentAfterSave = (sections) => {
+  const bySlot = assignNonPrimarySlots(sections)
+  const map = new Map()
+  for (const slot of ['warmup', 'skill', 'skill2']) {
+    const s = bySlot[slot]
+    if (s && !s.legacySlot) map.set(s.id, slot)
+  }
+  return map
+}
+
+export const legacyPayloadFromSections = (sections) => {
+  const primary = sections.find(s => s.isPrimary) || sections[0] || createSection('metcon', true)
+  const { warmup: warmupS, skill: skillS, skill2: skill2S } = assignNonPrimarySlots(sections)
 
   const nonPrimaryFields = (prefix, s) => {
     if (prefix === 'warmup') return { warmup: s ? parseLiniiWod(s.text) : [], warmup_visible: s ? s.visible : true }

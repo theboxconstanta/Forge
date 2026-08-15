@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   createSection, DEFAULT_NEW_WOD_SECTIONS, sectionsFromLegacyWod,
   legacyPayloadFromSections, validateSectionsForLegacy,
+  assignNonPrimarySlots, legacySlotAssignmentAfterSave,
 } from './wodSections'
 
 // Traduceri fake, doar cele 2 functii folosite de validateSectionsForLegacy.
@@ -309,5 +310,90 @@ describe('validateSectionsForLegacy', () => {
     ]
     const result = validateSectionsForLegacy(sections, t)
     expect(result.errors).toEqual(['PRIMARY_COUNT:0', 'TOO_MANY:4'])
+  })
+})
+
+// Layer 2b.1 (PROGRAMMING_SKILL_SECTION_FORMAT_INHERITANCE_FIX_REPORT.md) -
+// the originally-reported "Skill Section silently inherits the primary's
+// format" symptom was investigated and found NOT reproducible (5 direct
+// live-production attempts, all correct) - but the investigation found a
+// real, narrower gap: a brand-new section's legacySlot stays null until the
+// EDITOR IS RELOADED (only sectionsFromLegacyWod sets it), even after that
+// section has already been saved successfully once. These tests cover the
+// hardening that closes that gap - legacySlot is now also stamped onto
+// in-memory sections immediately after their first successful save (see
+// legacySlotAssignmentAfterSave, wired into saveWod's success handler).
+describe('assignNonPrimarySlots / legacySlotAssignmentAfterSave (Layer 2b.1 hardening)', () => {
+  it('a brand-new scored section (legacySlot null) resolves to skill and appears in the post-save map', () => {
+    const primary = createSection('metcon', true)
+    const skill = { ...createSection('skill', false), scored: true, movementName: 'Squat Clean' }
+    const sections = [skill, primary]
+    expect(assignNonPrimarySlots(sections).skill).toBe(skill)
+    const map = legacySlotAssignmentAfterSave(sections)
+    expect(map.get(skill.id)).toBe('skill')
+  })
+
+  it('two brand-new scored sections get distinct slots (skill, skill2), both appear in the map', () => {
+    const primary = createSection('metcon', true)
+    const a = { ...createSection('skill', false), scored: true, movementName: 'A' }
+    const b = { ...createSection('skill', false), scored: true, movementName: 'B' }
+    const map = legacySlotAssignmentAfterSave([a, b, primary])
+    expect(map.get(a.id)).toBe('skill')
+    expect(map.get(b.id)).toBe('skill2')
+  })
+
+  it('a section that already has legacySlot is NOT re-added to the map (already stamped, nothing to do)', () => {
+    const primary = createSection('metcon', true)
+    const already = { ...createSection('skill', false), scored: true, legacySlot: 'skill' }
+    const map = legacySlotAssignmentAfterSave([already, primary])
+    expect(map.size).toBe(0)
+  })
+
+  it('an unscored brand-new section still gets stamped (positional fallback slot, warmup first), not just scored ones', () => {
+    const primary = createSection('metcon', true)
+    const plain = { ...createSection('skill', false), scored: false, movementName: 'Plain' }
+    // Unscored candidates fill 'warmup' first (restCandidati loop order),
+    // matching assignNonPrimarySlots' existing, unchanged positional
+    // fallback - only scored candidates get skill/skill2 priority.
+    const map = legacySlotAssignmentAfterSave([plain, primary])
+    expect(map.get(plain.id)).toBe('warmup')
+  })
+
+  it('THE FIX: stamping legacySlot after the first save prevents a later in-session reorder (no reload) from swapping content between slots', () => {
+    const primary = createSection('metcon', true)
+    const squatClean = { ...createSection('skill', false), scored: true, movementName: 'Squat Clean' }
+    const amrapSkill = { ...createSection('skill', false), scored: true, movementName: '' }
+    // First save: both still legacySlot:null -> positional (squatClean first -> skill, amrapSkill second -> skill2).
+    let sections = [squatClean, amrapSkill, primary]
+    const payload1 = legacyPayloadFromSections(sections)
+    expect(payload1.skill_name).toBe('Squat Clean')
+    expect(payload1.skill2_name).toBe(null)
+    // Hardening: stamp legacySlot onto the in-memory sections, exactly as saveWod's success handler now does.
+    const map = legacySlotAssignmentAfterSave(sections)
+    sections = sections.map(s => (map.has(s.id) ? { ...s, legacySlot: map.get(s.id) } : s))
+    expect(sections.find(s => s.id === squatClean.id).legacySlot).toBe('skill')
+    expect(sections.find(s => s.id === amrapSkill.id).legacySlot).toBe('skill2')
+    // Reorder WITHOUT any reload (swap array position) and save again.
+    const reordered = [
+      sections.find(s => s.id === amrapSkill.id),
+      sections.find(s => s.id === squatClean.id),
+      primary,
+    ]
+    const payload2 = legacyPayloadFromSections(reordered)
+    // Content must stay bound to identity, not position - Squat Clean is STILL skill, not skill2.
+    expect(payload2.skill_name).toBe('Squat Clean')
+    expect(payload2.skill2_name).toBe(null)
+  })
+
+  it('WITHOUT the fix (legacySlot never stamped), the same in-session reorder WOULD swap content - proves the test above is meaningful, not vacuous', () => {
+    const primary = createSection('metcon', true)
+    const squatClean = { ...createSection('skill', false), scored: true, movementName: 'Squat Clean' }
+    const amrapSkill = { ...createSection('skill', false), scored: true, movementName: '' }
+    const sections = [squatClean, amrapSkill, primary] // legacySlot never stamped, deliberately
+    const reordered = [amrapSkill, squatClean, primary]
+    const payload = legacyPayloadFromSections(reordered)
+    // Without the hardening, position alone decides - amrapSkill (now first) claims 'skill'.
+    expect(payload.skill_name).toBe(null)
+    expect(payload.skill2_name).toBe('Squat Clean')
   })
 })
