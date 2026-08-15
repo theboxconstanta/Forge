@@ -57,10 +57,19 @@ export const emptySectionVariants = () => Object.fromEntries(
 // typeKey === 'warmup' + format === null => card de text liber (fara
 // FormatConfigEditor), exact UI-ul WARM-UP de dinainte - orice alt tip
 // implicit primeste un format (Weightlifting), la fel ca SKILL dinainte.
+// Phase 1B (multi-section scoring) - `scored` is independent of `isPrimary`.
+// The primary section is always scored (isPrimary implies scored, enforced
+// at read/write time below, not stored redundantly). A non-primary section
+// (warmup/skill/skill2) can now ALSO be marked independently scored -
+// `warmup`-typed sections are excluded from the toggle in the UI (see
+// SectionCard) since Warm-up has no equivalent legacy column to persist it
+// (skill_scored/skill2_scored only, Phase 1B migration) and stays
+// permanently non-scoreable, unchanged from before this phase.
 export const createSection = (typeKey, isPrimary = false) => ({
   id: newSectionId(),
   typeKey,
   isPrimary,
+  scored: isPrimary,
   visible: true,
   open: false,
   title: '',
@@ -115,14 +124,14 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
   const sections = []
   if ((w.warmup || []).length > 0 || w.warmup_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'warmup', isPrimary: false, visible: w.warmup_visible !== false, open,
+      id: newSectionId(), typeKey: 'warmup', isPrimary: false, scored: false, visible: w.warmup_visible !== false, open,
       title: '', format: null, formatConfig: {}, movementName: '', text: (w.warmup || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
     })
   }
   if ((w.skill || []).length > 0 || w.skill_name || w.skill_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'skill', isPrimary: false, visible: w.skill_visible !== false, open,
+      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill_scored, visible: w.skill_visible !== false, open,
       title: '', format: w.skill_type || 'Weightlifting', formatConfig: w.skill_format_config || {},
       movementName: w.skill_name || '', text: (w.skill || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
@@ -130,7 +139,7 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
   }
   if ((w.skill2 || []).length > 0 || w.skill2_name || w.skill2_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'skill', isPrimary: false, visible: w.skill2_visible !== false, open,
+      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill2_scored, visible: w.skill2_visible !== false, open,
       title: '', format: w.skill2_type || 'Weightlifting', formatConfig: w.skill2_format_config || {},
       movementName: w.skill2_name || '', text: (w.skill2 || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
@@ -138,7 +147,7 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
   }
   const [dMin, dSec] = (w.duration || '20:0').split(':')
   sections.push({
-    id: newSectionId(), typeKey: 'metcon', isPrimary: true, visible: true, open,
+    id: newSectionId(), typeKey: 'metcon', isPrimary: true, scored: true, visible: true, open,
     title: '', format: w.type || 'AMRAP', formatConfig: w.format_config || {},
     movementName: '', text: '', durationMin: dMin || '20', durationSec: dSec || '0', name: w.name || '',
     variants: Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, {
@@ -173,6 +182,11 @@ export const legacyPayloadFromSections = (sections) => {
       [`${prefix}_type`]: s ? (s.format || 'Weightlifting') : 'Weightlifting',
       [`${prefix}_format_config`]: s && Object.keys(s.formatConfig || {}).length > 0 ? s.formatConfig : null,
       [`${prefix}_visible`]: s ? s.visible : true,
+      // Phase 1B - independently-scored flag for this slot (loggingMode
+      // 'required' at the Workout Engine V2 sync boundary, see
+      // mapLegacyWodToWorkout). false when the slot is empty, matching
+      // every other field here.
+      [`${prefix}_scored`]: s ? !!s.scored : false,
     }
   }
 

@@ -37,8 +37,8 @@ const wodFixtureNoExtras = {
 const wodFixtureWithExtras = {
   ...wodFixtureNoExtras,
   warmup: ['400m Run', '10 Air Squats'], warmup_visible: true,
-  skill: ['5x3 Back Squat @ 70%'], skill_name: 'Back Squat', skill_type: 'Weightlifting', skill_format_config: null, skill_visible: true,
-  skill2: ['Practice pistol squats'], skill2_name: 'Pistol Squat', skill2_type: 'Weightlifting', skill2_format_config: null, skill2_visible: false,
+  skill: ['5x3 Back Squat @ 70%'], skill_name: 'Back Squat', skill_type: 'Weightlifting', skill_format_config: null, skill_visible: true, skill_scored: false,
+  skill2: ['Practice pistol squats'], skill2_name: 'Pistol Squat', skill2_type: 'Weightlifting', skill2_format_config: null, skill2_visible: false, skill2_scored: false,
 }
 
 describe('DEFAULT_NEW_WOD_SECTIONS', () => {
@@ -90,6 +90,23 @@ describe('sectionsFromLegacyWod', () => {
     const opened = sectionsFromLegacyWod(wodFixtureWithExtras, { open: true })
     expect(closed.every(s => s.open === false)).toBe(true)
     expect(opened.every(s => s.open === true)).toBe(true)
+  })
+
+  // Phase 1B (multi-section scoring)
+  it('sectiunea primara e mereu scored:true; skill/skill2 citesc skill_scored/skill2_scored (implicit false)', () => {
+    const sections = sectionsFromLegacyWod(wodFixtureWithExtras)
+    const [warmup, skill, skill2, metcon] = sections
+    expect(metcon.scored).toBe(true)
+    expect(skill.scored).toBe(false)
+    expect(skill2.scored).toBe(false)
+    expect(warmup.scored).toBe(false) // warmup ramane permanent nescorabil - niciun toggle in UI, niciun camp legacy skill_scored-equivalent
+  })
+
+  it('skill_scored:true/skill2_scored:true se reflecta corect in sections[i].scored', () => {
+    const sections = sectionsFromLegacyWod({ ...wodFixtureWithExtras, skill_scored: true, skill2_scored: true })
+    const [, skill, skill2] = sections
+    expect(skill.scored).toBe(true)
+    expect(skill2.scored).toBe(true)
   })
 })
 
@@ -163,6 +180,31 @@ describe('legacyPayloadFromSections', () => {
     const primary = { ...createSection('metcon', true), format: 'EMOM', formatConfig: { totalRounds: 10, intervalSec: 60 }, durationMin: '99', durationSec: '99' }
     const payload = legacyPayloadFromSections([primary])
     expect(payload.duration).toBe('10:00')
+  })
+
+  // Phase 1B (multi-section scoring)
+  it('scrie skill_scored/skill2_scored dupa sections[i].scored (implicit false, POZITIONAL ca restul campurilor skill/skill2)', () => {
+    const warmup = createSection('warmup', false)
+    const skill = { ...createSection('skill', false), scored: true }
+    const skill2 = { ...createSection('skill', false), scored: false }
+    const primary = createSection('metcon', true)
+    const payload = legacyPayloadFromSections([warmup, skill, skill2, primary])
+    expect(payload.skill_scored).toBe(true)
+    expect(payload.skill2_scored).toBe(false)
+  })
+
+  it('mai putin de 3 sectiuni non-primare goleste explicit skill_scored/skill2_scored (false), la fel ca restul coloanelor', () => {
+    const primary = createSection('metcon', true)
+    const payload = legacyPayloadFromSections([primary])
+    expect(payload.skill_scored).toBe(false)
+    expect(payload.skill2_scored).toBe(false)
+  })
+
+  it('round-trip: sectionsFromLegacyWod -> legacyPayloadFromSections reproduce fidel skill_scored/skill2_scored', () => {
+    const sections = sectionsFromLegacyWod({ ...wodFixtureWithExtras, skill_scored: true, skill2_scored: false })
+    const payload = legacyPayloadFromSections(sections)
+    expect(payload.skill_scored).toBe(true)
+    expect(payload.skill2_scored).toBe(false)
   })
 })
 

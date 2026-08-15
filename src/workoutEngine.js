@@ -135,10 +135,15 @@ export function mapLegacyWodToWorkout(wod) {
     sections.push(legacySectionFromArray(wod.id, 'warmup', 'warmup', order++, wod.warmup, null, null, null, 'none'))
   }
   if (wod.skill && wod.skill.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config, 'optional'))
+    // Phase 1B (multi-section scoring) - skill_scored is the single source
+    // of truth for whether this slot is independently scored ('required')
+    // vs. the pre-Phase-1B default ('optional', unchanged for every
+    // existing row - the column defaults to false). See wodSections.js's
+    // `scored` field (editor) and the Phase 1B migration.
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill', order++, wod.skill, wod.skill_name, wod.skill_type, wod.skill_format_config, wod.skill_scored ? 'required' : 'optional'))
   }
   if (wod.skill2 && wod.skill2.length) {
-    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config, 'optional'))
+    sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config, wod.skill2_scored ? 'required' : 'optional'))
   }
   sections.push(legacyMetconSection(wod, order++))
 

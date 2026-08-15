@@ -1031,6 +1031,8 @@ export const TRANSLATIONS = {
       ? 'Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - niciuna nu e marcată acum.'
       : `Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - ${n} sunt marcate acum.`,
     wodSectionsErrorTooMany: (n) => `Prea multe sectiuni suplimentare (${n}) - Member View-ul actual poate arăta cel mult 3, pe lângă sectiunea principală. Șterge sau reorganizează sectiunile ca să poți salva.`,
+    wodSectionScoredToggle: 'Scorată independent (are propriul clasament)',
+    wodSectionScoredBadge: 'scorată',
 
     // Workout Intelligence, WI-1 - semnale simple de revizuire pe un draft generat de AI
     wiReviewBadge: (n) => `🔎 ${n} de verificat`,
@@ -2138,6 +2140,8 @@ export const TRANSLATIONS = {
       ? 'Exactly one section must be marked as the primary (scored) workout - none is marked right now.'
       : `Exactly one section must be marked as the primary (scored) workout - ${n} are marked right now.`,
     wodSectionsErrorTooMany: (n) => `Too many additional sections (${n}) - the current Member View can show at most 3 alongside the primary section. Remove or reorganize sections to save.`,
+    wodSectionScoredToggle: 'Independently scored (has its own leaderboard)',
+    wodSectionScoredBadge: 'scored',
 
     // Workout Intelligence, WI-1 - simple review signals on an AI-generated draft
     wiReviewBadge: (n) => `🔎 ${n} to review`,

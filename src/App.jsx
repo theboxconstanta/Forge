@@ -1209,6 +1209,7 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
           <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
             {section.title.trim() || typeLabel}
             {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '600' }}>★ {t.wodSectionPrimaryBadge}</span>}
+            {!section.isPrimary && section.scored && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1F6B79', fontWeight: '600' }}>◆ {t.wodSectionScoredBadge}</span>}
             {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '600' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
           </span>
         </div>
@@ -1236,6 +1237,19 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
               style={{ marginBottom: '10px', fontSize: '11px', padding: '5px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', color: '#555', cursor: 'pointer' }}>
               {t.wodSectionMakePrimary}
             </button>
+          )}
+          {/* Phase 1B (multi-section scoring) - independent of isPrimary/
+              Make Primary above. Only offered for skill-shaped sections
+              (has a format) - Warm-up stays permanently non-scoreable
+              (isPlainText, no legacy column to persist it against). Persists
+              via skill_scored/skill2_scored (position-based, same slot
+              mapping as every other skill/skill2 field - see
+              legacyPayloadFromSections). */}
+          {!section.isPrimary && !isPlainText && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <MiniSwitch checked={!!section.scored} onChange={(v) => onChange({ scored: v })} />
+              <span style={{ fontSize: '11px', color: '#555' }}>{t.wodSectionScoredToggle}</span>
+            </div>
           )}
 
           {isPlainText ? (

@@ -191,6 +191,20 @@ describe('mapLegacyWodToWorkout', () => {
     expect(w.sections.find((s) => s.slotKey === 'skill2').loggingMode).toBe('optional')
     expect(w.sections.find((s) => s.slotKey === 'metcon').loggingMode).toBe('required')
   })
+
+  it('Phase 1B: skill_scored/skill2_scored true -> loggingMode "required" instead of "optional" (metcon/warmup unaffected)', () => {
+    const withScored = {
+      ...wodFixture,
+      warmup: ['400m Run'],
+      skill: ['Practice handstand holds'], skill_name: 'Skill', skill_type: 'Not For Time', skill_scored: true,
+      skill2: ['Practice pistol squats'], skill2_name: 'Skill 2', skill2_type: 'Not For Time', skill2_scored: false,
+    }
+    const w = mapLegacyWodToWorkout(withScored)
+    expect(w.sections.find((s) => s.slotKey === 'skill').loggingMode).toBe('required')
+    expect(w.sections.find((s) => s.slotKey === 'skill2').loggingMode).toBe('optional')
+    expect(w.sections.find((s) => s.slotKey === 'warmup').loggingMode).toBe('none')
+    expect(w.sections.find((s) => s.slotKey === 'metcon').loggingMode).toBe('required')
+  })
 })
 
 describe('mapV2WorkoutRow / mapV2SectionRow', () => {
