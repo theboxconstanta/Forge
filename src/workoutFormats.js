@@ -1089,6 +1089,122 @@ export function toKgForRanking(value, unit) {
   return unit === 'lbs' ? value / KG_TO_LBS_RANKING : value
 }
 
+// Layer 2b - Universal Scoring Architecture, Phase 1B. Comparatorul canonic
+// de clasament (fostul `sortLogs` din App.jsx/Clasament, un closure peste
+// wodZiFormat/wodZiData ale INTREGULUI WOD), acum o functie PURA
+// parametrizata cu formatul/config-ul UNEI SINGURE Sectiuni scorate
+// independent (primara sau nu). Fiecare Sectiune isi are propriul clasament,
+// comparat cu PROPRIUL comparator - o Sectiune LOAD nu se compara niciodata
+// cu logica unei Sectiuni TIME doar pt ca sunt in acelasi Workout. Aceeasi
+// functie serveste atat Sectiunea primara (Metcon) cat si oricare Sectiune
+// suplimentara (Skill/Skill2/orice sectiune noua) - identitatea sursei
+// (wod_logs vs skill_logs) e irelevanta aici, ambele tabele au aceleasi
+// campuri de scor (result/time_result/sets/log_meta/completion_state).
+// Deduplicarea "un singur log per membru" e per apelare (adica per
+// Sectiune) - un membru care a logat atat Sectiunea A cat si B trebuie sa
+// apara in AMBELE clasamente, nu sa fie stins de un dedup global care ar
+// pastra doar cel mai recent log al lui (bug identificat in timpul
+// investigatiei Layer 2b: fostul dedupLogsGlobal rula PESTE toate
+// Sectiunile odata, inainte de orice grupare pe Sectiune).
+export function parseTimeResult(str) {
+  if (!str) return Infinity
+  const parts = str.trim().split(':').map(Number)
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  return (parseFloat(str) || Infinity) * 60
+}
+export function parseRoundsScore(str) {
+  if (!str) return null
+  const match = str.match(/(\d+(\.\d+)?)/)
+  return match ? parseFloat(match[1]) : null
+}
+// Suma reps-urilor din runda partiala/neterminata - vezi comentariul
+// original din App.jsx (istoricul git al acestui fisier / Layer 2b report)
+// pt motivatia completa a formatului "facut/prescris Miscare".
+export function partialRepsOfLog(log, isSequential) {
+  const str = log.result || ''
+  let segment
+  if (isSequential) {
+    segment = str
+  } else {
+    const plusIdx = str.indexOf('+')
+    if (plusIdx === -1) return 0
+    segment = str.slice(plusIdx + 1)
+  }
+  return segment.split(',').reduce((sum, seg) => {
+    const match = seg.trim().match(/^(\d+(\.\d+)?)/)
+    return match ? sum + parseFloat(match[1]) : sum
+  }, 0)
+}
+export function sortSectionLogs(arr, formatId, formatConfig) {
+  const format = formatId ? getFormat(formatId) : null
+  if (format?.family === 'sets') {
+    const weightScored = isWeightScoredSetsFormat(formatConfig)
+    const withScore = arr.map(log => {
+      const score = setsDisplayScore(formatId, formatConfig, log.sets)
+      const rankScore = (weightScored && score != null) ? toKgForRanking(score, log.profile?.weight_unit || 'kg') : score
+      return { ...log, _setsScore: score, _setsRankScore: rankScore }
+    })
+    const comparaSets = (a, b) => {
+      if (a._setsRankScore == null && b._setsRankScore == null) return new Date(a.logged_at) - new Date(b.logged_at)
+      if (a._setsRankScore == null) return 1
+      if (b._setsRankScore == null) return -1
+      if (a._setsRankScore !== b._setsRankScore) return b._setsRankScore - a._setsRankScore
+      return new Date(a.logged_at) - new Date(b.logged_at)
+    }
+    const byMemberSets = {}
+    withScore.forEach(log => {
+      const id = log.member_id
+      if (!byMemberSets[id] || comparaSets(log, byMemberSets[id]) < 0) byMemberSets[id] = log
+    })
+    return Object.values(byMemberSets).sort(comparaSets)
+  }
+  if (format?.family === 'chained') {
+    const comparaChained = (a, b) => {
+      const sa = a.log_meta?.totalReps, sb = b.log_meta?.totalReps
+      if (sa == null && sb == null) return new Date(a.logged_at) - new Date(b.logged_at)
+      if (sa == null) return 1
+      if (sb == null) return -1
+      if (sa !== sb) return sb - sa
+      return new Date(a.logged_at) - new Date(b.logged_at)
+    }
+    const byMemberChained = {}
+    arr.forEach(log => {
+      const id = log.member_id
+      if (!byMemberChained[id] || comparaChained(log, byMemberChained[id]) < 0) byMemberChained[id] = log
+    })
+    return Object.values(byMemberChained).sort(comparaChained)
+  }
+  // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11/19 - logurile noi
+  // (post-Faza 0) au completion_state scris explicit la salvare, citit
+  // direct aici; logurile vechi (completion_state NULL) cad pe inferenta
+  // veche (!!time_result), byte-identic cu comportamentul de dinainte.
+  const finished = (log) => log.completion_state != null ? log.completion_state === 'completed' : !!log.time_result
+  const isSequential = isSequentialFormat(formatId, formatConfig)
+  const compara = (a, b) => {
+    const fa = finished(a), fb = finished(b)
+    if (fa !== fb) return fa ? -1 : 1
+    if (fa) {
+      const diffTime = parseTimeResult(a.time_result) - parseTimeResult(b.time_result)
+      if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
+      return new Date(a.logged_at) - new Date(b.logged_at)
+    }
+    if (!isSequential) {
+      const diffRunde = (parseRoundsScore(b.result) || 0) - (parseRoundsScore(a.result) || 0)
+      if (diffRunde !== 0) return diffRunde
+    }
+    const diffPartial = partialRepsOfLog(b, isSequential) - partialRepsOfLog(a, isSequential)
+    if (diffPartial !== 0) return diffPartial
+    return new Date(a.logged_at) - new Date(b.logged_at)
+  }
+  const byMember = {}
+  arr.forEach(log => {
+    const id = log.member_id
+    if (!byMember[id] || compara(log, byMember[id]) < 0) byMember[id] = log
+  })
+  return Object.values(byMember).sort(compara)
+}
+
 // Pentru fiecare numar de reps logat, ia cea mai mare greutate introdusa si o
 // compara cu cel mai mare PR existent la aceeasi miscare + acelasi numar
 // exact de reps (PR-urile se tin separat pe numar de reps). Returneaza doar

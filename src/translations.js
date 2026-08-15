@@ -628,6 +628,8 @@ export const TRANSLATIONS = {
     clasamentMixedCategoriesLabel: 'Mixed Categories',
     clasamentVariantLabel: 'VARIANTĂ',
     clasamentWeightPrescribedSuffix: (prescribed) => `(prescris: ${prescribed})`,
+    clasamentPartMetconLabel: 'Metcon',
+    clasamentSectionEmptyLabel: 'Niciun rezultat încă pentru această secțiune',
 
     // Feed
     feedTitle: 'Feed',
@@ -1737,6 +1739,8 @@ export const TRANSLATIONS = {
     clasamentMixedCategoriesLabel: 'Mixed Categories',
     clasamentVariantLabel: 'VARIANT',
     clasamentWeightPrescribedSuffix: (prescribed) => `(prescribed: ${prescribed})`,
+    clasamentPartMetconLabel: 'Metcon',
+    clasamentSectionEmptyLabel: 'No results yet for this section',
 
     // Feed
     feedTitle: 'Feed',

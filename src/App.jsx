@@ -45,6 +45,7 @@ import {
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
+  sortSectionLogs,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -1644,7 +1645,19 @@ function Timer({ onBack, defaultFortime, t }) {
   )
 }
 
-function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
+// Layer 2b - sortSectionLogs (comparatorul canonic de clasament) traieste
+// acum in workoutFormats.js, parametrizat pe formatul/config-ul UNEI SINGURE
+// Sectiuni, in loc sa fie un closure App.jsx peste wodZiFormat/wodZiData ale
+// intregului WOD - vezi definitia de acolo pt detalii/motivatie.
+
+const NIVELE = [
+  { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
+  { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
+  { id: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
+  { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
+]
+
+function Clasament({ logs, sections, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
@@ -1652,289 +1665,140 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
   const [expandedLogId, setExpandedLogId] = useState(null)
   const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
   const isToday = selectedDate === todayStr
-  // getFormat(undefined) cade tacit pe 'For Time' (fortime_or_amrap +
-  // sequentialPartial) - intr-o zi fara WOD programat (wodZiData null), dar cu
-  // loguri vechi/orfane inca in intervalul de date, asta ar trata gresit acele
-  // loguri ca fiind "neterminate in time cap" (isNotRxd) sau "secventiale"
-  // (sortLogs), doar pentru ca formatul necunoscut a cazut pe un fallback
-  // arbitrar. Calculat o singura data (nu per nivel/log) - null cand nu stim
-  // real formatul zilei, nu un fallback ghicit.
-  const wodZiFormat = wodZiData?.type ? getFormat(wodZiData.type) : null
   const goDay = (delta) => {
     const d = new Date(selectedDate + 'T00:00:00'); d.setDate(d.getDate() + delta)
     const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     onDateChange(s)
   }
 
-  const parseTime = (str) => {
-    if (!str) return Infinity
-    const parts = str.trim().split(':').map(Number)
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    if (parts.length === 2) return parts[0] * 60 + parts[1]
-    return (parseFloat(str) || Infinity) * 60
-  }
+  // Layer 2b - Section-aware grouping. `sections` = fiecare Sectiune
+  // scorata independent (logging_mode:'required') a WOD-ului afisat, primara
+  // (slot_key:'metcon') prima. Gol/absent cand nu exista deloc date Workout
+  // Engine V2 pt aceasta data (WOD legacy, sau nicio zi programata) - in
+  // acel caz TOATE logurile sunt tratate ca apartinand unui singur bucket
+  // implicit (comportament IDENTIC cu dinainte de Layer 2b).
+  const primarySection = (sections || []).find(s => s.slot_key === 'metcon') || null
+  const additionalSections = (sections || []).filter(s => s.slot_key !== 'metcon')
+  const hasMultipleSections = !!primarySection && additionalSections.length > 0
+  const scoredSectionIds = new Set((sections || []).map(s => s.id))
 
-  const parseScore = (str) => {
-    if (!str) return null
-    const match = str.match(/(\d+(\.\d+)?)/)
-    return match ? parseFloat(match[1]) : null
-  }
+  // Carei Sectiuni ii apartine un log. wod_logs scrise inainte de Layer 2a
+  // (workout_section_id NULL) erau intotdeauna loguri pt tot WOD-ul/Sectiunea
+  // primara, prin constructie - fallback-ul pe Sectiunea primara e exact, nu
+  // o presupunere (SCORING_PHASE1A readiness doc, S35). skill_logs cu
+  // workout_section_id NULL preced orice concept de identitate de Sectiune
+  // pe acest tabel SI orice moment in care un slot Skill/Skill2 a fost
+  // vreodata marcat scorat independent - nu exista nicio Sectiune CURENTA
+  // careia sa le putem atasa corect, deci (spre deosebire de wod_logs) nu
+  // se rezolva la nicio Sectiune scorata si sunt excluse din clasament (raman
+  // complet vizibile in Jurnalul propriu al membrului, neafectate).
+  const resolveSectionId = (log) => log.workout_section_id || (log._source === 'wod_logs' && primarySection ? primarySection.id : null)
+  const hasV2Sections = (sections || []).length > 0
+  const logsBySection = {}
+  ;(logs || []).forEach(log => {
+    const sid = resolveSectionId(log)
+    const bucketKey = hasV2Sections ? sid : '__legacy'
+    if (bucketKey == null) return
+    if (hasV2Sections && !scoredSectionIds.has(bucketKey)) return
+    if (!logsBySection[bucketKey]) logsBySection[bucketKey] = []
+    logsBySection[bucketKey].push(log)
+  })
 
-  // Suma reps-urilor din runda partiala/neterminata ("6 runde + 5 Pull-ups, 3
-  // Push-ups" -> 8) - la AMRAP (si la RFT/Ladder neterminate) doua persoane
-  // pot avea acelasi numar de runde complete dar cantitati diferite de munca
-  // in runda ramasa neterminata; fara asta erau departajate arbitrar (dupa
-  // ordinea din raspunsul serverului), nu dupa cine a muncit mai mult.
-  // Reps-ul FACUT (nu prescris) din runda partiala, per miscare. Formatul nou
-  // "facut/prescris Miscare" (ex. "3/15 Power Snatches", vezi composePartialText
-  // in workoutFormats.js) are 2 numere per segment - fara sa luam doar primul,
-  // suma insuma gresit si numarul prescris (3+15=18 in loc de 3 facute).
-  // La formate secventiale (For Time/Ladder - sequentialPartial), rezultatul
-  // compus n-are prefixul "N runde +" (nu exista concept de runda) - tot
-  // textul e direct lista de segmente "facut/prescris miscare". La restul
-  // formatelor (AMRAP/RFT), segmentele de dupa '+' raman singura sursa.
-  const partialRepsOf = (log, isSequential) => {
-    const str = log.result || ''
-    let segment
-    if (isSequential) {
-      segment = str
-    } else {
-      const plusIdx = str.indexOf('+')
-      if (plusIdx === -1) return 0
-      segment = str.slice(plusIdx + 1)
-    }
-    return segment.split(',').reduce((sum, seg) => {
-      const match = seg.trim().match(/^(\d+(\.\d+)?)/)
-      return match ? sum + parseFloat(match[1]) : sum
-    }, 0)
-  }
-
-  // Clasare: intai cine a facut mai multe runde (cine a terminat tot WOD-ul
-  // fara sa noteze runde partiale e egalat cu maximul de runde notat explicit
-  // in sectiune - nu poate fi mai mult decat atat), apoi in cadrul aceluiasi
-  // numar de runde cine a muncit mai mult in runda neterminata (AMRAP), apoi
-  // cine a fost mai rapid. Nu se mai compara direct timpul intre cineva care
-  // n-a terminat WOD-ul si cineva care a terminat (bug raportat: cineva cu
-  // mai putine runde aparea inaintea celor cu mai multe, doar pentru ca
-  // timpul lui brut de oprire era mai mic).
-  // Clasare in 2 nivele stricte, nu un singur numar "runde efective" comparat
-  // direct intre toata lumea: (1) cine a terminat (are time_result) - mereu
-  // inaintea (2) cine n-a terminat (are doar runde+reps partiale), indiferent
-  // de valori numerice. Incercarea anterioara de a da finisherilor un numar
-  // de "runde efective" (aproximat din ce au notat non-finisherii sau din
-  // format_config.rounds) esua exact la formate fara un numar real de runde
-  // prescrise (For Time/Ladder/Chipper, unde miscarile sunt o secventa, nu
-  // runde repetate) - un non-finisher cu reps partiale mari putea depasi
-  // numeric un finisher real. Verificarea stricta pe time_result elimina
-  // complet ambiguitatea: a terminat = are timp, punct.
-  // Scorul de afisat/clasat pt un log family:'sets' (Weightlifting/Build to
-  // Heavy/1RM/Strength Sets/Complex/Superset/Death By Weight/Tabata/Intervals)
-  // - vezi setsDisplayScore in workoutFormats.js.
-  const setsScoreOf = (log) => setsDisplayScore(wodZiData?.type, wodZiData?.format_config, log.sets)
-
-  const sortLogs = (arr) => {
-    // Family 'sets' nu foloseste deloc time_result/result - composeWodLogFields
-    // le lasa null pt aceste formate, rezultatul real e in `sets` (structurat
-    // pe randuri). Fara ramura asta, TOATE log-urile family:'sets' cadeau pe
-    // "neterminat" (finished mereu false, time_result mereu null) si erau
-    // departajate doar dupa ordinea de logare, indiferent cat de greu s-a
-    // lucrat efectiv (bug raportat: 5 seturi reale, 90->100kg logate, aparea
-    // "-" pe Clasament, nesortat dupa performanta). Scorul e calculat o
-    // singura data si atasat pe log (_setsScore), reutilizat la afisare in
-    // randarea Clasamentului, fara sa recalculam.
-    if (wodZiFormat?.family === 'sets') {
-      // M9 Preferences: _setsScore stays the RAW logged number (still shown
-      // as-is at display time, tagged with that member's own weight_unit -
-      // unchanged). _setsRankScore is a separate, kg-normalized value used
-      // ONLY for ordering, so a kg Member and an lbs Member sort correctly
-      // against each other on the same weight-based leaderboard (bug found
-      // during the M9 Preferences audit: raw numbers were compared directly
-      // regardless of unit). Reps-scored sets formats (Total Reps/Lowest
-      // Reps) are never weights, so isWeightScoredSetsFormat skips the
-      // conversion for them - reps stay reps.
-      const weightScored = isWeightScoredSetsFormat(wodZiData?.format_config)
-      const withScore = arr.map(log => {
-        const score = setsScoreOf(log)
-        const rankScore = (weightScored && score != null) ? toKgForRanking(score, log.profile?.weight_unit || 'kg') : score
-        return { ...log, _setsScore: score, _setsRankScore: rankScore }
-      })
-      const comparaSets = (a, b) => {
-        if (a._setsRankScore == null && b._setsRankScore == null) return new Date(a.logged_at) - new Date(b.logged_at)
-        if (a._setsRankScore == null) return 1
-        if (b._setsRankScore == null) return -1
-        if (a._setsRankScore !== b._setsRankScore) return b._setsRankScore - a._setsRankScore
-        return new Date(a.logged_at) - new Date(b.logged_at)
-      }
-      const byMemberSets = {}
-      withScore.forEach(log => {
-        const id = log.member_id
-        if (!byMemberSets[id] || comparaSets(log, byMemberSets[id]) < 0) byMemberSets[id] = log
-      })
-      return Object.values(byMemberSets).sort(comparaSets)
-    }
-    // WOD-uri inlantuite ("straight into") - la fel ca la 'sets', result/
-    // time_result raman mereu null (vezi composeWodLogFields), scorul real
-    // e precalculat la salvare in log_meta.totalReps - fara ramura asta ar
-    // cadea toate pe "neterminat" si ar fi departajate doar dupa ordinea de
-    // logare, indiferent de reps.
-    if (wodZiFormat?.family === 'chained') {
-      const comparaChained = (a, b) => {
-        const sa = a.log_meta?.totalReps, sb = b.log_meta?.totalReps
-        if (sa == null && sb == null) return new Date(a.logged_at) - new Date(b.logged_at)
-        if (sa == null) return 1
-        if (sb == null) return -1
-        if (sa !== sb) return sb - sa
-        return new Date(a.logged_at) - new Date(b.logged_at)
-      }
-      const byMemberChained = {}
+  // Blocurile "pe nivel" pt Sectiunea PRIMARA - reproduce EXACT modelul
+  // RX/Intermediate/Beginner/OnRamp + Mixed Categories de dinainte de Layer
+  // 2b, neschimbat, doar mutat intr-o functie reutilizabila.
+  const buildBlocksForPrimary = (sectionLogs) => {
+    const dedupLogsGlobal = (arr) => {
+      const byMember = {}
       arr.forEach(log => {
-        const id = log.member_id
-        if (!byMemberChained[id] || comparaChained(log, byMemberChained[id]) < 0) byMemberChained[id] = log
+        const curr = byMember[log.member_id]
+        if (!curr || new Date(log.logged_at) > new Date(curr.logged_at)) byMember[log.member_id] = log
       })
-      return Object.values(byMemberChained).sort(comparaChained)
+      return Object.values(byMember)
     }
-    // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 11/19 - logurile noi
-    // (post-Faza 0) au completion_state scris explicit la salvare, citit
-    // direct aici; logurile vechi (completion_state NULL, scrise inainte de
-    // aceasta migratie) cad pe inferenta veche (!!time_result), byte-identic
-    // cu comportamentul de dinainte - niciun ranking existent nu se schimba.
-    const finished = (log) => log.completion_state != null ? log.completion_state === 'completed' : !!log.time_result
-    // La formate secventiale (For Time/Ladder), rezultatul non-finisherilor
-    // nu are un numar de "runde" real de comparat (parseScore ar extrage
-    // doar numarul primei miscari din text, irelevant) - departajarea se
-    // face direct pe total reps facute (partialRepsOf).
-    const isSequential = isSequentialFormat(wodZiData?.type, wodZiData?.format_config)
-    // Fiecare comparatie numerica poate produce NaN cand ambele loguri au
-    // aceeasi valoare "goala" (Infinity - Infinity la timp) - un comparator
-    // Array.sort care intoarce NaN nu are comportament garantat de
-    // specificatie. Verificam explicit NaN la fiecare pas si cadem pe
-    // urmatorul nivel, cu ordinea cronologica drept fallback final.
-    const compara = (a, b) => {
-      const fa = finished(a), fb = finished(b)
-      if (fa !== fb) return fa ? -1 : 1
-      if (fa) {
-        const diffTime = parseTime(a.time_result) - parseTime(b.time_result)
-        if (diffTime !== 0 && !Number.isNaN(diffTime)) return diffTime
-        return new Date(a.logged_at) - new Date(b.logged_at)
-      }
-      if (!isSequential) {
-        const diffRunde = (parseScore(b.result) || 0) - (parseScore(a.result) || 0)
-        if (diffRunde !== 0) return diffRunde
-      }
-      const diffPartial = partialRepsOf(b, isSequential) - partialRepsOf(a, isSequential)
-      if (diffPartial !== 0) return diffPartial
-      return new Date(a.logged_at) - new Date(b.logged_at)
+    const logsUnicePerMembru = dedupLogsGlobal(sectionLogs)
+    const getSectionLogsForTier = (nivelId) => {
+      const sorted = sortSectionLogs(logsUnicePerMembru.filter(l => l.variant_level === nivelId), wodZiData?.type, wodZiData?.format_config)
+      if (genderTab === 'masculin') return sorted.filter(l => l.profile?.gender === 'masculin')
+      if (genderTab === 'feminin') return sorted.filter(l => l.profile?.gender === 'feminin')
+      return sorted
     }
-    const byMember = {}
-    arr.forEach(log => {
-      const id = log.member_id
-      if (!byMember[id] || compara(log, byMember[id]) < 0) byMember[id] = log
-    })
-    return Object.values(byMember).sort(compara)
+    const prescribedWeightFor = (nivelId, log) => wodZiData?.[weightKeyForVariant(nivelId, log.profile?.gender)] || null
+    const prescribedMovementsFor = (nivelId) => wodZiData?.[`movements_${nivelId.toLowerCase()}`] || null
+    const splitRxSiMixed = (nivelId, sectionLogsForTier) => {
+      const rxLogs = []
+      const mixedLogs = []
+      const prescribedMovements = prescribedMovementsFor(nivelId)
+      sectionLogsForTier.forEach(log => {
+        const prescribedWeight = prescribedWeightFor(nivelId, log)
+        const { miscariAfisate } = parseWodLogDetails(log, t)
+        const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements, _supportsRx: true }
+        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements)
+        if (isMixed) mixedLogs.push(logCuDetalii)
+        else rxLogs.push(logCuDetalii)
+      })
+      return { rxLogs, mixedLogs }
+    }
+    const niveleData = NIVELE.map(nivel => ({ nivel, ...splitRxSiMixed(nivel.id, getSectionLogsForTier(nivel.id)) }))
+    const toateLogurileMixed = niveleData.flatMap(nd => nd.mixedLogs)
+    return [
+      ...niveleData
+        .map(({ nivel, rxLogs }) => ({ nivel, weightGroups: [{ weight: null, label: null, logs: rxLogs }] }))
+        .filter(s => s.weightGroups[0].logs.length > 0),
+      ...(toateLogurileMixed.length > 0 ? [{
+        nivel: { id: t.clasamentMixedCategoriesLabel, culoare: '#5B4B8A', bg: '#EFEAF9' },
+        weightGroups: NIVELE
+          .map(n => ({
+            weight: n.id, label: n.id,
+            logs: toateLogurileMixed.filter(l => l._nivelOriginal === n.id)
+              .sort((a, b) => (greutateNumerica(b.weight_logged) ?? Infinity) - (greutateNumerica(a.weight_logged) ?? Infinity)),
+          }))
+          .filter(g => g.logs.length > 0),
+      }] : []),
+    ]
   }
 
-  const NIVELE = [
-    { id: 'RX', culoare: '#791F1F', bg: '#FCEBEB' },
-    { id: 'Intermediate', culoare: '#633806', bg: '#FAEEDA' },
-    { id: 'Beginner', culoare: '#0E0E0E', bg: '#f0f0f0' },
-    { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
-  ]
-
-  // Un membru poate avea mai multe log-uri pentru acelasi WOD (relogat din
-  // greseala, sau a incercat alta varianta) - fara dedup GLOBAL (pe toate
-  // nivelele), ar aparea cate o data in fiecare sectiune in care are un log
-  // (ex: si la Intermediate, si la RX). Pastram doar cel mai recent log al
-  // fiecarui membru pentru acest WOD, indiferent de nivel - nivelul acelui
-  // log e cel care decide in ce sectiune apare.
-  const dedupLogsGlobal = (arr) => {
-    const byMember = {}
-    arr.forEach(log => {
-      const curr = byMember[log.member_id]
-      if (!curr || new Date(log.logged_at) > new Date(curr.logged_at)) byMember[log.member_id] = log
-    })
-    return Object.values(byMember)
-  }
-  const logsUnicePerMembru = dedupLogsGlobal(logs)
-
-  const getSectionLogs = (nivelId) => {
-    const sorted = sortLogs(logsUnicePerMembru.filter(l => l.variant_level === nivelId))
-    if (genderTab === 'masculin') return sorted.filter(l => l.profile?.gender === 'masculin')
-    if (genderTab === 'feminin') return sorted.filter(l => l.profile?.gender === 'feminin')
-    return sorted
+  // O Sectiune suplimentara (Skill/Skill2/orice sectiune noua adaugata prin
+  // "+ Adauga sectiune") n-are variante de scalare - Layer 2a scrie mereu
+  // variant_level:'RX' pt ele ("o singura prescriptie") - deci un singur
+  // clasament plat, fara nivele si fara Mixed Categories (nu exista o a doua
+  // varianta fata de care cineva sa fie "mixt").
+  const buildBlocksForAdditionalSection = (sectionLogs, section) => {
+    const sorted = sortSectionLogs(sectionLogs, section.format, section.format_config)
+    const filtered = genderTab === 'masculin' ? sorted.filter(l => l.profile?.gender === 'masculin')
+      : genderTab === 'feminin' ? sorted.filter(l => l.profile?.gender === 'feminin')
+      : sorted
+    if (filtered.length === 0) return []
+    return [{
+      nivel: { id: section.title || section.slot_key, culoare: '#0E0E0E', bg: '#f0f0f0' },
+      weightGroups: [{ weight: null, label: null, logs: filtered.map(log => ({ ...log, _supportsRx: false })) }],
+    }]
   }
 
-  const totalLogs = NIVELE.reduce((acc, n) => acc + getSectionLogs(n.id).length, 0)
+  const partsToRender = hasMultipleSections
+    ? [primarySection, ...additionalSections]
+    : [primarySection || { id: '__legacy', slot_key: 'metcon' }]
 
-  // Cine a schimbat greutatea SAU miscarile fata de cele prescrise variantei
-  // nu poate concura corect cu cine a facut exact ce a fost programat - fara
-  // asta, cineva la 40kg si cineva la 61kg (sau cineva cu alte miscari cu
-  // totul) apareau pe aceeasi lista, clasati doar dupa timp/reps, ca si cum
-  // ar fi comparabili. Ii scoatem intr-o categorie separata, "Mixed
-  // Categories", grupata pe varianta lor originala (nu ii amestecam intre ei
-  // pe nivele diferite) - vezi isMixedCategory in workoutFormats.js. Daca
-  // varianta n-are greutate/miscari prescrise configurate, comportament
-  // identic cu inainte (nimeni nu poate fi "Mixed"). `sectionLogs` e deja
-  // sortat de sortLogs() - un filtru pe un array sortat pastreaza ordinea
-  // relativa, deci fiecare subgrup ramane corect sortat intern fara sa
-  // resortam.
-  // Greutatea prescrisa difera pe gen (RX barbati 61kg vs RX femei 43kg) -
-  // fiecare log se compara cu prescrisul GENULUI SAU, nu cu o singura valoare
-  // per varianta (relevant mai ales pe tab-ul "Toti", unde sectiunea
-  // amesteca ambele genuri). Daca genul lui n-are greutate configurata deloc,
-  // e considerat RX implicit (identic cu comportamentul dinainte de feature).
-  const prescribedWeightFor = (nivelId, log) => wodZiData?.[weightKeyForVariant(nivelId, log.profile?.gender)] || null
-  const prescribedMovementsFor = (nivelId) => wodZiData?.[`movements_${nivelId.toLowerCase()}`] || null
-  const splitRxSiMixed = (nivelId, sectionLogs) => {
-    const rxLogs = []
-    const mixedLogs = []
-    const prescribedMovements = prescribedMovementsFor(nivelId)
-    sectionLogs.forEach(log => {
-      // prescribedWeight/prescribedMovements atasate direct pe log (nu doar
-      // folosite local) - randarea de mai jos le reutilizeaza la isNotRxd, in
-      // loc sa cheme prescribedWeightFor a doua oara pt acelasi log.
-      const prescribedWeight = prescribedWeightFor(nivelId, log)
-      // wod_logs nu are o coloana structurata "movements" - miscarile efectiv
-      // logate (posibil editate de membru fata de prescris, vezi wodMiscariCustom)
-      // sunt scrise ca text liber in `notes` (impreuna cu header-ul de format si
-      // nota membrului) - parseWodLogDetails e acelasi parser folosit de Jurnal,
-      // singura sursa reala de adevar pt ce a logat efectiv membrul.
-      const { miscariAfisate } = parseWodLogDetails(log, t)
-      const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements }
-      const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements)
-      if (isMixed) mixedLogs.push(logCuDetalii)
-      else rxLogs.push(logCuDetalii)
-    })
-    return { rxLogs, mixedLogs }
-  }
-  const niveleData = NIVELE.map(nivel => ({ nivel, ...splitRxSiMixed(nivel.id, getSectionLogs(nivel.id)) }))
-  const toateLogurileMixed = niveleData.flatMap(nd => nd.mixedLogs)
-  // Sectiunile de afisat: cele 4 nivele normale (doar log-urile care respecta
-  // exact prescrisul), plus - daca exista macar unul - o a 5-a sectiune
-  // "Mixed Categories", cu cate un subgrup per nivel original (RX/
-  // Intermediate/Beginner/OnRamp), NU amestecati intre ei.
-  const sectionsDeAfisat = [
-    ...niveleData
-      .map(({ nivel, rxLogs }) => ({ nivel, weightGroups: [{ weight: null, label: null, logs: rxLogs }] }))
-      .filter(s => s.weightGroups[0].logs.length > 0),
-    ...(toateLogurileMixed.length > 0 ? [{
-      nivel: { id: t.clasamentMixedCategoriesLabel, culoare: '#5B4B8A', bg: '#EFEAF9' },
-      // In interiorul fiecarui subgrup, cine a scalat mai jos nu poate sta
-      // inaintea cuiva care a ridicat mai mult, doar pt ca a facut mai multe
-      // repetari - greutatea mai mica il coboara automat, indiferent de
-      // performanta. Sortare descrescatoare dupa greutatea logata (fara
-      // greutate logata - ex. doar miscare schimbata, nu greutate - conteaza
-      // ca "greutate maxima", nu e penalizat) - la egalitate de greutate,
-      // pastreaza ordinea de performanta deja calculata de sortLogs (sort
-      // stabil, nu reamesteca perechile egale).
-      weightGroups: NIVELE
-        .map(n => ({
-          weight: n.id, label: n.id,
-          logs: toateLogurileMixed.filter(l => l._nivelOriginal === n.id)
-            .sort((a, b) => (greutateNumerica(b.weight_logged) ?? Infinity) - (greutateNumerica(a.weight_logged) ?? Infinity)),
-        }))
-        .filter(g => g.logs.length > 0),
-    }] : []),
-  ]
+  const renderGroups = partsToRender.map(section => {
+    const isPrimaryPart = section.slot_key === 'metcon'
+    const sectionLogsForPart = hasV2Sections ? (logsBySection[section.id] || []) : (logsBySection.__legacy || [])
+    const blocks = isPrimaryPart ? buildBlocksForPrimary(sectionLogsForPart) : buildBlocksForAdditionalSection(sectionLogsForPart, section)
+    const sectionFormatId = isPrimaryPart ? wodZiData?.type : section.format
+    const sectionFormatConfig = isPrimaryPart ? wodZiData?.format_config : section.format_config
+    return {
+      partId: section.id || '__legacy',
+      partLabel: hasMultipleSections ? (section.title || (isPrimaryPart ? t.clasamentPartMetconLabel : section.slot_key)) : null,
+      blocks,
+      sectionFormat: sectionFormatId ? getFormat(sectionFormatId) : null,
+      sectionFormatId,
+      sectionFormatConfig,
+      // Obiect in aceeasi forma ca wodZiData (.type/.format_config), pt ca
+      // randarea cardurilor de mai jos sa functioneze identic indiferent de
+      // Sectiune, fara ramuri separate.
+      sectionData: isPrimaryPart ? wodZiData : { type: section.format, format_config: section.format_config },
+    }
+  })
+  const totalLogs = renderGroups.reduce((acc, g) => acc + g.blocks.reduce((a2, b) => a2 + b.weightGroups.reduce((a3, wg) => a3 + wg.logs.length, 0), 0), 0)
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -1976,7 +1840,17 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
         </div>
       ) : (
         <div>
-          {sectionsDeAfisat.map(({ nivel, weightGroups }) => {
+          {renderGroups.map((renderGroup) => (
+            <div key={renderGroup.partId}>
+              {renderGroup.partLabel && (
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
+                  {renderGroup.partLabel}
+                </div>
+              )}
+              {renderGroup.partLabel && renderGroup.blocks.length === 0 && (
+                <div style={{ fontSize: '12px', color: '#bbb', marginBottom: '16px' }}>{t.clasamentSectionEmptyLabel}</div>
+              )}
+              {renderGroup.blocks.map(({ nivel, weightGroups }) => {
             const sectionLogs = weightGroups.flatMap(g => g.logs)
             const isForTime = sectionLogs.some(l => l.time_result) &&
               sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length
@@ -2009,19 +1883,24 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
                       const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
                       // Family 'sets' nu are niciodata time_result/result (vezi
-                      // setsScoreOf/sortLogs mai sus) - scorul calculat acolo
-                      // (_setsScore) e singura sursa de afisat, cu unitatea
+                      // setsScoreOf/sortSectionLogs mai sus) - scorul calculat
+                      // acolo (_setsScore) e singura sursa de afisat, cu unitatea
                       // preferata a membrului care a logat.
                       // La fel ca 'sets' mai sus - 'chained' nu are niciodata
                       // time_result/result (vezi composeWodLogFields), scorul
                       // real e log_meta.totalReps, precalculat la salvare.
-                      const result = wodZiFormat?.family === 'sets'
+                      const result = renderGroup.sectionFormat?.family === 'sets'
                         ? (log._setsScore != null ? `${log._setsScore}${(log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg'}` : '—')
-                        : wodZiFormat?.family === 'chained'
+                        : renderGroup.sectionFormat?.family === 'chained'
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
-                      const notRxdLog = isNotRxd(log, log._prescribedWeight, wodZiData?.type, wodZiData?.format_config, log._loggedMovements, log._prescribedMovements)
+                      // Sectiunile suplimentare (_supportsRx:false) n-au variante
+                      // de scalare fata de care sa fie clasificate Not-Rx (vezi
+                      // buildBlocksForAdditionalSection) - badge-ul nu se aplica.
+                      const notRxdLog = log._supportsRx
+                        ? isNotRxd(log, log._prescribedWeight, renderGroup.sectionFormatId, renderGroup.sectionFormatConfig, log._loggedMovements, log._prescribedMovements)
+                        : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t)
@@ -2033,27 +1912,27 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
                       // acelasi scor deja calculat mai sus pt headline (cu unitate
                       // inclusa), nu doar il adaugam langa "X seturi" fara sens.
                       // Ascending AMRAP: aceeasi cifra de "reps totale" ca in Jurnal
-                      // (vezi parseWodLogDetails/JurnalList) - aici wodZiFormat/
-                      // wodZiData sunt deja cele ale WOD-ului afisat pe tot ecranul
-                      // de Clasament, nu trebuie rezolvate per-log ca acolo.
-                      const ascendingTotalReps = (wodZiFormat?.ascending && log.result && miscariAfisate.length > 0)
+                      // (vezi parseWodLogDetails/JurnalList) - randGroup.sectionFormat/
+                      // sectionData sunt deja cele ale Sectiunii afisate in acest
+                      // bloc, nu trebuie rezolvate per-log ca acolo.
+                      const ascendingTotalReps = (renderGroup.sectionFormat?.ascending && log.result && miscariAfisate.length > 0)
                         ? (() => {
-                            const { rounds, partialArr } = parseAscendingAmrapResult(log.result, miscariAfisate, wodZiData?.format_config?.startReps, wodZiData?.format_config?.incrementReps)
-                            return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, wodZiData?.format_config?.startReps, wodZiData?.format_config?.incrementReps)
+                            const { rounds, partialArr } = parseAscendingAmrapResult(log.result, miscariAfisate, renderGroup.sectionFormatConfig?.startReps, renderGroup.sectionFormatConfig?.incrementReps)
+                            return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, renderGroup.sectionFormatConfig?.startReps, renderGroup.sectionFormatConfig?.incrementReps)
                           })()
                         : null
                       // WOD-uri inlantuite - detaliu = textul deja compus per
                       // etapa (log_meta.stages[].text), fara sa mai fie nevoie
                       // de niciun re-parse (spre deosebire de Ascending AMRAP).
-                      const rezultatBucati = (wodZiFormat?.family === 'sets' && result !== '—') ? [result]
-                        : wodZiFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
+                      const rezultatBucati = (renderGroup.sectionFormat?.family === 'sets' && result !== '—') ? [result]
+                        : renderGroup.sectionFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
                         : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                         : rezultatBucatiRaw
                       // parseWodLogDetails nu stie de 'chained' (result/
                       // time_result/sets/log_meta.completed brute sunt mereu
                       // null la aceasta familie) - fara asta, blocul REZULTAT
                       // de mai jos nu s-ar afisa niciodata pt un WOD inlantuit.
-                      const areRezultatFinal = areRezultat || (wodZiFormat?.family === 'chained' && rezultatBucati.length > 0)
+                      const areRezultatFinal = areRezultat || (renderGroup.sectionFormat?.family === 'chained' && rezultatBucati.length > 0)
                       const areDetaliiFinal = areDetalii || areRezultatFinal
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
@@ -2146,6 +2025,8 @@ function Clasament({ logs, loading, wodZiData, onRefresh, selectedDate, onDateCh
               </div>
             )
           })}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -6159,6 +6040,10 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(false)
   const [clasamentLogs, setClasamentLogs] = useState([])
+  // Layer 2b - fiecare Sectiune scorata independent (logging_mode:'required')
+  // a WOD-ului afisat pe Clasament, primara ('metcon') inclusa. Gol cand nu
+  // exista deloc date Workout Engine V2 pt acea zi.
+  const [clasamentSections, setClasamentSections] = useState([])
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
@@ -6646,7 +6531,11 @@ function App() {
         fetchWodLogs(); fetchClasament(clasamentDateRef.current); fetchProgressionData()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_logs' }, () => {
-        fetchSkillLogs()
+        // Layer 2b - Clasamentul citeste acum si skill_logs (o Sectiune
+        // scorata independent poate fi logata prin oricare din cele 2
+        // tabele) - orice schimbare trebuie sa refaca fetch-ul, la fel ca la
+        // wod_logs mai sus, nu doar Jurnalul propriu.
+        fetchSkillLogs(); fetchClasament(clasamentDateRef.current)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
         fetchSettings()
@@ -7509,14 +7398,44 @@ function App() {
     const targetDate = dateStr || clasamentDate || todayFallback
     const { data: wodZi } = await supabase.from('wods').select(`id, type, duration, name, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')}`).eq('date', targetDate).maybeSingle()
     setClasamentWodData(wodZi || null)
+    // Layer 2b - fiecare Sectiune CURENT scorata independent
+    // (loggingMode:'required') a acestui WOD, primara ('metcon') inclusa -
+    // sursa de adevar pt cate clasamente separate se afiseaza si cu ce
+    // format/config e comparat fiecare. Gol cand nu exista deloc date
+    // Workout Engine V2 pt acea zi (WOD legacy sau nicio zi programata) -
+    // Clasament cade atunci pe bucket-ul unic implicit, comportament
+    // identic cu dinainte de Layer 2b.
+    let v2Sections = []
+    if (userProfile?.gym_id && wodZi?.id) {
+      try {
+        const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, targetDate)
+        v2Sections = (v2?.sections || [])
+          .filter(s => s.loggingMode === 'required')
+          .map(s => ({ id: s.id, slot_key: s.slotKey, title: s.title, format: s.format, format_config: s.formatConfig }))
+          .sort((a, b) => (a.slot_key === 'metcon' ? -1 : b.slot_key === 'metcon' ? 1 : 0))
+      } catch (err) {
+        console.error('fetchClasament: loadFromWorkoutEngineV2 failed (cade pe bucket unic legacy):', err)
+      }
+    }
+    setClasamentSections(v2Sections)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
+    // skill_logs n-are coloana variant_level (sectiunile Skill/Skill2 n-au
+    // variante de scalare, vezi buildBlocksForAdditionalSection) - fara
+    // filtru echivalent aici.
+    let qSkill = supabase.from('skill_logs').select('*')
     if (wodZi?.id) {
       q = q.eq('wod_id', wodZi.id)
+      qSkill = qSkill.eq('wod_id', wodZi.id)
     } else {
       q = q.gte('logged_at', targetDate + 'T00:00:00').lte('logged_at', targetDate + 'T23:59:59')
+      qSkill = qSkill.gte('logged_at', targetDate + 'T00:00:00').lte('logged_at', targetDate + 'T23:59:59')
     }
-    const { data: logs } = await q
-    if (logs && logs.length > 0) {
+    const [{ data: wodLogsData }, { data: skillLogsData }] = await Promise.all([q, qSkill])
+    const logs = [
+      ...(wodLogsData || []).map(l => ({ ...l, _source: 'wod_logs' })),
+      ...(skillLogsData || []).map(l => ({ ...l, _source: 'skill_logs' })),
+    ]
+    if (logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
       const { data: profiles } = await supabase.from('members').select('id, full_name, email, gender, avatar_url, weight_unit').in('id', ids)
       const map = {}
@@ -10511,7 +10430,7 @@ function App() {
       })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 

@@ -13,6 +13,7 @@ import {
   isWeightScoredSetsFormat, toKgForRanking,
   shouldLogRoundsInsteadOfTime, composeFortimeOrAmrapFields,
   deriveDurationCompletionState, normalizeCompletionState,
+  sortSectionLogs, parseTimeResult, parseRoundsScore, partialRepsOfLog,
 } from './workoutFormats'
 import { getT, TRANSLATIONS } from './translations'
 
@@ -884,5 +885,172 @@ describe('maxWeightFromSets / setsDisplayScore', () => {
   })
   it('fara nimic logat -> null (afisat ca "-" pe Clasament)', () => {
     expect(setsDisplayScore('Build to Heavy/1RM', {}, null)).toBe(null)
+  })
+})
+
+// Layer 2b - Universal Scoring Architecture, Phase 1B. sortSectionLogs e
+// comparatorul canonic de clasament, parametrizat pe formatul/config-ul UNEI
+// SINGURE Sectiuni scorate independent (extras din fostul closure App.jsx
+// `sortLogs`, care lucra mereu peste "WOD-ul intreg" - vezi
+// SCORING_PHASE1B_LAYER2B_SECTION_LEADERBOARD_IMPLEMENTATION_REPORT.md).
+describe('sortSectionLogs', () => {
+  const log = (overrides) => ({ member_id: 'm1', logged_at: '2026-08-15T10:00:00Z', profile: {}, ...overrides })
+
+  describe('one-score regressions (comportament identic cu fostul sortLogs)', () => {
+    it('For Time: finisherul e mereu inaintea celui neterminat, indiferent de valori', () => {
+      const a = log({ member_id: 'a', time_result: '25:00', completion_state: 'completed' })
+      const b = log({ member_id: 'b', result: '20 rounds', completion_state: 'capped' })
+      const out = sortSectionLogs([b, a], 'For Time', {})
+      expect(out.map(l => l.member_id)).toEqual(['a', 'b'])
+    })
+    it('RFT: intre 2 finisheri, timpul mai mic castiga', () => {
+      const a = log({ member_id: 'a', time_result: '12:30', completion_state: 'completed' })
+      const b = log({ member_id: 'b', time_result: '11:45', completion_state: 'completed' })
+      const out = sortSectionLogs([a, b], 'RFT', { rounds: 5 })
+      expect(out.map(l => l.member_id)).toEqual(['b', 'a'])
+    })
+    it('AMRAP: mai multe runde complete castiga, apoi reps partiale in runda neterminata', () => {
+      const a = log({ member_id: 'a', result: '6 rounds + 5 reps' })
+      const b = log({ member_id: 'b', result: '7 rounds' })
+      const c = log({ member_id: 'c', result: '6 rounds + 10 reps' })
+      const out = sortSectionLogs([a, b, c], 'AMRAP', {})
+      expect(out.map(l => l.member_id)).toEqual(['b', 'c', 'a'])
+    })
+    it('Strength/LOAD (family:sets): greutatea maxima castiga', () => {
+      const a = log({ member_id: 'a', sets: { 'Back Squat': [{ reps: '1', weight: '140' }] } })
+      const b = log({ member_id: 'b', sets: { 'Back Squat': [{ reps: '1', weight: '150' }] } })
+      const out = sortSectionLogs([a, b], 'Build to Heavy/1RM', {})
+      expect(out.map(l => l.member_id)).toEqual(['b', 'a'])
+      expect(out[0]._setsScore).toBe(150)
+    })
+    it('Chipper (family: For Time la baza): finisher inaintea celui cu progres partial', () => {
+      const a = log({ member_id: 'a', time_result: '18:20', completion_state: 'completed' })
+      const b = log({ member_id: 'b', result: '80 reps', completion_state: 'capped' })
+      const out = sortSectionLogs([b, a], 'Chipper', {})
+      expect(out.map(l => l.member_id)).toEqual(['a', 'b'])
+    })
+  })
+
+  describe('grupare pe Sectiune - fiecare Sectiune cu propriul comparator', () => {
+    it('o Sectiune TIME si o Sectiune LOAD, apelate separat, nu se amesteca niciodata', () => {
+      const timeLogs = [log({ member_id: 'x', time_result: '10:00', completion_state: 'completed' })]
+      const loadLogs = [log({ member_id: 'y', sets: { 'Clean': [{ reps: '1', weight: '100' }] } })]
+      const timeRanked = sortSectionLogs(timeLogs, 'For Time', {})
+      const loadRanked = sortSectionLogs(loadLogs, 'Build to Heavy/1RM', {})
+      expect(timeRanked).toHaveLength(1)
+      expect(loadRanked).toHaveLength(1)
+      expect(timeRanked[0]._setsScore).toBeUndefined()
+      expect(loadRanked[0]._setsScore).toBe(100)
+    })
+  })
+
+  describe('surse de rezultate polimorfice (wod_logs vs skill_logs)', () => {
+    it('functioneaza identic pe un rand in forma skill_logs (fara weight_logged/variant_level)', () => {
+      // skill_logs n-are coloanele weight_logged/variant_level/completion_state
+      // deloc (vezi schema live) - sortSectionLogs nu trebuie sa presupuna ca
+      // exista, doar sa foloseasca sets/result/time_result/log_meta, comune
+      // ambelor tabele.
+      const a = { member_id: 'a', logged_at: '2026-08-15T10:00:00Z', sets: { 'Deadlift': [{ reps: '3', weight: '120' }] } }
+      const b = { member_id: 'b', logged_at: '2026-08-15T10:05:00Z', sets: { 'Deadlift': [{ reps: '3', weight: '130' }] } }
+      const out = sortSectionLogs([a, b], 'Strength Sets', {})
+      expect(out.map(l => l.member_id)).toEqual(['b', 'a'])
+    })
+  })
+
+  describe('logare partiala / editare / stergere - dedup e per apelare, nu global', () => {
+    it('un membru absent dintr-o Sectiune nu apare in clasamentul acelei Sectiuni', () => {
+      const sectionALogs = [log({ member_id: 'a', time_result: '10:00', completion_state: 'completed' })]
+      const sectionBLogs = [] // 'a' n-a logat inca Sectiunea B
+      expect(sortSectionLogs(sectionALogs, 'For Time', {}).map(l => l.member_id)).toEqual(['a'])
+      expect(sortSectionLogs(sectionBLogs, 'For Time', {})).toEqual([])
+    })
+    it('editarea unui rezultat (rulare noua a functiei cu valoarea schimbata) re-ordoneaza corect', () => {
+      const a = log({ member_id: 'a', time_result: '15:00', completion_state: 'completed' })
+      const b = log({ member_id: 'b', time_result: '14:00', completion_state: 'completed' })
+      expect(sortSectionLogs([a, b], 'For Time', {}).map(l => l.member_id)).toEqual(['b', 'a'])
+      const aEdited = { ...a, time_result: '13:00' }
+      expect(sortSectionLogs([aEdited, b], 'For Time', {}).map(l => l.member_id)).toEqual(['a', 'b'])
+    })
+    it('stergerea unui rezultat (absenta din array) nu afecteaza ordinea celorlalti', () => {
+      const a = log({ member_id: 'a', time_result: '10:00', completion_state: 'completed' })
+      const b = log({ member_id: 'b', time_result: '11:00', completion_state: 'completed' })
+      const c = log({ member_id: 'c', time_result: '12:00', completion_state: 'completed' })
+      const before = sortSectionLogs([a, b, c], 'For Time', {}).map(l => l.member_id)
+      const after = sortSectionLogs([a, c], 'For Time', {}).map(l => l.member_id) // b sters
+      expect(before).toEqual(['a', 'b', 'c'])
+      expect(after).toEqual(['a', 'c'])
+    })
+    it('un membru cu 2 loguri pt aceeasi Sectiune - ramane doar cel mai bun, nu ambele', () => {
+      const older = log({ member_id: 'a', logged_at: '2026-08-15T09:00:00Z', time_result: '20:00', completion_state: 'completed' })
+      const newerWorse = log({ member_id: 'a', logged_at: '2026-08-15T09:05:00Z', time_result: '25:00', completion_state: 'completed' })
+      const out = sortSectionLogs([older, newerWorse], 'For Time', {})
+      expect(out).toHaveLength(1)
+      expect(out[0].time_result).toBe('20:00')
+    })
+  })
+
+  describe('completion_state - explicit vs inferat (legacy)', () => {
+    it('completion_state explicit "capped" precede time_result la clasificarea finished/neterminat', () => {
+      // Un log cu completion_state:'capped' dar cu time_result completat din
+      // greseala (date istorice inconsistente) tot trebuie tratat ca
+      // neterminat - completion_state e sursa de adevar cand exista.
+      const cappedButHasTime = log({ member_id: 'a', time_result: '20:00', completion_state: 'capped', result: '18 rounds' })
+      const finished = log({ member_id: 'b', time_result: '19:00', completion_state: 'completed' })
+      const out = sortSectionLogs([cappedButHasTime, finished], 'RFT', {})
+      expect(out.map(l => l.member_id)).toEqual(['b', 'a'])
+    })
+    it('completion_state NULL (log vechi, pre-Faza 0) cade pe inferenta veche (!!time_result)', () => {
+      const legacyFinished = { member_id: 'a', logged_at: '2026-08-15T10:00:00Z', time_result: '15:00', completion_state: null }
+      const legacyUnfinished = { member_id: 'b', logged_at: '2026-08-15T10:00:00Z', result: '10 rounds', completion_state: null }
+      const out = sortSectionLogs([legacyFinished, legacyUnfinished], 'For Time', {})
+      expect(out.map(l => l.member_id)).toEqual(['a', 'b'])
+    })
+  })
+
+  describe('egalitati adevarate (true ties)', () => {
+    it('timp identic -> departajat de logged_at (comportament existent, neschimbat de Layer 2b)', () => {
+      const first = log({ member_id: 'a', logged_at: '2026-08-15T09:00:00Z', time_result: '10:00', completion_state: 'completed' })
+      const second = log({ member_id: 'b', logged_at: '2026-08-15T09:05:00Z', time_result: '10:00', completion_state: 'completed' })
+      const out = sortSectionLogs([second, first], 'For Time', {})
+      expect(out.map(l => l.member_id)).toEqual(['a', 'b'])
+    })
+  })
+
+  describe('unitati kg/lbs - clasament LOAD normalizat', () => {
+    it('un membru cu preferinta lbs si unul cu kg se claseaza corect intre ei', () => {
+      // 220 lbs = ~99.8 kg, sub 100kg real - membrul kg trebuie sa castige.
+      const lbsMember = log({ member_id: 'lbs', profile: { weight_unit: 'lbs' }, sets: { 'Snatch': [{ reps: '1', weight: '220' }] } })
+      const kgMember = log({ member_id: 'kg', profile: { weight_unit: 'kg' }, sets: { 'Snatch': [{ reps: '1', weight: '100' }] } })
+      const out = sortSectionLogs([lbsMember, kgMember], 'Build to Heavy/1RM', {})
+      expect(out.map(l => l.member_id)).toEqual(['kg', 'lbs'])
+    })
+  })
+
+  describe('siguranta - format necunoscut/lipsa nu crapa', () => {
+    it('formatId null (nicio Sectiune/WOD cunoscut) cade pe familia implicita For Time, nu arunca', () => {
+      const a = log({ member_id: 'a', time_result: '10:00', completion_state: 'completed' })
+      expect(() => sortSectionLogs([a], null, null)).not.toThrow()
+      expect(sortSectionLogs([a], null, null).map(l => l.member_id)).toEqual(['a'])
+    })
+    it('array gol -> array gol, fara sa arunce', () => {
+      expect(sortSectionLogs([], 'AMRAP', {})).toEqual([])
+    })
+  })
+})
+
+describe('parseTimeResult / parseRoundsScore / partialRepsOfLog', () => {
+  it('parseTimeResult: mm:ss si hh:mm:ss', () => {
+    expect(parseTimeResult('12:30')).toBe(750)
+    expect(parseTimeResult('1:02:30')).toBe(3750)
+    expect(parseTimeResult(null)).toBe(Infinity)
+  })
+  it('parseRoundsScore extrage primul numar dintr-un text de runde', () => {
+    expect(parseRoundsScore('7 rounds')).toBe(7)
+    expect(parseRoundsScore(null)).toBe(null)
+  })
+  it('partialRepsOfLog: AMRAP/RFT ia doar segmentul dupa "+"; secvential ia tot textul', () => {
+    expect(partialRepsOfLog({ result: '6 rounds + 5 Pull-ups, 3 Push-ups' }, false)).toBe(8)
+    expect(partialRepsOfLog({ result: '5 Pull-ups, 3 Push-ups' }, true)).toBe(8)
+    expect(partialRepsOfLog({ result: '6 rounds' }, false)).toBe(0)
   })
 })
