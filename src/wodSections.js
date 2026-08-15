@@ -65,11 +65,18 @@ export const emptySectionVariants = () => Object.fromEntries(
 // SectionCard) since Warm-up has no equivalent legacy column to persist it
 // (skill_scored/skill2_scored only, Phase 1B migration) and stays
 // permanently non-scoreable, unchanged from before this phase.
+// Layer 2a.5 (SCORING_PHASE1B_LAYER2A5_SECTION_IDENTITY_INTEGRITY_REPORT.md) -
+// `legacySlot` e sursa de adevar pt "carui slot legacy (warmup/skill/
+// skill2) apartine sectiunea asta", INDEPENDENT de pozitia ei curenta in
+// lista. null pt o sectiune noua, niciodata inca salvata - vezi
+// legacyPayloadFromSections mai jos pt de ce distinctia asta conteaza acum
+// (inainte de Layer 2a nu conta, continutul "urma pozitia" era inofensiv).
 export const createSection = (typeKey, isPrimary = false) => ({
   id: newSectionId(),
   typeKey,
   isPrimary,
   scored: isPrimary,
+  legacySlot: null,
   visible: true,
   open: false,
   title: '',
@@ -124,14 +131,14 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
   const sections = []
   if ((w.warmup || []).length > 0 || w.warmup_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'warmup', isPrimary: false, scored: false, visible: w.warmup_visible !== false, open,
+      id: newSectionId(), typeKey: 'warmup', isPrimary: false, scored: false, legacySlot: 'warmup', visible: w.warmup_visible !== false, open,
       title: '', format: null, formatConfig: {}, movementName: '', text: (w.warmup || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
     })
   }
   if ((w.skill || []).length > 0 || w.skill_name || w.skill_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill_scored, visible: w.skill_visible !== false, open,
+      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill_scored, legacySlot: 'skill', visible: w.skill_visible !== false, open,
       title: '', format: w.skill_type || 'Weightlifting', formatConfig: w.skill_format_config || {},
       movementName: w.skill_name || '', text: (w.skill || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
@@ -139,7 +146,7 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
   }
   if ((w.skill2 || []).length > 0 || w.skill2_name || w.skill2_visible === false) {
     sections.push({
-      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill2_scored, visible: w.skill2_visible !== false, open,
+      id: newSectionId(), typeKey: 'skill', isPrimary: false, scored: !!w.skill2_scored, legacySlot: 'skill2', visible: w.skill2_visible !== false, open,
       title: '', format: w.skill2_type || 'Weightlifting', formatConfig: w.skill2_format_config || {},
       movementName: w.skill2_name || '', text: (w.skill2 || []).join('\n'),
       durationMin: '20', durationSec: '0', name: '', variants: emptySectionVariants(),
@@ -162,17 +169,51 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
 
 // Inversul de mai sus - mapeaza lista de sectiuni (oricate) pe cele 4 sloturi
 // fixe din `wods`. Sectiunea primara -> coloanele principale + variante de
-// scalare. Primele 3 sectiuni NON-primare, IN ORDINEA CURENTA din lista ->
-// warmup/skill/skill2 - reordonarea in editor schimba efectiv CE ajunge in
-// care coloana legacy (continutul "urmeaza" pozitia, nu invers), acelasi
-// principiu ca slot_key din Faza 5B, aplicat aici la nivel de UI. O sectiune
-// non-primara lipsa (mai putin de 3) goleste explicit coloana ei legacy -
-// asa se propaga o stergere de sectiune in UI pana la RPC-ul de Faza 5B
-// (care sterge tintit randul workout_sections corespunzator).
+// scalare.
+//
+// Layer 2a.5 fix (SCORING_PHASE1B_LAYER2A5_SECTION_IDENTITY_INTEGRITY_REPORT.md) -
+// pana la Faza 6, mapare-a non-primarelor era STRICT POZITIONALA (primele 3
+// din lista, in ordinea curenta -> warmup/skill/skill2, "continutul urmeaza
+// pozitia") - inofensiv atunci, fiindca nimic nu citea `workout_sections`
+// pt scoring. Layer 2a a facut `workout_section_id` identitate de scoring
+// (wod_logs.workout_section_id) - de-atunci, o simpla reordonare/adaugare/
+// stergere putea muta CONTINUTUL unei sectiuni deja logate intr-o alta
+// coloana legacy (deci alt slot_key, alt workout_sections.id de facto -
+// bug real gasit si reprodus live la finalul Layer 2a: continutul "Back
+// Squat" a ajuns in coloana warmup dupa adaugarea unei sectiuni noi).
+//
+// Fix: fiecare sectiune deja existenta (incarcata prin sectionsFromLegacyWod,
+// deci deja salvata cel putin o data) poarta legacySlot - ISI PASTREAZA
+// slotul, indiferent unde ajunge in lista. DOAR sectiunile cu adevarat noi
+// (legacySlot null - niciodata inca salvate, deci fara identitate anterioara
+// de protejat) ocupa sloturile ramase libere, in ordinea lor curenta din
+// lista - acelasi comportament pozitional de dinainte, dar acum limitat
+// STRICT la cazul in care chiar nu exista nimic de stricat.
 export const legacyPayloadFromSections = (sections) => {
   const primary = sections.find(s => s.isPrimary) || sections[0] || createSection('metcon', true)
   const nonPrimary = sections.filter(s => !s.isPrimary)
-  const [warmupS, skillS, skill2S] = nonPrimary
+  const bySlot = { warmup: null, skill: null, skill2: null }
+  const unassigned = []
+  for (const s of nonPrimary) {
+    if (s.legacySlot && !bySlot[s.legacySlot]) bySlot[s.legacySlot] = s
+    else unassigned.push(s)
+  }
+  // Un candidat NOU marcat `scored` primeste prioritate pe skill/skill2 -
+  // coloana warmup n-are NICIUN camp de format/scored (nonPrimaryFields mai
+  // jos scrie doar warmup/warmup_visible pt ea), deci o sectiune scorata
+  // ajunsa acolo si-ar pierde silentios formatul si flagul `scored`. Restul
+  // candidatilor (nescorati) raman POZITIONALI ca inainte (warmup/skill/
+  // skill2, in ordinea lor din lista) - comportament neschimbat pt cazul
+  // fara nimic de pierdut.
+  const scoredCandidati = unassigned.filter(s => s.scored)
+  const restCandidati = unassigned.filter(s => !s.scored)
+  for (const slot of ['skill', 'skill2']) {
+    if (!bySlot[slot] && scoredCandidati.length > 0) bySlot[slot] = scoredCandidati.shift()
+  }
+  for (const slot of ['warmup', 'skill', 'skill2']) {
+    if (!bySlot[slot] && restCandidati.length > 0) bySlot[slot] = restCandidati.shift()
+  }
+  const { warmup: warmupS, skill: skillS, skill2: skill2S } = bySlot
 
   const nonPrimaryFields = (prefix, s) => {
     if (prefix === 'warmup') return { warmup: s ? parseLiniiWod(s.text) : [], warmup_visible: s ? s.visible : true }

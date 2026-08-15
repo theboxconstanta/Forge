@@ -206,6 +206,69 @@ describe('legacyPayloadFromSections', () => {
     expect(payload.skill_scored).toBe(true)
     expect(payload.skill2_scored).toBe(false)
   })
+
+  // Layer 2a.5 (SCORING_PHASE1B_LAYER2A5_SECTION_IDENTITY_INTEGRITY_REPORT.md) -
+  // legacySlot identity fix. Bug real, reprodus live la finalul Layer 2a:
+  // continutul unei sectiuni deja SALVATE (deci deja legata de un
+  // workout_sections.id real, posibil deja logata) putea "sari" intr-o alta
+  // coloana legacy doar prin adaugarea/stergerea/reordonarea altor sectiuni,
+  // fiindca mapare-a era STRICT pozitionala. Testele urmatoare dovedesc ca o
+  // sectiune deja incarcata (legacySlot != null) isi pastreaza slotul,
+  // indiferent de pozitie - doar sectiunile cu adevarat noi (legacySlot
+  // null) mai raman pozitionale (testat deja mai sus, neschimbat).
+  it('sectiune EXISTENTA isi pastreaza coloana legacy la reordonare (nu mai e pozitional)', () => {
+    const sections = sectionsFromLegacyWod(wodFixtureWithExtras) // [warmup, skill, skill2, metcon]
+    const [warmup, skill, skill2, metcon] = sections
+    const reordered = [skill2, skill, warmup, metcon]
+    const payload = legacyPayloadFromSections(reordered)
+    expect(payload.warmup).toEqual(wodFixtureWithExtras.warmup)
+    expect(payload.skill).toEqual(wodFixtureWithExtras.skill)
+    expect(payload.skill_name).toBe(wodFixtureWithExtras.skill_name)
+    expect(payload.skill2).toEqual(wodFixtureWithExtras.skill2)
+    expect(payload.skill2_name).toBe(wodFixtureWithExtras.skill2_name)
+  })
+
+  it('inserarea unei sectiuni NOI SCORATE inaintea uneia EXISTENTE nu fura slotul celei existente si nu ajunge in warmup (unde si-ar pierde formatul)', () => {
+    // wodFixtureNoExtras + doar skill populat -> skill2 ramane liber pt noua sectiune.
+    const wodCuUnSlotLiber = { ...wodFixtureNoExtras, skill: ['5x3 Back Squat @ 70%'], skill_name: 'Back Squat', skill_type: 'Weightlifting' }
+    const sections = sectionsFromLegacyWod(wodCuUnSlotLiber) // [skill, metcon]
+    const [skill, metcon] = sections
+    const newSection = { ...createSection('strength', false), movementName: 'Nou adaugat', scored: true }
+    const withInsert = [newSection, skill, metcon]
+    const payload = legacyPayloadFromSections(withInsert)
+    // sectiunea existenta isi pastreaza coloana...
+    expect(payload.skill_name).toBe('Back Squat')
+    // ...noua sectiune SCORATA ocupa singurul slot ramas liber (skill2) -
+    // niciodata warmup, care n-are camp de format/scored deloc.
+    expect(payload.warmup).toEqual([])
+    expect(payload.skill2_name).toBe('Nou adaugat')
+    expect(payload.skill2_scored).toBe(true)
+  })
+
+  it('stergerea unei sectiuni EXISTENTE elibereaza coloana ei, nu e mostenita de alta sectiune', () => {
+    const sections = sectionsFromLegacyWod(wodFixtureWithExtras) // [warmup, skill, skill2, metcon]
+    const [, skill, skill2, metcon] = sections // warmup eliminat din lista
+    const payload = legacyPayloadFromSections([skill, skill2, metcon])
+    expect(payload.warmup).toEqual([])
+    expect(payload.skill).toEqual(wodFixtureWithExtras.skill)
+    expect(payload.skill_name).toBe(wodFixtureWithExtras.skill_name)
+    expect(payload.skill2_name).toBe(wodFixtureWithExtras.skill2_name)
+  })
+
+  it('save -> reload -> save: identitatea supravietuieste unui ciclu complet de editare (adauga apoi sterge o sectiune noua)', () => {
+    // Simuleaza exact scenariul reprodus live: WOD salvat cu warmup gol +
+    // skill (Back Squat) + metcon, apoi coach-ul adauga o sectiune noua.
+    const wodDupaPrimulSave = { ...wodFixtureNoExtras, skill: ['5x5 Back Squat @ 60kg'], skill_name: 'Back Squat', skill_scored: true }
+    const sections1 = sectionsFromLegacyWod(wodDupaPrimulSave) // [skill(legacySlot='skill'), metcon] - warmup gol, omis
+    const withNewSkill2 = [...sections1.slice(0, -1), { ...createSection('skill', false), movementName: 'Deadlift', scored: true }, sections1[sections1.length - 1]]
+    const payload = legacyPayloadFromSections(withNewSkill2)
+    // Back Squat ramane in coloana `skill` (identitatea lui originala),
+    // NU aluneca in `warmup` doar pentru ca lista are acum un element in plus.
+    expect(payload.skill_name).toBe('Back Squat')
+    expect(payload.skill_scored).toBe(true)
+    expect(payload.warmup).toEqual([])
+    expect(payload.skill2_name).toBe('Deadlift')
+  })
 })
 
 describe('validateSectionsForLegacy', () => {
