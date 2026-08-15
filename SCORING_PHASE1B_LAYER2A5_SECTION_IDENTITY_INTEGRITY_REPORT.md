@@ -1,6 +1,6 @@
 # FORGE — Phase 1B, Layer 2A.5 — Section Identity Stability & Editor Integrity — Implementation Report
 
-**Status:** Root cause found and proven, fix implemented and committed, 58 regression tests passing (28 WOD-SIMPLE + 30 forge-admin-web), two adjacent architectural questions verified safe via direct database testing. **Live browser re-verification of the fix is incomplete** — the production deployment did not update within 50+ minutes of pushing, an apparent Vercel deployment/promotion issue unrelated to the code, disclosed in full below rather than fabricated.
+**Status: COMPLETE.** Root cause found and proven, fix implemented and committed, 58 regression tests passing (28 WOD-SIMPLE + 30 forge-admin-web), two adjacent architectural questions verified safe via direct database testing. **Live browser re-verification is now also complete** — the earlier-reported stale-deployment blocker was investigated with the `vercel` CLI and found to be a false alarm (premature checks during the build/promotion window, not a stuck pipeline); the correct commit (`cf2b3c2`) was confirmed live via `vercel inspect --logs` + direct bundle `curl`, the exact original bug scenario was re-reproduced against that confirmed-live build and now passes, and a result-safety + Layer 2a regression smoke test were run on top of it. See "Deployment Incident" onward for full detail. All test data created during this final verification pass was removed and confirmed via SQL.
 
 ---
 
@@ -173,28 +173,86 @@ WOD-SIMPLE `npm run build`: clean. forge-admin-web `tsc -b` + `npm run build`: c
 
 ## Production Verification
 
-**Partially complete — disclosed honestly, not fabricated.**
-
-Completed and verified live, with real production data, via direct SQL (not just UI):
+**Complete.** Completed and verified live, with real production data, via direct SQL (not just UI):
 - Production historical-corruption audit (0 evidence found).
 - Scoring Snapshot does-not-drift-on-edit test (constructed a real test Section+result, changed the Section's format, edited the result, confirmed `format_snapshot` unchanged).
 - Section-removal-with-results safety test (constructed a real test Section+result, deleted the Section, confirmed the result and its full snapshot survived intact with only `workout_section_id` nulled).
+- (New, this pass) The exact original bug scenario, re-reproduced live in the browser against a confirmed-correct production build — see "Final Production Reproduction Test" below.
+- (New, this pass) A result-attach-then-edit safety test and a Layer 2a regression smoke test — see the sections below.
 
-**Not completed:** re-clicking through the exact original bug scenario in the live browser UI to visually confirm the fix. I reproduced the exact scenario (scored Skill "Back Squat" → add scored Skill2 "Deadlift" → save) against the currently-deployed production bundle and it **still showed the old, buggy behavior** — but investigation showed this is because the production deployment at `forge-delta-ivory.vercel.app` had not updated to include this mission's commit (`7ff15eb`) despite it being pushed and confirmed present on `origin/main` over 50 minutes prior. Direct verification (fetching the served JS bundle, checking for the `legacySlot` string; checking Vercel's own `age`/`x-vercel-cache: HIT` response headers, which showed a response cached ~3.8–4.3 hours earlier and *growing*, not resetting, across repeated checks) confirms this is a stale/stuck production deployment or promotion issue on the Vercel project side, not a code or fix problem. I do not have Vercel API write/list access from this session to diagnose further (`list_deployments` returned 403 Forbidden even with the correct project/org id recovered from `.vercel/repo.json`). **This needs the user's attention on the Vercel dashboard** — the fix itself is not in question (proven via unit tests + the isolated database reproduction of the exact mechanism), but a live, visual, end-to-end confirmation in the actual member-facing UI has not yet been obtained.
+## Deployment Incident
+
+The previous session's report disclosed an apparent blocker: re-clicking the exact bug scenario against `forge-delta-ivory.vercel.app` still showed the old buggy behavior, and the served JS bundle appeared to be missing the `legacySlot` fix ~50+ minutes after the fix commit (`7ff15eb`) was pushed, with Vercel's `age`/`x-vercel-cache: HIT` headers growing rather than resetting across repeated checks.
+
+This session investigated with the actual `vercel` CLI (found via `.vercel/repo.json` → project `prj_oTc3Wvts2QUGH0PcP7NsQIT07Gid`, team `team_wNJfFVA2pKB0PPG6CcC1DAxj`, project name `forge`; not available/considered in the prior session). `vercel project ls`, `vercel list forge`, and `vercel inspect <deployment-url> --logs` showed a deployment (`dpl_HwdY4pgyQVCd29HUwDt5JMvGUXQa`, created 11:45:03 UTC) built from exactly commit `cf2b3c2` (the Layer 2a.5 report commit, which includes the `7ff15eb` fix), that succeeded and is aliased to `forge-delta-ivory.vercel.app`. A direct `curl` of the alias (bypassing the browser entirely) confirmed the served bundle is `index-C_87K-wm.js`, containing the string `legacySlot` 4 times (`grep -c`), with a fresh, small `Age` header — not the large, growing one seen before.
+
+**Conclusion: the deployment pipeline was never actually stuck.** The prior session's checks were made during the normal build/promotion window and happened to catch the CDN still serving the previous edge-cached response; by the time of this investigation the correct build was already live. No infrastructure fix was needed, and no fake/empty commit was created to force a redeploy — the existing `cf2b3c2` deployment was used as-is.
+
+## Production Deployment Proof
+
+Two independent signals, both pointing at the same commit:
+1. **Vercel platform record**: `vercel inspect dpl_HwdY4pgyQVCd29HUwDt5JMvGUXQa --logs` — source commit `cf2b3c2`, status Ready, aliased to `forge-delta-ivory.vercel.app`.
+2. **Served artifact**: direct `curl` of the production alias (not the extension's cached tab) served `index-C_87K-wm.js`, and `grep -c legacySlot` on that exact file returned `4` — the fix string is physically present in what members' browsers download.
+
+Both were re-confirmed at the start of this pass by loading a fresh browser tab, clearing its service worker registrations and caches, and reloading — the tab loaded the same `index-C_87K-wm.js` bundle.
+
+## Final Production Reproduction Test
+
+Reproduced the exact canonical scenario from the mission spec, live, against the confirmed-correct build, as the Coach/Admin (Lucian's account), on `2026-08-15`:
+
+1. Created a new test WOD (`"LAYER2A5 FINAL VERIFY DELETE ME"`, AMRAP 20:00 "10 Burpees") with **only** a Skill section populated: "Back Squat", content `5x5 Back Squat @ 60kg`, toggled **Scorată independent** ON. Saved.
+   - Baseline recorded via SQL: `wods.id = 4a32fc15-e072-4888-a5dd-b7aa758759e4`, `skill_scored = true`, `skill = ["5x5 Back Squat @ 60kg"]`, `skill2 = []`, `warmup = []`.
+   - Corresponding `workout_sections` row: `id = 0fe1f333-34e4-4d16-b204-0f1bf39b3020`, `slot_key = 'skill'`, `movements = ["5x5 Back Squat @ 60kg"]`.
+2. Added a second Section, toggled it **Scorată independent** ON, set it to "Deadlift" / `5x3 Deadlift @ 100kg`. Saved.
+3. Verified via SQL immediately after:
+   - `wods.skill` **still** `["5x5 Back Squat @ 60kg"]` — unchanged. `wods.skill2` now `["5x3 Deadlift @ 100kg"]`. `wods.warmup` **still `[]`** — the Back Squat content did **not** move there this time.
+   - `workout_sections`: the original Back Squat section kept the exact same `id` (`0fe1f333-...`) and `slot_key='skill'`; the new Deadlift section got its own new `id` (`4632c1e7-67f6-4b52-a621-0d653b5c8eb0`) at `slot_key='skill2'`. No row's content was overwritten by another's.
+
+**Result: PASS.** This is the exact sequence that broke in both the Layer 2a and pre-fix Layer 2a.5 reproductions; against the confirmed-live fixed build it now behaves correctly.
 
 ## SQL Identity Verification
 
-Covered under Production Verification above — all three targeted database-level checks (historical audit, snapshot-on-edit, deletion-with-results) used direct SQL against production, before-and-after comparisons, not UI-only observation.
+Before/after states for the reproduction above are captured in full in "Final Production Reproduction Test." Additionally, after performing a further editor operation (see "Layer 2a Integration Smoke Test" below — reordering the two scored Sections), a third SQL check confirmed `wods.skill`/`skill2`/`warmup` and both `workout_sections` rows' `id`/`slot_key`/`movements` were **still** unchanged — reordering alone, post-fix, has zero effect on legacy-column identity, matching the unit-test coverage.
+
+## Layer 2a Integration Smoke Test
+
+This surfaced one clarification worth recording precisely: logging a result against a Skill/Skill2 section (via the member-facing "Loghează Skill Work" UI) writes to the pre-existing **`skill_logs`** table (keyed by `member_id, wod_id, slot`), not `wod_logs` — `wod_logs.workout_section_id` is the path for genuinely new, non-legacy-mapped Sections (added via "+ Adaugă secțiune" with a non-warmup/skill/skill2 type). `skill_logs` was extended with its own `workout_section_id` column as part of the same Layer 2a work, so it carries the identical protection — this was verified directly rather than assumed:
+
+1. Logged a real result against each of the two scored Sections from the reproduction above (Back Squat: "Loghează Skill Work" → note `LAYER2A5 TEST - skill result` → Salvează; Deadlift: same, note `LAYER2A5 TEST - skill2 result`). Both showed the correct, section-scoped "SKILL WORK DONE" / "Editează Skill Work" state (not the old bug where a top-level badge could be triggered by the wrong section — Layer 2a's `logZiWod` scoping fix is still intact).
+2. SQL confirmed both `skill_logs` rows resolved to the correct `workout_section_id` and `skill_name_snapshot` (`slot=1` → `Back Squat` → `0fe1f333-...`; `slot=2` → `Deadlift` → `4632c1e7-...`).
+3. **Result-safety test (§10):** with both results attached, performed a further editor operation — reordered the two Sections in the Admin UI (moved Deadlift above Back Squat) and saved. Re-ran the SQL check: both `skill_logs` rows **still** resolved to the same `workout_section_id`s with the same `skill_name_snapshot`s — no cross-contamination between the two results caused by the reorder.
+4. **Reload/Edit regression check (§11):** hard-reloaded the page (full navigation, not SPA soft-nav) and re-expanded the WOD card. SKILL still showed "Back Squat" (with "Editează Skill Work", i.e. correctly recognized as already logged) and SKILL 2 still showed "Deadlift" — labels and edit-vs-log state survived the reload correctly, and the two results were not swapped despite the underlying Section order having changed.
+
+**Result: PASS.** Both the new Layer 2a.5 identity fix and the pre-existing Layer 2a scoping/snapshot logic behave correctly together, under a real edit performed after real results were already attached.
+
+## Cleanup Verification
+
+All test data created during this final verification pass was deleted via direct SQL and confirmed with a follow-up SQL sweep returning zero rows:
+- `skill_logs` (2 test rows, both `LAYER2A5 TEST`) — checked first for any `pr_events.source_skill_log_id` reference (none found, so no CHECK-constraint cleanup ordering issue this time) — deleted.
+- `workouts` (1 row, `legacy_wod_id` pointing at the test WOD) — deleted, which cascaded `workout_sections`.
+- `wods` (1 row, `"LAYER2A5 FINAL VERIFY DELETE ME"`) — deleted last (FK from `workouts.legacy_wod_id` required this order).
+- Verified via SQL: `count(*) = 0` across `wods`, `workouts`, `workout_sections` (by the three specific section ids created), and `skill_logs` (by the two specific log ids created).
+- Verified in the browser: after a hard reload, the Home screen shows "Niciun WOD azi" (No WOD today) for `2026-08-15` — the test workout is gone from the live UI, not just the database.
 
 ## Test Data Cleanup
 
-All test data created this mission was removed and verified via a final SQL sweep (0 rows remaining matching `LAYER2A5`/`DELETE ME` naming across `wods`, `workouts`, `wod_logs`) — including the repro-scenario workout that was created against the stale bundle and therefore itself exhibited the bug's symptom (its own test data, not real member data, so this is expected and not itself a finding).
+Combined with the previous session's cleanup (also verified complete at the time, for the pre-fix reproduction data created against the then-stale bundle): all test data from every reproduction attempt across both sessions has been removed and confirmed via SQL. No test data remains in production.
 
 ## Known Limitations
 
 - Primary-section promotion/demotion does not specially preserve a demoted section's identity (disclosed above, low-priority, not a normal workflow today).
-- The live UI re-verification gap described above.
+- `skill_logs` vs `wod_logs` is a pre-existing architectural split (Skill/Skill2 legacy slots use one table, genuinely new Sections use the other) that predates this mission and was not introduced or changed by it — noted here only because the original report's "Layer 2a Regression Verification" section did not explicitly distinguish the two, and this pass's smoke test made the distinction concrete.
 
-## Readiness for Layer 2b
+## Final Layer 2b Readiness Verdict
 
-**Blocked on obtaining live production confirmation of this fix**, not on the fix's correctness. Once the Vercel deployment issue is resolved and the reproduction scenario can be re-run live (a 5-minute check: mark a Skill section scored, add a second scored section, save, confirm via the Admin UI or a quick SQL check that content didn't move), Layer 2b may proceed. The underlying data Layer 2b will key off (`workout_sections.id`/`slot_key` stability) is now correctly protected at the one layer that was actually at risk.
+**Is Layer 2b now safe to begin: YES.**
+
+All blocking items are closed:
+- The Vercel deployment incident is resolved (was never actually a stuck pipeline — confirmed via CLI + direct bundle inspection).
+- The exact original bug scenario has been re-reproduced live against the confirmed-correct production build and now passes.
+- SQL identity verification confirms Section identity (`workout_sections.id`/`slot_key`) and legacy-column content stay stable across add, reorder, and save operations.
+- A result-safety test with two real logged results attached, followed by a further editor operation (reorder), shows no cross-contamination in either `skill_logs` or the underlying `workout_sections`/`wods` state.
+- A minimal Layer 2a regression smoke test (log → save → reload → edit) confirms the pre-existing scoping/snapshot logic still works correctly on top of the Layer 2a.5 fix.
+- All test data from this pass and the prior session's reproduction has been removed and confirmed via SQL and live UI.
+
+Per the mission's explicit instruction, Layer 2b (leaderboard regrouping, A+B aggregation, Segment/Attempt work) has **not** been started in this session and remains a separate, future mission.
