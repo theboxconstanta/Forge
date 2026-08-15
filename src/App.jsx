@@ -5342,10 +5342,21 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // has no snapshot column (a minor cosmetic detail, not an
               // interpretation-critical fact) - omitted from the subtitle
               // in that fallback case rather than adding a column for it.
-              const wodNume = w.wods?.name || w.wod_name_snapshot || null
-              const wodSubtitlu = w.wods
-                ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}`
-                : (w.format_snapshot ? formatTypeLabel(w.format_snapshot, w.format_config_snapshot) : null)
+              // Layer 2a - un log legat de o sectiune suplimentara
+              // (workout_section_id, non-primara) NU poate arata numele/
+              // formatul WOD-ului legat (w.wods) - acelea sunt ale sectiunii
+              // PRIMARE, nicio legatura cu sectiunea reala logata. Snapshot-ul
+              // (populat corect per-sectiune de snapshot_wod_log_context) e
+              // sursa corecta oricand workout_section_id e setat - inclusiv
+              // pt loguri legate de sectiunea primara, unde e oricum identic
+              // cu w.wods la momentul logarii (aceeasi sursa).
+              const esteSectiuneLegata = !!w.workout_section_id
+              const wodNume = esteSectiuneLegata ? w.wod_name_snapshot : (w.wods?.name || w.wod_name_snapshot || null)
+              const wodSubtitlu = esteSectiuneLegata
+                ? (w.format_snapshot ? formatTypeLabel(w.format_snapshot, w.format_config_snapshot) : null)
+                : (w.wods
+                  ? `${formatTypeLabel(w.wods.type, w.wods.format_config)}${w.wods.duration ? ' ' + formatWodDurata(w.wods.duration) : ''}`
+                  : (w.format_snapshot ? formatTypeLabel(w.format_snapshot, w.format_config_snapshot) : null))
               // Results Phase 2 Slice 4 - "vs data trecuta", vizibil chiar si
               // cand cardul e inchis (membrul trebuie sa vada progresia dintr-o
               // privire, fara sa deschida fiecare log). null cand WOD-ul nu s-a
@@ -5354,19 +5365,26 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const progressionNote = w.performance_identity_id
                 ? formatProgressionNote(progressionByIdentity?.get(w.performance_identity_id))
                 : null
-              const prescribedWeightLog = w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null
+              // Layer 2a - o sectiune suplimentara n-are variante de scalare
+              // (RX/Intermediate/Beginner/OnRamp) fata de care sa compari "a
+              // scazut greutatea/miscarile" - null explicit (nu w.wods, care
+              // ar fi comparatia GRESITA - a sectiunii primare), isNotRxd
+              // ramane corect (doar semnalul "neterminat in time cap"
+              // conteaza atunci, vezi isNotRxd/movementsChanged).
+              const prescribedWeightLog = esteSectiuneLegata ? null : (w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null)
               // Ca la weightKeyForVariant: doar variantele reale (RX/Intermediate/
               // Beginner/OnRamp) au o coloana movements_* prescrisa pe wods - la o
               // logare libera (fara wod_id) sau cu variant_level = numele unui
               // format (nu al unei variante), accesul intoarce undefined -> null,
               // fara sa dea eroare.
-              const prescribedMovementsLog = w.wods?.[`movements_${(w.variant_level || '').toLowerCase()}`] || null
+              const prescribedMovementsLog = esteSectiuneLegata ? null : (w.wods?.[`movements_${(w.variant_level || '').toLowerCase()}`] || null)
               // Incercam toate semnalele posibile pt tipul real (wods legat,
               // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
               // trateaza deja corect cazul cand niciunul nu exista (formatId absent
               // -> nu presupune "For Time", sare peste verificarea de time cap).
-              const formatTipResolvat = w.wods?.type || w.format_type || headerFormatId
-              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, w.wods?.format_config, miscariAfisate, prescribedMovementsLog)
+              const formatTipResolvat = esteSectiuneLegata ? (w.format_snapshot || w.format_type || headerFormatId) : (w.wods?.type || w.format_type || headerFormatId)
+              const formatConfigResolvat = esteSectiuneLegata ? w.format_config_snapshot : w.wods?.format_config
+              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, formatConfigResolvat, miscariAfisate, prescribedMovementsLog)
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
               // fara nicio greutate (bug raportat: un Complex cu greutate maxima
@@ -5376,7 +5394,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // altceva in afara de "X seturi", deci inlocuim complet (nu doar
               // adaugam), altfel "65kg" si "10 seturi" ar aparea impreuna, unul
               // util, celalalt fara sens langa greutatea reala.
-              const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, w.wods?.format_config, w.sets) : null
+              const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, formatConfigResolvat, w.sets) : null
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -5385,8 +5403,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const formatAfisat = getFormat(formatTipResolvat)
               const ascendingTotalReps = (formatAfisat?.ascending && w.result && miscariAfisate.length > 0)
                 ? (() => {
-                    const { rounds, partialArr } = parseAscendingAmrapResult(w.result, miscariAfisate, w.wods?.format_config?.startReps, w.wods?.format_config?.incrementReps)
-                    return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, w.wods?.format_config?.startReps, w.wods?.format_config?.incrementReps)
+                    const { rounds, partialArr } = parseAscendingAmrapResult(w.result, miscariAfisate, formatConfigResolvat?.startReps, formatConfigResolvat?.incrementReps)
+                    return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, formatConfigResolvat?.startReps, formatConfigResolvat?.incrementReps)
                   })()
                 : null
               // WOD-uri inlantuite - result/time_result/sets/log_meta.completed
@@ -5680,6 +5698,48 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
   )
 }
 
+// Layer 2a - cardul de Home pt o sectiune suplimentara independent-scorata
+// (Layer 1's `scored` toggle). Acelasi tipar vizual minimal ca WOD-ul
+// principal si Skill Work de mai sus (checkmark + text "Logat", niciun
+// rezumat detaliat de scor pe Home - acelasi standard existent, nu unul
+// nou), generalizat la N sectiuni (nu 2 sloturi fixe).
+function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }) {
+  const movements = (section.movements || []).map(m => m.name)
+  if (movements.length === 0 && !section.title) return null
+  return (
+    <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
+      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em' }}>
+          {section.title || t.wodSectionScoredBadge}
+        </div>
+        <span style={{ fontSize: '10px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
+      </div>
+      {isOpen && (
+        <>
+          {describeFormatConfig(section.format, section.formatConfig, t) && (
+            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{section.format} — {describeFormatConfig(section.format, section.formatConfig, t)}</div>
+          )}
+          <div style={{ marginTop: '10px' }}>
+            {movements.map((m, mi) => (
+              <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+            ))}
+          </div>
+          {log && (
+            <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
+              <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
+            </div>
+          )}
+          <button onClick={onLogClick}
+            style={{ marginTop: '10px', width: '100%', padding: '8px', background: log ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+            {log ? t.homeEditSkillButton : t.homeLogSkillButton}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 // Eticheta "Not RX'd" - randata identic in Clasament, JurnalList si
 // WorkoutSharePopup (inainte, 3 stiluri inline usor diferite intre ele, fara
 // niciun motiv functional). `compact` = varianta mica de pe cardurile de
@@ -5784,6 +5844,10 @@ function App() {
   const [wodDeschis, setWodDeschis] = useState(false)
   const [skillDeschis, setSkillDeschis] = useState(false)
   const [skillDeschis2, setSkillDeschis2] = useState(false)
+  // Layer 2a - expand/collapse pt cardurile de sectiuni suplimentare scorate
+  // (oricate, nu doar 2 ca skillDeschis/skillDeschis2) - Set de section id.
+  const [scoredSectionsOpen, setScoredSectionsOpen] = useState(() => new Set())
+  const toggleScoredSectionOpen = (id) => setScoredSectionsOpen(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   const [variantaAleasa, setVariantaAleasa] = useState(null)
   const [wodZiData, setWodZiData] = useState(null)
   // Faza 7 (Member View -> Workout Engine V2) - randul V2 (workouts +
@@ -6031,6 +6095,13 @@ function App() {
   // - acolo formatul e deja fixat, nu mai e nimic de "compus".
   const [logWodStep, setLogWodStep] = useState('compose')
   const [editLogId, setEditLogId] = useState(null)
+  // Layer 2a - id-ul sectiunii independent-scorate (Layer 1) fiind logata,
+  // cand membrul apasa "Log Score" de pe un card din additionalScoredSectionsV
+  // in loc de pe WOD-ul principal. null = logheaza sectiunea primara (azi,
+  // neschimbat) sau editeaza un log existent (editLogId, prioritate mai
+  // mare - vezi activeLogFormatId mai jos). Golit la fel ca editLogId de
+  // fiecare data cand ecranul logWOD se inchide/reseteaza.
+  const [logTargetSectionId, setLogTargetSectionId] = useState(null)
   const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
   const [editLogHeader, setEditLogHeader] = useState('')
   const [editLogFormatId, setEditLogFormatId] = useState(null)
@@ -7823,6 +7894,50 @@ function App() {
       setWodSaving(false)
       return
     }
+    // Layer 2a - logarea unei sectiuni suplimentare independent-scorate
+    // (additionalScoredSectionsV). Mereu INSERT (nu upsert) - acelasi
+    // principiu ca logarea sectiunii primare mai jos: o corectare ulterioara
+    // se face prin editare din Jurnal (editLogId, ramura de mai sus), nu
+    // prin re-apasarea "Log Score" - simetric cu cum functioneaza deja
+    // logarea WOD-ului oficial azi. workout_section_id e sursa de adevar
+    // pt "carei sectiuni ii apartine" - noteFull/miscariText folosesc
+    // titlul/miscarile SECTIUNII tinta, nu ale WOD-ului zilei intreg.
+    if (logTargetSectionId && logTargetSection) {
+      const chainedAreContiutSectiune = wodChainedStages.some(s =>
+        (s?.roundsCompleted || '').toString().trim() !== ''
+        || (s?.partialReps || []).some(v => (v || '').toString().trim() !== '')
+        || Object.values(s?.sets || {}).flat().some(r => (r?.reps || '').toString().trim() !== '' || (r?.weight || '').toString().trim() !== ''))
+      const areContiutSectiune = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim()
+        || Object.keys(wodSets).length > 0 || wodCompleted || wodWeightLogged.trim() || chainedAreContiutSectiune
+      if (!areContiutSectiune) { showToast(t.toastFillResultOrTime); return }
+      setWodSaving(true)
+      const sectionHeaderLine = `${logTargetSection.format || ''}${logTargetSection.title ? ' — "' + logTargetSection.title + '"' : ''}`.trim()
+      const sectionMiscariText = [...(sectionHeaderLine ? [sectionHeaderLine] : []), ...miscariPentruLog].join('\n')
+      const noteFullSectiune = [sectionMiscariText || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
+      const logFieldsSectiune = composeWodLogFields()
+      const { error } = await supabase.from('wod_logs').insert({
+        member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData?.id || null,
+        workout_section_id: logTargetSectionId,
+        // Sectiunile suplimentare n-au variante de scalare (RX/Intermediate/
+        // Beginner/OnRamp) - o singura prescriptie, tratata drept "RX"
+        // (aceeasi conventie ca metconScalingVariantsForDisplay: "RX e baza
+        // sectiunii"), deci mereu clasificabil Rx/Not-Rx fata de acea
+        // prescriptie unica, niciodata format_type liber (e o sectiune
+        // publicata, nu o Logare Noua).
+        variant_level: 'RX', format_type: null,
+        notes: noteFullSectiune || null,
+        ...logFieldsSectiune,
+      })
+      if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
+      else {
+        showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
+        setScreen(prevScreen === 'log' ? 'log' : 'home'); if (prevScreen === 'log') setLogTab('jurnal')
+        setLogTargetSectionId(null)
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+      }
+      setWodSaving(false)
+      return
+    }
     // WOD-uri inlantuite: miscarile stau in config.stages, nu in wodMiscari
     // (vezi catalogul) - fara verificarea asta, un Chained AMRAP completat
     // integral in wodChainedStages ar fi respins ca "fara continut" (niciuna
@@ -8175,8 +8290,31 @@ function App() {
   // fetchWodZiWorkoutV2 mai sus). Folosit STRICT pt randare - Logarea
   // continua sa citeasca wodZiData/variantaAleasa, neschimbate.
   const workoutForDisplay = wodZiWorkoutV2 || mapLegacyWodToWorkout(wodZiData)
-  const primarySectionV = workoutForDisplay?.sections?.find(s => s.loggingMode === 'required') || null
+  // Phase 1B, Layer 1 bug fix: this used to match the FIRST section with
+  // loggingMode === 'required', which was safe only because the primary
+  // (metcon) section was the sole 'required' section possible. Now that
+  // Skill/Skill2 can also be independently scored (Layer 1's `scored`
+  // toggle), matching by slotKey === 'metcon' is the only correct way to
+  // find the actual primary section - matching by loggingMode alone could
+  // silently resolve to a scored Skill section instead, since it appears
+  // earlier in section order (warmup -> skill -> skill2 -> metcon).
+  const primarySectionV = workoutForDisplay?.sections?.find(s => s.slotKey === 'metcon') || null
   const supportingSectionsV = (workoutForDisplay?.sections || []).filter(s => s !== primarySectionV)
+  // Layer 2a - non-primary sections the coach has marked independently
+  // scored (Layer 1). Each gets its own Log Score entry point + its own
+  // wod_logs row (workout_section_id-linked), independent of the primary
+  // section's log. Sections with loggingMode 'optional'/'none' are
+  // unaffected - still Skill Work (skill_logs), unchanged.
+  //
+  // Gated on wodZiWorkoutV2 (real V2 data, real UUID section ids) being
+  // loaded - the legacy fallback (mapLegacyWodToWorkout, used while V2
+  // hasn't synced/loaded yet) can ALSO report loggingMode 'required' for a
+  // scored Skill/Skill2 (Layer 1 reads skill_scored/skill2_scored either
+  // way), but its section ids are synthetic (`legacy:${wodId}:skill`, not
+  // real UUIDs) - inserting one as workout_section_id would fail (invalid
+  // uuid) or worse, silently mismatch. Same guard discipline already used
+  // by sectionIdV2/skillSectionIdV2 below.
+  const additionalScoredSectionsV = wodZiWorkoutV2 ? supportingSectionsV.filter(s => s.loggingMode === 'required') : []
 
   // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
   // sectiunea primara a modelului de domeniu - logica pura (RX = baza
@@ -8190,22 +8328,39 @@ function App() {
   const metconVariantsForDisplay = (section) =>
     metconScalingVariantsForDisplay(section).map((v, i) => ({ ...VARIANTE_CONFIG[i], ...v }))
 
+  // Layer 2a - sectiunea suplimentara (additionalScoredSectionsV) fiind
+  // logata, cand logTargetSectionId e setat. Prioritate sub editLogId (o
+  // editare din Jurnal ramane mereu editare, indiferent ce sectiune ar fi
+  // fost tinta initial), deasupra variantaAleasa/wodTip (logarea sectiunii
+  // primare/libere, neschimbata). Sectiunile suplimentare n-au variante de
+  // scalare (RX/Intermediate/Beginner/OnRamp) - un singur `format`+
+  // `movements`, la fel ca Skill Work de dinainte de Layer 1.
+  const logTargetSection = logTargetSectionId ? additionalScoredSectionsV.find(s => s.id === logTargetSectionId) : null
   // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
   // ales liber de membru) - inlocuieste vechiul isAmrapLog/miscariPentruAmrapLog,
   // acum generalizat prin catalogul din workoutFormats.js (FormatLogger).
   const activeLogFormatId = editLogId
     ? (editLogFormatId || 'For Time')
+    : logTargetSection ? (logTargetSection.format || 'Weightlifting')
     : (variantaAleasa !== null ? (wodZiData?.type || 'For Time') : wodTip)
   const activeLogFormatConfig = editLogId
     ? editLogFormatConfig
+    : logTargetSection ? logTargetSection.formatConfig
     : (variantaAleasa !== null ? wodZiData?.format_config : wodFormatConfig)
   const miscariPentruLog = editLogId
     ? editLogMiscari
+    : logTargetSection ? (logTargetSection.movements || []).map(m => m.name)
     : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
-  // (logare noua sau editare) - vezi isNotRxd in workoutFormats.js.
+  // (logare noua sau editare) - vezi isNotRxd in workoutFormats.js. Pt o
+  // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
+  // (mai jos) extrage greutatea direct din textul fiecarei miscari
+  // (miscariPentruLog), exact ca la Skill Work dinainte, fara sa mai
+  // depinda de o coloana separata de greutate pe gen (care nu exista pt
+  // sectiuni suplimentare, doar pt sectiunea primara).
   const prescribedWeightPentruLog = editLogId
     ? editLogPrescribedWeight
+    : logTargetSection ? ''
     : (variantaAleasa !== null ? (wodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
   // Faza 3 (rxEngine.js) - clasificare RX/Not Rx in timp real, derivata la
   // citire din acelasi text folosit mai sus pt prescribedWeightPentruLog,
@@ -8701,6 +8856,11 @@ function App() {
         const logZiWod = wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id) : null
         const logZiSkill = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === 1) : null
         const logZiSkill2 = wodZiData ? skillLogs.find(l => l.wod_id === wodZiData.id && l.slot === 2) : null
+        // Layer 2a - acelasi tipar ca logZiSkill/logZiSkill2 de mai sus, dar
+        // pe identitate de sectiune (workout_section_id) in loc de slot
+        // pozitional fix - generalizeaza la oricate sectiuni suplimentare
+        // scorate, nu doar 2.
+        const logZiForSection = (sectionId) => wodZiData ? wodLogs.find(l => l.wod_id === wodZiData.id && l.workout_section_id === sectionId) : null
         return (
           <div style={{ paddingBottom: '80px', background: '#FFFFFF' }}>
 
@@ -9081,6 +9241,26 @@ function App() {
                         loggable={skill2Section?.loggingMode !== 'none'} t={t} />
                     )
                   })()}
+                  {/* Layer 2a - cate un card per sectiune suplimentara marcata
+                      "Independently scored" (Layer 1). Nou (nu era logat) ->
+                      pregateste ecranul logWOD pt sectiunea tinta
+                      (logTargetSectionId). Deja logat -> Editarea se face din
+                      Jurnal (acelasi loc unde se editeaza si restul logurilor),
+                      nu direct de aici - reutilizeaza fluxul de editare deja
+                      corect (onEditWod), fara sa-l duplice. */}
+                  {additionalScoredSectionsV.map((section) => {
+                    const log = logZiForSection(section.id)
+                    return (
+                      <ScoredSectionHomeCard key={section.id} section={section} log={log}
+                        isOpen={scoredSectionsOpen.has(section.id)} onToggle={() => toggleScoredSectionOpen(section.id)}
+                        onLogClick={() => {
+                          if (log) { setScreen('log'); setLogTab('jurnal'); return }
+                          setLogTargetSectionId(section.id); setEditLogId(null)
+                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+                          setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
+                        }} t={t} />
+                    )
+                  })}
                   {/* P0 UI refinement (WORKOUT_VARIANT_UI_REFINEMENT_REPORT.md) -
                       white-card accordion. Selection/expand state
                       (variantaAleasa) and the click handler are byte-identical
@@ -9492,12 +9672,26 @@ function App() {
                 const linii = prefix.split('\n').filter(Boolean)
                 const headerTip = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
                 const movimenteLog = linii.slice(headerTip ? 1 : 0)
-                const formatId = log.wods?.type || log.format_type || headerTip || 'For Time'
+                // Layer 2a - un log legat de o sectiune suplimentara
+                // (workout_section_id, non-primara) NU poate fi editat corect
+                // citind log.wods?.type/format_config - acelea sunt formatul
+                // sectiunii PRIMARE a WOD-ului, nicio legatura cu sectiunea
+                // reala logata (ex. Sectiunea B "1RM Clean", Weightlifting,
+                // pe un WOD a carui sectiune primara e RFT). format_snapshot/
+                // format_config_snapshot (Scoring Snapshot, deja populate
+                // corect per-sectiune de trigger-ul snapshot_wod_log_context)
+                // sunt sursa corecta oricand workout_section_id e setat -
+                // pentru loguri legate de sectiunea PRIMARA, snapshot-ul e
+                // oricum identic cu log.wods (aceeasi sursa la momentul
+                // logarii), deci schimbarea e sigura si acolo, nu doar o
+                // corectie ingusta pt sectiuni suplimentare.
+                const formatId = (log.workout_section_id ? log.format_snapshot : null) || log.wods?.type || log.format_type || headerTip || 'For Time'
+                const formatConfigForEdit = (log.workout_section_id ? log.format_config_snapshot : null) || log.wods?.format_config
                 const format = getFormat(formatId)
                 setEditLogId(log.id)
                 setEditLogHeader(headerTip ? linii[0] : '')
                 setEditLogFormatId(formatId)
-                setEditLogFormatConfig(log.wods?.format_config || null)
+                setEditLogFormatConfig(formatConfigForEdit || null)
                 setEditLogMiscari(movimenteLog)
                 setEditLogMiscareCurenta('')
                 // La RFT/Partner WOD (scoreMode 'fortime_or_amrap'), rezultatul
@@ -9512,7 +9706,7 @@ function App() {
                 // format ca orice rezultat salvat (non-null) e o compunere de
                 // repetari per miscare, fara sa mai ghicim din tiparul textului.
                 const areRundeCompuse = /^\d+\s+runde/.test((log.result || '').trim())
-                if (isSequentialFormat(formatId, log.wods?.format_config)) {
+                if (isSequentialFormat(formatId, formatConfigForEdit)) {
                   const partialArr = log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => '')
                   setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
                 } else if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
@@ -9522,7 +9716,7 @@ function App() {
                   // 1 - parseAscendingAmrapResult reface exact acea tinta
                   // inainte sa desfaca reps-urile partiale (vezi catalogul).
                   const { rounds, partialArr } = format.ascending
-                    ? parseAscendingAmrapResult(log.result || '', movimenteLog, log.wods?.format_config?.startReps, log.wods?.format_config?.incrementReps)
+                    ? parseAscendingAmrapResult(log.result || '', movimenteLog, formatConfigForEdit?.startReps, formatConfigForEdit?.incrementReps)
                     : parseAmrapResult(log.result || '', movimenteLog)
                   setWodResult(''); setWodRoundsCompleted(rounds); setWodPartialReps(partialArr)
                 } else {
@@ -9583,10 +9777,14 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
               if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              // Layer 2a - la fel ca editLogId mai sus: formatul e deja fixat
+              // de sectiune, nu exista pas "compose" de revenit la el - back
+              // navigheaza direct in afara ecranului.
+              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setScreen(prevScreen || 'home') }
               else if (logWodStep === 'score') { setLogWodStep('compose') }
               else { setScreen(prevScreen || 'home') }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : t.logWodNewTitle}</h1>
+            <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : logTargetSection ? (logTargetSection.title || t.wodSectionScoredBadge) : t.logWodNewTitle}</h1>
           </div>
 
           {editLogId ? (
@@ -9695,7 +9893,7 @@ function App() {
 
           {(editLogId || logWodStep === 'score') && (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            {!editLogId && (
+            {!editLogId && !logTargetSectionId && (
               <div onClick={() => setLogWodStep('compose')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#888', cursor: 'pointer', marginBottom: '14px' }}>
                 ← {t.logWodBackToComposeLink}
               </div>
