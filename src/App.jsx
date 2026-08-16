@@ -52,6 +52,7 @@ import {
   sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy, legacySlotAssignmentAfterSave,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
+import { buildAggregateLeaderboard } from './aggregateLeaderboard'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
@@ -1657,7 +1658,7 @@ const NIVELE = [
   { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
 ]
 
-function Clasament({ logs, sections, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
+function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
@@ -1799,6 +1800,14 @@ function Clasament({ logs, sections, loading, wodZiData, onRefresh, selectedDate
     }
   })
   const totalLogs = renderGroups.reduce((acc, g) => acc + g.blocks.reduce((a2, b) => a2 + b.weightGroups.reduce((a3, wg) => a3 + wg.logs.length, 0), 0), 0)
+
+  // Workout Aggregation - derivat DIN DATELE DEJA INCARCATE mai sus
+  // (logsBySection/sections), zero interogari suplimentare. null pt
+  // marea majoritate a WOD-urilor (aggregateDefinition absent) - byte-
+  // identic cu comportamentul dinainte de aceasta functionalitate.
+  const aggregateSectionsById = {}
+  ;(sections || []).forEach(s => { aggregateSectionsById[s.id] = { format: s.format, format_config: s.format_config } })
+  const aggregateLeaderboard = buildAggregateLeaderboard(aggregateDefinition, aggregateSectionsById, logsBySection)
 
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
@@ -2027,6 +2036,36 @@ function Clasament({ logs, sections, loading, wodZiData, onRefresh, selectedDate
           })}
             </div>
           ))}
+          {/* Workout Aggregation - bloc ADITIONAL, dupa toate Sectiunile
+              atomice, doar cand un aggregateDefinition e configurat SI
+              exista cel putin un membru cu agregat disponibil. Niciodata
+              nu inlocuieste clasamentele de Sectiune de mai sus - acelea
+              raman intotdeauna vizibile, neschimbate. */}
+          {aggregateLeaderboard && aggregateLeaderboard.entries.length > 0 && (
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
+                {aggregateLeaderboard.label}
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                {aggregateLeaderboard.entries.map((entry, i) => {
+                  const name = entry.profile?.full_name || entry.profile?.email?.split('@')[0] || t.clasamentAnonymous
+                  const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : '#e0e0e0'
+                  const unit = entry.result.unit
+                  const displayValue = unit === 'seconds' ? secToTime(entry.result.value)
+                    : unit === 'kg' ? `${entry.result.value}kg`
+                    : `${entry.result.value} ${unit}`
+                  return (
+                    <div key={entry.memberId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fff', borderRadius: '10px', marginBottom: '6px', borderLeft: `3px solid ${medalColor}` }}>
+                      <div style={{ width: '20px', fontSize: '12px', fontWeight: '700', color: '#888', textAlign: 'center' }}>{i + 1}</div>
+                      <AvatarCircle name={name} avatarUrl={entry.profile?.avatar_url} size={32} />
+                      <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E' }}>{displayValue}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -6052,6 +6091,12 @@ function App() {
   // a WOD-ului afisat pe Clasament, primara ('metcon') inclusa. Gol cand nu
   // exista deloc date Workout Engine V2 pt acea zi.
   const [clasamentSections, setClasamentSections] = useState([])
+  // Workout Aggregation - null pt marea majoritate a WOD-urilor
+  // (comportament implicit, nicio schimbare vizibila). Populat DOAR cand
+  // WOD-ul afisat are un aggregate_definition configurat direct pe
+  // `workouts` (nicio cale de autor inca - Faza A/B, doar motorul +
+  // integrarea read).
+  const [clasamentAggregateDefinition, setClasamentAggregateDefinition] = useState(null)
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
@@ -7414,6 +7459,7 @@ function App() {
     // Clasament cade atunci pe bucket-ul unic implicit, comportament
     // identic cu dinainte de Layer 2b.
     let v2Sections = []
+    let aggregateDefinition = null
     if (userProfile?.gym_id && wodZi?.id) {
       try {
         const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, targetDate)
@@ -7421,11 +7467,13 @@ function App() {
           .filter(s => s.loggingMode === 'required')
           .map(s => ({ id: s.id, slot_key: s.slotKey, title: s.title, format: s.format, format_config: s.formatConfig }))
           .sort((a, b) => (a.slot_key === 'metcon' ? -1 : b.slot_key === 'metcon' ? 1 : 0))
+        aggregateDefinition = v2?.aggregateDefinition ?? null
       } catch (err) {
         console.error('fetchClasament: loadFromWorkoutEngineV2 failed (cade pe bucket unic legacy):', err)
       }
     }
     setClasamentSections(v2Sections)
+    setClasamentAggregateDefinition(aggregateDefinition)
     let q = supabase.from('wod_logs').select('*').in('variant_level', ['OnRamp', 'Beginner', 'Intermediate', 'RX'])
     // skill_logs n-are coloana variant_level (sectiunile Skill/Skill2 n-au
     // variante de scalare, vezi buildBlocksForAdditionalSection) - fara
@@ -10438,7 +10486,7 @@ function App() {
       })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 

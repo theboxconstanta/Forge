@@ -183,6 +183,11 @@ export function mapV2WorkoutRow(workout, sectionRows) {
     id: workout.id, gymId: workout.gym_id, date: workout.date,
     title: workout.title ?? null, notes: workout.notes ?? null,
     sections: (sectionRows || []).map(mapV2SectionRow).sort((a, b) => a.order - b.order),
+    // Workout Aggregation Phase A - null pt orice WOD care nu are unul
+    // configurat (marea majoritate azi), citit direct din coloana
+    // aditiva `workouts.aggregate_definition` (select('*') mai jos
+    // include deja coloana, doar nu era expusa aici pana acum).
+    aggregateDefinition: workout.aggregate_definition ?? null,
     source: 'v2',
   }
 }

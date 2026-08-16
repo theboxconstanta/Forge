@@ -101,7 +101,11 @@ const v2SectionRowsFixture = [
 function normalizeForComparison(workout) {
   return {
     ...workout,
-    id: undefined, source: undefined,
+    // Workout Aggregation Phase A - conceptul exista DOAR pe calea V2
+    // (workouts.aggregate_definition, o coloana pe care `wods`, calea
+    // legacy, n-o are deloc) - o asimetrie by-design intre cele doua
+    // cai, la fel ca id/source de mai jos, nu o eroare de mapare.
+    id: undefined, source: undefined, aggregateDefinition: undefined,
     sections: workout.sections.map((s) => {
       const { legacyWodId, ...metadataRest } = s.metadata || {}
       return {
@@ -221,6 +225,17 @@ describe('mapV2WorkoutRow / mapV2SectionRow', () => {
 
   it('null pt un workout null (nu arunca)', () => {
     expect(mapV2WorkoutRow(null, [])).toBeNull()
+  })
+
+  it('Workout Aggregation Phase A - expune aggregate_definition ca aggregateDefinition, null cand coloana e null', () => {
+    const w = mapV2WorkoutRow({ ...v2WorkoutFixture, aggregate_definition: null }, v2SectionRowsFixture)
+    expect(w.aggregateDefinition).toBeNull()
+  })
+
+  it('Workout Aggregation Phase A - expune un aggregate_definition populat neschimbat', () => {
+    const def = { participantSectionIds: ['a', 'b'], combineFunction: 'sum' }
+    const w = mapV2WorkoutRow({ ...v2WorkoutFixture, aggregate_definition: def }, v2SectionRowsFixture)
+    expect(w.aggregateDefinition).toEqual(def)
   })
 })
 
