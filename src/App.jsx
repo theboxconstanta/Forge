@@ -29,6 +29,7 @@ import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
 import {
   syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId,
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
+  effectiveLeaderboardVisible,
 } from './workoutEngine'
 import { resolveBenchmarkNames } from './benchmarkResolution'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
@@ -1682,6 +1683,14 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
   const additionalSections = (sections || []).filter(s => s.slot_key !== 'metcon')
   const hasMultipleSections = !!primarySection && additionalSections.length > 0
   const scoredSectionIds = new Set((sections || []).map(s => s.id))
+  // Section Leaderboard Visibility - `sections` e deja filtrat pe
+  // loggingMode:'required' mai sus in fetchClasament (invariant structural,
+  // nu o presupunere re-verificata aici), deci adaptorul catre
+  // rezolvatorul canonic (workoutEngine.js) poate fixa loggingMode:
+  // 'required' direct - nu exista alt loc unde acest adaptor sa poata
+  // diverge de rezolvatorul folosit in alta parte (Aggregate, viitor
+  // consumator Admin), pt ca logica reala traieste intr-un singur loc.
+  const isSectionVisible = s => !!s && effectiveLeaderboardVisible({ loggingMode: 'required', leaderboardVisible: s.leaderboard_visible })
 
   // Carei Sectiuni ii apartine un log. wod_logs scrise inainte de Layer 2a
   // (workout_section_id NULL) erau intotdeauna loguri pt tot WOD-ul/Sectiunea
@@ -1776,9 +1785,25 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
     }]
   }
 
+  // Section Leaderboard Visibility - filtrarea de vizibilitate se aplica
+  // STRICT aici, la selectia de RANDARE individuala - niciodata mai sus, la
+  // fetch/normalizare (sections/logsBySection raman complete, nefiltrate,
+  // pt ca Workout Aggregation (mai jos, aggregateSectionsById) le citeste
+  // direct pe acelea, independent de partsToRender). O Sectiune ascunsa
+  // ramane complet loggable/rankata/PR-eligibila/Aggregate-eligibila - doar
+  // propriul ei bloc individual nu se mai randeaza. Fallback-ul legacy
+  // ('__legacy') ramane neconditionat cand nu exista deloc date Workout
+  // Engine V2 - nu exista niciun coach control pt acel caz.
   const partsToRender = hasMultipleSections
-    ? [primarySection, ...additionalSections]
-    : [primarySection || { id: '__legacy', slot_key: 'metcon' }]
+    ? [primarySection, ...additionalSections].filter(isSectionVisible)
+    : primarySection
+    ? (isSectionVisible(primarySection) ? [primarySection] : [])
+    : [{ id: '__legacy', slot_key: 'metcon' }]
+  // Eticheta "PART" (titlul Sectiunii) apare doar cand mai mult de UN bloc
+  // se randeaza efectiv - nu doar cand exista structural mai multe Sectiuni
+  // (hasMultipleSections) - o singura Sectiune vizibila (cealalta ascunsa)
+  // nu trebuie sa arate un header "PART" fara sens langa ea.
+  const showPartLabels = partsToRender.length > 1
 
   const renderGroups = partsToRender.map(section => {
     const isPrimaryPart = section.slot_key === 'metcon'
@@ -1788,7 +1813,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
     const sectionFormatConfig = isPrimaryPart ? wodZiData?.format_config : section.format_config
     return {
       partId: section.id || '__legacy',
-      partLabel: hasMultipleSections ? (section.title || (isPrimaryPart ? t.clasamentPartMetconLabel : section.slot_key)) : null,
+      partLabel: showPartLabels ? (section.title || (isPrimaryPart ? t.clasamentPartMetconLabel : section.slot_key)) : null,
       blocks,
       sectionFormat: sectionFormatId ? getFormat(sectionFormatId) : null,
       sectionFormatId,
@@ -1841,7 +1866,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>{t.clasamentLoading}</div>
-      ) : totalLogs === 0 ? (
+      ) : totalLogs === 0 && !(aggregateLeaderboard && aggregateLeaderboard.entries.length > 0) ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
           <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Flag size={36} color="#ccc" strokeWidth={1.5} /></div>
           <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>{t.clasamentEmptyTitle}</div>
@@ -7497,7 +7522,7 @@ function App() {
         const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, targetDate)
         v2Sections = (v2?.sections || [])
           .filter(s => s.loggingMode === 'required')
-          .map(s => ({ id: s.id, slot_key: s.slotKey, title: s.title, format: s.format, format_config: s.formatConfig }))
+          .map(s => ({ id: s.id, slot_key: s.slotKey, title: s.title, format: s.format, format_config: s.formatConfig, leaderboard_visible: s.leaderboardVisible }))
           .sort((a, b) => (a.slot_key === 'metcon' ? -1 : b.slot_key === 'metcon' ? 1 : 0))
         aggregateDefinition = v2?.aggregateDefinition ?? null
       } catch (err) {

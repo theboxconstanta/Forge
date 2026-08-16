@@ -206,3 +206,34 @@ describe('rank-combine leaderboard (S43)', () => {
     expect(board.entries[0].result.value).toBe(board.entries[1].result.value)
   })
 })
+
+// Section Leaderboard Visibility - regression proof that Aggregation stays
+// completely blind to it, mirroring forge-admin-web's own identical
+// regression tests exactly. App.jsx builds `aggregateSectionsById`/
+// `entriesBySection` from the FULL, unfiltered `sections` list, never from
+// the visibility-filtered `partsToRender` (see App.jsx's own comment right
+// above that split). `sectionsById` here ({id, format, format_config}) has
+// no `leaderboard_visible` field at all - there is no way for a caller to
+// even express "exclude this participant because its own leaderboard is
+// hidden" through this function's signature, which is itself the strongest
+// possible guarantee against a future regression re-coupling the two
+// concepts. Section 'b' stands in for a Section a coach hid.
+describe('Section Leaderboard Visibility - hidden participant Sections still combine', () => {
+  it('sum (value-combine) still includes a participant whose own Section leaderboard is hidden', () => {
+    const def = { participantSectionIds: ['a', 'b'], combineFunction: 'sum' }
+    const logsBySectionId = { a: [log('luci', 100)], b: [log('luci', 130)] }
+    const board = buildAggregateLeaderboard(def, sectionsById, logsBySectionId)
+    expect(board.entries[0].result.value).toBe(230)
+  })
+
+  it('placement-sum (rank-combine) still ranks a member using their placement within a hidden Section', () => {
+    const def = { participantSectionIds: ['a', 'b'], combineFunction: 'placement-sum' }
+    const logsBySectionId = {
+      a: [log('luci', 100), log('andrei', 90)],
+      b: [log('luci', 40), log('andrei', 60)], // luci placed 2nd here despite having the higher a-value
+    }
+    const board = buildAggregateLeaderboard(def, sectionsById, logsBySectionId)
+    // luci: rank1(a)+rank2(b)=3; andrei: rank2(a)+rank1(b)=3 - a genuine tie proves both Sections' own ranks were actually used, not one silently dropped.
+    expect(board.entries.map((e) => e.result.value)).toEqual([3, 3])
+  })
+})

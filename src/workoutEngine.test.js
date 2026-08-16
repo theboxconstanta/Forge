@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapLegacyWodToWorkout, mapV2WorkoutRow, mapV2SectionRow, metconScalingVariantsForDisplay } from './workoutEngine'
+import { mapLegacyWodToWorkout, mapV2WorkoutRow, mapV2SectionRow, metconScalingVariantsForDisplay, effectiveLeaderboardVisible } from './workoutEngine'
 
 // Fixture-uri REALE, extrase direct din productie (WOD "NED", 2026-07-03,
 // CrossFit C15) - nu date inventate. wodFixture e randul `wods` brut;
@@ -111,6 +111,12 @@ function normalizeForComparison(workout) {
       return {
         ...s,
         id: undefined,
+        // Section Leaderboard Visibility - la fel ca aggregateDefinition
+        // mai sus, conceptul exista DOAR pe calea V2 (workout_sections.
+        // leaderboard_visible, o coloana pe care mapLegacyWodToWorkout n-o
+        // citeste deloc - Sectiunile legacy nu au niciun coach control
+        // asupra vizibilitatii inca).
+        leaderboardVisible: undefined,
         benchmarkMetadata: s.benchmarkMetadata?.isBenchmark
           ? s.benchmarkMetadata
           : { name: null, isBenchmark: false, isHero: false },
@@ -236,6 +242,46 @@ describe('mapV2WorkoutRow / mapV2SectionRow', () => {
     const def = { participantSectionIds: ['a', 'b'], combineFunction: 'sum' }
     const w = mapV2WorkoutRow({ ...v2WorkoutFixture, aggregate_definition: def }, v2SectionRowsFixture)
     expect(w.aggregateDefinition).toEqual(def)
+  })
+
+  it('Section Leaderboard Visibility - expune leaderboard_visible ca leaderboardVisible neschimbat', () => {
+    const w = mapV2WorkoutRow(v2WorkoutFixture, [{ ...v2SectionRowsFixture[0], leaderboard_visible: false }])
+    expect(w.sections[0].leaderboardVisible).toBe(false)
+  })
+
+  it('Section Leaderboard Visibility - implicit true cand coloana lipseste din rand (compat inapoi)', () => {
+    const { leaderboard_visible, ...rowWithoutColumn } = { ...v2SectionRowsFixture[0], leaderboard_visible: true }
+    const w = mapV2WorkoutRow(v2WorkoutFixture, [rowWithoutColumn])
+    expect(w.sections[0].leaderboardVisible).toBe(true)
+  })
+})
+
+describe('effectiveLeaderboardVisible', () => {
+  it('o Sectiune scored (loggingMode required) cu leaderboardVisible true - vizibila', () => {
+    expect(effectiveLeaderboardVisible({ loggingMode: 'required', leaderboardVisible: true })).toBe(true)
+  })
+  it('o Sectiune scored cu leaderboardVisible false - ascunsa (TRACK only)', () => {
+    expect(effectiveLeaderboardVisible({ loggingMode: 'required', leaderboardVisible: false })).toBe(false)
+  })
+  it('o Sectiune scored fara leaderboardVisible explicit (legacy/nou creata) - implicit vizibila', () => {
+    expect(effectiveLeaderboardVisible({ loggingMode: 'required' })).toBe(true)
+  })
+  it('starea invalida "scored=false, leaderboard=true" e imposibila prin rezolvator - mereu false cand nu e required', () => {
+    expect(effectiveLeaderboardVisible({ loggingMode: 'optional', leaderboardVisible: true })).toBe(false)
+    expect(effectiveLeaderboardVisible({ loggingMode: 'none', leaderboardVisible: true })).toBe(false)
+  })
+  it('null/undefined section - false, nu arunca', () => {
+    expect(effectiveLeaderboardVisible(null)).toBe(false)
+    expect(effectiveLeaderboardVisible(undefined)).toBe(false)
+  })
+  it('preferinta stocata reapare cand Sectiunea redevine scored (nu e stearsa cand scored trece pe false)', () => {
+    const hiddenWhileScored = { loggingMode: 'required', leaderboardVisible: false }
+    expect(effectiveLeaderboardVisible(hiddenWhileScored)).toBe(false)
+    const unscored = { ...hiddenWhileScored, loggingMode: 'optional' }
+    expect(effectiveLeaderboardVisible(unscored)).toBe(false)
+    // Coach re-activeaza scored - stessa leaderboardVisible:false stocata ramane respectata (TRACK only), nu resetata la default true.
+    const rescored = { ...unscored, loggingMode: 'required' }
+    expect(effectiveLeaderboardVisible(rescored)).toBe(false)
   })
 })
 

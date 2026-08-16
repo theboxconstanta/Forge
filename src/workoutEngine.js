@@ -172,7 +172,26 @@ export function mapV2SectionRow(row) {
     duration: row.duration_minutes ?? null,
     benchmarkMetadata: row.benchmark_metadata ?? { name: null, isBenchmark: false, isHero: false },
     metadata: row.metadata ?? {},
+    // Section Leaderboard Visibility - vezi migratia 20260822110000.
+    // Absent (Sectiuni legacy, nesincronizate niciodata cu coloana noua)
+    // -> implicit true, comportamentul actual neschimbat.
+    leaderboardVisible: row.leaderboard_visible ?? true,
   }
+}
+
+// Section Leaderboard Visibility - rezolvatorul CANONIC, unica sursa de
+// adevar pt "acest Sectiune isi arata propriul bloc individual de
+// clasament?" - doua conditii independente: trackability/rankability
+// (loggingMode, neschimbat) SI presentation (leaderboardVisible, nou). O
+// Sectiune care nu e loggingMode:'required' nu e NICIODATA vizibila
+// individual, indiferent de leaderboardVisible (starea "scored=false,
+// leaderboard=true" e structural imposibila prin acest rezolvator, nu doar
+// prin conventie). Cand Sectiunea devine din nou scored, preferinta
+// stocata anterior in leaderboardVisible reapare automat - nu e stearsa
+// cand scored trece pe false, doar ignorata cat timp ramane false.
+export function effectiveLeaderboardVisible(section) {
+  if (!section || section.loggingMode !== 'required') return false
+  return section.leaderboardVisible !== false
 }
 
 /** Mapare PURA: un rand `workouts` + sectiunile lui deja mapate -> Workout
