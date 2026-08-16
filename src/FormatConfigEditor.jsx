@@ -197,6 +197,13 @@ function StageListField({ label, value, onChange, t }) {
 }
 
 function SelectField({ label, value, options, onChange }) {
+  // Fostul `value || options[0]` arata primul element din listă ca fallback
+  // vizual, ignorand complet default-ul declarat in schema (ex. Intervals:
+  // options=['Lowest Reps','Total Reps'], default='Total Reps' - dropdown-ul
+  // arata gresit 'Lowest Reps'). Apelantul trece acum `field.default` direct
+  // in `value`, deci fallback-ul de aici ramane doar pt cazul (deja imposibil
+  // in practica) in care nici schema n-are default - options[0] ca ultima
+  // plasa de siguranta, neschimbat.
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
@@ -280,7 +287,7 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <NumberField key={key} label={label} value={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
         )
         if (field.type === 'select') return (
-          <SelectField key={key} label={label} value={cfg[key]} options={field.options} onChange={v => setField(key, v)} />
+          <SelectField key={key} label={label} value={cfg[key] ?? field.default ?? null} options={field.options} onChange={v => setField(key, v)} />
         )
         if (field.type === 'text') return (
           <TextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />

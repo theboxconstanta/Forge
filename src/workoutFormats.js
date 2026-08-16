@@ -1011,13 +1011,40 @@ export function defaultRowsForFormat(formatId, config, movements) {
   return out
 }
 
+// Rezolva scoringMode-ul EFECTIV al unui format family:'sets': valoarea
+// persistata in config, sau (cand lipseste) default-ul DEJA DECLARAT in
+// schema formatului (WORKOUT_FORMATS[formatId].config.scoringMode.default).
+// Sursa unica pt computeSetsScore (mai jos) SI pt afisarea etichetei scorului
+// (Clasament) - niciuna nu re-deriva propriul raspuns la "ce scoringMode e
+// activ", ca sa nu poata diverge.
+//
+// Bug real gasit prin audit: campurile scoringMode 'required: true' (Tabata/
+// Intervals) declara un 'default' in catalog, dar SelectField-ul din
+// FormatConfigEditor arata vizual options[0] (nu schema.default) si NU scrie
+// niciodata cheia in `config` decat daca adminul chiar atinge dropdown-ul -
+// un Interval WOD lasat pe alegerea deja-corecta-vizual ramane persistat
+// FARA scoringMode deloc. Rezultatul: WOD-uri reale cu 6 runde de reps
+// logate corect (115/14/185/26/233/33 = 606) cadeau pe null (niciun
+// fallback de greutate, pt ca nu exista greutate logata la reps pure),
+// Clasamentul aratand doar "6 seturi" descriptiv, nu scorul atletic real.
+// Fix: cand config-ul persistat nu are scoringMode, foloseste default-ul
+// DEJA DECLARAT in schema formatului - niciun format nou, nicio migrare,
+// doar rezolvarea corecta a valorii implicite pe care catalogul o promitea
+// deja. Complex/EMOM raman neschimbate (scoringMode acolo e 'required:
+// false', fara default - absenta ramane absenta, cad in continuare pe
+// maxWeightFromSets).
+export function resolveSetsScoringMode(formatId, config) {
+  const schemaDefault = formatId ? getFormat(formatId)?.config?.scoringMode?.default : null
+  return config?.scoringMode || schemaDefault || null
+}
+
 // Calculeaza scorul unui format family:'sets' cu scoringMode configurabil
 // (Tabata/Intervals: Total Reps = suma tuturor randurilor, Lowest Reps = cea
 // mai mica valoare dintre randuri cu reps completat; Complex: Max Weight/
 // Total Weight, vezi mai jos). Intoarce null daca nu exista randuri cu date
 // valide (reps sau greutate, dupa caz) sau formatul nu are scoringMode.
 export function computeSetsScore(formatId, config, rowsByKey) {
-  const scoringMode = config?.scoringMode
+  const scoringMode = resolveSetsScoringMode(formatId, config)
   if (!scoringMode) return null
   // Total Weight: suma greutatilor logate pe fiecare runda (ex. Complex cu
   // greutate diferita per runda, gasit pe BTWB - vezi comentariul de la
@@ -1069,11 +1096,20 @@ export function setsDisplayScore(formatId, config, rowsByKey) {
 
 // Adevarat daca setsDisplayScore() de mai sus intoarce o GREUTATE (kg/lbs)
 // pt acest WOD, fals daca intoarce un numar de REPS (scoringMode 'Total
-// Reps'/'Lowest Reps') - oglindeste exact ramurile din computeSetsScore.
+// Reps'/'Lowest Reps') - oglindeste exact ramurile din computeSetsScore,
+// folosind ACELASI rezolvator (resolveSetsScoringMode) - altfel ar putea
+// diverge de computeSetsScore chiar pt cazul care a motivat acest audit:
+// fara acest fix, un Interval Total Reps cu scoringMode absent din config
+// (rezolvat corect la 606 de computeSetsScore) tot ar arata GREUTATE aici
+// (`!scoringMode` = true), Clasamentul afisand gresit "606kg" in loc de
+// "606 reps" chiar dupa fix-ul de la computeSetsScore. formatId opțional
+// (backward-compat) - omis, se comporta exact ca inainte (absenta ramane
+// absenta => weight-scored, corect pt Complex/Weightlifting/EMOM fara
+// scoringMode, care nu au niciun default de rezolvat oricum).
 // Sursa unica pt Clasament (sortLogs in App.jsx), ca sa nu normalizeze
 // kg/lbs pe un scor care de fapt nu e deloc o greutate.
-export function isWeightScoredSetsFormat(config) {
-  const scoringMode = config?.scoringMode
+export function isWeightScoredSetsFormat(config, formatId) {
+  const scoringMode = formatId !== undefined ? resolveSetsScoringMode(formatId, config) : config?.scoringMode
   return !scoringMode || scoringMode === 'Total Weight' || scoringMode === 'Max Weight'
 }
 
@@ -1139,7 +1175,7 @@ export function partialRepsOfLog(log, isSequential) {
 export function sortSectionLogs(arr, formatId, formatConfig) {
   const format = formatId ? getFormat(formatId) : null
   if (format?.family === 'sets') {
-    const weightScored = isWeightScoredSetsFormat(formatConfig)
+    const weightScored = isWeightScoredSetsFormat(formatConfig, formatId)
     const withScore = arr.map(log => {
       const score = setsDisplayScore(formatId, formatConfig, log.sets)
       const rankScore = (weightScored && score != null) ? toKgForRanking(score, log.profile?.weight_unit || 'kg') : score

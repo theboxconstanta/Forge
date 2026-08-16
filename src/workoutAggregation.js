@@ -33,7 +33,7 @@ export function classifySectionMetric(formatId, formatConfig) {
   if (!formatId) return null
   const format = getFormat(formatId)
   if (format.family === 'sets') {
-    return isWeightScoredSetsFormat(formatConfig)
+    return isWeightScoredSetsFormat(formatConfig, formatId)
       ? { kind: 'LOAD', unit: 'kg', direction: 'higher' }
       : { kind: 'REPS', unit: 'count', direction: 'higher' }
   }

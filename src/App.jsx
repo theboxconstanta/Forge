@@ -41,7 +41,7 @@ import {
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
-  isWeightScoredSetsFormat, toKgForRanking,
+  isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
@@ -1898,8 +1898,15 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // La fel ca 'sets' mai sus - 'chained' nu are niciodata
                       // time_result/result (vezi composeWodLogFields), scorul
                       // real e log_meta.totalReps, precalculat la salvare.
+                      // Bug real: aici se adauga mereu kg/lbs, chiar si cand
+                      // scorul e de fapt REPS (scoringMode Total/Lowest Reps)
+                      // - isWeightScoredSetsFormat exista exact pt asta
+                      // (deja folosit in sortSectionLogs pt clasare), dar nu
+                      // era aplicat aici, la afisare (Clasament arata gresit
+                      // "606kg" in loc de "606 reps").
+                      const setsWeightScored = renderGroup.sectionFormat?.family === 'sets' ? isWeightScoredSetsFormat(renderGroup.sectionFormatConfig, renderGroup.sectionFormatId) : false
                       const result = renderGroup.sectionFormat?.family === 'sets'
-                        ? (log._setsScore != null ? `${log._setsScore}${(log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg'}` : '—')
+                        ? (log._setsScore != null ? `${log._setsScore}${setsWeightScored ? ((log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg') : ` ${t.clasamentRepsUnit}`}` : '—')
                         : renderGroup.sectionFormat?.family === 'chained'
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         : (log.time_result || log.result || '—')
@@ -1912,14 +1919,17 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
-                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t)
-                      // Family 'sets' fara scoringMode configurat (Complex,
-                      // Weightlifting, Build to Heavy/1RM etc.) - result/
-                      // time_result/log_meta sunt mereu null la aceasta familie,
-                      // deci rezultatBucati brut n-are niciodata altceva in afara
-                      // de "X seturi" (fara nicio greutate) - inlocuim complet cu
-                      // acelasi scor deja calculat mai sus pt headline (cu unitate
-                      // inclusa), nu doar il adaugam langa "X seturi" fara sens.
+                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, renderGroup.sectionFormat?.simpleReps)
+                      // Family 'sets' CU scor calculat (scoringMode rezolvat,
+                      // configurat explicit sau din default-ul schemei - vezi
+                      // resolveSetsScoringMode) - scorul nu mai apare in blocul
+                      // REZULTAT de sus, langa "X seturi"; apare intr-un bloc
+                      // TOTAL/MINIM/MAXIM dedicat, DUPA detalierea pe runde
+                      // (wSetsParti mai jos), citire "detaliu -> concluzie", nu
+                      // invers. Family 'sets' FARA scor (Complex/Weightlifting
+                      // fara scoringMode configurat) ramane neschimbata - "X
+                      // seturi" descriptiv, fara total de aratat.
+                      const showSetsScoreAtEnd = renderGroup.sectionFormat?.family === 'sets' && result !== '—'
                       // Ascending AMRAP: aceeasi cifra de "reps totale" ca in Jurnal
                       // (vezi parseWodLogDetails/JurnalList) - randGroup.sectionFormat/
                       // sectionData sunt deja cele ale Sectiunii afisate in acest
@@ -1933,16 +1943,21 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // WOD-uri inlantuite - detaliu = textul deja compus per
                       // etapa (log_meta.stages[].text), fara sa mai fie nevoie
                       // de niciun re-parse (spre deosebire de Ascending AMRAP).
-                      const rezultatBucati = (renderGroup.sectionFormat?.family === 'sets' && result !== '—') ? [result]
+                      // Family 'sets' cu scor (showSetsScoreAtEnd) - gol aici,
+                      // apare in blocul TOTAL/MINIM/MAXIM dupa detaliere (mai
+                      // jos), nu langa "X seturi" ca inainte.
+                      const rezultatBucati = showSetsScoreAtEnd ? []
                         : renderGroup.sectionFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
                         : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                         : rezultatBucatiRaw
-                      // parseWodLogDetails nu stie de 'chained' (result/
-                      // time_result/sets/log_meta.completed brute sunt mereu
-                      // null la aceasta familie) - fara asta, blocul REZULTAT
-                      // de mai jos nu s-ar afisa niciodata pt un WOD inlantuit.
-                      const areRezultatFinal = areRezultat || (renderGroup.sectionFormat?.family === 'chained' && rezultatBucati.length > 0)
-                      const areDetaliiFinal = areDetalii || areRezultatFinal
+                      // Reflecta direct continutul afisat (rezultatBucati),
+                      // nu mai depinde de areRezultat brut (calculat pe
+                      // rezultatBucatiRaw, inainte de orice inlocuire de mai
+                      // sus) - altfel un 'sets' cu scor ar arata blocul
+                      // REZULTAT gol (areRezultat brut ramane true datorita
+                      // "X seturi", desi rezultatBucati e acum []).
+                      const areRezultatFinal = rezultatBucati.length > 0
+                      const areDetaliiFinal = areDetalii || areRezultatFinal || showSetsScoreAtEnd
                       return (
                         <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
@@ -2006,13 +2021,25 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                 </div>
                               )}
                               {wHasSets && (
-                                <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                                <div style={{ marginBottom: (showSetsScoreAtEnd || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {wSetsParti.map((p, j) => (
                                     <div key={j} style={{ marginBottom: '6px' }}>
                                       <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
                                       <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
                                     </div>
                                   ))}
+                                </div>
+                              )}
+                              {/* Scor family:'sets' - DUPA detalierea pe runde, niciodata
+                                  langa "X seturi" sau intr-o coloana laterala. Eticheta
+                                  depinde de scoringMode-ul rezolvat (Total/Minim/Maxim), nu
+                                  hardcodata 'TOTAL' pt orice scor. */}
+                              {showSetsScoreAtEnd && (
+                                <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    {t.clasamentSetsScoreLabel[resolveSetsScoringMode(renderGroup.sectionFormatId, renderGroup.sectionFormatConfig)] || t.jurnalResultLabel}
+                                  </div>
+                                  <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '700' }}>{result}</div>
                                 </div>
                               )}
                               {noteLog && noteLog.trim() && (
@@ -5167,7 +5194,7 @@ function stripWeightSuffix(movementLine) {
 // de Clasament (dropdown-ul altui participant, doar de vizualizat) - fara
 // asta, cele 2 ecrane ar fi trebuit sa parseze aceleasi campuri separat, cu
 // risc sa diverga.
-function parseWodLogDetails(w, t) {
+function parseWodLogDetails(w, t, simpleReps) {
   const parts = (w.notes || '').split('\n---\n')
   const miscariLog = parts.length > 1 ? parts[0] : (parts[0] || null)
   const noteLog = parts.length > 1 ? parts[1] : null
@@ -5179,12 +5206,17 @@ function parseWodLogDetails(w, t) {
   const headerFormatId = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
   const miscariAfisate = linii.slice(headerFormatId ? 1 : 0)
   const wHasSets = w.sets && Object.keys(w.sets).length > 0
+  // simpleReps (Tabata/Intervals - un rand = exact un singur set, niciodata
+  // repetabil) - eticheta "Set 1:" e zgomot vizual cand exista mereu un
+  // singur set per rand; formatele cu seturi reale repetabile (Weightlifting,
+  // Strength Sets) raman neschimbate, "Set N:" ramane semnificativ acolo.
   const wSetsParti = wHasSets ? Object.entries(w.sets).map(([cheie, seturi]) => ({
     cheie, seturiTxt: (seturi || []).map((set, si) => {
       const bucati = []
       if (set.reps) bucati.push(`${set.reps} reps`)
       if (set.weight) bucati.push(`${set.weight}`)
-      return `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
+      const omitLabel = simpleReps && (seturi || []).length === 1
+      return omitLabel ? bucati.join(' @ ') : `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
     }).join(' · '),
   })) : []
   const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)

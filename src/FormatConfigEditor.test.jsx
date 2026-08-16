@@ -73,4 +73,16 @@ describe('FormatConfigEditor', () => {
     render(<FormatConfigEditor formatId="Tabata" onFormatChange={() => {}} config={{}} onConfigChange={() => {}} t={tRo} />)
     expect(screen.getByText('Scor pe interval')).toBeInTheDocument()
   })
+
+  // Bug real de productie: SelectField arata `options[0]` ca fallback vizual
+  // in loc de default-ul declarat in schema - Tabata (options: ['Lowest
+  // Reps','Total Reps'], default:'Lowest Reps') nu prindea bug-ul pt ca
+  // options[0] coincide cu default-ul. Intervals (options: ['Lowest Reps',
+  // 'Total Reps'], default:'Total Reps') expune bug-ul real: dropdown-ul
+  // arata gresit 'Lowest Reps' desi default-ul e 'Total Reps'.
+  it('Intervals cu config gol arata vizual default-ul schemei (Total Reps), nu primul element din options (Lowest Reps)', () => {
+    render(<FormatConfigEditor formatId="Intervals" onFormatChange={() => {}} config={{}} onConfigChange={() => {}} t={tRo} />)
+    expect(screen.getByDisplayValue('Total Reps')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Lowest Reps')).not.toBeInTheDocument()
+  })
 })

@@ -381,6 +381,13 @@ export const TRANSLATIONS = {
     jurnalSetsCountLabel: (n) => `${n} seturi`,
     jurnalTotalRepsLabel: (n) => `${n} reps totale`,
     jurnalCompletedLabel: '✓ Completat',
+    // Eticheta blocului de scor final family:'sets', afisat DUPA detalierea
+    // pe runde (nu inainte) - depinde de scoringMode-ul configurat, nu
+    // hardcodat 'TOTAL' pt orice scor (Lowest/Max nu sunt un total).
+    clasamentSetsScoreLabel: {
+      'Total Reps': 'TOTAL', 'Total Weight': 'TOTAL', 'Lowest Reps': 'MINIM', 'Max Weight': 'MAXIM',
+    },
+    clasamentRepsUnit: 'reps',
     jurnalNoDetails: 'Nicio detaliere suplimentară.',
     jurnalEdit: '✎ Editează',
     jurnalSkillTitle: 'SKILL WORK',
@@ -1501,6 +1508,10 @@ export const TRANSLATIONS = {
     jurnalSetsCountLabel: (n) => `${n} sets`,
     jurnalTotalRepsLabel: (n) => `${n} total reps`,
     jurnalCompletedLabel: '✓ Completed',
+    clasamentSetsScoreLabel: {
+      'Total Reps': 'TOTAL', 'Total Weight': 'TOTAL', 'Lowest Reps': 'LOWEST', 'Max Weight': 'MAX',
+    },
+    clasamentRepsUnit: 'reps',
     jurnalNoDetails: 'No further details.',
     jurnalEdit: '✎ Edit',
     jurnalSkillTitle: 'SKILL WORK',

@@ -4,7 +4,7 @@ import {
   composePartialText, parsePartialText, composeAmrapResult, parseAmrapResult,
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
-  defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore,
+  defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore, resolveSetsScoringMode,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
@@ -545,6 +545,60 @@ describe('computeSetsScore', () => {
     const rows = { 'Rundă 1': [{ weight: '20' }], 'Rundă 2': [{ weight: '40' }], 'Rundă 3': [{ weight: '30' }] }
     expect(computeSetsScore('Complex', { scoringMode: 'Max Weight' }, rows)).toBe(40)
   })
+
+  // Bug real de productie: Intervals (si Tabata) declara scoringMode
+  // 'required: true' cu un 'default' in schema, dar config-ul persistat
+  // poate lipsi complet acea cheie (SelectField-ul arata vizual options[0],
+  // nu default-ul, si nu scrie in config decat daca adminul chiar atinge
+  // dropdown-ul) - computeSetsScore trebuie sa foloseasca default-ul deja
+  // declarat in schema, nu sa returneze null.
+  describe('fallback pe default-ul schemei cand scoringMode lipseste din config (S25/S40)', () => {
+    it('exemplul real de productie: Intervals, 6 runde, config fara scoringMode - rezolva Total Reps (default) = 606', () => {
+      const rows = {
+        'Rundă 1': [{ reps: '115' }], 'Rundă 2': [{ reps: '14' }], 'Rundă 3': [{ reps: '185' }],
+        'Rundă 4': [{ reps: '26' }], 'Rundă 5': [{ reps: '233' }], 'Rundă 6': [{ reps: '33' }],
+      }
+      expect(computeSetsScore('Intervals', { rounds: 6 }, rows)).toBe(606)
+    })
+    it('Tabata cu config fara scoringMode - rezolva Lowest Reps (default-ul SAU al lui Tabata)', () => {
+      const rows = { 'Rundă 1': [{ reps: '10' }], 'Rundă 2': [{ reps: '8' }], 'Rundă 3': [{ reps: '12' }] }
+      expect(computeSetsScore('Tabata', { rounds: 8, workSec: 20, restSec: 10 }, rows)).toBe(8)
+    })
+    it('un scoringMode explicit configurat are mereu prioritate fata de default', () => {
+      const rows = { 'Rundă 1': [{ reps: '10' }], 'Rundă 2': [{ reps: '8' }], 'Rundă 3': [{ reps: '12' }] }
+      expect(computeSetsScore('Intervals', { rounds: 3, scoringMode: 'Lowest Reps' }, rows)).toBe(8)
+    })
+    it('Complex/EMOM (scoringMode optional, fara default) raman null cand config-ul nu-l are - fallback-ul de greutate ramane corect pt ele', () => {
+      expect(computeSetsScore('Complex', {}, { 'Rundă 1': [{ weight: '40' }] })).toBe(null)
+      expect(computeSetsScore('EMOM', {}, { 'Min 1': [{ reps: '5' }] })).toBe(null)
+    })
+    it('independenta de format (S38/S39): Tabata si Intervals cu ACELASI scoringMode explicit produc acelasi rezultat pt aceleasi date', () => {
+      const rows = { 'Rundă 1': [{ reps: '20' }], 'Rundă 2': [{ reps: '15' }] }
+      expect(computeSetsScore('Tabata', { scoringMode: 'Total Reps' }, rows)).toBe(computeSetsScore('Intervals', { scoringMode: 'Total Reps' }, rows))
+    })
+    it('zero legitim intr-o runda conteaza, nu e tratat ca lipsa (S31)', () => {
+      const rows = { 'Rundă 1': [{ reps: '100' }], 'Rundă 2': [{ reps: '100' }], 'Rundă 3': [{ reps: '0' }], 'Rundă 4': [{ reps: '100' }] }
+      expect(computeSetsScore('Intervals', { rounds: 4 }, rows)).toBe(300)
+    })
+    it('o runda cu reps gol/nescris (nu 0) e exclusa din calcul, nu convertita silentios in 0 (S32)', () => {
+      const rows = { 'Rundă 1': [{ reps: '100' }], 'Rundă 2': [{ reps: '' }], 'Rundă 3': [{ reps: '100' }] }
+      expect(computeSetsScore('Intervals', { rounds: 3 }, rows)).toBe(200)
+    })
+  })
+})
+
+describe('resolveSetsScoringMode', () => {
+  it('foloseste valoarea din config cand exista', () => {
+    expect(resolveSetsScoringMode('Intervals', { scoringMode: 'Lowest Reps' })).toBe('Lowest Reps')
+  })
+  it('cade pe default-ul schemei cand config-ul nu are scoringMode', () => {
+    expect(resolveSetsScoringMode('Intervals', { rounds: 6 })).toBe('Total Reps')
+    expect(resolveSetsScoringMode('Tabata', {})).toBe('Lowest Reps')
+  })
+  it('null pt formate fara default declarat in schema (Complex, EMOM)', () => {
+    expect(resolveSetsScoringMode('Complex', {})).toBe(null)
+    expect(resolveSetsScoringMode('EMOM', {})).toBe(null)
+  })
 })
 
 // M9 Member Preferences - leaderboard kg/lbs normalization (audit-found
@@ -563,6 +617,23 @@ describe('isWeightScoredSetsFormat', () => {
   it('Total Reps / Lowest Reps - NU e greutate (reps, nu se normalizează kg/lbs)', () => {
     expect(isWeightScoredSetsFormat({ scoringMode: 'Total Reps' })).toBe(false)
     expect(isWeightScoredSetsFormat({ scoringMode: 'Lowest Reps' })).toBe(false)
+  })
+
+  // Al doilea bug real gasit prin acelasi audit: fara formatId, absenta
+  // scoringMode din config e interpretata mereu ca "e greutate" - corect pt
+  // Complex/Weightlifting (fara default), dar GRESIT pt Intervals (default
+  // 'Total Reps') - fara acest fix, chiar dupa ce computeSetsScore rezolva
+  // corect 606 reps, headline-ul din Clasament tot ar arata "606kg".
+  it('cu formatId, foloseste acelasi default din schema ca si computeSetsScore (nu mai diverg)', () => {
+    expect(isWeightScoredSetsFormat({ rounds: 6 }, 'Intervals')).toBe(false)
+    expect(isWeightScoredSetsFormat({}, 'Tabata')).toBe(false)
+  })
+  it('formatId fara default declarat (Complex/EMOM) - comportament neschimbat, ramane greutate', () => {
+    expect(isWeightScoredSetsFormat({}, 'Complex')).toBe(true)
+    expect(isWeightScoredSetsFormat({}, 'EMOM')).toBe(true)
+  })
+  it('fara formatId (compat inapoi) - comportament vechi neschimbat', () => {
+    expect(isWeightScoredSetsFormat({ rounds: 6 })).toBe(true)
   })
 })
 
