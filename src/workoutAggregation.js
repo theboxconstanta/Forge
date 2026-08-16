@@ -43,6 +43,25 @@ export function classifySectionMetric(formatId, formatConfig) {
   return null
 }
 
+// Coach-authoring UX helper (Phase 3, S17): given 2+ candidate Sections'
+// {format, formatConfig} the coach has selected (or is considering), which
+// of the 7 approved combine functions are legal choices right now? Family B
+// (placement-sum/points-sum) is unit-agnostic (S8) and therefore always
+// offered once there are 2+ candidates - Family A is only offered when
+// every candidate classifies to the same metric kind/unit/direction (the
+// same rule validateAggregateDefinition enforces after the fact; this
+// function answers the same question BEFORE a choice is made, so the
+// editor can show Family A as an absent option rather than a validation
+// error surfaced later, per S17's own explicit instruction). Pure, no
+// Section-count-of-1 case (returns []) since an aggregate always needs 2+.
+export function getCompatibleCombineFunctions(sections) {
+  if (!Array.isArray(sections) || sections.length < 2) return []
+  const metrics = sections.map(s => classifySectionMetric(s.format, s.formatConfig))
+  const valueCompatible = metrics.every(m => m != null) &&
+    metrics.every(m => m.kind === metrics[0].kind && m.unit === metrics[0].unit && m.direction === metrics[0].direction)
+  return valueCompatible ? COMBINE_FUNCTIONS : RANK_COMBINE_FUNCTIONS
+}
+
 // Structural + Family-A compatibility validation, mirroring the DB
 // trigger's structural checks (20260822100000_workout_aggregation_
 // phase_a.sql) plus the one check that trigger deliberately does NOT do

@@ -7,6 +7,7 @@ import {
   validateAggregateDefinition,
   sectionValueForMember,
   deriveWorkoutAggregate,
+  getCompatibleCombineFunctions,
 } from './workoutAggregation'
 import { toKgForRanking } from './workoutFormats'
 
@@ -31,6 +32,29 @@ describe('classifySectionMetric', () => {
   it('returns null for a missing/empty format id', () => {
     expect(classifySectionMetric(null, {})).toBeNull()
     expect(classifySectionMetric('', {})).toBeNull()
+  })
+})
+
+describe('getCompatibleCombineFunctions (Phase 3 authoring UX)', () => {
+  it('fewer than 2 candidate Sections offers nothing', () => {
+    expect(getCompatibleCombineFunctions([])).toEqual([])
+    expect(getCompatibleCombineFunctions([section()])).toEqual([])
+  })
+  it('two metric-compatible LOAD Sections offer all 7 functions', () => {
+    const sections = [section({ id: 'a' }), section({ id: 'b' })]
+    expect(getCompatibleCombineFunctions(sections)).toEqual(COMBINE_FUNCTIONS)
+  })
+  it('a TIME Section paired with a LOAD Section offers only rank-combine functions', () => {
+    const sections = [section({ id: 'a', format: 'Weightlifting' }), section({ id: 'b', format: 'For Time' })]
+    expect(getCompatibleCombineFunctions(sections)).toEqual(RANK_COMBINE_FUNCTIONS)
+  })
+  it('a Family-A-unclassifiable Section (e.g. AMRAP) paired with a LOAD Section offers only rank-combine', () => {
+    const sections = [section({ id: 'a', format: 'Weightlifting' }), section({ id: 'b', format: 'AMRAP' })]
+    expect(getCompatibleCombineFunctions(sections)).toEqual(RANK_COMBINE_FUNCTIONS)
+  })
+  it('three metric-compatible TIME Sections still offer all 7', () => {
+    const sections = [section({ id: 'a', format: 'For Time' }), section({ id: 'b', format: 'For Time' }), section({ id: 'c', format: 'For Time' })]
+    expect(getCompatibleCombineFunctions(sections)).toEqual(COMBINE_FUNCTIONS)
   })
 })
 
