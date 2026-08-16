@@ -220,7 +220,7 @@ The pure engine and its read-side integration are complete, tested (100 new test
 37. **Cleanup status**: complete, verified 0 residual rows + live UI check.
 38. **Known limitations**: browser-UI verification abandoned for a direct-SQL/real-engine substitution (disclosed above); Family B not live-exercised; `worst-placement` policy rejected not implemented; snapshot-based versioning deferred.
 39. **Report path**: `WORKOUT_AGGREGATION_PHASE_A_IMPLEMENTATION_REPORT.md`.
-40. **Commit hashes**: recorded after this report is committed (see final commit message).
-41. **Origin/working-tree status**: confirmed clean after push (see final steps).
+40. **Commit hashes**: WOD-SIMPLE `e2ab983`, forge-admin-web `15c5815`.
+41. **Origin/working-tree status**: both pushed to `origin/main`; both working trees clean with respect to this mission's own scope (remaining untracked files in either repo predate and are unrelated to this mission, correctly left untouched).
 42. **Confirmation**: Competition Mode, Segment, and Attempt architecture were NOT implemented or modified in any way by this phase.
 43. **Is the implemented Workout Aggregation foundation safe to proceed to the next approved aggregation piece: YES.**
