@@ -132,7 +132,7 @@ WOD-SIMPLE: 5 new tests (`getCompatibleCombineFunctions`, `workoutAggregation.te
 
 ## Production Deployment
 
-forge-admin-web only (WOD-SIMPLE received no code changes this phase). Commit `18fe787` — "feat(programming): Workout Aggregation Phase 3 - coach authoring UX for aggregate_definition." Deployed to production, verified via `vercel inspect` matching the deployment's timestamp to the push, aliased to `https://forge-admin-web.vercel.app`.
+All authoring UI/save-path work is forge-admin-web-only, deployed via commit `18fe787` — "feat(programming): Workout Aggregation Phase 3 - coach authoring UX for aggregate_definition." Deployed to production, verified via `vercel inspect` matching the deployment's timestamp to the push, aliased to `https://forge-admin-web.vercel.app`. WOD-SIMPLE received one small, non-deployed parity addition (`getCompatibleCombineFunctions` ported into its own engine copy, commit `fe73c30`) — it has no authoring UI to call it from (see Readiness Audit), so nothing in WOD-SIMPLE required a new production deployment this phase.
 
 ## Actual UI Acceptance
 
@@ -230,7 +230,7 @@ No other architecture section (§1-49) names an additional "required," "approved
 40. No weighted aggregation, custom formula, or multi-aggregate-per-Workout was built.
 41. No Team/Partner aggregation was built.
 42. Ownership unchanged: Programming (this phase's own new authoring code) declares; Results (untouched) derives.
-43. All work committed and pushed; this report is the final remaining artifact, committed immediately after this response.
+43. All work committed and pushed — forge-admin-web `18fe787`, WOD-SIMPLE `fe73c30` (engine parity helper) and `506238d` (this report); working trees clean of any uncommitted work from this mission.
 
 **(A) Is Phase 3 Coach Authoring fully complete? YES.**
 
