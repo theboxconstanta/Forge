@@ -35,3 +35,25 @@ export async function resolveBenchmarkNames(names) {
   }
   return result
 }
+
+// Member Performance, Phase 1 (Benchmark History) - looks up display
+// metadata (canonical_name/category) for a set of already-known
+// benchmark_id UUIDs, e.g. the distinct wod_logs.benchmark_id values a
+// member has logged against. Deliberately separate from
+// resolveBenchmarkNames above (that one resolves NAME -> id; this one
+// resolves id -> display metadata) - callers that already have the id
+// directly on a log row (server-resolved at logging time, see
+// snapshot_wod_log_context) should never need to re-resolve by name.
+// Keyed by benchmark_id (string) so callers can Map.get(log.benchmark_id)
+// directly.
+export async function getBenchmarksByIds(ids) {
+  const distinct = [...new Set((ids || []).filter(Boolean))]
+  const result = new Map()
+  if (distinct.length === 0) return result
+  const { data, error } = await supabase.from('benchmarks').select('id, canonical_name, category').in('id', distinct)
+  if (error) throw error
+  for (const row of data || []) {
+    result.set(row.id, { canonical_name: row.canonical_name, category: row.category })
+  }
+  return result
+}

@@ -31,7 +31,8 @@ import {
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
   effectiveLeaderboardVisible,
 } from './workoutEngine'
-import { resolveBenchmarkNames } from './benchmarkResolution'
+import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
+import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay } from './benchmarkHistory'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -5288,6 +5289,42 @@ function PerformanceOverviewPanel({ gymId, memberId }) {
   )
 }
 
+// Member Performance, Faza 1 (Istoric Benchmark) - o lista, un rand per
+// Benchmark Identity (wod_logs.benchmark_id) pt care membrul are cel putin
+// un rezultat logat, sortata implicit dupa cel mai recent atacat (cea mai
+// mare valoare pt membru, per MEMBER_PERFORMANCE_DOMAIN_ARCHITECTURE_V1.md
+// "Sorting"). Zero interogare noua - grupeaza wodLogs deja incarcat pt
+// Jurnal, la fel ca ecranul benchmarkDetail insusi.
+function BenchmarksSection({ wodLogs, benchmarksById, onSelect, t, lang }) {
+  const entries = buildBenchmarkListEntries(wodLogs, benchmarksById)
+  if (entries.length === 0) {
+    return (
+      <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
+        {t.benchmarkListEmpty}
+      </div>
+    )
+  }
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.benchmarkListSectionTitle}</div>
+      <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {entries.map((e, idx) => (
+          <div key={e.benchmarkId} onClick={() => onSelect(e.benchmarkId)}
+            style={{ padding: '12px 14px', borderBottom: idx < entries.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{e.displayName || '—'}</div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>
+                {t.benchmarkAttemptsLabel(e.attemptCount)} · {new Date(e.lastPerformedAt).toLocaleDateString(localeFor(lang))}
+              </div>
+            </div>
+            <span style={{ fontSize: '14px', color: '#ccc' }}>›</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
@@ -5866,6 +5903,29 @@ function App() {
   // RESULTS_DOMAIN_ARCHITECTURE.md §7 pt fix-ul real). Rateaza orice WOD
   // custom de sala cu nume diferit de HERO_WODS_INFO.
   const [benchmarkDetailName, setBenchmarkDetailName] = useState(null)
+  // Member Performance, Faza 1 (Istoric Benchmark) - id-ul canonic al
+  // Benchmark-ului deschis pe ecranul benchmarkDetail, cand e cunoscut
+  // direct (setat de noua sectiune "Benchmarks" de mai jos, care grupeaza
+  // deja pe wod_logs.benchmark_id). Cand ecranul e deschis din vechiul
+  // punct de intrare (Hero WODs din PR, doar dupa nume), acest id ramane
+  // null si e rezolvat la randare din benchmarkResolutionMap - un SINGUR
+  // model de interogare (id-based), nu doua (vezi MEMBER_PERFORMANCE_
+  // PHASE1_BENCHMARK_HISTORY_IMPLEMENTATION_REPORT.md).
+  const [benchmarkDetailId, setBenchmarkDetailId] = useState(null)
+  const [benchmarkDetailTier, setBenchmarkDetailTier] = useState(null)
+  // Metadata de afisare (canonical_name/category) pt fiecare benchmark_id
+  // deja prezent in wodLogs - o singura interogare batched, nu una per
+  // benchmark, refacuta doar cand setul de id-uri distincte se schimba.
+  const [benchmarksById, setBenchmarksById] = useState(new Map())
+  useEffect(() => {
+    const ids = [...new Set(wodLogs.map(l => l.benchmark_id).filter(Boolean))]
+    if (ids.length === 0) return
+    let cancelled = false
+    getBenchmarksByIds(ids)
+      .then(map => { if (!cancelled) setBenchmarksById(prev => new Map([...prev, ...map])) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [wodLogs])
   // Results Phase 2, Slice 1 - the canonical resolution upgrade for the
   // screen above. Resolves every distinct wods.name already present in
   // wodLogs (one batched call, not one per log) so a log against an ALIAS
@@ -10173,6 +10233,17 @@ function App() {
         <PerformanceOverviewPanel gymId={userProfile.gym_id} memberId={user.id} />
       )}
 
+      {screen === 'pr' && (
+        <div style={{ padding: '0 20px' }}>
+          <BenchmarksSection
+            wodLogs={wodLogs}
+            benchmarksById={benchmarksById}
+            onSelect={(benchmarkId) => { setBenchmarkDetailId(benchmarkId); setBenchmarkDetailTier(null); setPrevScreen('pr'); setScreen('benchmarkDetail') }}
+            t={t} lang={lang}
+          />
+        </div>
+      )}
+
       {screen === 'pr' && (() => {
         const prGroups = {}
         prDate.forEach(pr => { if (!prGroups[pr.movement]) prGroups[pr.movement] = []; prGroups[pr.movement].push(pr) })
@@ -10486,57 +10557,101 @@ function App() {
 
 
       {screen === 'benchmarkDetail' && (() => {
-        // Client-side filter over wodLogs already loaded for this member
-        // (fetchWodLogs) - no new query beyond the batched resolution call
-        // above. Slice 1: a log now matches either by the same exact name
-        // (the original Phase 1 approximation, always available, zero
-        // network dependency) OR by resolving to the SAME canonical
-        // benchmark_id as benchmarkDetailName itself (catches aliases -
-        // see the effect above). Union, not replacement, per that same
-        // effect's own comment.
-        const targetResolved = benchmarkResolutionMap.get(benchmarkDetailName)
-        const entries = wodLogs
-          .filter(l => {
-            // Falls back to wod_name_snapshot once the linked WOD is gone
-            // (Slice 2) - a deleted WOD's own historical entries must keep
-            // matching this Benchmark's history exactly as they did before
-            // deletion, both by exact name and by alias resolution.
-            const name = l.wods?.name ?? l.wod_name_snapshot
-            if (name === benchmarkDetailName) return true
-            if (!targetResolved || !name) return false
-            const logResolved = benchmarkResolutionMap.get(name)
-            return logResolved?.benchmarkId === targetResolved.benchmarkId
-          })
-          .sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at))
+        // Member Performance, Faza 1 (Istoric Benchmark) - ONE query model:
+        // grupeaza pe wod_logs.benchmark_id (rezolvat server-side la logare,
+        // vezi snapshot_wod_log_context), niciodata pe potrivire de nume.
+        // benchmarkDetailId e deja id-ul real cand ecranul e deschis din
+        // noua sectiune "Benchmarks" de mai jos; cand e deschis din vechiul
+        // punct de intrare (Hero WODs din PR, doar dupa nume), id-ul e
+        // rezolvat aici din benchmarkResolutionMap - acelasi rezultat final,
+        // fara o a doua implementare de grupare/comparare.
+        const targetId = benchmarkDetailId || benchmarkResolutionMap.get(benchmarkDetailName)?.benchmarkId
+        const displayName = (targetId && benchmarksById.get(targetId)?.canonical_name) || benchmarkDetailName || '—'
+        const groups = groupLogsByBenchmark(wodLogs)
+        const logs = targetId ? (groups.get(targetId) || []) : []
+        const summaryByTier = deriveBenchmarkSummary(logs)
+        // Tier-urile (Rx/Scaled/etc.) NU sunt niciodata amestecate intr-un
+        // singur "cel mai bun" (invariant inghetat, Architecture V1) - cea
+        // mai recent atacata tier e implicit selectata.
+        const tiers = Object.keys(summaryByTier).sort((a, b) => new Date(summaryByTier[b].latest.logged_at) - new Date(summaryByTier[a].latest.logged_at))
+        const activeTier = benchmarkDetailTier && summaryByTier[benchmarkDetailTier] ? benchmarkDetailTier : tiers[0]
+        const summary = activeTier ? summaryByTier[activeTier] : null
+        const changeLabel = (change) => {
+          if (!change) return null
+          if (change.direction === 'same') return t.benchmarkChangeSame
+          return change.direction === 'better' ? t.benchmarkChangeBetter(change.magnitude, change.unit) : t.benchmarkChangeWorse(change.magnitude, change.unit)
+        }
+        const changeColor = (change) => !change ? '#888' : change.direction === 'better' ? '#3C9F3C' : change.direction === 'worse' ? '#C0392B' : '#888'
         return (
-          <div style={{ padding: '16px' }}>
-            <button onClick={() => setScreen(prevScreen)}
+          <div style={{ padding: '16px', paddingBottom: '80px' }}>
+            <button onClick={() => { setScreen(prevScreen); setBenchmarkDetailId(null); setBenchmarkDetailTier(null) }}
               style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
               ‹ {t.prHistoryLabel}
             </button>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.benchmarkDetailTitle(benchmarkDetailName)}</div>
-            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px' }}>{t.benchmarkDetailApproxNote}</div>
-            {entries.length === 0 ? (
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{t.benchmarkDetailTitle(displayName)}</div>
+            {logs.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.benchmarkDetailEmpty}</div>
             ) : (
-              <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                {entries.map((log, idx) => {
-                  const { rezultatBucati } = parseWodLogDetails(log, t)
-                  return (
-                    <div key={log.id} style={{ padding: '12px 14px', borderBottom: idx < entries.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <>
+                {tiers.length > 1 && (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                    {tiers.map(tier => (
+                      <div key={tier} onClick={() => setBenchmarkDetailTier(tier)}
+                        style={{ padding: '6px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: tier === activeTier ? '#0E0E0E' : '#f0f0f0', color: tier === activeTier ? '#fff' : '#888' }}>
+                        {tier} · {summaryByTier[tier].attemptCount}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {summary && (
+                  <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: summary.previous ? '1fr 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.best, t) || '—'}</div>
+                        <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
+                        <div style={{ fontSize: '10px', color: '#bbb' }}>
+                          {new Date(summary.latest.logged_at).toLocaleDateString(localeFor(lang))}
+                          {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '700' }}>★ {t.benchmarkNewBestBadge}</span>}
+                        </div>
+                      </div>
+                      {summary.previous && (
+                        <div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.previous, t) || '—'}</div>
+                          <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                        </div>
+                      )}
+                    </div>
+                    {summary.change && (
+                      <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: '600', color: changeColor(summary.change) }}>{changeLabel(summary.change)}</div>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                  {(summary?.history || []).map((log, idx, arr) => (
+                    <div key={log.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
-                        {log.variant_level && (
-                          <span style={{ fontSize: '10px', fontWeight: '600', color: '#888', textTransform: 'uppercase' }}>{log.variant_level}</span>
-                        )}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {summary.best?.id === log.id && <span style={{ fontSize: '10px', fontWeight: '700', color: '#8a9a3c' }}>★</span>}
+                          {log.completion_state === 'capped' && (
+                            <span style={{ fontSize: '9px', fontWeight: '600', color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
+                          )}
+                        </span>
                       </div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>
-                        {rezultatBucati.length > 0 ? rezultatBucati.join(' · ') : '—'}
+                        {benchmarkScoreDisplay(log, t) || '—'}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )
