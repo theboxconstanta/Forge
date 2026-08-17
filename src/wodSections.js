@@ -290,6 +290,50 @@ export const legacyPayloadFromSections = (sections) => {
   }
 }
 
+// Member Performance, Faza 4 (Completitudine Metadata Programming) - un gol
+// real, confirmat pe date de productie, nu ipotetic: doua Sectiuni
+// Strength Sets reale au fost salvate cu format_config:{} (fara
+// setsScheme), desi schema din workoutFormats.js declara deja
+// `setsScheme: { required: true }` de la introducerea campului
+// (2026-07-05) - nimic, niciodata, nu a validat efectiv acel `required`
+// (nici acest gate, nici editorul de format). Vezi
+// MEMBER_PERFORMANCE_PHASE4_PROGRAMMING_METADATA_COMPLETENESS_
+// IMPLEMENTATION_REPORT.md pt evidenta completa (Quick Create + manual,
+// ambele salveaza prin acelasi gate, deci un singur fix aici acopera
+// ambele cai de autoring).
+//
+// Scop deliberat ingust - NU un validator generic pt orice camp
+// `required:true` din intreg catalogul (AMRAP durationSec, EMOM
+// totalRounds etc. - acelea au deja `default` si sunt pre-completate de
+// editor, deci nu au acelasi gol real). Doar cele doua formate
+// movement-performance de care depinde rezolvatorul Fazei 3
+// (movementHistory.js): Strength Sets.setsScheme si
+// Superset.movements/targetSets. Complex.complexMovements e in afara
+// scopului (nu e citit de rezolvator, e o preocupare generala de
+// Programming/catalog); Build to Heavy/1RM.targetLabel are deja default
+// ('1RM') si acoperire reala 100% (Faza 3) - nimic de reparat acolo.
+const MOVEMENT_PERFORMANCE_REQUIRED_FIELDS = {
+  'Strength Sets': ['setsScheme'],
+  'Superset': ['movements', 'targetSets'],
+}
+
+function isRequiredFieldMissing(fieldKey, value) {
+  if (fieldKey === 'targetSets') return !(Number(value) > 0)
+  return !Array.isArray(value) || value.length === 0
+}
+
+export function validateMovementPerformanceMetadata(sections, t) {
+  const errors = []
+  sections.forEach((s) => {
+    const requiredFields = MOVEMENT_PERFORMANCE_REQUIRED_FIELDS[s.format]
+    if (!requiredFields) return
+    const config = s.formatConfig || {}
+    const missing = requiredFields.filter((key) => isRequiredFieldMissing(key, config[key]))
+    if (missing.length > 0) errors.push(t.wodSectionsErrorMissingFormatFields(s.format))
+  })
+  return errors
+}
+
 // Gate de validare (decizia userului, Faza 6 - nu badge/vizibilitate
 // partiala) - salvarea e blocata complet daca lista curenta de sectiuni nu
 // poate fi reprezentata fidel in modelul legacy (Member View + Logging
@@ -301,5 +345,6 @@ export const validateSectionsForLegacy = (sections, t) => {
   const nonPrimaryCount = sections.length - primaryCount
   if (primaryCount !== 1) errors.push(t.wodSectionsErrorPrimaryCount(primaryCount))
   if (nonPrimaryCount > 3) errors.push(t.wodSectionsErrorTooMany(nonPrimaryCount))
+  errors.push(...validateMovementPerformanceMetadata(sections, t))
   return { valid: errors.length === 0, errors }
 }

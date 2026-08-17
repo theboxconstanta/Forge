@@ -449,6 +449,35 @@ describe('Rx/variant separation (mission §56)', () => {
   })
 })
 
+describe('Historical stability (Phase 4 mission §27-28/§59)', () => {
+  it('resolveComparisonIdentity has no hidden state - a Result logged against an old snapshot keeps resolving against THAT snapshot even if the config passed for "current" Programming differs, proving the module never reaches for "live" data on its own', () => {
+    const historicalSnapshot = { formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '5RM' } }
+    const currentLiveConfig = { formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '3RM' } }
+    // The resolver only ever sees what's explicitly passed to it (the frozen
+    // snapshot in a real wod_logs row) - it has no DB access of its own, so
+    // a coach editing Programming after the fact cannot retroactively change
+    // what an already-logged Result resolves to. The real end-to-end
+    // guarantee lives in snapshot_wod_log_context's own trigger definition
+    // (BEFORE INSERT OR UPDATE OF wod_id - never re-fires on an unrelated
+    // Programming edit), verified directly against
+    // supabase/migrations/20260812090200_results_phase2_slice2_snapshot_triggers.sql.
+    expect(resolveComparisonIdentity(historicalSnapshot).repTarget).toBe(5)
+    expect(resolveComparisonIdentity(currentLiveConfig).repTarget).toBe(3)
+  })
+})
+
+describe('Format switch does not contaminate resolver (mission §21/§56)', () => {
+  it('stale keys left over from a previous format (e.g. setsScheme surviving a switch to Build to Heavy/1RM) are silently ignored - the resolver only ever reads the field(s) that belong to the CURRENT formatSnapshot', () => {
+    const staleConfig = { targetLabel: '3RM', setsScheme: [5, 5, 5, 5, 5] }
+    expect(resolveComparisonIdentity({ formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: staleConfig })).toEqual({ mode: 'RM_TEST', repTarget: 3, comparable: true })
+  })
+
+  it('the reverse: a stale targetLabel surviving a switch to Strength Sets is also ignored', () => {
+    const staleConfig = { targetLabel: '5RM', setsScheme: [5, 5, 5] }
+    expect(resolveComparisonIdentity({ formatSnapshot: 'Strength Sets', formatConfigSnapshot: staleConfig })).toEqual({ mode: 'SETS_ACROSS', repTarget: null, comparable: false })
+  })
+})
+
 describe('PR Engine handoff contract (mission §83) - no pr_events, purely derived', () => {
   it('comparisonKey groups only comparable (RM_TEST) entries into safely-comparable buckets', () => {
     const logs = [

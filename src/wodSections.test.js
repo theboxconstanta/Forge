@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
   createSection, DEFAULT_NEW_WOD_SECTIONS, sectionsFromLegacyWod,
-  legacyPayloadFromSections, validateSectionsForLegacy,
+  legacyPayloadFromSections, validateSectionsForLegacy, validateMovementPerformanceMetadata,
   assignNonPrimarySlots, legacySlotAssignmentAfterSave,
 } from './wodSections'
 
-// Traduceri fake, doar cele 2 functii folosite de validateSectionsForLegacy.
+// Traduceri fake, doar functiile folosite de validateSectionsForLegacy.
 const t = {
   wodSectionsErrorPrimaryCount: (n) => `PRIMARY_COUNT:${n}`,
   wodSectionsErrorTooMany: (n) => `TOO_MANY:${n}`,
+  wodSectionsErrorMissingFormatFields: (format) => `MISSING_FIELDS:${format}`,
 }
 
 // Fixture REAL, acelasi WOD "NED" (2026-07-03, CrossFit C15) folosit si de
@@ -395,5 +396,85 @@ describe('assignNonPrimarySlots / legacySlotAssignmentAfterSave (Layer 2b.1 hard
     // Without the hardening, position alone decides - amrapSkill (now first) claims 'skill'.
     expect(payload.skill_name).toBe(null)
     expect(payload.skill2_name).toBe('Squat Clean')
+  })
+})
+
+// Member Performance, Faza 4 (Completitudine Metadata Programming) - real
+// production bug found: two live Strength Sets Sections were saved with
+// format_config:{} (setsScheme missing) despite the schema declaring it
+// required:true since before either Section was authored - nothing ever
+// validated that. Fix: extend the existing hard save-gate
+// (validateSectionsForLegacy) with the same "block, don't warn" pattern
+// already used for section-count validation. Scope deliberately narrow -
+// only the two movement-performance formats the Phase 3 rep-scheme
+// resolver depends on (Strength Sets, Superset), not a generic
+// required-field validator for the whole catalog.
+describe('validateMovementPerformanceMetadata (Phase 4)', () => {
+  it('blocks a Strength Sets section with no setsScheme at all (the real production bug)', () => {
+    const s = { ...createSection('metcon', true), format: 'Strength Sets', formatConfig: {} }
+    const errors = validateMovementPerformanceMetadata([s], t)
+    expect(errors).toEqual(['MISSING_FIELDS:Strength Sets'])
+  })
+
+  it('blocks a Strength Sets section with an empty setsScheme array', () => {
+    const s = { ...createSection('metcon', true), format: 'Strength Sets', formatConfig: { setsScheme: [] } }
+    expect(validateMovementPerformanceMetadata([s], t)).toHaveLength(1)
+  })
+
+  it('allows a Strength Sets section with a real setsScheme', () => {
+    const s = { ...createSection('metcon', true), format: 'Strength Sets', formatConfig: { setsScheme: [5, 5, 5, 5, 5] } }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('blocks a Superset section missing movements', () => {
+    const s = { ...createSection('metcon', true), format: 'Superset', formatConfig: { targetSets: 3 } }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual(['MISSING_FIELDS:Superset'])
+  })
+
+  it('blocks a Superset section missing targetSets', () => {
+    const s = { ...createSection('metcon', true), format: 'Superset', formatConfig: { movements: ['Back Squat'] } }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual(['MISSING_FIELDS:Superset'])
+  })
+
+  it('blocks a Superset section with targetSets:0 (falsy-but-present is still missing)', () => {
+    const s = { ...createSection('metcon', true), format: 'Superset', formatConfig: { movements: ['Back Squat'], targetSets: 0 } }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual(['MISSING_FIELDS:Superset'])
+  })
+
+  it('allows a Superset section with both movements and targetSets', () => {
+    const s = { ...createSection('metcon', true), format: 'Superset', formatConfig: { movements: ['Back Squat'], targetSets: 3 } }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('does NOT block Build to Heavy/1RM even with an empty config - targetLabel already has a safe schema default', () => {
+    const s = { ...createSection('metcon', true), format: 'Build to Heavy/1RM', formatConfig: {} }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('does NOT block Weightlifting - format has zero config fields, nothing to require', () => {
+    const s = { ...createSection('metcon', true), format: 'Weightlifting', formatConfig: {} }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('does NOT block Complex even with no complexMovements - out of this fix\'s scope (not read by the Phase 3 resolver, general Programming concern, deferred deliberately)', () => {
+    const s = { ...createSection('metcon', true), format: 'Complex', formatConfig: {} }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('does NOT block unrelated formats (For Time, AMRAP, etc.) regardless of their own required fields - scope is intentionally narrow', () => {
+    const s = { ...createSection('metcon', true), format: 'AMRAP', formatConfig: {} }
+    expect(validateMovementPerformanceMetadata([s], t)).toEqual([])
+  })
+
+  it('is wired into validateSectionsForLegacy - the real save gate rejects a bad Strength Sets section even when section counts are otherwise valid', () => {
+    const primary = { ...createSection('metcon', true), format: 'Strength Sets', formatConfig: {} }
+    const result = validateSectionsForLegacy([primary], t)
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('MISSING_FIELDS:Strength Sets')
+  })
+
+  it('validateSectionsForLegacy stays valid when movement-performance metadata is complete', () => {
+    const primary = { ...createSection('metcon', true), format: 'Strength Sets', formatConfig: { setsScheme: [5, 5, 5] } }
+    expect(validateSectionsForLegacy([primary], t).valid).toBe(true)
   })
 })
