@@ -599,6 +599,36 @@ describe('resolveSetsScoringMode', () => {
     expect(resolveSetsScoringMode('Complex', {})).toBe(null)
     expect(resolveSetsScoringMode('EMOM', {})).toBe(null)
   })
+
+  // Bug real gasit prin audit universal de scoring (08-17): 'Death By' nu are
+  // niciun camp scoringMode in schema (spre deosebire de Tabata/Intervals),
+  // deci cadea mereu pe null aici -> isWeightScoredSetsFormat il trata ca
+  // scorat pe greutate -> un Death By pe reps (bodyweight) ramanea neclasat
+  // ("-") pe Clasament, desi reps-ul era complet logat. Death By Weight
+  // ramane neschimbat (corect scorat pe greutate).
+  it('Death By este mereu Total Reps, hardcodat, indiferent de config (bug real gasit prin audit)', () => {
+    expect(resolveSetsScoringMode('Death By', {})).toBe('Total Reps')
+    expect(resolveSetsScoringMode('Death By', { startReps: 1, incrementReps: 1, intervalSec: 60 })).toBe('Total Reps')
+  })
+  it('Death By Weight ramane neschimbat - null (scorat pe greutate via fallback-ul existent)', () => {
+    expect(resolveSetsScoringMode('Death By Weight', {})).toBe(null)
+  })
+})
+
+describe('Death By scoring - end-to-end (bug real gasit prin audit universal de scoring, 08-17)', () => {
+  it('un Death By pe reps pure (bodyweight, fara greutate logata) primeste acum scorul real, nu null', () => {
+    const rows = { 'Min 1': [{ reps: '1', weight: '', completed: true }], 'Min 2': [{ reps: '2', weight: '', completed: true }], 'Min 3': [{ reps: '2', weight: '', completed: false }] }
+    expect(computeSetsScore('Death By', {}, rows)).toBe(5)
+    expect(setsDisplayScore('Death By', {}, rows)).toBe(5)
+  })
+  it('isWeightScoredSetsFormat este acum false pt Death By (era true inainte de fix)', () => {
+    expect(isWeightScoredSetsFormat({}, 'Death By')).toBe(false)
+  })
+  it('Death By Weight ramane scorat pe greutate (fallback-ul maxWeightFromSets, neschimbat)', () => {
+    const rows = { 'Min 1': [{ reps: '', weight: '40', completed: true }], 'Min 2': [{ reps: '', weight: '45', completed: true }] }
+    expect(setsDisplayScore('Death By Weight', {}, rows)).toBe(45)
+    expect(isWeightScoredSetsFormat({}, 'Death By Weight')).toBe(true)
+  })
 })
 
 // M9 Member Preferences - leaderboard kg/lbs normalization (audit-found

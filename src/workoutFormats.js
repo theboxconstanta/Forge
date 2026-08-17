@@ -1033,7 +1033,23 @@ export function defaultRowsForFormat(formatId, config, movements) {
 // deja. Complex/EMOM raman neschimbate (scoringMode acolo e 'required:
 // false', fara default - absenta ramane absenta, cad in continuare pe
 // maxWeightFromSets).
+//
+// Bug real gasit prin audit universal de scoring (08-17): 'Death By' (varianta
+// cu reps crescator, distincta de 'Death By Weight') nu are NICIUN camp
+// scoringMode in schema - spre deosebire de Tabata/Intervals/EMOM. Rezultat:
+// resolveSetsScoringMode intoarce mereu null pt Death By, isWeightScoredSetsFormat
+// il trateaza deci ca scorat pe greutate, iar un Death By pe reps (bodyweight,
+// ex. "Death By Burpees") cade pe maxWeightFromSets - care intoarce null cand
+// nu exista nicio greutate logata (cazul normal pt reps pure). Clasamentul
+// arata acei membri neclasati ("-"), desi reps-ul e complet logat si valid.
+// Spre deosebire de EMOM/Complex (unde greutatea e o alegere reala a
+// antrenorului), Death By NU are nicio interpretare legitima pe greutate -
+// 'Death By Weight' e deja formatul separat pt asta. Nu exista ambiguitate de
+// rezolvat cu un dropdown; scorul canonic e mereu Total Reps (suma reps-ului
+// logat pe fiecare interval, inclusiv runda partiala de esec) - hardcodat aici,
+// fara camp nou in schema, fara UI nou.
 export function resolveSetsScoringMode(formatId, config) {
+  if (formatId === 'Death By') return 'Total Reps'
   const schemaDefault = formatId ? getFormat(formatId)?.config?.scoringMode?.default : null
   return config?.scoringMode || schemaDefault || null
 }
