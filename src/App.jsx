@@ -33,6 +33,7 @@ import {
 } from './workoutEngine'
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay } from './benchmarkHistory'
+import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay } from './movementHistory'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -5325,6 +5326,41 @@ function BenchmarksSection({ wodLogs, benchmarksById, onSelect, t, lang }) {
   )
 }
 
+// Member Performance, Faza 2 (Istoric Miscari) - extinde exact acelasi
+// ecran Performance (screen==='pr'), nu creeaza o zona separata (mission
+// §42). Zero interogare noua - grupeaza wodLogs/skillLogs deja incarcate.
+// Doar miscari cu istoric real apar (mission §34, varianta A) - fara search
+// in V1, dataset-ul e inca mic.
+function MovementsSection({ wodLogs, skillLogs, onSelect, t, lang, weightUnit }) {
+  const entries = buildMovementListEntries(wodLogs, skillLogs)
+  if (entries.length === 0) {
+    return (
+      <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
+        {t.movementListEmpty}
+      </div>
+    )
+  }
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.movementListSectionTitle}</div>
+      <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {entries.map((e, idx) => (
+          <div key={e.movementKey} onClick={() => onSelect(e.movementKey)}
+            style={{ padding: '12px 14px', borderBottom: idx < entries.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{e.displayName}</div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>
+                {movementEntryDisplay(e.latestEntry, weightUnit)} · {t.benchmarkAttemptsLabel(e.attemptCount)} · {new Date(e.lastPerformedAt).toLocaleDateString(localeFor(lang))}
+              </div>
+            </div>
+            <span style={{ fontSize: '14px', color: '#ccc' }}>›</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
@@ -5913,6 +5949,10 @@ function App() {
   // PHASE1_BENCHMARK_HISTORY_IMPLEMENTATION_REPORT.md).
   const [benchmarkDetailId, setBenchmarkDetailId] = useState(null)
   const [benchmarkDetailTier, setBenchmarkDetailTier] = useState(null)
+  // Member Performance, Faza 2 (Istoric Miscari) - cheia normalizata a
+  // miscarii deschise pe ecranul movementDetail (movementHistory.js:
+  // normalizeKey), setata de sectiunea "Movements" de mai jos.
+  const [movementDetailKey, setMovementDetailKey] = useState(null)
   // Metadata de afisare (canonical_name/category) pt fiecare benchmark_id
   // deja prezent in wodLogs - o singura interogare batched, nu una per
   // benchmark, refacuta doar cand setul de id-uri distincte se schimba.
@@ -10241,6 +10281,12 @@ function App() {
             onSelect={(benchmarkId) => { setBenchmarkDetailId(benchmarkId); setBenchmarkDetailTier(null); setPrevScreen('pr'); setScreen('benchmarkDetail') }}
             t={t} lang={lang}
           />
+          <MovementsSection
+            wodLogs={wodLogs}
+            skillLogs={skillLogs}
+            onSelect={(movementKey) => { setMovementDetailKey(movementKey); setPrevScreen('pr'); setScreen('movementDetail') }}
+            t={t} lang={lang} weightUnit={userProfile?.weight_unit}
+          />
         </div>
       )}
 
@@ -10648,6 +10694,47 @@ function App() {
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>
                         {benchmarkScoreDisplay(log, t) || '—'}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
+      {screen === 'movementDetail' && (() => {
+        // Member Performance, Faza 2 (Istoric Miscari) - Latest + History,
+        // deliberat FARA "Best"/PR (vezi movementHistory.js header) - un set
+        // de rezultate cu scheme de repetari diferite (100kg x5 vs 120kg x1)
+        // n-are un "mai bun" canonic fara identitate rep-scheme, iar Forge
+        // nu are inca acea identitate (gap real, cunoscut, nerezolvat aici).
+        const groups = groupMovementEntries(wodLogs, skillLogs)
+        const entries = movementDetailKey ? (groups.get(movementDetailKey) || []) : []
+        const history = deriveMovementHistory(entries)
+        const weightUnit = userProfile?.weight_unit
+        return (
+          <div style={{ padding: '16px', paddingBottom: '80px' }}>
+            <button onClick={() => { setScreen(prevScreen); setMovementDetailKey(null) }}
+              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
+              ‹ {t.prHistoryLabel}
+            </button>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{history?.displayName || '—'}</div>
+            {!history ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.movementDetailEmpty}</div>
+            ) : (
+              <>
+                <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
+                  <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}</div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                  {history.history.map((entry, idx, arr) => (
+                    <div key={entry.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(entry.loggedAt).toLocaleDateString(localeFor(lang))}</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(entry, weightUnit) || '—'}</span>
                     </div>
                   ))}
                 </div>

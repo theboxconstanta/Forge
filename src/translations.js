@@ -581,6 +581,10 @@ export const TRANSLATIONS = {
     benchmarkChangeSame: '— identic',
     benchmarkTierAll: 'Toate',
     benchmarkCappedLabel: 'LIMITAT',
+    // Member Performance, Faza 2 - Istoric Miscari
+    movementListSectionTitle: 'MIȘCĂRI',
+    movementListEmpty: 'Niciun istoric de mișcări încă. Rezultatele tale la Weightlifting, Strength Sets, Build to Heavy și Superset apar aici.',
+    movementDetailEmpty: 'Niciun rezultat logat pentru această mișcare.',
     prPercentOf1rm: (bestKg, unit) => `% DIN 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'ISTORIC',
     prRepCountLabel: (n) => `${n}RM`,
@@ -1712,6 +1716,10 @@ export const TRANSLATIONS = {
     benchmarkChangeSame: '— same',
     benchmarkTierAll: 'All',
     benchmarkCappedLabel: 'CAPPED',
+    // Member Performance, Phase 2 - Movement History
+    movementListSectionTitle: 'MOVEMENTS',
+    movementListEmpty: 'No movement history yet. Your Weightlifting, Strength Sets, Build to Heavy, and Superset results will appear here.',
+    movementDetailEmpty: 'No logged results for this movement yet.',
     prPercentOf1rm: (bestKg, unit) => `% OF 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'HISTORY',
     prRepCountLabel: (n) => `${n}RM`,
