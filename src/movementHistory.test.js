@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractMovementEntriesFromWodLogs, extractMovementEntriesFromSkillLogs,
   groupMovementEntries, deriveMovementHistory, buildMovementListEntries, movementEntryDisplay,
+  resolveComparisonIdentity, comparisonModeLabel,
 } from './movementHistory'
 
 // Member Performance, Phase 2 (Movement History) - test matrix per the
@@ -265,5 +266,200 @@ describe('Reps-only entry (bodyweight movement, no weight)', () => {
   it('displays "N reps" without fabricating a weight', () => {
     const entries = extractMovementEntriesFromWodLogs([wodLog({ id: 'a', format_snapshot: 'Superset', sets: { 'Strict Pull-ups': [{ reps: '8', weight: '' }] } })])
     expect(movementEntryDisplay(entries[0])).toBe('8 reps')
+  })
+})
+
+// Member Performance, Phase 3 (Rep-Scheme Identity Hardening) - test
+// matrix per the mission's own §65-77.
+
+describe('Explicit RM (mission §65)', () => {
+  it('Back Squat 1RM: 100 then 110 share the same comparisonKey (comparable)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '100' }] }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '110' }] }, logged_at: '2026-02-01' }),
+    ]
+    const [e1, e2] = extractMovementEntriesFromWodLogs(logs)
+    expect(e1.comparisonMode).toBe('RM_TEST')
+    expect(e1.repTarget).toBe(1)
+    expect(e1.comparable).toBe(true)
+    expect(e1.comparisonKey).toBe(e2.comparisonKey)
+    expect(comparisonModeLabel(e1)).toBe('1RM')
+  })
+
+  it('Back Squat 3RM is a separate comparisonKey from 1RM', () => {
+    const oneRm = extractMovementEntriesFromWodLogs([wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '110' }] } })])[0]
+    const threeRm = extractMovementEntriesFromWodLogs([wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '3RM' }, sets: { 'Back Squat': [{ reps: '3', weight: '100' }] } })])[0]
+    expect(oneRm.comparisonKey).not.toBe(threeRm.comparisonKey)
+    expect(comparisonModeLabel(threeRm)).toBe('3RM')
+  })
+
+  it('Back Squat 5RM is a separate comparisonKey from both', () => {
+    const fiveRm = extractMovementEntriesFromWodLogs([wodLog({ id: 'c', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '95' }] } })])[0]
+    expect(fiveRm.comparisonMode).toBe('RM_TEST')
+    expect(fiveRm.repTarget).toBe(5)
+  })
+})
+
+describe('Training set (mission §66)', () => {
+  it('Back Squat 5x5 (Strength Sets, setsScheme present) is SETS_ACROSS, never RM_TEST, never comparable', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Strength Sets', format_config_snapshot: { setsScheme: [5, 5, 5, 5, 5] },
+      sets: { 'Back Squat': [{ reps: '5', weight: '100' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('SETS_ACROSS')
+    expect(entries[0].comparable).toBe(false)
+    expect(comparisonModeLabel(entries[0])).toBe('Training')
+  })
+
+  it('a real production ladder (descending sets to a single) is still SETS_ACROSS, not inferred as an RM test', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Strength Sets', format_config_snapshot: { setsScheme: [3, 3, 2, 2, 1, 1, 1, 1] },
+      sets: { 'Power Clean': [{ reps: '1', weight: '80' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('SETS_ACROSS')
+    expect(entries[0].comparable).toBe(false)
+  })
+})
+
+describe('Heavy Single vs 1RM (mission §67/§47/§48)', () => {
+  it('Forge has no distinct "Heavy Single" concept - Build to Heavy/1RM always resolves via its own targetLabel stepper (proven: default "1RM")', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' },
+      sets: { 'Front Squat': [{ reps: '1', weight: '115' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('RM_TEST')
+    expect(entries[0].repTarget).toBe(1)
+  })
+})
+
+describe('Build to Heavy (mission §68)', () => {
+  it('a real production case: "Build to a 3-rep-max front squats" with targetLabel "3RM" resolves to RM_TEST, repTarget 3', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '3RM' },
+      sets: { 'Build to a 3-rep-max front squats': [{ reps: '3', weight: '100' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('RM_TEST')
+    expect(entries[0].repTarget).toBe(3)
+    expect(entries[0].comparable).toBe(true)
+  })
+})
+
+describe('Complex (mission §49/§69) - must not create false component-movement RM identity', () => {
+  it('Snatch Complex with scoringMode Max Weight: RM_TEST, repTarget null (whole complex is the subject, not a rep count)', () => {
+    const log = skillLog({
+      id: 's1', format_snapshot: 'Complex', skill_name_snapshot: 'Snatch Complex',
+      format_config_snapshot: { scoringMode: 'Max Weight', complexMovements: ['Power Snatch', 'Hang Power Snatch'] },
+      sets: { 'Rundă 1': [{ reps: '1', weight: '60' }] },
+    })
+    const entries = extractMovementEntriesFromSkillLogs([log])
+    expect(entries[0].movementName).toBe('Snatch Complex')
+    expect(entries[0].comparisonMode).toBe('RM_TEST')
+    expect(entries[0].repTarget).toBeNull()
+    expect(entries[0].comparable).toBe(true)
+  })
+
+  it('Snatch Complex with scoringMode Total Weight: SETS_ACROSS, not comparable', () => {
+    const log = skillLog({
+      id: 's2', format_snapshot: 'Complex', skill_name_snapshot: 'Snatch Complex',
+      format_config_snapshot: { scoringMode: 'Total Weight' },
+      sets: { 'Rundă 1': [{ reps: '1', weight: '60' }] },
+    })
+    expect(extractMovementEntriesFromSkillLogs([log])[0].comparisonMode).toBe('SETS_ACROSS')
+  })
+
+  it('a real production case (scoringMode unset/null on all 4 live rows): UNKNOWN, never guessed', () => {
+    const log = skillLog({
+      id: 's3', format_snapshot: 'Complex', skill_name_snapshot: 'Snatch Complex',
+      format_config_snapshot: { complexMovements: ['Power Snatch', 'Hang Power Snatch'] },
+      sets: { 'Rundă 1': [{ reps: '1', weight: '50' }] },
+    })
+    const entries = extractMovementEntriesFromSkillLogs([log])
+    expect(entries[0].comparisonMode).toBe('UNKNOWN')
+    expect(entries[0].comparable).toBe(false)
+    expect(comparisonModeLabel(entries[0])).toBeNull()
+  })
+})
+
+describe('Max Reps (mission §70)', () => {
+  it('a bodyweight Superset entry has no RM-test signal, is SETS_ACROSS if targetSets declared', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Superset', format_config_snapshot: { movements: ['Strict Pull-ups'], targetSets: 3 },
+      sets: { 'Strict Pull-ups': [{ reps: '20', weight: '' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('SETS_ACROSS')
+    expect(entries[0].comparable).toBe(false)
+  })
+})
+
+describe('Unknown / legacy (mission §71)', () => {
+  it('Weightlifting (zero config fields, ever) is always UNKNOWN, still displayable', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Weightlifting', format_config_snapshot: {},
+      sets: { Snatch: [{ reps: '1', weight: '70' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('UNKNOWN')
+    expect(entries[0].comparable).toBe(false)
+    expect(movementEntryDisplay(entries[0])).toBe('70kg × 1')
+  })
+
+  it('a real production case: Strength Sets with setsScheme null (legacy authoring) is UNKNOWN, not fabricated as SETS_ACROSS', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Strength Sets', format_config_snapshot: { setsScheme: null },
+      sets: { 'Power Clean': [{ reps: '3', weight: '80' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('UNKNOWN')
+  })
+
+  it('a legacy row with no format_config_snapshot at all is UNKNOWN, not a crash', () => {
+    const entries = extractMovementEntriesFromWodLogs([wodLog({
+      id: 'a', format_snapshot: 'Strength Sets', format_config_snapshot: undefined,
+      sets: { 'Power Clean': [{ reps: '3', weight: '80' }] },
+    })])
+    expect(entries[0].comparisonMode).toBe('UNKNOWN')
+    expect(entries[0].comparable).toBe(false)
+  })
+})
+
+describe('Quick Create / manual authoring parity (mission §72/§73)', () => {
+  it('resolveComparisonIdentity is a pure function of format_snapshot+format_config_snapshot only - identical input from either authoring path yields identical identity', () => {
+    const quickCreateConfig = { formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '5RM' } }
+    const manualConfig = { formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '5RM' } }
+    expect(resolveComparisonIdentity(quickCreateConfig)).toEqual(resolveComparisonIdentity(manualConfig))
+  })
+
+  it('Back Squat 5RM text and Back Squat 5x5 text produce different identities', () => {
+    const rm = resolveComparisonIdentity({ formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '5RM' } })
+    const training = resolveComparisonIdentity({ formatSnapshot: 'Strength Sets', formatConfigSnapshot: { setsScheme: [5, 5, 5, 5, 5] } })
+    expect(rm.mode).not.toBe(training.mode)
+  })
+})
+
+describe('Reload / determinism (mission §75)', () => {
+  it('calling resolveComparisonIdentity twice with the same input is byte-identical (pure, no hidden state)', () => {
+    const input = { formatSnapshot: 'Build to Heavy/1RM', formatConfigSnapshot: { targetLabel: '3RM' } }
+    expect(resolveComparisonIdentity(input)).toEqual(resolveComparisonIdentity(input))
+  })
+})
+
+describe('Rx/variant separation (mission §56)', () => {
+  it('the same movement+RM at different tiers gets a different comparisonKey - tiers never pooled', () => {
+    const rx = extractMovementEntriesFromWodLogs([wodLog({ id: 'a', variant_level: 'RX', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '120' }] } })])[0]
+    const scaled = extractMovementEntriesFromWodLogs([wodLog({ id: 'b', variant_level: 'Scaled', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '90' }] } })])[0]
+    expect(rx.comparisonKey).not.toBe(scaled.comparisonKey)
+  })
+})
+
+describe('PR Engine handoff contract (mission §83) - no pr_events, purely derived', () => {
+  it('comparisonKey groups only comparable (RM_TEST) entries into safely-comparable buckets', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '95' }] }, logged_at: '2026-02-01' }),
+      wodLog({ id: 'c', format_snapshot: 'Strength Sets', format_config_snapshot: { setsScheme: [5, 5, 5] }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, logged_at: '2026-03-01' }),
+    ]
+    const entries = extractMovementEntriesFromWodLogs(logs)
+    const comparableEntries = entries.filter((e) => e.comparable)
+    expect(comparableEntries).toHaveLength(2)
+    const keys = new Set(comparableEntries.map((e) => e.comparisonKey))
+    expect(keys.size).toBe(1)
   })
 })

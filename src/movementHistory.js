@@ -56,8 +56,107 @@
 // future PR Engine phase, not this one). Movement History shows only
 // Latest + full History, each entry displaying its own honest reps/weight
 // context, no comparator applied.
+//
+// Member Performance, Phase 3 (Rep-Scheme Identity Hardening) - adds a
+// COMPARISON IDENTITY to each entry, answering "what kind of performance
+// on this movement is this?" (not just "what movement is this?"). Proven
+// by direct code+data audit (MEMBER_PERFORMANCE_PHASE3_REP_SCHEME_IDENTITY_
+// IMPLEMENTATION_REPORT.md), NOT inferred from rep count alone (a 5x5
+// training set is never treated as a 5RM test just because 5 reps were
+// logged - mission's own central warning):
+//
+//   RM_TEST - an EXPLICIT, structurally-declared rep-max test intent.
+//   Today exactly two sources: (1) Build to Heavy/1RM's own `targetLabel`
+//   config field - a UI stepper (RepMaxStepperField, FormatConfigEditor.jsx)
+//   that can ONLY ever produce a clean "NRM" string (1-30), never free
+//   text - confirmed live in production to already match the workout's own
+//   name ("Build to a 3-rep-max front squats" -> targetLabel "3RM").
+//   (2) Complex format (reached only via skill_logs' skill_name_snapshot
+//   fallback, per Phase 2) with `scoringMode === 'Max Weight'` - the
+//   coach's own explicit choice that the scored metric is a single best
+//   effort, not summed volume. repTarget is the parsed integer for (1),
+//   always null for (2) since the whole complex (not one rep count) is the
+//   comparable subject.
+//
+//   SETS_ACROSS - a declared TRAINING structure with no test-intent
+//   signal: Strength Sets with a non-empty `setsScheme` (even a descending
+//   ladder like [3,3,2,2,1,1,1,1] found in real production data - the
+//   mission is explicit that rep count/ladder shape alone must NOT be
+//   read as "this was a max test"), Superset with a positive `targetSets`,
+//   Complex with `scoringMode === 'Total Weight'` (summed across rounds,
+//   mechanically larger with more rounds, not a max).
+//
+//   UNKNOWN - no declared structure at all: Weightlifting (format has zero
+//   config fields, ever), or any of the above formats missing their own
+//   declared field (confirmed live: 20/31 real Strength Sets rows have
+//   `setsScheme: null`, all 4 real Complex skill_logs have
+//   `scoringMode: null` with no schema-declared default - honestly
+//   unknown, never guessed).
+//
+// Only RM_TEST is `comparable: true` (PR-comparison-eligible). SETS_ACROSS
+// and UNKNOWN remain fully DISPLAYABLE in Movement History (mission §29's
+// "comparable vs displayable" distinction) but are never treated as
+// PR-comparable. `comparisonKey` groups movement+tier+mode+repTarget only -
+// never date/section/workout title (mutable/occurrence-specific) - so a
+// future PR Engine phase can safely compare only within the same key
+// without reimplementing this resolver. This phase does NOT read/write
+// `pr_events`, does NOT expand `evaluate_movement_prs`, and does NOT
+// display a "Best" within any group (Movement Detail still shows only
+// Latest + History, now with an honest per-entry mode label).
 
 import { getFormat, normalizeSetsRows } from './workoutFormats'
+
+// Parses the Build to Heavy/1RM `targetLabel` field - guaranteed by its own
+// UI (RepMaxStepperField) to be exactly `${1-30}RM`, never free text.
+// Returns null for anything that doesn't match (defensive only - no real
+// production row has ever failed this).
+function parseRepMaxTarget(targetLabel) {
+  const match = String(targetLabel || '').trim().match(/^(\d{1,2})RM$/i)
+  if (!match) return null
+  const n = parseInt(match[1], 10)
+  return Number.isFinite(n) && n >= 1 && n <= 30 ? n : null
+}
+
+// The comparison-identity resolver - pure, deterministic, no DB access, no
+// AI, no fuzzy inference. See module header for the full evidence trail
+// behind each branch.
+export function resolveComparisonIdentity({ formatSnapshot, formatConfigSnapshot }) {
+  const config = formatConfigSnapshot || {}
+  if (formatSnapshot === 'Build to Heavy/1RM') {
+    const repTarget = parseRepMaxTarget(config.targetLabel)
+    return repTarget != null
+      ? { mode: 'RM_TEST', repTarget, comparable: true }
+      : { mode: 'UNKNOWN', repTarget: null, comparable: false }
+  }
+  if (formatSnapshot === 'Complex') {
+    if (config.scoringMode === 'Max Weight') return { mode: 'RM_TEST', repTarget: null, comparable: true }
+    if (config.scoringMode === 'Total Weight') return { mode: 'SETS_ACROSS', repTarget: null, comparable: false }
+    return { mode: 'UNKNOWN', repTarget: null, comparable: false }
+  }
+  if (formatSnapshot === 'Strength Sets') {
+    const scheme = config.setsScheme
+    if (Array.isArray(scheme) && scheme.length > 0) return { mode: 'SETS_ACROSS', repTarget: null, comparable: false }
+    return { mode: 'UNKNOWN', repTarget: null, comparable: false }
+  }
+  if (formatSnapshot === 'Superset') {
+    const targetSets = parseInt(config.targetSets, 10)
+    if (Number.isFinite(targetSets) && targetSets > 0) return { mode: 'SETS_ACROSS', repTarget: null, comparable: false }
+    return { mode: 'UNKNOWN', repTarget: null, comparable: false }
+  }
+  // Weightlifting (zero config fields, ever) and any other/unrecognized format.
+  return { mode: 'UNKNOWN', repTarget: null, comparable: false }
+}
+
+// Small, honest per-entry label (mission §61's explicitly-safe enrichment) -
+// never a group/Best claim. "3RM" for an explicit rep-max test, "Max" for a
+// Complex scored as a single best effort, "Training" for a declared
+// training structure, no label at all for UNKNOWN (nothing to honestly say).
+export function comparisonModeLabel(entry) {
+  if (!entry) return null
+  if (entry.comparisonMode === 'RM_TEST') return entry.repTarget != null ? `${entry.repTarget}RM` : 'Max'
+  if (entry.comparisonMode === 'SETS_ACROSS') return 'Training'
+  return null
+}
 
 const MOVEMENT_KEYED_FORMATS = new Set(['Weightlifting', 'Strength Sets', 'Build to Heavy/1RM', 'Superset'])
 
@@ -91,17 +190,27 @@ function toNumberOrNull(v) {
 // (§29), so the UI never needs to know which physical table a Result came
 // from.
 function makeEntry({ sourceLog, source, movementName, reps, weight, rowIndex }) {
+  const tier = sourceLog.variant_level || 'RX'
+  const identity = resolveComparisonIdentity({
+    formatSnapshot: sourceLog.format_snapshot,
+    formatConfigSnapshot: sourceLog.format_config_snapshot,
+  })
   return {
     id: `${source}:${sourceLog.id}:${rowIndex}`,
     logId: sourceLog.id,
     source,
     movementName,
+    tier,
     reps: toNumberOrNull(reps),
     weight: toNumberOrNull(weight),
     repsRaw: reps ?? null,
     weightRaw: weight ?? null,
     loggedAt: sourceLog.logged_at,
     sectionId: sourceLog.workout_section_id ?? null,
+    comparisonMode: identity.mode,
+    repTarget: identity.repTarget,
+    comparable: identity.comparable,
+    comparisonKey: `${normalizeKey(movementName)}::${tier}::${identity.mode}::${identity.repTarget ?? ''}`,
   }
 }
 

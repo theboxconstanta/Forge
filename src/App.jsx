@@ -33,7 +33,7 @@ import {
 } from './workoutEngine'
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay } from './benchmarkHistory'
-import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay } from './movementHistory'
+import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel } from './movementHistory'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -10727,13 +10727,19 @@ function App() {
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                   <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
-                  <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}</div>
+                  <div style={{ fontSize: '10px', color: '#bbb' }}>
+                    {new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}
+                    {comparisonModeLabel(history.latest) && <span style={{ marginLeft: '6px', color: '#888' }}>· {comparisonModeLabel(history.latest)}</span>}
+                  </div>
                 </div>
                 <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   {history.history.map((entry, idx, arr) => (
                     <div key={entry.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(entry.loggedAt).toLocaleDateString(localeFor(lang))}</span>
+                      <span style={{ fontSize: '12px', color: '#aaa' }}>
+                        {new Date(entry.loggedAt).toLocaleDateString(localeFor(lang))}
+                        {comparisonModeLabel(entry) && <span style={{ marginLeft: '6px' }}>· {comparisonModeLabel(entry)}</span>}
+                      </span>
                       <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(entry, weightUnit) || '—'}</span>
                     </div>
                   ))}
