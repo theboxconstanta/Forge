@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractMovementEntriesFromWodLogs, extractMovementEntriesFromSkillLogs,
   groupMovementEntries, deriveMovementHistory, buildMovementListEntries, movementEntryDisplay,
-  resolveComparisonIdentity, comparisonModeLabel,
+  resolveComparisonIdentity, comparisonModeLabel, deriveCurrentMovementBests,
 } from './movementHistory'
 
 // Member Performance, Phase 2 (Movement History) - test matrix per the
@@ -490,5 +490,104 @@ describe('PR Engine handoff contract (mission §83) - no pr_events, purely deriv
     expect(comparableEntries).toHaveLength(2)
     const keys = new Set(comparableEntries.map((e) => e.comparisonKey))
     expect(keys.size).toBe(1)
+  })
+})
+
+// Member Performance, Phase 6 (Performance Overview) - Current Movement
+// Bests. Mandatory invariant: derived from Results, never from pr_events.
+
+describe('deriveCurrentMovementBests (mission §5/§9/§10/§11/§12/§13/§20)', () => {
+  it('picks the highest weight among comparable entries for one identity', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '105' }] }, logged_at: '2026-02-01' }),
+      wodLog({ id: 'c', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '95' }] }, logged_at: '2026-03-01' }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].weight).toBe(105)
+  })
+
+  it('1RM, 3RM, 5RM are three separate current bests, never pooled (mission §9/§54)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '120' }] } }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '3RM' }, sets: { 'Back Squat': [{ reps: '3', weight: '110' }] } }),
+      wodLog({ id: 'c', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] } }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(3)
+    expect(bests.map((b) => b.weight).sort((a, b) => a - b)).toEqual([100, 110, 120])
+  })
+
+  it('excludes SETS_ACROSS (5x5) even at a higher weight than the real RM_TEST best (mission §10/§55)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] } }),
+      wodLog({ id: 'b', format_snapshot: 'Strength Sets', format_config_snapshot: { setsScheme: [5, 5, 5, 5, 5] }, sets: { 'Back Squat': [{ reps: '5', weight: '999' }] } }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].weight).toBe(100)
+  })
+
+  it('excludes UNKNOWN (Weightlifting) even at a higher weight - matches the real Phase 5 false-positive pattern (mission §12/§57)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '120' }] } }),
+      wodLog({ id: 'b', format_snapshot: 'Weightlifting', format_config_snapshot: {}, sets: { 'Back Squat': [{ reps: '1', weight: '150' }] } }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].weight).toBe(120)
+  })
+
+  it('Heavy Single does not replace 1RM unless it is itself classified RM_TEST (mission §11/§56 - Forge has no distinct Heavy Single concept, so a non-RM_TEST "heavy" attempt never competes)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '120' }] } }),
+      wodLog({ id: 'b', format_snapshot: 'Weightlifting', format_config_snapshot: {}, sets: { 'Back Squat': [{ reps: '1', weight: '125' }] } }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].weight).toBe(120)
+  })
+
+  it('different tiers/variant_level never pool into one current best (mission §39)', () => {
+    const logs = [
+      wodLog({ id: 'a', variant_level: 'RX', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '120' }] } }),
+      wodLog({ id: 'b', variant_level: 'Scaled', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '1RM' }, sets: { 'Back Squat': [{ reps: '1', weight: '90' }] } }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(2)
+  })
+
+  it('equal-best tie breaks to the more recent occurrence, never invents superiority (mission §41)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, logged_at: '2026-03-01' }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].logId).toBe('b')
+  })
+
+  it('track-only (leaderboard-agnostic) Results remain eligible - this module never reads leaderboard_visible (mission §36/§37)', () => {
+    const logs = [wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] } })]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+  })
+
+  it('edit-down: the current best recomputes correctly when the source data changes (mission §64)', () => {
+    const before = [wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '105' }] } })]
+    const after = [wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '95' }] } })]
+    expect(deriveCurrentMovementBests(before, [])[0].weight).toBe(105)
+    expect(deriveCurrentMovementBests(after, [])[0].weight).toBe(95)
+  })
+
+  it('delete: the current best falls back to the next eligible entry (mission §65)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '105' }] } }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '100' }] } }),
+    ]
+    expect(deriveCurrentMovementBests(logs, [])[0].weight).toBe(105)
+    const afterDelete = logs.filter((l) => l.id !== 'a')
+    expect(deriveCurrentMovementBests(afterDelete, [])[0].weight).toBe(100)
   })
 })

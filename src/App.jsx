@@ -32,8 +32,9 @@ import {
   effectiveLeaderboardVisible,
 } from './workoutEngine'
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
-import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay } from './benchmarkHistory'
-import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel } from './movementHistory'
+import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay, buildCurrentBenchmarkBests, buildRecentBenchmarkProgress } from './benchmarkHistory'
+import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel, deriveCurrentMovementBests, normalizeKey as normalizeMovementKey } from './movementHistory'
+import { filterValidRecentPrEvents, sortRecentPrEvents } from './recentPrEvents'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -5361,6 +5362,125 @@ function MovementsSection({ wodLogs, skillLogs, onSelect, t, lang, weightUnit })
   )
 }
 
+// Member Performance, Faza 6 (Performance Overview) - Current Bests.
+// Combina cele 2 surse deja derivate DOAR din Results (niciodata din
+// pr_events - invariantul dur al misiunii, sectiunile 5/20): cea mai buna
+// greutate curenta per miscare+tier+mod+tinta-repetari
+// (deriveCurrentMovementBests) si cel mai bun scor curent per
+// benchmark+tier (buildCurrentBenchmarkBests). Randata doar daca exista
+// cel putin un rezultat - fara mesaj "gol" care sa domine ecranul cand
+// membrul are Recorduri Curente reale dar 0 evenimente PR recente
+// (mission §47-49).
+function CurrentBestsSection({ currentMovementBests, currentBenchmarkBests, onSelectMovement, onSelectBenchmark, t, lang, weightUnit }) {
+  if (currentMovementBests.length === 0 && currentBenchmarkBests.length === 0) return null
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.currentBestsSectionTitle}</div>
+      <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {currentMovementBests.map((entry, idx) => (
+          <div key={`m:${entry.comparisonKey}`} onClick={() => onSelectMovement(normalizeMovementKey(entry.movementName))}
+            style={{ padding: '12px 14px', borderBottom: (idx < currentMovementBests.length - 1 || currentBenchmarkBests.length > 0) ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{entry.movementName}{entry.tier && entry.tier !== 'RX' ? ` · ${entry.tier}` : ''}</div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>
+                {new Date(entry.loggedAt).toLocaleDateString(localeFor(lang))}
+                {comparisonModeLabel(entry) && <span> · {comparisonModeLabel(entry)}</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(entry, weightUnit)}</span>
+              <span style={{ fontSize: '14px', color: '#ccc' }}>›</span>
+            </div>
+          </div>
+        ))}
+        {currentBenchmarkBests.map((item, idx) => (
+          <div key={`b:${item.benchmarkId}:${item.tier}`} onClick={() => onSelectBenchmark(item.benchmarkId)}
+            style={{ padding: '12px 14px', borderBottom: idx < currentBenchmarkBests.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{item.displayName || '—'}{item.tier && item.tier !== 'RX' ? ` · ${item.tier}` : ''}</div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{new Date(item.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(item.best, t) || '—'}</span>
+              <span style={{ fontSize: '14px', color: '#ccc' }}>›</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Member Performance, Faza 6 - Recent PRs. Citeste `pr_events` (Faza 5),
+// deja filtrat de App.jsx prin filterValidRecentPrEvents (voided_at +
+// re-validare de identitate fata de Sursa reala - vezi recentPrEvents.js)
+// inainte sa ajunga aici - acest component doar afiseaza, nu mai
+// filtreaza o a doua oara. Concept diferit de Current Bests (mission §6):
+// un EVENIMENT istoric, nu "adevarul de acum".
+function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBenchmark, t, lang }) {
+  if (events.length === 0) return null
+  const scoreLabel = (value, unit) => `${value}${unit === 'seconds' ? 's' : unit === 'reps' ? ' reps' : ` ${unit}`}`
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.recentPrsSectionTitle}</div>
+      <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {events.map((event, idx) => {
+          const isBenchmark = event.pr_type === 'benchmark'
+          const displayName = isBenchmark ? (benchmarksById.get(event.benchmark_id)?.canonical_name || '—') : event.movement
+          const subParts = [new Date(event.occurred_at).toLocaleDateString(localeFor(lang))]
+          if (!isBenchmark && event.rep_scheme) subParts.push(`${event.rep_scheme}RM`)
+          if (isBenchmark && event.scaling_context) subParts.push(event.scaling_context)
+          return (
+            <div key={event.id} onClick={() => isBenchmark ? onSelectBenchmark(event.benchmark_id) : onSelectMovement(normalizeMovementKey(event.movement))}
+              style={{ padding: '12px 14px', borderBottom: idx < events.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{displayName}</div>
+                <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{subParts.join(' · ')}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{scoreLabel(event.score_value, event.score_unit)}</div>
+                {!event.is_first_recorded && event.improvement_value != null && (
+                  <div style={{ fontSize: '10px', color: '#3C9F3C', fontWeight: '600' }}>↑ {scoreLabel(event.improvement_value, event.score_unit)}</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Member Performance, Faza 6 - Recent Benchmark Progress. Doar
+// benchmark+tier unde ultima incercare bate strict incercarea anterioara
+// (buildRecentBenchmarkProgress deja a exclus worse/same/o-singura-
+// incercare - mission §29-31) - niciodata o eticheta gresita "progres"
+// pe o inrautatire.
+function RecentBenchmarkProgressSection({ progress, onSelectBenchmark, t, lang }) {
+  if (progress.length === 0) return null
+  const changeLabel = (change) => change.direction === 'better' ? t.benchmarkChangeBetter(change.magnitude, change.unit) : t.benchmarkChangeSame
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.recentBenchmarkProgressSectionTitle}</div>
+      <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        {progress.map((item, idx) => (
+          <div key={`${item.benchmarkId}:${item.tier}`} onClick={() => onSelectBenchmark(item.benchmarkId)}
+            style={{ padding: '12px 14px', borderBottom: idx < progress.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{item.displayName || '—'}{item.tier && item.tier !== 'RX' ? ` · ${item.tier}` : ''}</div>
+              <div style={{ fontSize: '11px', color: '#3C9F3C', marginTop: '2px', fontWeight: '600' }}>{changeLabel(item.change)}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(item.latest, t) || '—'}</span>
+              <span style={{ fontSize: '14px', color: '#ccc' }}>›</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
   const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
@@ -5926,6 +6046,7 @@ function App() {
   const [prDate, setPrDate] = useState([])
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
+  const [prEvents, setPrEvents] = useState([])
   // Results Phase 2 Slice 4 - Universal Workout Progression. Keyed by
   // performance_identity_id (see JurnalList's own "vs data trecuta" note),
   // fetched once per session and re-fetched on the same wod_logs realtime
@@ -6515,6 +6636,7 @@ function App() {
       fetchCustomHeroWods()
       fetchWodLogs()
       fetchSkillLogs()
+      fetchPrEvents()
       fetchRezervari()
       fetchWaitlistMea()
       fetchClaseDB()
@@ -6746,6 +6868,12 @@ function App() {
         // tabele) - orice schimbare trebuie sa refaca fetch-ul, la fel ca la
         // wod_logs mai sus, nu doar Jurnalul propriu.
         fetchSkillLogs(); fetchClasament(clasamentDateRef.current)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pr_events' }, () => {
+        // Member Performance, Faza 6 - un pr_event nou/anulat (voided_at,
+        // Faza 5) trebuie sa se reflecte imediat in Recent PRs, fara
+        // reload manual - acelasi tipar ca wod_logs/skill_logs de mai sus.
+        fetchPrEvents()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
         fetchSettings()
@@ -7352,6 +7480,16 @@ function App() {
   const fetchSkillLogs = async () => {
     const { data } = await supabase.from('skill_logs').select('*, wods(date, skill_name, skill_type, skill, skill_format_config, skill2_name, skill2_type, skill2, skill2_format_config)').eq('member_id', user.id)
     if (data) setSkillLogs(data)
+  }
+
+  // Member Performance, Faza 6 (Performance Overview) - ledger brut,
+  // membrul isi vede doar propriile evenimente (RLS). "Recent PRs" e
+  // singurul loc din PWA care citeste `pr_events` direct - Current Bests
+  // (mai jos, randat din wodLogs/skillLogs deja incarcate) nu-l foloseste
+  // niciodata, per invariantul dur al misiunii.
+  const fetchPrEvents = async () => {
+    const { data } = await supabase.from('pr_events').select('*').eq('member_id', user.id).order('occurred_at', { ascending: false }).limit(50)
+    if (data) setPrEvents(data)
   }
 
   const confirmSkillPR = async (candidate) => {
@@ -10273,22 +10411,56 @@ function App() {
         <PerformanceOverviewPanel gymId={userProfile.gym_id} memberId={user.id} />
       )}
 
-      {screen === 'pr' && (
-        <div style={{ padding: '0 20px' }}>
-          <BenchmarksSection
-            wodLogs={wodLogs}
-            benchmarksById={benchmarksById}
-            onSelect={(benchmarkId) => { setBenchmarkDetailId(benchmarkId); setBenchmarkDetailTier(null); setPrevScreen('pr'); setScreen('benchmarkDetail') }}
-            t={t} lang={lang}
-          />
-          <MovementsSection
-            wodLogs={wodLogs}
-            skillLogs={skillLogs}
-            onSelect={(movementKey) => { setMovementDetailKey(movementKey); setPrevScreen('pr'); setScreen('movementDetail') }}
-            t={t} lang={lang} weightUnit={userProfile?.weight_unit}
-          />
-        </div>
-      )}
+      {screen === 'pr' && (() => {
+        const goToMovement = (movementKey) => { setMovementDetailKey(movementKey); setPrevScreen('pr'); setScreen('movementDetail') }
+        const goToBenchmark = (benchmarkId) => { setBenchmarkDetailId(benchmarkId); setBenchmarkDetailTier(null); setPrevScreen('pr'); setScreen('benchmarkDetail') }
+        // Faza 6 - Current Bests, NICIODATA din pr_events (mission §5/§20),
+        // recalculat direct din wodLogs/skillLogs deja incarcate, la fel ca
+        // BenchmarksSection/MovementsSection de mai jos - editare/stergere
+        // se reflecta imediat, fara reload (mission §34-38).
+        const currentMovementBests = deriveCurrentMovementBests(wodLogs, skillLogs)
+        const currentBenchmarkBests = buildCurrentBenchmarkBests(wodLogs, benchmarksById)
+        const recentBenchmarkProgress = buildRecentBenchmarkProgress(wodLogs, benchmarksById)
+        // Faza 6 - Recent PRs, singurul loc care citeste pr_events; filtrat
+        // prin recentPrEvents.js (voided_at + re-validare de identitate fata
+        // de Sursa reala - exclude cele 5 evenimente Weightlifting invalide
+        // cunoscute din Faza 5, fara sa le hardcodeze ID-urile).
+        const wodLogsById = new Map(wodLogs.map(w => [w.id, w]))
+        const skillLogsById = new Map(skillLogs.map(s => [s.id, s]))
+        const recentPrs = sortRecentPrEvents(filterValidRecentPrEvents(prEvents, wodLogsById, skillLogsById))
+        return (
+          <div style={{ padding: '0 20px' }}>
+            <CurrentBestsSection
+              currentMovementBests={currentMovementBests}
+              currentBenchmarkBests={currentBenchmarkBests}
+              onSelectMovement={goToMovement} onSelectBenchmark={goToBenchmark}
+              t={t} lang={lang} weightUnit={userProfile?.weight_unit}
+            />
+            <RecentPrsSection
+              events={recentPrs} benchmarksById={benchmarksById}
+              onSelectMovement={goToMovement} onSelectBenchmark={goToBenchmark}
+              t={t} lang={lang}
+            />
+            <RecentBenchmarkProgressSection
+              progress={recentBenchmarkProgress}
+              onSelectBenchmark={goToBenchmark}
+              t={t} lang={lang}
+            />
+            <BenchmarksSection
+              wodLogs={wodLogs}
+              benchmarksById={benchmarksById}
+              onSelect={goToBenchmark}
+              t={t} lang={lang}
+            />
+            <MovementsSection
+              wodLogs={wodLogs}
+              skillLogs={skillLogs}
+              onSelect={goToMovement}
+              t={t} lang={lang} weightUnit={userProfile?.weight_unit}
+            />
+          </div>
+        )
+      })()}
 
       {screen === 'pr' && (() => {
         const prGroups = {}

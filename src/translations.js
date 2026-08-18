@@ -585,6 +585,10 @@ export const TRANSLATIONS = {
     movementListSectionTitle: 'MIȘCĂRI',
     movementListEmpty: 'Niciun istoric de mișcări încă. Rezultatele tale la Weightlifting, Strength Sets, Build to Heavy și Superset apar aici.',
     movementDetailEmpty: 'Niciun rezultat logat pentru această mișcare.',
+    // Member Performance, Faza 6 - Performance Overview
+    currentBestsSectionTitle: 'CELE MAI BUNE ACTUALE',
+    recentPrsSectionTitle: 'PR-URI RECENTE',
+    recentBenchmarkProgressSectionTitle: 'PROGRES BENCHMARK RECENT',
     prPercentOf1rm: (bestKg, unit) => `% DIN 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'ISTORIC',
     prRepCountLabel: (n) => `${n}RM`,
@@ -1725,6 +1729,10 @@ export const TRANSLATIONS = {
     movementListSectionTitle: 'MOVEMENTS',
     movementListEmpty: 'No movement history yet. Your Weightlifting, Strength Sets, Build to Heavy, and Superset results will appear here.',
     movementDetailEmpty: 'No logged results for this movement yet.',
+    // Member Performance, Phase 6 - Performance Overview
+    currentBestsSectionTitle: 'CURRENT BESTS',
+    recentPrsSectionTitle: 'RECENT PRS',
+    recentBenchmarkProgressSectionTitle: 'RECENT BENCHMARK PROGRESS',
     prPercentOf1rm: (bestKg, unit) => `% OF 1RM — ${bestKg} ${unit}`,
     prHistoryLabel: 'HISTORY',
     prRepCountLabel: (n) => `${n}RM`,

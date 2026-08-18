@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   groupLogsByBenchmark, groupLogsByTier, benchmarkScoreValue, benchmarkScoreDisplay,
   deriveBenchmarkTierSummary, deriveBenchmarkSummary, buildBenchmarkListEntries,
+  buildCurrentBenchmarkBests, buildRecentBenchmarkProgress,
 } from './benchmarkHistory'
 
 // Member Performance, Phase 1 (Benchmark History) - adversarial case
@@ -215,5 +216,72 @@ describe('buildBenchmarkListEntries', () => {
     const logs = [log({ id: 'a', benchmark_id: 'unknown-id', wods: { name: 'Fran' } })]
     const entries = buildBenchmarkListEntries(logs, new Map())
     expect(entries[0].displayName).toBe('Fran')
+  })
+})
+
+// Member Performance, Phase 6 (Performance Overview) - Current Benchmark
+// Bests + Recent Benchmark Progress.
+
+describe('buildCurrentBenchmarkBests (mission §14/§21/§59)', () => {
+  it('one best per (benchmark, tier), reusing deriveBenchmarkSummary - Rx and Intermediate never pooled', () => {
+    const logs = [
+      log({ id: 'a', benchmark_id: 'fran', variant_level: 'RX', time_result: '5:12', logged_at: '2026-01-01' }),
+      log({ id: 'b', benchmark_id: 'fran', variant_level: 'RX', time_result: '4:47', logged_at: '2026-02-01' }),
+      log({ id: 'c', benchmark_id: 'fran', variant_level: 'Intermediate', time_result: '4:20', logged_at: '2026-01-15' }),
+    ]
+    const benchmarksById = new Map([['fran', { canonical_name: 'Fran', category: 'girl' }]])
+    const bests = buildCurrentBenchmarkBests(logs, benchmarksById)
+    expect(bests).toHaveLength(2)
+    const rx = bests.find((b) => b.tier === 'RX')
+    const im = bests.find((b) => b.tier === 'Intermediate')
+    expect(rx.best.id).toBe('b')
+    expect(im.best.id).toBe('c')
+    expect(rx.displayName).toBe('Fran')
+  })
+
+  it('across multiple benchmarks, one best entry per benchmark+tier', () => {
+    const logs = [
+      log({ id: 'a', benchmark_id: 'fran', time_result: '5:00' }),
+      log({ id: 'b', benchmark_id: 'cindy', format_snapshot: 'AMRAP', result: '10 rounds + 5 reps' }),
+    ]
+    const bests = buildCurrentBenchmarkBests(logs, new Map())
+    expect(bests.map((b) => b.benchmarkId).sort()).toEqual(['cindy', 'fran'])
+  })
+})
+
+describe('buildRecentBenchmarkProgress (mission §29-31/§60-61)', () => {
+  it('includes a benchmark+tier only when latest beats previous', () => {
+    const logs = [
+      log({ id: 'a', benchmark_id: 'fran', time_result: '5:12', logged_at: '2026-01-01' }),
+      log({ id: 'b', benchmark_id: 'fran', time_result: '4:47', logged_at: '2026-02-01' }),
+    ]
+    const progress = buildRecentBenchmarkProgress(logs, new Map([['fran', { canonical_name: 'Fran', category: 'girl' }]]))
+    expect(progress).toHaveLength(1)
+    expect(progress[0].change.direction).toBe('better')
+    expect(progress[0].displayName).toBe('Fran')
+  })
+
+  it('excludes a benchmark+tier when latest is WORSE than previous - never mislabels worsening as progress', () => {
+    const logs = [
+      log({ id: 'a', benchmark_id: 'fran', time_result: '4:47', logged_at: '2026-01-01' }),
+      log({ id: 'b', benchmark_id: 'fran', time_result: '5:02', logged_at: '2026-02-01' }),
+    ]
+    const progress = buildRecentBenchmarkProgress(logs, new Map())
+    expect(progress).toHaveLength(0)
+  })
+
+  it('excludes a one-attempt benchmark - no previous to compare against', () => {
+    const logs = [log({ id: 'a', benchmark_id: 'fran', time_result: '5:00' })]
+    const progress = buildRecentBenchmarkProgress(logs, new Map())
+    expect(progress).toHaveLength(0)
+  })
+
+  it('excludes a benchmark+tier when latest EQUALS previous - "same" is not progress', () => {
+    const logs = [
+      log({ id: 'a', benchmark_id: 'fran', time_result: '5:00', logged_at: '2026-01-01' }),
+      log({ id: 'b', benchmark_id: 'fran', time_result: '5:00', logged_at: '2026-02-01' }),
+    ]
+    const progress = buildRecentBenchmarkProgress(logs, new Map())
+    expect(progress).toHaveLength(0)
   })
 })

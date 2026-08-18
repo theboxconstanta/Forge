@@ -195,3 +195,57 @@ export function buildBenchmarkListEntries(wodLogs, benchmarksById) {
   entries.sort((a, b) => new Date(b.lastPerformedAt) - new Date(a.lastPerformedAt))
   return entries
 }
+
+// Member Performance, Phase 6 (Performance Overview) - Current Benchmark
+// Bests, across EVERY benchmark the member has attempted. Reuses
+// deriveBenchmarkSummary (Phase 1) as-is, per tier, for every benchmark -
+// no second comparator, no new grouping logic (mission §14/§21: "Reuse
+// Phase 1 logic/helpers... Do not reimplement Benchmark comparator").
+export function buildCurrentBenchmarkBests(wodLogs, benchmarksById) {
+  const byBenchmark = groupLogsByBenchmark(wodLogs)
+  const bests = []
+  for (const [benchmarkId, logs] of byBenchmark) {
+    const summaryByTier = deriveBenchmarkSummary(logs)
+    const meta = benchmarksById.get(benchmarkId)
+    for (const [tier, summary] of Object.entries(summaryByTier)) {
+      if (!summary?.best) continue
+      bests.push({
+        benchmarkId,
+        displayName: meta?.canonical_name || summary.best.wods?.name || summary.best.wod_name_snapshot || null,
+        tier,
+        best: summary.best,
+      })
+    }
+  }
+  bests.sort((a, b) => new Date(b.best.logged_at) - new Date(a.best.logged_at))
+  return bests
+}
+
+// Recent Benchmark Progress (mission §29-30) - only benchmark+tier streams
+// where the LATEST attempt is genuinely better than the PREVIOUS one, per
+// the canonical comparator (reused, not reimplemented). A worsened repeat
+// is deliberately excluded here, not mislabeled as progress (mission
+// §61's own explicit caution) - it remains visible in Benchmark History.
+// One-attempt benchmarks are excluded (mission §31 - no previous to
+// compare against).
+export function buildRecentBenchmarkProgress(wodLogs, benchmarksById) {
+  const byBenchmark = groupLogsByBenchmark(wodLogs)
+  const progress = []
+  for (const [benchmarkId, logs] of byBenchmark) {
+    const summaryByTier = deriveBenchmarkSummary(logs)
+    const meta = benchmarksById.get(benchmarkId)
+    for (const [tier, summary] of Object.entries(summaryByTier)) {
+      if (!summary?.previous || !summary.change || summary.change.direction !== 'better') continue
+      progress.push({
+        benchmarkId,
+        displayName: meta?.canonical_name || summary.latest.wods?.name || summary.latest.wod_name_snapshot || null,
+        tier,
+        latest: summary.latest,
+        previous: summary.previous,
+        change: summary.change,
+      })
+    }
+  }
+  progress.sort((a, b) => new Date(b.latest.logged_at) - new Date(a.latest.logged_at))
+  return progress
+}

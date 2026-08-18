@@ -166,7 +166,10 @@ function isMovementKeyedWodFormat(formatId) {
   return format?.family === 'sets' && format?.rowMode === 'movement' && MOVEMENT_KEYED_FORMATS.has(formatId)
 }
 
-function normalizeKey(text) {
+// Exported (Phase 6) so callers outside this module (Current Bests/Recent
+// PRs navigation, App.jsx) can resolve the same movementKey the Movement
+// List/Detail screens already use, without a second normalization rule.
+export function normalizeKey(text) {
   return String(text || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
@@ -318,4 +321,32 @@ export function buildMovementListEntries(wodLogs, skillLogs) {
   }
   entries.sort((a, b) => new Date(b.lastPerformedAt) - new Date(a.lastPerformedAt))
   return entries
+}
+
+// Member Performance, Phase 6 (Performance Overview) - Current Movement
+// Bests. Mandatory invariant (mission §5/§20): derived directly from
+// authoritative Results (this module's own entries), NEVER from
+// `pr_events`/`movement_pr_events_current` - those exist for the
+// DIFFERENT concept of "recent PR event history" (see recentPrEvents.js),
+// not "what is true right now". Grouping by `comparisonKey` (movement +
+// tier + mode + repTarget, Phase 3) automatically keeps 1RM/3RM/5RM and
+// Rx/Scaled tiers separate, and automatically excludes SETS_ACROSS/
+// UNKNOWN entries (only `comparable:true` entries participate) - no
+// second eligibility check invented here. Ties broken by most recent
+// occurrence, never by inventing superiority (mission §41).
+export function deriveCurrentMovementBests(wodLogs, skillLogs) {
+  const all = [...extractMovementEntriesFromWodLogs(wodLogs), ...extractMovementEntriesFromSkillLogs(skillLogs)]
+  const bestByKey = new Map()
+  all.forEach((entry) => {
+    if (!entry.comparable || entry.weight == null) return
+    const current = bestByKey.get(entry.comparisonKey)
+    if (!current) { bestByKey.set(entry.comparisonKey, entry); return }
+    if (entry.weight > current.weight) { bestByKey.set(entry.comparisonKey, entry); return }
+    if (entry.weight === current.weight && new Date(entry.loggedAt) > new Date(current.loggedAt)) {
+      bestByKey.set(entry.comparisonKey, entry)
+    }
+  })
+  const bests = [...bestByKey.values()]
+  bests.sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
+  return bests
 }
