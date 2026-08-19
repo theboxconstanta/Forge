@@ -197,19 +197,25 @@ function toNumberOrNull(v) {
 // `sets_movement_ids[rawSetsKey]`, looked up by the CALLER using the raw
 // `sets` key, not `movementName` - the two differ for a pooled non-Superset
 // skill_logs row, see extractMovementEntriesFromSkillLogs below) rides
-// alongside `movementName` on every entry. Deliberately NOT folded into
-// `comparisonKey` - that field is Phase 3/6 infrastructure shared with
-// Current Bests/PR Engine, both explicitly out of this phase's scope
-// (CANONICAL_MOVEMENT_IDENTITY_ARCHITECTURE_V1.md's own migration-path
-// note that Movement History and Current Best are separate, independently-
-// staged consumers). Only `movementHistoryIdentity()` (below) - Movement
-// History's own, new grouping key - reads `movementId`.
+// alongside `movementName` on every entry.
+//
+// Canonical Movement Identity, Phase 3 - `comparisonKey`'s own movement
+// component now reuses `movementHistoryIdentity()` (below) directly -
+// Phase 2 deliberately deferred this ("Movement History and Current Best
+// are separate, independently-staged consumers"); Phase 3 is the
+// explicitly-approved phase that connects them, per
+// CANONICAL_MOVEMENT_IDENTITY_ARCHITECTURE_V1.md's own migration path and
+// the mission's own "one comparison identity contract" instruction - ONE
+// function decides "what does movement identity mean here", consumed by
+// both Movement History grouping AND PR/Current-Best comparison, not two
+// independently-maintained rules that could silently drift apart.
 function makeEntry({ sourceLog, source, movementName, movementId, reps, weight, rowIndex }) {
   const tier = sourceLog.variant_level || 'RX'
   const identity = resolveComparisonIdentity({
     formatSnapshot: sourceLog.format_snapshot,
     formatConfigSnapshot: sourceLog.format_config_snapshot,
   })
+  const movementComponent = movementHistoryIdentity({ movementId, movementName })
   return {
     id: `${source}:${sourceLog.id}:${rowIndex}`,
     logId: sourceLog.id,
@@ -226,7 +232,7 @@ function makeEntry({ sourceLog, source, movementName, movementId, reps, weight, 
     comparisonMode: identity.mode,
     repTarget: identity.repTarget,
     comparable: identity.comparable,
-    comparisonKey: `${normalizeKey(movementName)}::${tier}::${identity.mode}::${identity.repTarget ?? ''}`,
+    comparisonKey: `${movementComponent}::${tier}::${identity.mode}::${identity.repTarget ?? ''}`,
   }
 }
 
@@ -305,6 +311,12 @@ export function extractMovementEntriesFromSkillLogs(skillLogs) {
 // reconciling old legacy rows is a separate, not-yet-justified future
 // backfill decision (Architecture V1 §13, Phase 4), never a grouping
 // heuristic.
+//
+// Canonical Movement Identity, Phase 3 - this same no-bridge rule now
+// ALSO governs `comparisonKey` (PR Engine / Current Bests), not only
+// Movement History grouping - a canonical PR stream and a legacy PR
+// stream for "the same" movement never merge either, for the identical
+// reason. One function, one invariant, two consumers.
 export function movementHistoryIdentity(entry) {
   return entry.movementId ? `id:${entry.movementId}` : `text:${normalizeKey(entry.movementName)}`
 }

@@ -592,14 +592,41 @@ describe('deriveCurrentMovementBests (mission §5/§9/§10/§11/§12/§13/§20)'
   // from pre-Phase-2 behavior - proving movementId carries through onto
   // each entry (for a future phase to use) without altering this phase's
   // own grouping in any way.
-  it('a shared movementId does not merge differently-spelled entries into one Current Best (comparisonKey stays text-only)', () => {
+  // Canonical Movement Identity, Phase 3 - this test's own assertion
+  // flips from Phase 2's own version: comparisonKey now reuses
+  // movementHistoryIdentity (movementId-first), so a shared movementId
+  // across differently-spelled entries correctly merges into ONE current
+  // best - the headline Phase 3 acceptance case, mirrored here for
+  // Current Bests exactly as the PR Engine's own live SQL testing proved
+  // server-side.
+  it('a shared movementId merges differently-spelled entries into one Current Best (identity beats text, Phase 3)', () => {
     const logs = [
       wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, sets_movement_ids: { 'Back Squat': 'uuid-x' }, logged_at: '2026-01-01' }),
       wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { BS: [{ reps: '5', weight: '105' }] }, sets_movement_ids: { BS: 'uuid-x' }, logged_at: '2026-02-01' }),
     ]
     const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(1)
+    expect(bests[0].weight).toBe(105)
+    expect(bests[0].movementId).toBe('uuid-x')
+  })
+
+  it('two different movementIds never merge into one Current Best even when raw text happens to match (identity beats text, the other direction)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { Press: [{ reps: '5', weight: '60' }] }, sets_movement_ids: { Press: 'uuid-strict-press' }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { Press: [{ reps: '5', weight: '80' }] }, sets_movement_ids: { Press: 'uuid-push-press' }, logged_at: '2026-02-01' }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
     expect(bests).toHaveLength(2)
-    expect(bests.every((b) => b.movementId === 'uuid-x')).toBe(true)
+    expect(bests.map((b) => b.movementId).sort()).toEqual(['uuid-push-press', 'uuid-strict-press'])
+  })
+
+  it('a canonical entry and a legacy (unresolved) entry for the "same" movement text never bridge into one Current Best', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, sets_movement_ids: { 'Back Squat': 'uuid-x' }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '110' }] }, logged_at: '2026-02-01' }), // no sets_movement_ids - legacy
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(2)
   })
 
   it('1RM, 3RM, 5RM are three separate current bests, never pooled (mission §9/§54)', () => {

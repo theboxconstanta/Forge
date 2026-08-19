@@ -5419,12 +5419,13 @@ function CurrentBestsSection({ currentMovementBests, currentBenchmarkBests, onSe
 // un EVENIMENT istoric, nu "adevarul de acum".
 function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBenchmark, t, lang }) {
   if (events.length === 0) return null
-  // Canonical Movement Identity, Phase 2 - a pr_events row has no
-  // movementId of its own yet (Architecture V1 §7 defers that to a later,
-  // not-yet-scheduled phase), so navigation always targets the `text:`
-  // form of Movement History's tagged identity - the exact same group a
-  // legacy (unresolved) Result would land in. Unlike CurrentBestsSection
-  // below, this can never navigate into a canonical (`id:`) group.
+  // Canonical Movement Identity, Phase 3 - pr_events.movement_id now
+  // exists (frozen server-side at event-creation time, same as every
+  // other canonical identity in this initiative), so navigation prefers
+  // it exactly like movementHistoryIdentity() does everywhere else -
+  // `id:<uuid>` when the event's own source resolved one, `text:...`
+  // (the same legacy group a pre-Phase-1 Result would land in) otherwise.
+  // No new resolution happens here - event.movement_id is just read.
   const scoreLabel = (value, unit) => `${value}${unit === 'seconds' ? 's' : unit === 'reps' ? ' reps' : ` ${unit}`}`
   return (
     <div style={{ marginBottom: '14px' }}>
@@ -5437,7 +5438,7 @@ function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBe
           if (!isBenchmark && event.rep_scheme) subParts.push(`${event.rep_scheme}RM`)
           if (isBenchmark && event.scaling_context) subParts.push(event.scaling_context)
           return (
-            <div key={event.id} onClick={() => isBenchmark ? onSelectBenchmark(event.benchmark_id) : onSelectMovement(`text:${normalizeMovementKey(event.movement)}`)}
+            <div key={event.id} onClick={() => isBenchmark ? onSelectBenchmark(event.benchmark_id) : onSelectMovement(event.movement_id ? `id:${event.movement_id}` : `text:${normalizeMovementKey(event.movement)}`)}
               style={{ padding: '12px 14px', borderBottom: idx < events.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{displayName}</div>
