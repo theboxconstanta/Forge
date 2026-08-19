@@ -192,7 +192,19 @@ function toNumberOrNull(v) {
 // skill_logs) - the "read boundary normalization" the mission asks for
 // (§29), so the UI never needs to know which physical table a Result came
 // from.
-function makeEntry({ sourceLog, source, movementName, reps, weight, rowIndex }) {
+//
+// Canonical Movement Identity, Phase 2 - `movementId` (Phase 1's own
+// `sets_movement_ids[rawSetsKey]`, looked up by the CALLER using the raw
+// `sets` key, not `movementName` - the two differ for a pooled non-Superset
+// skill_logs row, see extractMovementEntriesFromSkillLogs below) rides
+// alongside `movementName` on every entry. Deliberately NOT folded into
+// `comparisonKey` - that field is Phase 3/6 infrastructure shared with
+// Current Bests/PR Engine, both explicitly out of this phase's scope
+// (CANONICAL_MOVEMENT_IDENTITY_ARCHITECTURE_V1.md's own migration-path
+// note that Movement History and Current Best are separate, independently-
+// staged consumers). Only `movementHistoryIdentity()` (below) - Movement
+// History's own, new grouping key - reads `movementId`.
+function makeEntry({ sourceLog, source, movementName, movementId, reps, weight, rowIndex }) {
   const tier = sourceLog.variant_level || 'RX'
   const identity = resolveComparisonIdentity({
     formatSnapshot: sourceLog.format_snapshot,
@@ -203,6 +215,7 @@ function makeEntry({ sourceLog, source, movementName, reps, weight, rowIndex }) 
     logId: sourceLog.id,
     source,
     movementName,
+    movementId: movementId || null,
     tier,
     reps: toNumberOrNull(reps),
     weight: toNumberOrNull(weight),
@@ -231,9 +244,13 @@ export function extractMovementEntriesFromWodLogs(wodLogs) {
     Object.entries(rows).forEach(([movementKey, setRows]) => {
       const movementName = String(movementKey || '').trim()
       if (!movementName) return
+      // Phase 1's sets_movement_ids is keyed by the RAW sets key exactly -
+      // movementKey IS that key for wod_logs (never pooled), so a direct
+      // lookup is always correct here.
+      const movementId = log.sets_movement_ids?.[movementKey] || null
       ;(setRows || []).forEach((row, idx) => {
         if (!isValidSetRow(row)) return
-        entries.push(makeEntry({ sourceLog: log, source: 'wod_logs', movementName, reps: row.reps, weight: row.weight, rowIndex: idx }))
+        entries.push(makeEntry({ sourceLog: log, source: 'wod_logs', movementName, movementId, reps: row.reps, weight: row.weight, rowIndex: idx }))
       })
     })
   })
@@ -252,23 +269,54 @@ export function extractMovementEntriesFromSkillLogs(skillLogs) {
     Object.entries(rows).forEach(([key, setRows]) => {
       const movementName = movementKeyed ? String(key || '').trim() : fallbackMovement
       if (!movementName) return
+      // Phase 1's trigger resolves sets_movement_ids by the RAW sets key
+      // in every case, including the pooled (non-Superset) case, where it
+      // stores the SAME resolved id under every key - so this lookup is
+      // correct regardless of movementKeyed, without special-casing here.
+      const movementId = log.sets_movement_ids?.[key] || null
       ;(setRows || []).forEach((row, idx) => {
         if (!isValidSetRow(row)) return
-        entries.push(makeEntry({ sourceLog: log, source: 'skill_logs', movementName, reps: row.reps, weight: row.weight, rowIndex: idx }))
+        entries.push(makeEntry({ sourceLog: log, source: 'skill_logs', movementName, movementId, reps: row.reps, weight: row.weight, rowIndex: idx }))
       })
     })
   })
   return entries
 }
 
-// Groups all eligible entries (both sources) by normalized movement text.
-// Never pools distinct variations - grouping key is exact normalized text,
-// no aliasing/fuzzy matching of any kind.
+// Canonical Movement Identity, Phase 2 - Movement History's own grouping
+// key. Tagged, never an ambiguous raw UUID/text union: `id:<uuid>` when
+// Phase 1 froze a canonical identity on that entry's source Result,
+// `text:<normalizedName>` otherwise (the exact Phase 2-original behavior,
+// byte-for-byte, for every entry that predates Phase 1 or that Phase 1
+// left unresolved).
+//
+// Deliberately NO bridging between the two tags - a legacy `text:"back
+// squat"` entry and a canonical `id:<back-squat-uuid>` entry NEVER merge
+// into one group, even though a human would recognize them as the same
+// movement. This is not an oversight; it is CANONICAL_MOVEMENT_IDENTITY_
+// ARCHITECTURE_V1.md's own explicit, already-frozen decision (§6's
+// `movementId ?? text:normalizedText` formula) and this mission's own
+// hard invariant (§7/§31): canonical identity was frozen at Result
+// write/edit time (Phase 1), so a read-time bridge - even a deterministic
+// exact-name one - would let a later catalog rename silently change which
+// legacy rows group together, exactly the "historical meaning drift" the
+// whole initiative exists to prevent. The two groups naturally converge
+// over time as a member's own future logs accumulate canonical identity;
+// reconciling old legacy rows is a separate, not-yet-justified future
+// backfill decision (Architecture V1 §13, Phase 4), never a grouping
+// heuristic.
+export function movementHistoryIdentity(entry) {
+  return entry.movementId ? `id:${entry.movementId}` : `text:${normalizeKey(entry.movementName)}`
+}
+
+// Groups all eligible entries (both sources) by movementHistoryIdentity.
+// Never pools distinct variations - two different movementIds, or a
+// movementId vs. any text key, always stay separate groups.
 export function groupMovementEntries(wodLogs, skillLogs) {
   const all = [...extractMovementEntriesFromWodLogs(wodLogs), ...extractMovementEntriesFromSkillLogs(skillLogs)]
   const groups = new Map()
   all.forEach((entry) => {
-    const key = normalizeKey(entry.movementName)
+    const key = movementHistoryIdentity(entry)
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(entry)
   })
@@ -296,24 +344,46 @@ export function deriveMovementHistory(entries) {
   const byDate = [...entries].sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
   return {
     displayName: byDate[0].movementName,
+    // Canonical Movement Identity, Phase 2 - every entry in one group
+    // shares the same movementId by construction (movementHistoryIdentity
+    // is the grouping key), so any entry's own value is authoritative;
+    // null for a legacy (`text:`-keyed) group.
+    movementId: byDate[0].movementId || null,
     attemptCount: byDate.length,
     latest: byDate[0],
     history: byDate,
   }
 }
 
+// Canonical Movement Identity, Phase 2 - the group-level display name.
+// Row-level display truth (movementEntryDisplay, each entry's own
+// `movementName`) is NEVER touched by this - only the GROUP's own title
+// prefers the catalog's current canonical name when a movementId is
+// known and its catalog row is loaded (mission §11: a catalog rename
+// legitimately changes the group title going forward; historical rows
+// keep their own frozen text regardless). Falls back to the group's own
+// latest-logged raw text whenever no movementId exists, or the catalog
+// row can't be found (deleted/inaccessible - mission §44, never crashes,
+// never hides the group).
+export function movementGroupDisplayName(history, movementsById) {
+  if (!history) return null
+  const catalogName = history.movementId ? movementsById?.get(history.movementId)?.name : null
+  return catalogName || history.displayName
+}
+
 // Movement List (mission §34-35) - one row per movement identity the
 // member has ever logged an eligible Result for, sorted by
 // most-recently-performed. Deliberately no search/filter in V1 (mission
 // §34's own "prefer A for V1 if canonical identity coverage is weak").
-export function buildMovementListEntries(wodLogs, skillLogs) {
+export function buildMovementListEntries(wodLogs, skillLogs, movementsById) {
   const groups = groupMovementEntries(wodLogs, skillLogs)
   const entries = []
-  for (const [normalizedKey, groupEntries] of groups) {
+  for (const [identityKey, groupEntries] of groups) {
     const history = deriveMovementHistory(groupEntries)
     entries.push({
-      movementKey: normalizedKey,
-      displayName: history.displayName,
+      movementKey: identityKey,
+      movementId: history.movementId,
+      displayName: movementGroupDisplayName(history, movementsById),
       attemptCount: history.attemptCount,
       lastPerformedAt: history.latest.loggedAt,
       latestEntry: history.latest,

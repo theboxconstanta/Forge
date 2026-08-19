@@ -52,3 +52,24 @@ export async function createMovement(gymId, input) {
   }
   return data
 }
+
+/**
+ * Canonical Movement Identity, Phase 2 - display-metadata lookup for a set
+ * of already-known `movements.id` UUIDs (a member's own Movement History's
+ * distinct `sets_movement_ids` values), mirroring benchmarkResolution.js's
+ * own getBenchmarksByIds exactly (same batched-by-id, empty-input-
+ * short-circuits pattern). Never used to resolve identity - Phase 1's
+ * server-side trigger already did that; this exists purely to hydrate a
+ * canonical group's display name.
+ */
+export async function getMovementsByIds(ids) {
+  const distinct = [...new Set((ids || []).filter(Boolean))]
+  const result = new Map()
+  if (distinct.length === 0) return result
+  const { data, error } = await supabase.from('movements').select('id, name').in('id', distinct)
+  if (error) throw error
+  for (const row of data || []) {
+    result.set(row.id, { name: row.name })
+  }
+  return result
+}

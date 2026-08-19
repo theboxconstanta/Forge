@@ -33,7 +33,7 @@ import {
 } from './workoutEngine'
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay, buildCurrentBenchmarkBests, buildRecentBenchmarkProgress } from './benchmarkHistory'
-import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel, deriveCurrentMovementBests, normalizeKey as normalizeMovementKey } from './movementHistory'
+import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel, deriveCurrentMovementBests, normalizeKey as normalizeMovementKey, movementHistoryIdentity, movementGroupDisplayName } from './movementHistory'
 import { filterValidRecentPrEvents, sortRecentPrEvents } from './recentPrEvents'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
@@ -61,7 +61,7 @@ import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, remove
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
 import { generateVariantsFromRx, buildScalingOverrides } from './scalingEngine'
-import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError } from './movementsApi'
+import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -5332,8 +5332,8 @@ function BenchmarksSection({ wodLogs, benchmarksById, onSelect, t, lang }) {
 // §42). Zero interogare noua - grupeaza wodLogs/skillLogs deja incarcate.
 // Doar miscari cu istoric real apar (mission §34, varianta A) - fara search
 // in V1, dataset-ul e inca mic.
-function MovementsSection({ wodLogs, skillLogs, onSelect, t, lang, weightUnit }) {
-  const entries = buildMovementListEntries(wodLogs, skillLogs)
+function MovementsSection({ wodLogs, skillLogs, movementsById, onSelect, t, lang, weightUnit }) {
+  const entries = buildMovementListEntries(wodLogs, skillLogs, movementsById)
   if (entries.length === 0) {
     return (
       <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>
@@ -5378,7 +5378,7 @@ function CurrentBestsSection({ currentMovementBests, currentBenchmarkBests, onSe
       <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.currentBestsSectionTitle}</div>
       <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
         {currentMovementBests.map((entry, idx) => (
-          <div key={`m:${entry.comparisonKey}`} onClick={() => onSelectMovement(normalizeMovementKey(entry.movementName))}
+          <div key={`m:${entry.comparisonKey}`} onClick={() => onSelectMovement(movementHistoryIdentity(entry))}
             style={{ padding: '12px 14px', borderBottom: (idx < currentMovementBests.length - 1 || currentBenchmarkBests.length > 0) ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{entry.movementName}{entry.tier && entry.tier !== 'RX' ? ` · ${entry.tier}` : ''}</div>
@@ -5419,6 +5419,12 @@ function CurrentBestsSection({ currentMovementBests, currentBenchmarkBests, onSe
 // un EVENIMENT istoric, nu "adevarul de acum".
 function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBenchmark, t, lang }) {
   if (events.length === 0) return null
+  // Canonical Movement Identity, Phase 2 - a pr_events row has no
+  // movementId of its own yet (Architecture V1 §7 defers that to a later,
+  // not-yet-scheduled phase), so navigation always targets the `text:`
+  // form of Movement History's tagged identity - the exact same group a
+  // legacy (unresolved) Result would land in. Unlike CurrentBestsSection
+  // below, this can never navigate into a canonical (`id:`) group.
   const scoreLabel = (value, unit) => `${value}${unit === 'seconds' ? 's' : unit === 'reps' ? ' reps' : ` ${unit}`}`
   return (
     <div style={{ marginBottom: '14px' }}>
@@ -5431,7 +5437,7 @@ function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBe
           if (!isBenchmark && event.rep_scheme) subParts.push(`${event.rep_scheme}RM`)
           if (isBenchmark && event.scaling_context) subParts.push(event.scaling_context)
           return (
-            <div key={event.id} onClick={() => isBenchmark ? onSelectBenchmark(event.benchmark_id) : onSelectMovement(normalizeMovementKey(event.movement))}
+            <div key={event.id} onClick={() => isBenchmark ? onSelectBenchmark(event.benchmark_id) : onSelectMovement(`text:${normalizeMovementKey(event.movement)}`)}
               style={{ padding: '12px 14px', borderBottom: idx < events.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{displayName}</div>
@@ -6087,6 +6093,22 @@ function App() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [wodLogs])
+  // Canonical Movement Identity, Phase 2 - display-name hydration for
+  // every distinct movement_id Phase 1 already froze on this member's own
+  // wodLogs/skillLogs.sets_movement_ids. Same batched-by-id shape as
+  // benchmarksById above; never used for identity resolution itself
+  // (Phase 1's own server-side trigger already did that at write time).
+  const [movementsById, setMovementsById] = useState(new Map())
+  useEffect(() => {
+    const idsFrom = (logs) => logs.flatMap(l => l.sets_movement_ids ? Object.values(l.sets_movement_ids) : [])
+    const ids = [...new Set([...idsFrom(wodLogs), ...idsFrom(skillLogs)].filter(Boolean))]
+    if (ids.length === 0) return
+    let cancelled = false
+    getMovementsByIds(ids)
+      .then(map => { if (!cancelled) setMovementsById(prev => new Map([...prev, ...map])) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [wodLogs, skillLogs])
   // Results Phase 2, Slice 1 - the canonical resolution upgrade for the
   // screen above. Resolves every distinct wods.name already present in
   // wodLogs (one batched call, not one per log) so a log against an ALIAS
@@ -10455,6 +10477,7 @@ function App() {
             <MovementsSection
               wodLogs={wodLogs}
               skillLogs={skillLogs}
+              movementsById={movementsById}
               onSelect={goToMovement}
               t={t} lang={lang} weightUnit={userProfile?.weight_unit}
             />
@@ -10891,7 +10914,7 @@ function App() {
               style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
               ‹ {t.prHistoryLabel}
             </button>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{history?.displayName || '—'}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{movementGroupDisplayName(history, movementsById) || '—'}</div>
             {!history ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.movementDetailEmpty}</div>
             ) : (

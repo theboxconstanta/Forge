@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractMovementEntriesFromWodLogs, extractMovementEntriesFromSkillLogs,
   groupMovementEntries, deriveMovementHistory, buildMovementListEntries, movementEntryDisplay,
-  resolveComparisonIdentity, comparisonModeLabel, deriveCurrentMovementBests,
+  resolveComparisonIdentity, comparisonModeLabel, deriveCurrentMovementBests, movementGroupDisplayName,
 } from './movementHistory'
 
 // Member Performance, Phase 2 (Movement History) - test matrix per the
@@ -33,7 +33,7 @@ describe('Basic history (mission §62)', () => {
       wodLog({ id: 'c', sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, logged_at: '2026-07-20' }),
     ]
     const groups = groupMovementEntries(logs, [])
-    const history = deriveMovementHistory(groups.get('back squat'))
+    const history = deriveMovementHistory(groups.get('text:back squat'))
     expect(history.attemptCount).toBe(3)
     expect(history.latest.weight).toBe(100)
     expect(history.history.map((e) => e.weight)).toEqual([100, 95, 90])
@@ -48,7 +48,7 @@ describe('Mixed rep context - no fake best (mission §63)', () => {
       wodLog({ id: 'c', sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, logged_at: '2026-01-01' }),
     ]
     const groups = groupMovementEntries(logs, [])
-    const history = deriveMovementHistory(groups.get('back squat'))
+    const history = deriveMovementHistory(groups.get('text:back squat'))
     expect(history.history).toHaveLength(3)
     expect(history).not.toHaveProperty('best')
     expect(movementEntryDisplay(history.history[0])).toBe('120kg × 1')
@@ -66,9 +66,9 @@ describe('Distinct variations kept separate (mission §64)', () => {
     ]
     const groups = groupMovementEntries(logs, [])
     expect(groups.size).toBe(3)
-    expect(groups.has('snatch')).toBe(true)
-    expect(groups.has('power snatch')).toBe(true)
-    expect(groups.has('hang power snatch')).toBe(true)
+    expect(groups.has('text:snatch')).toBe(true)
+    expect(groups.has('text:power snatch')).toBe(true)
+    expect(groups.has('text:hang power snatch')).toBe(true)
   })
 })
 
@@ -81,7 +81,7 @@ describe('Text variation - case/whitespace normalization only (mission §65)', (
     ]
     const groups = groupMovementEntries(logs, [])
     expect(groups.size).toBe(1)
-    expect(groups.get('back squat')).toHaveLength(3)
+    expect(groups.get('text:back squat')).toHaveLength(3)
   })
 
   it('does NOT merge aliases like "BS" and "Back Squat", or "C&J" and "Clean and Jerk"', () => {
@@ -142,8 +142,8 @@ describe('Multi-section (mission §67)', () => {
     ]
     const groups = groupMovementEntries(logs, [])
     expect(groups.size).toBe(2)
-    expect(groups.has('back squat')).toBe(true)
-    expect(groups.has('snatch')).toBe(true)
+    expect(groups.has('text:back squat')).toBe(true)
+    expect(groups.has('text:snatch')).toBe(true)
   })
 })
 
@@ -205,7 +205,7 @@ describe('Section reorder (mission §23/§74)', () => {
       wodLog({ id: 'b', workout_section_id: 'sec-1', sets: { 'Back Squat': [{ reps: '5', weight: '95' }] }, logged_at: '2026-01-02' }),
     ]
     const groups = groupMovementEntries(logs, [])
-    expect(groups.get('back squat')).toHaveLength(2)
+    expect(groups.get('text:back squat')).toHaveLength(2)
   })
 })
 
@@ -245,7 +245,82 @@ describe('Mixed sources merge into one movement (mission §5/§29)', () => {
     const wLog = wodLog({ id: 'w1', sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, logged_at: '2026-01-01' })
     const sLog = skillLog({ id: 's1', format_snapshot: 'Weightlifting', skill_name_snapshot: 'Back Squat', sets: { 'Back Squat': [{ reps: '5', weight: '95' }] }, logged_at: '2026-01-02' })
     const groups = groupMovementEntries([wLog], [sLog])
-    expect(groups.get('back squat')).toHaveLength(2)
+    expect(groups.get('text:back squat')).toHaveLength(2)
+  })
+})
+
+// Canonical Movement Identity, Phase 2 - movement_id-aware grouping, per
+// CANONICAL_MOVEMENT_IDENTITY_PHASE2_MOVEMENT_HISTORY_GROUPING_IMPLEMENTATION_REPORT.md.
+describe('movementHistoryIdentity / canonical grouping (Phase 2)', () => {
+  it('same movementId, different raw text -> one canonical group (the headline feature)', () => {
+    const logs = [
+      wodLog({ id: 'a', sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, sets_movement_ids: { 'Back Squat': 'uuid-x' } }),
+      wodLog({ id: 'b', sets: { BS: [{ reps: '5', weight: '95' }] }, sets_movement_ids: { BS: 'uuid-x' } }),
+    ]
+    const groups = groupMovementEntries(logs, [])
+    expect(groups.size).toBe(1)
+    expect(groups.get('id:uuid-x')).toHaveLength(2)
+  })
+
+  it('same raw text, different movementId -> two distinct canonical groups (identity beats text)', () => {
+    const logs = [
+      wodLog({ id: 'a', sets: { Squat: [{ reps: '5', weight: '100' }] }, sets_movement_ids: { Squat: 'uuid-x' } }),
+      wodLog({ id: 'b', sets: { Squat: [{ reps: '5', weight: '80' }] }, sets_movement_ids: { Squat: 'uuid-y' } }),
+    ]
+    const groups = groupMovementEntries(logs, [])
+    expect(groups.size).toBe(2)
+    expect(groups.has('id:uuid-x')).toBe(true)
+    expect(groups.has('id:uuid-y')).toBe(true)
+  })
+
+  it('canonical (movementId) and legacy (null movementId) entries for the "same" movement never bridge into one group', () => {
+    const logs = [
+      wodLog({ id: 'a', sets: { 'Back Squat': [{ reps: '5', weight: '100' }] }, sets_movement_ids: { 'Back Squat': 'uuid-x' } }),
+      wodLog({ id: 'b', sets: { 'Back Squat': [{ reps: '5', weight: '95' }] } }), // no sets_movement_ids - legacy/unresolved
+    ]
+    const groups = groupMovementEntries(logs, [])
+    expect(groups.size).toBe(2)
+    expect(groups.get('id:uuid-x')).toHaveLength(1)
+    expect(groups.get('text:back squat')).toHaveLength(1)
+  })
+
+  it('a multi-movement row with one resolved + one unresolved key produces two distinct groups (partial identity map)', () => {
+    const log = wodLog({
+      id: 'a',
+      sets: { 'Power Clean': [{ reps: '3', weight: '60' }], '3-3-3-3-3': [{ reps: '3', weight: '60' }] },
+      sets_movement_ids: { 'Power Clean': 'uuid-pc', '3-3-3-3-3': null },
+    })
+    const groups = groupMovementEntries([log], [])
+    expect(groups.size).toBe(2)
+    expect(groups.has('id:uuid-pc')).toBe(true)
+    expect(groups.has('text:3-3-3-3-3')).toBe(true)
+  })
+
+  it('skill_logs pooled entries (non-Superset) sharing one movementId group together as one canonical group', () => {
+    const log = skillLog({
+      id: 's1', format_snapshot: 'Weightlifting', skill_name_snapshot: 'Deadlift',
+      sets: { '1 Clean pull': [{ reps: '1', weight: '60' }], '1 Squat clean': [{ reps: '1', weight: '50' }] },
+      sets_movement_ids: { '1 Clean pull': 'uuid-dl', '1 Squat clean': 'uuid-dl' },
+    })
+    const groups = groupMovementEntries([], [log])
+    expect(groups.size).toBe(1)
+    expect(groups.get('id:uuid-dl')).toHaveLength(2)
+  })
+
+  it('a non-movement-keyed format never produces entries even if sets_movement_ids happens to be populated', () => {
+    const log = wodLog({ id: 'a', format_snapshot: 'Intervals', sets: { 'Rundă 1': [{ reps: '9' }] }, sets_movement_ids: { 'Rundă 1': 'uuid-should-never-be-read' } })
+    expect(extractMovementEntriesFromWodLogs([log])).toHaveLength(0)
+  })
+
+  it('movementGroupDisplayName prefers the catalog current name for a canonical group, falls back to raw text for legacy groups or a missing catalog row', () => {
+    const canonicalGroups = groupMovementEntries([wodLog({ id: 'a', sets: { BS: [{ reps: '5', weight: '100' }] }, sets_movement_ids: { BS: 'uuid-x' } })], [])
+    const canonicalHistory = deriveMovementHistory(canonicalGroups.get('id:uuid-x'))
+    expect(movementGroupDisplayName(canonicalHistory, new Map([['uuid-x', { name: 'Barbell Back Squat' }]]))).toBe('Barbell Back Squat')
+    expect(movementGroupDisplayName(canonicalHistory, new Map())).toBe('BS') // catalog row missing/inaccessible -> falls back to raw snapshot, never crashes
+
+    const legacyGroups = groupMovementEntries([wodLog({ id: 'b', sets: { 'Front Squat': [{ reps: '5', weight: '80' }] } })], [])
+    const legacyHistory = deriveMovementHistory(legacyGroups.get('text:front squat'))
+    expect(movementGroupDisplayName(legacyHistory, new Map([['uuid-x', { name: 'Barbell Back Squat' }]]))).toBe('Front Squat')
   })
 })
 
@@ -506,6 +581,25 @@ describe('deriveCurrentMovementBests (mission §5/§9/§10/§11/§12/§13/§20)'
     const bests = deriveCurrentMovementBests(logs, [])
     expect(bests).toHaveLength(1)
     expect(bests[0].weight).toBe(105)
+  })
+
+  // Canonical Movement Identity, Phase 2 - PR Engine/Performance Overview
+  // regression proof: deriveCurrentMovementBests groups by comparisonKey,
+  // which Phase 2 deliberately never touches (see movementHistoryIdentity's
+  // own header comment) - it remains purely text-normalized. Two entries
+  // sharing a movementId but spelled differently ("Back Squat" vs "BS")
+  // therefore still produce TWO separate current bests here, unchanged
+  // from pre-Phase-2 behavior - proving movementId carries through onto
+  // each entry (for a future phase to use) without altering this phase's
+  // own grouping in any way.
+  it('a shared movementId does not merge differently-spelled entries into one Current Best (comparisonKey stays text-only)', () => {
+    const logs = [
+      wodLog({ id: 'a', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { 'Back Squat': [{ reps: '5', weight: '90' }] }, sets_movement_ids: { 'Back Squat': 'uuid-x' }, logged_at: '2026-01-01' }),
+      wodLog({ id: 'b', format_snapshot: 'Build to Heavy/1RM', format_config_snapshot: { targetLabel: '5RM' }, sets: { BS: [{ reps: '5', weight: '105' }] }, sets_movement_ids: { BS: 'uuid-x' }, logged_at: '2026-02-01' }),
+    ]
+    const bests = deriveCurrentMovementBests(logs, [])
+    expect(bests).toHaveLength(2)
+    expect(bests.every((b) => b.movementId === 'uuid-x')).toBe(true)
   })
 
   it('1RM, 3RM, 5RM are three separate current bests, never pooled (mission §9/§54)', () => {
