@@ -42,7 +42,7 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
-  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
+  normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
@@ -5822,17 +5822,38 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
       </div>
       {isOpen && (
         <>
-          {skillType === 'Complex' && skillFormatConfig?.complexMovements?.length > 0 ? (
-            <div style={{ marginTop: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>COMPLEX</div>
-              {skillFormatConfig.rounds && (
-                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{t.fmtRoundsAttempts}: {skillFormatConfig.rounds}</div>
-              )}
-              <div style={{ fontSize: '12px', color: '#555', marginTop: '3px' }}>{skillFormatConfig.complexMovements.join(' + ')}</div>
-            </div>
-          ) : describeFormatConfig(skillType, skillFormatConfig, t) && (
-            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{skillType} — {describeFormatConfig(skillType, skillFormatConfig, t)}</div>
-          )}
+          {/* Universal Member Workout Display Cleanup - Skill Work de pe
+              Acasa e tot Member View (nu editorul coach-ului), asa ca
+              foloseste acelasi helper member-clean ca si cardul principal
+              de WOD (formatMemberScheduleLines), nu describeFormatConfig
+              (copy de editor, "Nr. runde/incercari: 3" in loc de "3
+              Rounds") - gasit ca a doua suprafata reala cu acelasi defect,
+              nu doar cardul de WOD. Ramura "COMPLEX" hardcodata anterior
+              afisa literal eticheta de editor (t.fmtRoundsAttempts) direct
+              in JSX - eliminata, complexMovements + rounds sunt deja
+              campuri normale din catalog, acoperite generic. */}
+          {(() => {
+            if (skillType === 'Complex' && skillFormatConfig?.complexMovements?.length > 0) {
+              // complexMovements e deja aratat separat, mai jos (join ' + ') -
+              // exclus explicit din config-ul trimis la scheduleLines ca sa nu
+              // se duplice (odata generic, odata prin randul dedicat).
+              const { complexMovements, ...restConfig } = skillFormatConfig
+              const complexScheduleLines = formatMemberSkillDetailLines(skillType, restConfig, t)
+              return (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>COMPLEX</div>
+                  {complexScheduleLines.map((line, li) => (
+                    <div key={li} style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{line}</div>
+                  ))}
+                  <div style={{ fontSize: '12px', color: '#555', marginTop: '3px' }}>{complexMovements.join(' + ')}</div>
+                </div>
+              )
+            }
+            const scheduleLines = formatMemberSkillDetailLines(skillType, skillFormatConfig, t)
+            return scheduleLines.length > 0 && (
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{formatTypeLabel(skillType, skillFormatConfig)} — {scheduleLines.join(' · ')}</div>
+            )
+          })()}
           <div style={{ marginTop: '10px' }}>
             {(() => {
               const unitate = userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'

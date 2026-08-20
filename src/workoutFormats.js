@@ -859,64 +859,145 @@ export function resolveMemberHeaderTiming(formatId, config, legacyDuration, t) {
 
 // Randuri curate, separate, pt restul cardului de WOD al membrului (sub
 // header) - spre deosebire de describeFormatConfig (folosit de coach/Admin,
-// "eticheta: valoare" alaturate cu " · " - neschimbat, inca folosit acolo),
-// aici numarul de runde primeste propriul rand, cu formulare naturala
-// ("5 Rounds", nu "Numar runde: 5"). Time cap-ul NU mai apare aici - a
-// migrat in header (formatMemberHeaderTiming, mai sus), ca sa nu se
-// repete de doua ori pe acelasi card. Orice alt camp de config (structura,
-// schema de repetari, etape etc.) cade in continuare pe un rand generic
-// "eticheta: valoare", ca sa nu piarda tacut informatie pentru formate mai
-// complexe (Ladder, Buy-In/Cash-Out) care nu au fost cerute explicit sa
-// fie reformulate.
+// "eticheta: valoare" alaturate cu " · " - neschimbat, inca folosit acolo,
+// eticheta din editor e copy CORECT acolo), aici numarul de runde primeste
+// propriul rand, cu formulare naturala ("5 Rounds", nu "Numar runde: 5").
+// Time cap-ul NU mai apare aici - a migrat in header (formatMemberHeaderTiming,
+// mai sus), ca sa nu se repete de doua ori pe acelasi card.
+//
+// Universal Member Workout Display Cleanup (deduplicare structurala +
+// eliminare limbaj de editor din Member View) - doua probleme reale gasite
+// dupa fix-ul anterior (MEMBER_WORKOUT_PROGRAMMING_DISPLAY_INTEGRITY):
+//
+// 1. DUPLICARE: cand primary deja incorporeaza un fapt structural (ex. "3
+//    RFT" incorporeaza rounds=3), randul generic nu mai trebuie sa-l repete
+//    ("3 Rounds" dedesubt). Rezolvat generic, nu doar pt RFT: orice cheie
+//    din consumedKeys (computeFormatPrimaryLabel, singura sursa de adevar
+//    pt "ce stie deja primary") e omisa aici, automat pt orice format
+//    curent SAU viitor care ajunge sa foloseasca acelasi tipar.
+// 2. LEAKAGE DE COPY DE EDITOR: eticheta campurilor de config (fmtSharedRepScheme
+//    = "Shared rep scheme (e.g. 21-15-9)") e text de FORMULAR, potrivit in
+//    editorul coach-ului (App Admin), gresit ca limbaj pt membru. Pt campuri
+//    a caror VALOARE e deja notatie CrossFit auto-explicativa (o schema de
+//    reps "21-15-9", "5-5-5-5-5") sau vocabular de sportiv deja lizibil ca
+//    valoare goala (splitType "You go/I go", scoringMode "Total Reps"),
+//    aratam DOAR valoarea, fara eticheta - vezi MEMBER_BARE_VALUE_TYPES/
+//    MEMBER_BARE_VALUE_SELECT_FIELDS. Campuri care exista doar ca discriminator
+//    intern al modelului de date, fara sens pt un sportiv nici macar ca
+//    valoare goala (`structure`: 'Sequence'/'Repeated Rounds') sunt complet
+//    suprimate - MEMBER_SUPPRESSED_FIELDS. Restul campurilor (numere care au
+//    nevoie de context ca sa se inteleaga singure - startReps, targetSets
+//    etc, liste de miscari) raman pe randul generic eticheta: valoare, ca sa
+//    nu piarda tacut informatie - nicio schimbare de comportament acolo.
 const MEMBER_ROUNDS_KEYS = ['rounds', 'totalRounds']
 // Aceleasi campuri pe care formatMemberHeaderTiming le poate consuma (direct
 // sau prin estimateTotalDurationSec) - marcate "consumed" fara sa produca un
 // rand propriu aici, altfel ar aparea A DOUA OARA pe randul generic
 // "eticheta: valoare" de mai jos, dupa ce au fost deja aratate in header.
 const MEMBER_HEADER_TIMING_KEYS = ['timeCapSec', 'durationSec', 'mainDurationSec', 'totalDurationSec']
+// Tipuri de camp a caror valoare formatata e deja notatie CrossFit completa
+// prin ea insasi ("21-15-9", "5-5-5-5-5") - eticheta de editor n-ar adauga
+// nimic, doar ar suna a formular.
+const MEMBER_BARE_VALUE_TYPES = new Set(['repsSchemeList'])
+// Campuri `select` ale caror OPTIUNI sunt deja vocabular de sportiv, lizibile
+// ca valoare goala in contextul cardului (sub header-ul de format) - spre
+// deosebire de `structure`, care e un discriminator pur intern.
+const MEMBER_BARE_VALUE_SELECT_FIELDS = new Set(['splitType', 'baseFormat', 'scoringMode', 'ladderType'])
+// Campuri care descriu doar modelul de date al lui Forge, fara niciun sens
+// pt un sportiv nici macar aratate ca valoare goala.
+const MEMBER_SUPPRESSED_FIELDS = new Set(['structure'])
 
-export function formatMemberScheduleLines(formatId, config, t) {
+// Motorul comun din spatele randurilor member-clean - parametrizat DOAR pe
+// "suprima si campurile de timing (deja aratate intr-un header separat)?",
+// nu duplicat intre apelanti. formatMemberScheduleLines (cardul principal de
+// WOD, care ARE un header separat, WorkoutFormatHeader) suprima timing-ul;
+// formatMemberSkillDetailLines (Sectiunea Skill Work de pe Acasa, care NU
+// are niciun header separat) nu-l suprima, ca sa nu piarda tacut informatie
+// reala (gasit live: Skill Work tip RFT cu rounds+timeCapSec ambele setate,
+// fara alta locatie unde time cap-ul sa mai apara).
+function computeMemberDetailLines(formatId, config, t, suppressTimingKeys) {
   const fmt = getFormat(formatId)
   const cfg = config || {}
   const fields = fmt.config || {}
   const lines = []
-  const consumed = new Set(MEMBER_HEADER_TIMING_KEYS)
+  const { consumedKeys } = computeFormatPrimaryLabel(formatId, cfg)
+  const consumed = new Set(consumedKeys)
+  if (suppressTimingKeys) MEMBER_HEADER_TIMING_KEYS.forEach(k => consumed.add(k))
 
-  const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '')
+  const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '' && !consumed.has(k))
   if (roundsKey) {
     lines.push(`${cfg[roundsKey]} ${t?.memberWodRoundsLabel || 'Rounds'}`)
     consumed.add(roundsKey)
   }
 
+  // Ladder: directia (Ascending/Descending/Asc-Desc) e deja lizibila DIN
+  // secventa de reps aratata mai jos ("21-18-15-12-9" citeste vizual ca
+  // descrescator) - a mai arata si eticheta separat ar fi redundant, exact
+  // exemplul concret care a declansat aceasta misiune. Doar cand schema
+  // lipseste (date legacy) ladderType ramane singura informatie structurala
+  // disponibila si e aratata (bare value, mai jos).
+  if (fields.sharedRepScheme && Array.isArray(cfg.sharedRepScheme) && cfg.sharedRepScheme.length > 0) {
+    consumed.add('ladderType')
+  }
+
   Object.entries(fields).forEach(([key, field]) => {
-    if (consumed.has(key)) return
+    if (consumed.has(key) || MEMBER_SUPPRESSED_FIELDS.has(key)) return
     const value = cfg[key]
     if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return
-    const label = t?.[field.labelKey] || field.labelKey
     let displayValue
     if (field.type === 'duration') displayValue = secToTime(value)
     else if (field.type === 'movementList' || field.type === 'intervalList') displayValue = value.join(', ')
     else if (field.type === 'repsSchemeList') displayValue = value.join('-')
     else if (field.type === 'stageList') displayValue = `${value.length} etape`
     else displayValue = String(value)
+
+    if (MEMBER_BARE_VALUE_TYPES.has(field.type) || MEMBER_BARE_VALUE_SELECT_FIELDS.has(key)) {
+      lines.push(displayValue)
+      return
+    }
+    const label = t?.[field.labelKey] || field.labelKey
     lines.push(`${label}: ${displayValue}`)
   })
 
   return lines
 }
 
-// Eticheta scurta a formatului, cu numarul de runde inclus acolo unde e
-// conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time), nu doar
-// "RFT" urmat separat de "Numar runde: 5" (redundant si mai putin natural
-// de citit pe cardurile din Jurnal/Acasa). For Time cu structure="Repeated
-// Rounds" e semantic identic cu RFT (vezi comentariul de la definitia
-// formatului For Time) - primeste acelasi tratament "N <format>", nu doar
-// RFT special-cazat.
-export function formatTypeLabel(formatId, config) {
+export function formatMemberScheduleLines(formatId, config, t) {
+  return computeMemberDetailLines(formatId, config, t, true)
+}
+
+// Vezi comentariul de la computeMemberDetailLines - Sectiunea Skill Work de
+// pe Acasa (SkillHomeSection) foloseste aceasta varianta pt ca nu are un
+// WorkoutFormatHeader separat care sa "consume" deja time cap/duration.
+export function formatMemberSkillDetailLines(skillType, config, t) {
+  return computeMemberDetailLines(skillType, config, t, false)
+}
+
+// Eticheta scurta a formatului, cu numarul de runde/tinta inclus acolo unde
+// e conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time, "5RM"),
+// nu doar formatId urmat separat de un rand generic "Numar runde: 5"
+// (redundant si mai putin natural de citit). For Time cu structure=
+// "Repeated Rounds" e semantic identic cu RFT (vezi comentariul de la
+// definitia formatului For Time) - primeste acelasi tratament "N <format>".
+// Build to Heavy/1RM: targetLabel ('5RM'/'3RM'/'1RM'...) e deja limbaj de
+// sportiv, mult mai clar decat id-ul brut de format ("Build to Heavy/1RM")
+// - devine chiar el primary cand exista.
+//
+// Universal Member Workout Display Cleanup (deduplicare structurala) -
+// returneaza si SETUL de chei de config deja "consumate" de primary, ca
+// formatMemberScheduleLines (mai jos) sa poata omite exact acele campuri in
+// loc sa tina o lista separata, dezsincronizabila, de reguli "ce e deja
+// aratat in header". O singura sursa de adevar pt "ce stie deja primary".
+function computeFormatPrimaryLabel(formatId, config) {
   const cfg = config || {}
-  if (formatId === 'RFT' && cfg.rounds) return `${cfg.rounds} RFT`
-  if (formatId === 'For Time' && cfg.rounds && cfg.structure === 'Repeated Rounds') return `${cfg.rounds} For Time`
-  return formatId
+  if (formatId === 'RFT' && cfg.rounds) return { label: `${cfg.rounds} RFT`, consumedKeys: new Set(['rounds']) }
+  if (formatId === 'For Time' && cfg.rounds && cfg.structure === 'Repeated Rounds') return { label: `${cfg.rounds} For Time`, consumedKeys: new Set(['rounds']) }
+  if (formatId === 'Build to Heavy/1RM' && cfg.targetLabel) return { label: cfg.targetLabel, consumedKeys: new Set(['targetLabel']) }
+  return { label: formatId, consumedKeys: new Set() }
+}
+
+export function formatTypeLabel(formatId, config) {
+  return computeFormatPrimaryLabel(formatId, config).label
 }
 
 // --- family: 'sets' -----------------------------------------------------

@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore, resolveSetsScoringMode,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, formatTypeLabel, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, formatTypeLabel, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -801,13 +801,55 @@ describe('formatMemberScheduleLines', () => {
   const tRo = getT('ro')
   const tEn = getT('en')
 
-  it('RFT: rundele apar pe rândul lor, cu formulare naturală (nu "Număr runde: N") - time cap-ul a migrat în header', () => {
+  it('RFT (Universal Member Workout Display Cleanup): rundele NU mai apar separat - "4 RFT" din primary deja le comunică, randul dedicat ar fi redundant', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tEn))
-      .toEqual(['4 Rounds'])
+      .toEqual([])
   })
-  it('RO: aceeași formulare naturală, doar eticheta rundelor tradusă', () => {
+  it('RO: aceeași deduplicare, indiferent de limbă', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tRo))
-      .toEqual(['4 Runde'])
+      .toEqual([])
+  })
+  it('For Time cu structure Repeated Rounds: rundele NU mai apar separat (aceeași clasă de defect ca RFT)', () => {
+    expect(formatMemberScheduleLines('For Time', { rounds: 5, structure: 'Repeated Rounds', timeCapSec: 1200 }, tEn))
+      .toEqual([])
+  })
+  it('For Time FĂRĂ structure Repeated Rounds: rundele NU sunt consumate de primary, deci rămân pe rândul lor natural', () => {
+    expect(formatMemberScheduleLines('For Time', { rounds: 5, timeCapSec: 1200 }, tEn))
+      .toEqual(['5 Rounds'])
+  })
+  it('EMOM/Tabata/Complex/Intervals (rounds NU e consumat de primary la aceste formate): randul natural de runde rămâne neschimbat', () => {
+    expect(formatMemberScheduleLines('Tabata', { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Lowest Reps' }, tEn)[0]).toBe('8 Rounds')
+  })
+  it('Build to Heavy/1RM cu targetLabel: primary devine "5RM", niciun rând redundant "Target label: 5RM" dedesubt', () => {
+    expect(formatMemberScheduleLines('Build to Heavy/1RM', { targetLabel: '5RM' }, tEn)).toEqual([])
+  })
+  it('Ladder cu shared rep scheme: rândul e valoarea goală ("21-18-15-12-9"), FĂRĂ eticheta de editor "Shared rep scheme (e.g. 21-15-9):"', () => {
+    const lines = formatMemberScheduleLines('Ladder', { sharedRepScheme: [21, 18, 15, 12, 9], ladderType: 'Descending', timeCapSec: 1200 }, tEn)
+    expect(lines).toEqual(['21-18-15-12-9'])
+    expect(lines.join(' ')).not.toContain('Shared rep scheme')
+    expect(lines.join(' ')).not.toContain('scheme')
+  })
+  it('Ladder FĂRĂ shared rep scheme (date legacy): ladderType rămâne singura informație structurală, aratată ca valoare goală', () => {
+    expect(formatMemberScheduleLines('Ladder', { ladderType: 'Ascending', timeCapSec: 1200 }, tEn)).toEqual(['Ascending'])
+  })
+  it('Strength Sets: setsScheme e valoare goală ("5-5-5-5-5"), fără eticheta "Set scheme (target reps per set):"', () => {
+    const lines = formatMemberScheduleLines('Strength Sets', { setsScheme: [5, 5, 5, 5, 5] }, tEn)
+    expect(lines).toEqual(['5-5-5-5-5'])
+  })
+  it('For Time: sharedRepScheme e tot valoare goală, aceeași regulă generică (nu doar Ladder)', () => {
+    expect(formatMemberScheduleLines('For Time', { sharedRepScheme: [21, 15, 9] }, tEn)).toEqual(['21-15-9'])
+  })
+  it('Partner WOD: splitType/baseFormat sunt valoare goală, fără etichetele de editor "Split type:"/"Base format:"', () => {
+    const lines = formatMemberScheduleLines('Partner WOD', { splitType: 'You go/I go', baseFormat: 'AMRAP' }, tEn)
+    expect(lines).toContain('You go/I go')
+    expect(lines).toContain('AMRAP')
+    expect(lines.join(' ')).not.toContain('Split type')
+    expect(lines.join(' ')).not.toContain('Base format')
+  })
+  it('For Time: câmpul intern `structure` nu apare NICIODATĂ în Member View, nici ca etichetă, nici ca valoare goală', () => {
+    const lines = formatMemberScheduleLines('For Time', { structure: 'Sequence', sharedRepScheme: [21, 15, 9] }, tEn)
+    expect(lines.join(' ')).not.toContain('Sequence')
+    expect(lines.join(' ')).not.toContain('Structure')
   })
   it('AMRAP: fără câmpul "rounds", durata proprie nu mai apare aici (e în header)', () => {
     expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual([])
@@ -826,6 +868,26 @@ describe('formatMemberScheduleLines', () => {
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberScheduleLines(id, {}, tEn)).not.toThrow())
+  })
+})
+
+describe('formatMemberSkillDetailLines (Universal Member Workout Display Cleanup - Skill Work de pe Acasa, fără header separat)', () => {
+  const tEn = getT('en')
+
+  it('spre deosebire de formatMemberScheduleLines, NU suprimă time cap/durata - nu există alt loc unde ar mai fi arătate (găsit live: Skill Work tip RFT cu rounds+timeCapSec)', () => {
+    const lines = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
+    expect(lines.some(l => l.includes('20:00'))).toBe(true)
+  })
+  it('rundele tot nu se duplică - RFT rămâne fără un rând separat "3 Rounds" (rounds e deja în primary, formatTypeLabel)', () => {
+    const lines = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
+    expect(lines.some(l => /rounds/i.test(l))).toBe(false)
+  })
+  it('Complex: rounds apare curat ("3 Rounds"), fără eticheta de editor "Rounds/attempts:"', () => {
+    const lines = formatMemberSkillDetailLines('Complex', { rounds: 3 }, tEn)
+    expect(lines).toEqual(['3 Rounds'])
+  })
+  it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
+    FORMAT_IDS.forEach(id => expect(() => formatMemberSkillDetailLines(id, {}, tEn)).not.toThrow())
   })
 })
 
@@ -857,6 +919,12 @@ describe('getWorkoutFormatDisplay', () => {
   it('format bazat pe seturi/greutate (Strength Sets): nicio metadata secundara reala - doar formatul, nimic inventat', () => {
     expect(getWorkoutFormatDisplay('Strength Sets', { setsScheme: [5, 3, 1] }, null, tEn)).toEqual({ primary: 'Strength Sets', secondaryLabel: null, secondaryValue: null })
   })
+  it('Build to Heavy/1RM cu targetLabel: primary devine tinta insasi ("5RM"), nu id-ul brut de format', () => {
+    expect(getWorkoutFormatDisplay('Build to Heavy/1RM', { targetLabel: '5RM' }, null, tEn)).toEqual({ primary: '5RM', secondaryLabel: null, secondaryValue: null })
+  })
+  it('Build to Heavy/1RM fara targetLabel: primary ramane bare formatId', () => {
+    expect(getWorkoutFormatDisplay('Build to Heavy/1RM', {}, null, tEn).primary).toBe('Build to Heavy/1RM')
+  })
   it('format fara nicio sursa de durata SI fara duration legacy: nicio metadata inventata', () => {
     expect(getWorkoutFormatDisplay('Not For Time', {}, null, tEn)).toEqual({ primary: 'Not For Time', secondaryLabel: null, secondaryValue: null })
   })
@@ -886,6 +954,12 @@ describe('formatTypeLabel (Member Workout Display Integrity)', () => {
   })
   it('For Time cu rounds dar FARA structure Repeated Rounds: ramane bare (nu orice For Time cu rounds e echivalent RFT)', () => {
     expect(formatTypeLabel('For Time', { rounds: 5 })).toBe('For Time')
+  })
+  it('Build to Heavy/1RM cu targetLabel: primary devine tinta ("5RM")', () => {
+    expect(formatTypeLabel('Build to Heavy/1RM', { targetLabel: '5RM' })).toBe('5RM')
+  })
+  it('Build to Heavy/1RM fara targetLabel: ramane bare', () => {
+    expect(formatTypeLabel('Build to Heavy/1RM', {})).toBe('Build to Heavy/1RM')
   })
   it('alte formate: ramane bare formatId, nicio enrichment neceruta', () => {
     expect(formatTypeLabel('AMRAP', { durationSec: 900 })).toBe('AMRAP')
