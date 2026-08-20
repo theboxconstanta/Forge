@@ -832,9 +832,10 @@ const TIME_CAP_LABEL_FORMAT_IDS = ['For Time', 'Chipper', 'Ladder', 'RFT', 'Part
 export function getWorkoutFormatDisplay(formatId, config, legacyDuration, t) {
   const seconds = estimateTotalDurationSec(formatId, config)
   const value = seconds != null ? secToTime(seconds) : (legacyDuration || null)
-  if (!value) return { primary: formatId, secondaryLabel: null, secondaryValue: null }
+  const primary = formatTypeLabel(formatId, config)
+  if (!value) return { primary, secondaryLabel: null, secondaryValue: null }
   const isCap = TIME_CAP_LABEL_FORMAT_IDS.includes(formatId)
-  return { primary: formatId, secondaryLabel: isCap ? (t?.memberWodTimeCapLabel || 'Time cap') : null, secondaryValue: value }
+  return { primary, secondaryLabel: isCap ? (t?.memberWodTimeCapLabel || 'Time cap') : null, secondaryValue: value }
 }
 
 export function formatMemberHeaderTiming(formatId, config, t) {
@@ -907,10 +908,14 @@ export function formatMemberScheduleLines(formatId, config, t) {
 // Eticheta scurta a formatului, cu numarul de runde inclus acolo unde e
 // conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time), nu doar
 // "RFT" urmat separat de "Numar runde: 5" (redundant si mai putin natural
-// de citit pe cardurile din Jurnal/Acasa).
+// de citit pe cardurile din Jurnal/Acasa). For Time cu structure="Repeated
+// Rounds" e semantic identic cu RFT (vezi comentariul de la definitia
+// formatului For Time) - primeste acelasi tratament "N <format>", nu doar
+// RFT special-cazat.
 export function formatTypeLabel(formatId, config) {
   const cfg = config || {}
   if (formatId === 'RFT' && cfg.rounds) return `${cfg.rounds} RFT`
+  if (formatId === 'For Time' && cfg.rounds && cfg.structure === 'Repeated Rounds') return `${cfg.rounds} For Time`
   return formatId
 }
 

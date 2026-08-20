@@ -5,7 +5,7 @@ import {
   composeFormatHeader, parseFormatHeader, estimateTotalDurationSec,
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore, resolveSetsScoringMode,
-  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
+  REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, formatTypeLabel, AUTO_DURATION_FORMAT_IDS,
   isNotRxd, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
@@ -842,8 +842,14 @@ describe('getWorkoutFormatDisplay', () => {
   it('EMOM: durata totala calculata (totalRounds x intervalSec), fara eticheta', () => {
     expect(getWorkoutFormatDisplay('EMOM', { totalRounds: 12, intervalSec: 60 }, null, tEn)).toEqual({ primary: 'EMOM', secondaryLabel: null, secondaryValue: '12:00' })
   })
-  it('RFT + time cap: aceeasi sursa/eticheta ca For Time (timeCapSec)', () => {
-    expect(getWorkoutFormatDisplay('RFT', { rounds: 4, timeCapSec: 1500 }, null, tEn)).toEqual({ primary: 'RFT', secondaryLabel: 'Time cap', secondaryValue: '25:00' })
+  it('RFT + time cap: aceeasi sursa/eticheta ca For Time (timeCapSec), primary include numarul de runde (Member Workout Display Integrity)', () => {
+    expect(getWorkoutFormatDisplay('RFT', { rounds: 4, timeCapSec: 1500 }, null, tEn)).toEqual({ primary: '4 RFT', secondaryLabel: 'Time cap', secondaryValue: '25:00' })
+  })
+  it('For Time cu structure Repeated Rounds (semantic identic RFT): primary include numarul de runde', () => {
+    expect(getWorkoutFormatDisplay('For Time', { rounds: 5, structure: 'Repeated Rounds', timeCapSec: 1200 }, null, tEn)).toEqual({ primary: '5 For Time', secondaryLabel: 'Time cap', secondaryValue: '20:00' })
+  })
+  it('For Time fara structure Repeated Rounds: primary ramane bare (rounds nu se aplica unui For Time obisnuit)', () => {
+    expect(getWorkoutFormatDisplay('For Time', { timeCapSec: 1200 }, null, tEn).primary).toBe('For Time')
   })
   it('format stil interval (Intervals): durata totala calculata (rounds x (work+rest)), fara eticheta', () => {
     expect(getWorkoutFormatDisplay('Intervals', { rounds: 10, workSec: 120, restSec: 60 }, null, tEn)).toEqual({ primary: 'Intervals', secondaryLabel: null, secondaryValue: '30:00' })
@@ -865,6 +871,29 @@ describe('getWorkoutFormatDisplay', () => {
   })
   it('nu crapa pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => getWorkoutFormatDisplay(id, {}, null, tEn)).not.toThrow())
+  })
+})
+
+describe('formatTypeLabel (Member Workout Display Integrity)', () => {
+  it('RFT cu rounds: "N RFT"', () => {
+    expect(formatTypeLabel('RFT', { rounds: 3 })).toBe('3 RFT')
+  })
+  it('RFT fara rounds: ramane bare', () => {
+    expect(formatTypeLabel('RFT', {})).toBe('RFT')
+  })
+  it('For Time cu structure Repeated Rounds + rounds: "N For Time"', () => {
+    expect(formatTypeLabel('For Time', { rounds: 5, structure: 'Repeated Rounds' })).toBe('5 For Time')
+  })
+  it('For Time cu rounds dar FARA structure Repeated Rounds: ramane bare (nu orice For Time cu rounds e echivalent RFT)', () => {
+    expect(formatTypeLabel('For Time', { rounds: 5 })).toBe('For Time')
+  })
+  it('alte formate: ramane bare formatId, nicio enrichment neceruta', () => {
+    expect(formatTypeLabel('AMRAP', { durationSec: 900 })).toBe('AMRAP')
+    expect(formatTypeLabel('Strength Sets', { setsScheme: [5, 3, 1] })).toBe('Strength Sets')
+  })
+  it('config null/undefined: nu crapa', () => {
+    expect(formatTypeLabel('RFT', null)).toBe('RFT')
+    expect(formatTypeLabel('RFT', undefined)).toBe('RFT')
   })
 })
 

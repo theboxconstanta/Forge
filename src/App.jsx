@@ -1368,7 +1368,7 @@ function PastWodCard({ w, expanded, onToggle, onEdit, onDuplicate, onDelete, t, 
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {w.name ? `"${w.name}" · ` : ''}{w.type} {formatWodDurata(w.duration)}
+            {w.name ? `"${w.name}" · ` : ''}{formatTypeLabel(w.type, w.format_config)} {formatWodDurata(w.duration)}
           </div>
           <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {new Date(w.date + 'T00:00:00').toLocaleDateString(localeFor(lang))}{preview ? ` · ${preview}` : ''}
@@ -9642,7 +9642,7 @@ function App() {
                     )
                   })() : (
                   <div style={{ marginTop: '24px' }}>
-                    {metconVariantsForDisplay(primarySectionV).map((v, i) => {
+                    {(() => { const accordionScheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []; return metconVariantsForDisplay(primarySectionV).map((v, i) => {
                       const miscari = v.movements
                       const notaVarianta = v.notes
                       const isSelected = variantaAleasa === i
@@ -9676,6 +9676,9 @@ function App() {
                                   Day" de deasupra ramane doar nume + buton). */}
                               <div style={{ marginTop: '16px' }}>
                                 <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
+                                {accordionScheduleLines.map((line, li) => (
+                                  <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                                ))}
                               </div>
                               {miscari.length > 0 && (
                                 <div style={{ marginTop: '16px' }}>
@@ -9696,7 +9699,7 @@ function App() {
                           )}
                         </div>
                       )
-                    })}
+                    }) })()}
                   </div>
                   )}
                   <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
