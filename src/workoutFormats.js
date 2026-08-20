@@ -906,6 +906,18 @@ const MEMBER_BARE_VALUE_SELECT_FIELDS = new Set(['splitType', 'baseFormat', 'sco
 // Campuri care descriu doar modelul de date al lui Forge, fara niciun sens
 // pt un sportiv nici macar aratate ca valoare goala.
 const MEMBER_SUPPRESSED_FIELDS = new Set(['structure'])
+// Universal Visual Hierarchy Rule - o linie generata aici nu e automat
+// "metadata muted": doar campurile care descriu STRICT scorarea/logarea
+// (scoringMode - "Total Reps" vs "Lowest Reps" nu schimba CE faci fizic,
+// doar cum se noteaza rezultatul) sunt metadata secundara, aratata mai
+// discret. Orice altceva intors de acest fisier (schema de reps, numarul de
+// runde, work/rest, start/increment, split-ul de partener etc.) e
+// PRESCRIPTION STRUCTURE - informatie de care ai nevoie ca sa stii CE ai de
+// facut - si trebuie sa aiba aceeasi emfaza vizuala ca restul cardului, nu
+// stilul gri/muted rezervat notelor cu adevarat secundare. Clasificare pe
+// TIP/nume de camp (scoringMode), nu pe format - se aplica identic la EMOM/
+// Tabata/Intervals/Complex, fara niciun switch pe formatId.
+const MEMBER_METADATA_FIELDS = new Set(['scoringMode'])
 
 // Motorul comun din spatele randurilor member-clean - parametrizat DOAR pe
 // "suprima si campurile de timing (deja aratate intr-un header separat)?",
@@ -915,18 +927,25 @@ const MEMBER_SUPPRESSED_FIELDS = new Set(['structure'])
 // are niciun header separat) nu-l suprima, ca sa nu piarda tacut informatie
 // reala (gasit live: Skill Work tip RFT cu rounds+timeCapSec ambele setate,
 // fara alta locatie unde time cap-ul sa mai apara).
+//
+// Intoarce { prescriptionLines, metadataLines } (nu un singur array plat) -
+// ierarhia vizuala ceruta e FORMAT -> PRESCRIPTION STRUCTURE -> MISCARI ->
+// SECONDARY METADATA, adica metadata trebuie sa apara DUPA lista de
+// miscari, nu amestecata cu structura de dinaintea ei - apelantul (JSX)
+// randeaza cele doua grupuri separat, in acea ordine, cu stiluri diferite.
 function computeMemberDetailLines(formatId, config, t, suppressTimingKeys) {
   const fmt = getFormat(formatId)
   const cfg = config || {}
   const fields = fmt.config || {}
-  const lines = []
+  const prescriptionLines = []
+  const metadataLines = []
   const { consumedKeys } = computeFormatPrimaryLabel(formatId, cfg)
   const consumed = new Set(consumedKeys)
   if (suppressTimingKeys) MEMBER_HEADER_TIMING_KEYS.forEach(k => consumed.add(k))
 
   const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '' && !consumed.has(k))
   if (roundsKey) {
-    lines.push(`${cfg[roundsKey]} ${t?.memberWodRoundsLabel || 'Rounds'}`)
+    prescriptionLines.push(`${cfg[roundsKey]} ${t?.memberWodRoundsLabel || 'Rounds'}`)
     consumed.add(roundsKey)
   }
 
@@ -951,15 +970,16 @@ function computeMemberDetailLines(formatId, config, t, suppressTimingKeys) {
     else if (field.type === 'stageList') displayValue = `${value.length} etape`
     else displayValue = String(value)
 
+    const bucket = MEMBER_METADATA_FIELDS.has(key) ? metadataLines : prescriptionLines
     if (MEMBER_BARE_VALUE_TYPES.has(field.type) || MEMBER_BARE_VALUE_SELECT_FIELDS.has(key)) {
-      lines.push(displayValue)
+      bucket.push(displayValue)
       return
     }
     const label = t?.[field.labelKey] || field.labelKey
-    lines.push(`${label}: ${displayValue}`)
+    bucket.push(`${label}: ${displayValue}`)
   })
 
-  return lines
+  return { prescriptionLines, metadataLines }
 }
 
 export function formatMemberScheduleLines(formatId, config, t) {

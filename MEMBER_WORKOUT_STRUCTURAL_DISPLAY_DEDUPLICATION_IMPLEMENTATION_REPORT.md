@@ -222,6 +222,34 @@ None. Zero rows in `wods`, `workouts`, `workout_sections`, `wod_logs`, `skill_lo
 - Ascending AMRAP's `startReps`/`incrementReps`, Death By's start/increment, Superset's `targetSets`, Chained AMRAP's `stages`, Max Effort's `movement`, and the movement-list fields on Buy-In/Cash-Out remain on the generic `label: value` line — genuinely needed (their values are not self-explanatory alone) and unchanged, but the editor-style label text itself (e.g. "Reps in round 1: 3") is not yet rephrased into fully natural athlete copy. No real production evidence of a UX complaint here; left alone per "only fix proven cases," disclosed as the clearest remaining candidate if a real report surfaces.
 - `Chained AMRAP`'s `stages` field still collapses to a count-only line (`"3 stages"`) rather than expanding per-stage detail — pre-existing behavior, not part of either mission's confirmed defect class, unchanged.
 
-## Final Verdict
+## Final Verdict (before the Visual Hierarchy addendum)
 
 Both confirmed examples (RFT, Ladder) are fixed exactly as specified, the fix is implemented once in a shared, format-agnostic engine (not per-format JSX), it automatically covers the analogous Build to Heavy/1RM and Strength Sets cases plus a third real surface (Skill Work) found during the audit, all 890 real tests pass, build is clean, and zero scoring/Results/leaderboard/aggregation/Performance/Canonical Movement Identity/Admin code was touched.
+
+---
+
+## Addendum: Universal Visual Hierarchy Rule
+
+### Problem
+
+Deduplication (above) fixed *what* is shown and *what text* it uses, but every secondary line — genuinely required prescription structure (`21-18-15-12-9`, `5-5-5-5-5`, rounds, work/rest) and genuinely secondary scoring metadata (`Total Reps`, `Lowest Reps`) alike — was rendered with identical muted-gray styling (`color: #6B7280`). A member reading a Ladder card had no visual cue that the rep scheme is the thing they must actually perform, versus incidental detail.
+
+### Classification Rule (per field, not per format)
+
+Every line `computeMemberDetailLines` produces falls into exactly one of two tiers:
+- **PRESCRIPTION STRUCTURE** — everything the athlete needs to know *what to do*: rounds, rep/set schemes, work/rest, split type, base format, ladder type, start/increment reps or weight, target sets, stage counts, movement text. Default tier for every field.
+- **SECONDARY METADATA** — `scoringMode` only (`Total Reps`/`Lowest Reps`/`Max Weight`/`Total Weight`). It changes how a result is *scored/logged*, never what the athlete physically does. The one field in `MEMBER_METADATA_FIELDS`.
+
+No format is named in the classification logic — the split is keyed purely on the config field's identity (`scoringMode`), so it applies uniformly to every current and future format that happens to use that field (currently EMOM, Tabata, Intervals, Complex).
+
+### Implementation
+
+`computeMemberDetailLines` (single shared engine, already introduced by the deduplication fix above) now returns `{ prescriptionLines, metadataLines }` instead of one flat array. Both exported wrappers (`formatMemberScheduleLines`, `formatMemberSkillDetailLines`) inherit the new shape — no parallel logic. All 4 JSX call sites (single-variant member card, 4-tier accordion, Skill Work Complex branch, Skill Work generic branch) updated to render `prescriptionLines` with prescription-level emphasis (dark `#0E0E0E` text, `fontWeight: 600`, same or larger size than before) positioned between the format header and the movements list, and `metadataLines` with the pre-existing muted styling (`#6B7280`/`#888`, regular weight) positioned *after* the movements list — matching the requested `FORMAT → PRESCRIPTION STRUCTURE → MOVEMENTS/WORK → SECONDARY METADATA` order exactly, replacing the previous `FORMAT → gray technical config → MOVEMENTS` layout.
+
+### Verification
+
+24 new/updated test assertions (`formatMemberScheduleLines`/`formatMemberSkillDetailLines` now assert the `{prescriptionLines, metadataLines}` shape directly) plus explicit tier-classification tests for Tabata/Intervals/EMOM/Complex confirming `scoringMode` is the only field routed to `metadataLines`. Live-verified via `vite-node` against the mission's own worked examples (Ladder → `21-18-15-12-9` prescription, empty metadata; Strength Sets → `5-5-5-5-5` prescription) plus Tabata/Intervals (rounds+work+rest as prescription, scoring mode alone as metadata) and the same 2 real production Skill Work rows used in the base mission. 895/895 real tests pass (same 9 pre-existing unrelated Deno-import file failures), lint clean, production build clean.
+
+### Verdict
+
+Visual hierarchy now matches the requested rule across the entire 22-format registry, classified per-field (not per-format), with zero semantic/data changes and zero required structure removed.

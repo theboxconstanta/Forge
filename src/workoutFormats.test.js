@@ -801,70 +801,83 @@ describe('formatMemberScheduleLines', () => {
   const tRo = getT('ro')
   const tEn = getT('en')
 
+  it('intoarce { prescriptionLines, metadataLines }, nu un array plat', () => {
+    const result = formatMemberScheduleLines('RFT', { rounds: 4 }, tEn)
+    expect(result).toHaveProperty('prescriptionLines')
+    expect(result).toHaveProperty('metadataLines')
+  })
   it('RFT (Universal Member Workout Display Cleanup): rundele NU mai apar separat - "4 RFT" din primary deja le comunică, randul dedicat ar fi redundant', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tEn))
-      .toEqual([])
+      .toEqual({ prescriptionLines: [], metadataLines: [] })
   })
   it('RO: aceeași deduplicare, indiferent de limbă', () => {
     expect(formatMemberScheduleLines('RFT', { rounds: 4, timeCapSec: 1200 }, tRo))
-      .toEqual([])
+      .toEqual({ prescriptionLines: [], metadataLines: [] })
   })
   it('For Time cu structure Repeated Rounds: rundele NU mai apar separat (aceeași clasă de defect ca RFT)', () => {
     expect(formatMemberScheduleLines('For Time', { rounds: 5, structure: 'Repeated Rounds', timeCapSec: 1200 }, tEn))
-      .toEqual([])
+      .toEqual({ prescriptionLines: [], metadataLines: [] })
   })
-  it('For Time FĂRĂ structure Repeated Rounds: rundele NU sunt consumate de primary, deci rămân pe rândul lor natural', () => {
-    expect(formatMemberScheduleLines('For Time', { rounds: 5, timeCapSec: 1200 }, tEn))
+  it('For Time FĂRĂ structure Repeated Rounds: rundele NU sunt consumate de primary, deci rămân pe rândul lor natural (tier prescriptie)', () => {
+    expect(formatMemberScheduleLines('For Time', { rounds: 5, timeCapSec: 1200 }, tEn).prescriptionLines)
       .toEqual(['5 Rounds'])
   })
-  it('EMOM/Tabata/Complex/Intervals (rounds NU e consumat de primary la aceste formate): randul natural de runde rămâne neschimbat', () => {
-    expect(formatMemberScheduleLines('Tabata', { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Lowest Reps' }, tEn)[0]).toBe('8 Rounds')
+  it('EMOM/Tabata/Complex/Intervals (rounds NU e consumat de primary la aceste formate): randul natural de runde rămâne neschimbat, tier prescriptie', () => {
+    expect(formatMemberScheduleLines('Tabata', { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Lowest Reps' }, tEn).prescriptionLines[0]).toBe('8 Rounds')
   })
   it('Build to Heavy/1RM cu targetLabel: primary devine "5RM", niciun rând redundant "Target label: 5RM" dedesubt', () => {
-    expect(formatMemberScheduleLines('Build to Heavy/1RM', { targetLabel: '5RM' }, tEn)).toEqual([])
+    expect(formatMemberScheduleLines('Build to Heavy/1RM', { targetLabel: '5RM' }, tEn))
+      .toEqual({ prescriptionLines: [], metadataLines: [] })
   })
-  it('Ladder cu shared rep scheme: rândul e valoarea goală ("21-18-15-12-9"), FĂRĂ eticheta de editor "Shared rep scheme (e.g. 21-15-9):"', () => {
-    const lines = formatMemberScheduleLines('Ladder', { sharedRepScheme: [21, 18, 15, 12, 9], ladderType: 'Descending', timeCapSec: 1200 }, tEn)
-    expect(lines).toEqual(['21-18-15-12-9'])
-    expect(lines.join(' ')).not.toContain('Shared rep scheme')
-    expect(lines.join(' ')).not.toContain('scheme')
+  it('Ladder cu shared rep scheme: rândul e valoarea goală ("21-18-15-12-9"), FĂRĂ eticheta de editor "Shared rep scheme (e.g. 21-15-9):", tier prescriptie', () => {
+    const { prescriptionLines } = formatMemberScheduleLines('Ladder', { sharedRepScheme: [21, 18, 15, 12, 9], ladderType: 'Descending', timeCapSec: 1200 }, tEn)
+    expect(prescriptionLines).toEqual(['21-18-15-12-9'])
+    expect(prescriptionLines.join(' ')).not.toContain('Shared rep scheme')
+    expect(prescriptionLines.join(' ')).not.toContain('scheme')
   })
-  it('Ladder FĂRĂ shared rep scheme (date legacy): ladderType rămâne singura informație structurală, aratată ca valoare goală', () => {
-    expect(formatMemberScheduleLines('Ladder', { ladderType: 'Ascending', timeCapSec: 1200 }, tEn)).toEqual(['Ascending'])
+  it('Ladder FĂRĂ shared rep scheme (date legacy): ladderType rămâne singura informație structurală, aratată ca valoare goală, tier prescriptie', () => {
+    expect(formatMemberScheduleLines('Ladder', { ladderType: 'Ascending', timeCapSec: 1200 }, tEn).prescriptionLines).toEqual(['Ascending'])
   })
-  it('Strength Sets: setsScheme e valoare goală ("5-5-5-5-5"), fără eticheta "Set scheme (target reps per set):"', () => {
-    const lines = formatMemberScheduleLines('Strength Sets', { setsScheme: [5, 5, 5, 5, 5] }, tEn)
-    expect(lines).toEqual(['5-5-5-5-5'])
+  it('Strength Sets: setsScheme e valoare goală ("5-5-5-5-5"), fără eticheta "Set scheme (target reps per set):", tier prescriptie', () => {
+    expect(formatMemberScheduleLines('Strength Sets', { setsScheme: [5, 5, 5, 5, 5] }, tEn).prescriptionLines).toEqual(['5-5-5-5-5'])
   })
   it('For Time: sharedRepScheme e tot valoare goală, aceeași regulă generică (nu doar Ladder)', () => {
-    expect(formatMemberScheduleLines('For Time', { sharedRepScheme: [21, 15, 9] }, tEn)).toEqual(['21-15-9'])
+    expect(formatMemberScheduleLines('For Time', { sharedRepScheme: [21, 15, 9] }, tEn).prescriptionLines).toEqual(['21-15-9'])
   })
-  it('Partner WOD: splitType/baseFormat sunt valoare goală, fără etichetele de editor "Split type:"/"Base format:"', () => {
-    const lines = formatMemberScheduleLines('Partner WOD', { splitType: 'You go/I go', baseFormat: 'AMRAP' }, tEn)
-    expect(lines).toContain('You go/I go')
-    expect(lines).toContain('AMRAP')
-    expect(lines.join(' ')).not.toContain('Split type')
-    expect(lines.join(' ')).not.toContain('Base format')
+  it('Partner WOD: splitType/baseFormat sunt valoare goală, fără etichetele de editor "Split type:"/"Base format:", tier prescriptie (mecanica de echipa e esentiala pt cum se executa)', () => {
+    const { prescriptionLines } = formatMemberScheduleLines('Partner WOD', { splitType: 'You go/I go', baseFormat: 'AMRAP' }, tEn)
+    expect(prescriptionLines).toContain('You go/I go')
+    expect(prescriptionLines).toContain('AMRAP')
+    expect(prescriptionLines.join(' ')).not.toContain('Split type')
+    expect(prescriptionLines.join(' ')).not.toContain('Base format')
   })
-  it('For Time: câmpul intern `structure` nu apare NICIODATĂ în Member View, nici ca etichetă, nici ca valoare goală', () => {
-    const lines = formatMemberScheduleLines('For Time', { structure: 'Sequence', sharedRepScheme: [21, 15, 9] }, tEn)
-    expect(lines.join(' ')).not.toContain('Sequence')
-    expect(lines.join(' ')).not.toContain('Structure')
+  it('For Time: câmpul intern `structure` nu apare NICIODATĂ în Member View, nici ca etichetă, nici ca valoare goală, în niciun tier', () => {
+    const { prescriptionLines, metadataLines } = formatMemberScheduleLines('For Time', { structure: 'Sequence', sharedRepScheme: [21, 15, 9] }, tEn)
+    expect([...prescriptionLines, ...metadataLines].join(' ')).not.toContain('Sequence')
+    expect([...prescriptionLines, ...metadataLines].join(' ')).not.toContain('Structure')
   })
   it('AMRAP: fără câmpul "rounds", durata proprie nu mai apare aici (e în header)', () => {
-    expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual([])
+    expect(formatMemberScheduleLines('AMRAP', { durationSec: 900 }, tEn)).toEqual({ prescriptionLines: [], metadataLines: [] })
   })
-  it('EMOM: totalRounds mapează pe rândul de runde, intervalSec cade pe rândul generic', () => {
-    const lines = formatMemberScheduleLines('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)
-    expect(lines[0]).toBe('12 Rounds')
-    expect(lines.some(l => l.includes('1:00'))).toBe(true)
+  it('EMOM: totalRounds mapează pe rândul de runde, intervalSec cade pe rândul generic - ambele tier prescriptie (structura fizica a antrenamentului)', () => {
+    const { prescriptionLines } = formatMemberScheduleLines('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)
+    expect(prescriptionLines[0]).toBe('12 Rounds')
+    expect(prescriptionLines.some(l => l.includes('1:00'))).toBe(true)
   })
   it('câmpuri fără time cap/runde nu produc rânduri goale sau lipsă', () => {
-    expect(formatMemberScheduleLines('For Time', {}, tEn)).toEqual([])
+    expect(formatMemberScheduleLines('For Time', {}, tEn)).toEqual({ prescriptionLines: [], metadataLines: [] })
   })
   it('un format fără time cap/runde dar cu alt câmp păstrează acel câmp pe rândul generic', () => {
-    const lines = formatMemberScheduleLines('Ladder', { ladderType: 'Ascending' }, tEn)
-    expect(lines.some(l => l.includes('Ascending'))).toBe(true)
+    expect(formatMemberScheduleLines('Ladder', { ladderType: 'Ascending' }, tEn).prescriptionLines.some(l => l.includes('Ascending'))).toBe(true)
+  })
+  it('Universal Visual Hierarchy Rule: scoringMode (EMOM/Tabata/Intervals/Complex) e SINGURUL câmp tier metadata - nu schimbă CE faci fizic, doar cum se notează scorul', () => {
+    expect(formatMemberScheduleLines('Tabata', { rounds: 8, workSec: 20, restSec: 10, scoringMode: 'Lowest Reps' }, tEn).metadataLines).toEqual(['Lowest Reps'])
+    expect(formatMemberScheduleLines('Intervals', { rounds: 10, workSec: 60, restSec: 60, scoringMode: 'Total Reps' }, tEn).metadataLines).toEqual(['Total Reps'])
+    expect(formatMemberScheduleLines('EMOM', { totalRounds: 10, intervalSec: 60, scoringMode: 'Total Reps' }, tEn).metadataLines).toEqual(['Total Reps'])
+    expect(formatMemberScheduleLines('Complex', { complexMovements: ['Clean'], rounds: 3, scoringMode: 'Max Weight' }, tEn).metadataLines).toEqual(['Max Weight'])
+  })
+  it('fara scoringMode, metadataLines e mereu gol pt formatele testate mai sus', () => {
+    expect(formatMemberScheduleLines('Tabata', { rounds: 8, workSec: 20, restSec: 10 }, tEn).metadataLines).toEqual([])
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberScheduleLines(id, {}, tEn)).not.toThrow())
@@ -874,17 +887,25 @@ describe('formatMemberScheduleLines', () => {
 describe('formatMemberSkillDetailLines (Universal Member Workout Display Cleanup - Skill Work de pe Acasa, fără header separat)', () => {
   const tEn = getT('en')
 
+  it('intoarce { prescriptionLines, metadataLines }, nu un array plat', () => {
+    const result = formatMemberSkillDetailLines('RFT', { rounds: 3 }, tEn)
+    expect(result).toHaveProperty('prescriptionLines')
+    expect(result).toHaveProperty('metadataLines')
+  })
   it('spre deosebire de formatMemberScheduleLines, NU suprimă time cap/durata - nu există alt loc unde ar mai fi arătate (găsit live: Skill Work tip RFT cu rounds+timeCapSec)', () => {
-    const lines = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
-    expect(lines.some(l => l.includes('20:00'))).toBe(true)
+    const { prescriptionLines } = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
+    expect(prescriptionLines.some(l => l.includes('20:00'))).toBe(true)
   })
   it('rundele tot nu se duplică - RFT rămâne fără un rând separat "3 Rounds" (rounds e deja în primary, formatTypeLabel)', () => {
-    const lines = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
-    expect(lines.some(l => /rounds/i.test(l))).toBe(false)
+    const { prescriptionLines } = formatMemberSkillDetailLines('RFT', { rounds: 3, timeCapSec: 1200 }, tEn)
+    expect(prescriptionLines.some(l => /rounds/i.test(l))).toBe(false)
   })
-  it('Complex: rounds apare curat ("3 Rounds"), fără eticheta de editor "Rounds/attempts:"', () => {
-    const lines = formatMemberSkillDetailLines('Complex', { rounds: 3 }, tEn)
-    expect(lines).toEqual(['3 Rounds'])
+  it('Complex: rounds apare curat ("3 Rounds"), fără eticheta de editor "Rounds/attempts:", tier prescriptie', () => {
+    expect(formatMemberSkillDetailLines('Complex', { rounds: 3 }, tEn)).toEqual({ prescriptionLines: ['3 Rounds'], metadataLines: [] })
+  })
+  it('scoringMode ramane tier metadata si aici (aceeasi regula, indiferent de context)', () => {
+    expect(formatMemberSkillDetailLines('Complex', { rounds: 3, scoringMode: 'Total Weight' }, tEn))
+      .toEqual({ prescriptionLines: ['3 Rounds'], metadataLines: ['Total Weight'] })
   })
   it('nu crapă pentru niciun format din catalog, cu orice config gol', () => {
     FORMAT_IDS.forEach(id => expect(() => formatMemberSkillDetailLines(id, {}, tEn)).not.toThrow())

@@ -5842,16 +5842,33 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
               return (
                 <div style={{ marginTop: '8px' }}>
                   <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>COMPLEX</div>
-                  {complexScheduleLines.map((line, li) => (
-                    <div key={li} style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{line}</div>
+                  {/* Universal Visual Hierarchy Rule - prescriptie (runde etc.)
+                      la fel de proeminenta ca restul cardului, nu gri/muted;
+                      metadata (scoringMode) ramane discreta, DUPA miscari. */}
+                  {complexScheduleLines.prescriptionLines.map((line, li) => (
+                    <div key={li} style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>{line}</div>
                   ))}
                   <div style={{ fontSize: '12px', color: '#555', marginTop: '3px' }}>{complexMovements.join(' + ')}</div>
+                  {complexScheduleLines.metadataLines.map((line, li) => (
+                    <div key={li} style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{line}</div>
+                  ))}
                 </div>
               )
             }
             const scheduleLines = formatMemberSkillDetailLines(skillType, skillFormatConfig, t)
-            return scheduleLines.length > 0 && (
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{formatTypeLabel(skillType, skillFormatConfig)} — {scheduleLines.join(' · ')}</div>
+            if (scheduleLines.prescriptionLines.length === 0 && scheduleLines.metadataLines.length === 0) return null
+            return (
+              <div style={{ marginTop: '8px' }}>
+                {scheduleLines.prescriptionLines.length > 0 && (
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{formatTypeLabel(skillType, skillFormatConfig)} — {scheduleLines.prescriptionLines.join(' · ')}</div>
+                )}
+                {scheduleLines.metadataLines.length > 0 && (
+                  <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                    {scheduleLines.prescriptionLines.length === 0 && `${formatTypeLabel(skillType, skillFormatConfig)} — `}
+                    {scheduleLines.metadataLines.join(' · ')}
+                  </div>
+                )}
+              </div>
             )
           })()}
           <div style={{ marginTop: '10px' }}>
@@ -9641,8 +9658,14 @@ function App() {
                           <span style={{ fontSize: '14px', fontWeight: '500', color: '#0E0E0E' }}>{v.nivel}</span>
                         </div>
                         <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
-                        {scheduleLines.map((line, li) => (
-                          <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                        {/* Universal Visual Hierarchy Rule - FORMAT -> PRESCRIPTION
+                            STRUCTURE (aceeasi emfaza ca restul cardului - text
+                            inchis, semibold, NU stilul gri/muted de metadata) ->
+                            MISCARI -> SECONDARY METADATA (scoringMode etc.,
+                            dupa miscari, discret). Clasificarea vine din
+                            workoutFormats.js (per camp, nu per format). */}
+                        {scheduleLines.prescriptionLines.map((line, li) => (
+                          <div key={li} style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                         ))}
                         {miscari.length > 0 && (
                           <div style={{ marginTop: '16px' }}>
@@ -9653,6 +9676,9 @@ function App() {
                             ))}
                           </div>
                         )}
+                        {scheduleLines.metadataLines.map((line, li) => (
+                          <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
+                        ))}
                         {notaVarianta && (
                           <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
@@ -9697,8 +9723,11 @@ function App() {
                                   Day" de deasupra ramane doar nume + buton). */}
                               <div style={{ marginTop: '16px' }}>
                                 <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
-                                {accordionScheduleLines.map((line, li) => (
-                                  <div key={li} style={{ fontSize: '15px', color: '#6B7280', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                                {/* Universal Visual Hierarchy Rule - vezi
+                                    comentariul identic din ramura membrului cu o
+                                    singura varianta, mai sus. */}
+                                {accordionScheduleLines.prescriptionLines.map((line, li) => (
+                                  <div key={li} style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                                 ))}
                               </div>
                               {miscari.length > 0 && (
@@ -9710,6 +9739,9 @@ function App() {
                                   ))}
                                 </div>
                               )}
+                              {accordionScheduleLines.metadataLines.map((line, li) => (
+                                <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
+                              ))}
                               {notaVarianta && (
                                 <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
                                   <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
