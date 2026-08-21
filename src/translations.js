@@ -1061,6 +1061,8 @@ export const TRANSLATIONS = {
       ? 'Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - niciuna nu e marcată acum.'
       : `Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - ${n} sunt marcate acum.`,
     wodSectionsErrorTooMany: (n) => `Prea multe sectiuni suplimentare (${n}) - Member View-ul actual poate arăta cel mult 3, pe lângă sectiunea principală. Șterge sau reorganizează sectiunile ca să poți salva.`,
+    wodSectionsErrorTooManyWarmup: (n) => `Prea multe sectiuni de tip Warm-up (${n}) - modelul actual poate salva cel mult 1. Șterge sau schimbă tipul celorlalte ca să poți salva.`,
+    wodSectionsErrorTooManyOther: (n) => `Prea multe sectiuni non-Warm-up (${n}) - modelul actual poate salva cel mult 2 (ex. Skill + Strength), pe lângă sectiunea principală. Șterge sau reorganizează sectiunile ca să poți salva.`,
     // Member Performance, Faza 4 - completeaza campul lipsa inainte de salvare
     // (setsScheme la Strength Sets, movements/targetSets la Superset) - fara
     // acest camp, istoricul de miscari al membrului nu poate distinge un test
@@ -2202,6 +2204,8 @@ export const TRANSLATIONS = {
       ? 'Exactly one section must be marked as the primary (scored) workout - none is marked right now.'
       : `Exactly one section must be marked as the primary (scored) workout - ${n} are marked right now.`,
     wodSectionsErrorTooMany: (n) => `Too many additional sections (${n}) - the current Member View can show at most 3 alongside the primary section. Remove or reorganize sections to save.`,
+    wodSectionsErrorTooManyWarmup: (n) => `Too many Warm-up sections (${n}) - the current model can save at most 1. Remove or retype the others to save.`,
+    wodSectionsErrorTooManyOther: (n) => `Too many non-Warm-up sections (${n}) - the current model can save at most 2 (e.g. Skill + Strength) alongside the primary section. Remove or reorganize sections to save.`,
     wodSectionsErrorMissingFormatFields: (format) => `The "${format}" section is missing a required field (e.g. the set scheme for Strength Sets, or the movements/set count for Superset) - fill it in to save.`,
     wodSectionScoredToggle: 'Independently scored (has its own leaderboard)',
     wodSectionScoredBadge: 'scored',

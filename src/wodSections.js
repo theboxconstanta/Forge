@@ -195,50 +195,74 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
 // sectiunile in memorie DUPA un salvare reusit) sa foloseasca EXACT acelasi
 // calcul, o singura data - niciodata doua implementari separate care ar
 // putea diverge intre ele.
+// Bug real gasit + reprodus (raport Fix SKILL Sections Rendering as
+// WARM-UP): o sectiune noua tastata explicit "Skill" (sau orice alt tip
+// non-warmup) de coach, NESCORATA, ajungea in slotul legacy `warmup` doar
+// pt ca `warmup` era primul verificat in bucla pozitionala de mai jos -
+// typeKey-ul ales de coach nu era consultat DELOC la alegerea slotului.
+// Pe Member View, slotul `warmup` are mereu titlul hardcodat "WARM-UP"
+// (App.jsx, indiferent de typeKey), deci sectiunea aparea gresit ca
+// Warm-up. Fix: candidatii se impart intai dupa typeKey (warmup vs
+// non-warmup) - un candidat non-warmup nu mai concureaza NICIODATA pe
+// slotul warmup, si invers. `validateSectionsForLegacy` (mai jos in fisier)
+// garanteaza dinainte de salvare ca exista loc (max 1 warmup + max 2
+// non-warmup) - fara acea garantie, un candidat ramas fara slot ar fi
+// disparut silentios din payload, nu doar mislabeled.
 export const assignNonPrimarySlots = (sections) => {
   const nonPrimary = sections.filter(s => !s.isPrimary)
   const bySlot = { warmup: null, skill: null, skill2: null }
   const unassigned = []
   for (const s of nonPrimary) {
-    if (s.legacySlot && !bySlot[s.legacySlot]) bySlot[s.legacySlot] = s
+    // legacySlot-ul existent e onorat DOAR daca ramane compatibil cu
+    // typeKey-ul CURENT al sectiunii - slotul warmup n-are nicio coloana de
+    // format/nume (nonPrimaryFields mai jos), deci o sectiune re-tastata
+    // intre warmup <-> non-warmup nu-si mai poate pastra slotul vechi (bug
+    // real gasit separat: re-tastarea unui WARM-UP existent ca SKILL
+    // continua sa scrie in coloanele warmup, pierzand continutul, fiindca
+    // legacySlot ramanea "warmup" dupa schimbarea typeKey-ului).
+    const slotStillCompatible = s.legacySlot && ((s.legacySlot === 'warmup') === (s.typeKey === 'warmup'))
+    if (slotStillCompatible && !bySlot[s.legacySlot]) bySlot[s.legacySlot] = s
     else unassigned.push(s)
   }
+  const warmupCandidati = unassigned.filter(s => s.typeKey === 'warmup')
+  const otherCandidati = unassigned.filter(s => s.typeKey !== 'warmup')
+
   // Un candidat NOU marcat `scored` primeste prioritate pe skill/skill2 -
   // coloana warmup n-are NICIUN camp de format/scored (nonPrimaryFields mai
   // jos scrie doar warmup/warmup_visible pt ea), deci o sectiune scorata
   // ajunsa acolo si-ar pierde silentios formatul si flagul `scored`. Restul
-  // candidatilor (nescorati) raman POZITIONALI ca inainte (warmup/skill/
-  // skill2, in ordinea lor din lista) - comportament neschimbat pt cazul
-  // fara nimic de pierdut.
-  const scoredCandidati = unassigned.filter(s => s.scored)
-  const restCandidati = unassigned.filter(s => !s.scored)
+  // candidatilor non-warmup (nescorati) raman POZITIONALI intre ei
+  // (skill/skill2, in ordinea lor din lista) - comportament neschimbat pt
+  // cazul fara nimic de pierdut, doar nu mai concureaza cu warmup.
+  const scoredCandidati = otherCandidati.filter(s => s.scored)
+  const restCandidati = otherCandidati.filter(s => !s.scored)
   for (const slot of ['skill', 'skill2']) {
     if (!bySlot[slot] && scoredCandidati.length > 0) bySlot[slot] = scoredCandidati.shift()
   }
-  for (const slot of ['warmup', 'skill', 'skill2']) {
+  for (const slot of ['skill', 'skill2']) {
     if (!bySlot[slot] && restCandidati.length > 0) bySlot[slot] = restCandidati.shift()
   }
+  if (!bySlot.warmup && warmupCandidati.length > 0) bySlot.warmup = warmupCandidati.shift()
   return bySlot
 }
 
-// Sectiunile deja existente (legacySlot != null) isi pastreaza slotul prin
-// constructie (assignNonPrimarySlots de mai sus le respecta primele) - doar
-// sectiunile INCA null au nevoie sa fie "stampilate" dupa un salvare reusit.
-// Fara asta, o sectiune noua ramane legacySlot:null la nesfarsit CAT TIMP
-// coach-ul nu paraseste/reincarca editorul (sectionsFromLegacyWod e singurul
-// alt loc care seteaza legacySlot) - o fereastra reala, desi neconfirmata sa
-// fi produs vreodata un rezultat gresit (investigatie PROGRAMMING_SKILL_
-// SECTION_FORMAT_INHERITANCE_FIX_REPORT.md: 5 reproduceri directe, toate
-// corecte), in care identitatea unei sectiuni noi ramane dependenta de
-// pozitie in loc sa fie ferm stabilita imediat ce exista un rand real in DB
-// careia ii corespunde. Returneaza un Map id->slot, aplicat de apelant
-// (App.jsx) peste starea locala dupa succesul salvarii.
+// Sectiunile deja existente cu un legacySlot inca COMPATIBIL isi pastreaza
+// slotul prin constructie (assignNonPrimarySlots de mai sus le respecta
+// primele) - dar doua categorii de sectiuni au nevoie sa fie "stampilate"
+// (sau re-stampilate) dupa un salvare reusit: cele INCA null (niciodata
+// salvate) SI cele al caror slot vechi a devenit incompatibil cu typeKey-ul
+// lor curent (re-tastate intre warmup <-> non-warmup - vezi comentariul din
+// assignNonPrimarySlots). Fara actualizarea si pt a doua categorie, starea
+// locala din editor ar continua sa creada ca sectiunea e inca in vechiul ei
+// slot pana la un reload complet, desi salvarea in DB s-a facut deja corect
+// in noul slot. Returneaza un Map id->slot, aplicat de apelant (App.jsx)
+// peste starea locala dupa succesul salvarii.
 export const legacySlotAssignmentAfterSave = (sections) => {
   const bySlot = assignNonPrimarySlots(sections)
   const map = new Map()
   for (const slot of ['warmup', 'skill', 'skill2']) {
     const s = bySlot[slot]
-    if (s && !s.legacySlot) map.set(s.id, slot)
+    if (s && s.legacySlot !== slot) map.set(s.id, slot)
   }
   return map
 }
@@ -342,9 +366,25 @@ export function validateMovementPerformanceMetadata(sections, t) {
 export const validateSectionsForLegacy = (sections, t) => {
   const errors = []
   const primaryCount = sections.filter(s => s.isPrimary).length
-  const nonPrimaryCount = sections.length - primaryCount
+  const nonPrimary = sections.filter(s => !s.isPrimary)
+  const nonPrimaryCount = nonPrimary.length
   if (primaryCount !== 1) errors.push(t.wodSectionsErrorPrimaryCount(primaryCount))
-  if (nonPrimaryCount > 3) errors.push(t.wodSectionsErrorTooMany(nonPrimaryCount))
+  if (nonPrimaryCount > 3) {
+    errors.push(t.wodSectionsErrorTooMany(nonPrimaryCount))
+  } else {
+    // Fix SKILL Sections Rendering as WARM-UP - "<=3 total" singur nu
+    // garanta ca fiecare sectiune are un slot legacy compatibil: modelul
+    // are DOAR 1 slot warmup si 2 sloturi non-warmup (skill/skill2), nu
+    // "3 oricare". 3 sectiuni typeKey=skill (fara niciun warmup) treceau
+    // validarea veche dar una din ele ar fi ramas fara slot compatibil -
+    // assignNonPrimarySlots ar fi facut-o sa dispara silentios din payload
+    // in loc doar sa fie mislabeled. Verificat separat, dupa gate-ul de
+    // total, ca sa nu dubleze eroarea cand oricum sunt prea multe in total.
+    const warmupCount = nonPrimary.filter(s => s.typeKey === 'warmup').length
+    const otherCount = nonPrimaryCount - warmupCount
+    if (warmupCount > 1) errors.push(t.wodSectionsErrorTooManyWarmup(warmupCount))
+    if (otherCount > 2) errors.push(t.wodSectionsErrorTooManyOther(otherCount))
+  }
   errors.push(...validateMovementPerformanceMetadata(sections, t))
   return { valid: errors.length === 0, errors }
 }

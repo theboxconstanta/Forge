@@ -9,6 +9,8 @@ import {
 const t = {
   wodSectionsErrorPrimaryCount: (n) => `PRIMARY_COUNT:${n}`,
   wodSectionsErrorTooMany: (n) => `TOO_MANY:${n}`,
+  wodSectionsErrorTooManyWarmup: (n) => `TOO_MANY_WARMUP:${n}`,
+  wodSectionsErrorTooManyOther: (n) => `TOO_MANY_OTHER:${n}`,
   wodSectionsErrorMissingFormatFields: (format) => `MISSING_FIELDS:${format}`,
 }
 
@@ -136,18 +138,79 @@ describe('legacyPayloadFromSections', () => {
     expect(payload.movements_rx).toEqual(wodFixtureWithExtras.movements_rx)
   })
 
-  it('mapare POZITIONALA, nu pe typeKey - primele 3 sectiuni non-primare merg pe warmup/skill/skill2 in ordinea din lista, indiferent de tipul lor', () => {
+  // Fix SKILL Sections Rendering as WARM-UP - mapare-a NU mai e strict
+  // pozitionala pt slotul warmup: doar o sectiune typeKey==='warmup' poate
+  // ajunge acolo, indiferent de pozitia ei in lista. O sectiune 'cooldown'/
+  // 'mobility'/'skill'/etc, chiar nescorata, concureaza DOAR pe skill/skill2
+  // (pozitional intre ele, ca inainte) - niciodata pe warmup, unde si-ar
+  // pierde silentios continutul (coloana warmup n-are camp de nume/format).
+  it('sectiuni non-warmup (cooldown, mobility) NU ajung niciodata pe warmup, indiferent de ordine - concureaza doar pe skill/skill2', () => {
     const sections = [
       { ...createSection('cooldown', false), text: 'linia unu' },
       { ...createSection('mobility', false), movementName: 'Hip openers', format: 'Weightlifting', text: '' },
       createSection('metcon', true),
     ]
     const payload = legacyPayloadFromSections(sections)
-    // prima sectiune non-primara (typeKey 'cooldown') -> coloana warmup
-    expect(payload.warmup).toEqual(['linia unu'])
-    // a doua sectiune non-primara (typeKey 'mobility') -> coloana skill
-    expect(payload.skill_name).toBe('Hip openers')
-    expect(payload.skill2).toEqual([])
+    expect(payload.warmup).toEqual([])
+    // prima sectiune non-warmup (typeKey 'cooldown') -> coloana skill
+    expect(payload.skill).toEqual(['linia unu'])
+    // a doua sectiune non-warmup (typeKey 'mobility') -> coloana skill2
+    expect(payload.skill2_name).toBe('Hip openers')
+  })
+
+  it('o sectiune typeKey warmup ajunge NUMAI pe warmup, chiar daca skill/skill2 sunt deja ocupate', () => {
+    const skill = { ...createSection('skill', false), movementName: 'A' }
+    const skill2 = { ...createSection('skill', false), movementName: 'B' }
+    const warmup = { ...createSection('warmup', false), text: 'usor 10 min' }
+    const primary = createSection('metcon', true)
+    const payload = legacyPayloadFromSections([skill, skill2, warmup, primary])
+    expect(payload.warmup).toEqual(['usor 10 min'])
+    expect(payload.skill_name).toBe('A')
+    expect(payload.skill2_name).toBe('B')
+  })
+
+  it('THE FIX (bug real raportat): o sectiune NOUA, nescorata, tastata explicit SKILL nu mai ajunge pe warmup cand e singura sectiune non-primara', () => {
+    const skillSection = { ...createSection('skill', false), scored: false, movementName: '10/10 Bulgarian Split Squats' }
+    const primary = createSection('metcon', true)
+    const payload = legacyPayloadFromSections([skillSection, primary])
+    expect(payload.warmup).toEqual([])
+    expect(payload.skill_name).toBe('10/10 Bulgarian Split Squats')
+  })
+
+  it('WITHOUT the fix, the same case WOULD have landed in warmup - proves the test above is meaningful, not vacuous', () => {
+    // Reproduce the OLD assignNonPrimarySlots behavior directly (inline, not
+    // imported - the real function is already fixed) to document exactly
+    // what the bug looked like before this patch.
+    const oldAssignNonPrimarySlots = (sections) => {
+      const nonPrimary = sections.filter(s => !s.isPrimary)
+      const bySlot = { warmup: null, skill: null, skill2: null }
+      const unassigned = nonPrimary.filter(s => !(s.legacySlot && !bySlot[s.legacySlot]))
+      const scoredCandidati = unassigned.filter(s => s.scored)
+      const restCandidati = unassigned.filter(s => !s.scored)
+      for (const slot of ['skill', 'skill2']) {
+        if (!bySlot[slot] && scoredCandidati.length > 0) bySlot[slot] = scoredCandidati.shift()
+      }
+      for (const slot of ['warmup', 'skill', 'skill2']) {
+        if (!bySlot[slot] && restCandidati.length > 0) bySlot[slot] = restCandidati.shift()
+      }
+      return bySlot
+    }
+    const skillSection = { ...createSection('skill', false), scored: false, movementName: '10/10 Bulgarian Split Squats' }
+    const primary = createSection('metcon', true)
+    expect(oldAssignNonPrimarySlots([skillSection, primary]).warmup).toBe(skillSection)
+  })
+
+  it('re-tastarea unei sectiuni EXISTENTE (WARM-UP -> SKILL) nu-si mai pastreaza slotul incompatibil - Test 6 din raport', () => {
+    const existingWarmup = { ...createSection('warmup', false), legacySlot: 'warmup', text: 'usor' }
+    const retyped = { ...existingWarmup, typeKey: 'skill', text: '', movementName: '10/10 Bulgarian Split Squats' }
+    const primary = createSection('metcon', true)
+    const payload = legacyPayloadFromSections([retyped, primary])
+    expect(payload.warmup).toEqual([])
+    expect(payload.skill_name).toBe('10/10 Bulgarian Split Squats')
+    // legacySlotAssignmentAfterSave trebuie sa re-stampileze noul slot -
+    // nu doar sectiunile cu legacySlot inca null.
+    const map = legacySlotAssignmentAfterSave([retyped, primary])
+    expect(map.get(retyped.id)).toBe('skill')
   })
 
   it('reordonarea a doua sectiuni non-primare schimba CE ajunge in care coloana legacy', () => {
@@ -293,6 +356,33 @@ describe('validateSectionsForLegacy', () => {
     expect(result.errors).toContain('PRIMARY_COUNT:2')
   })
 
+  // Fix SKILL Sections Rendering as WARM-UP - "<=3 total" singur nu garanta
+  // ca fiecare sectiune are un slot compatibil (doar 1 slot warmup exista).
+  it('invalid: 2 sectiuni typeKey warmup (modelul are un singur slot warmup)', () => {
+    const sections = [createSection('warmup', false), createSection('warmup', false), createSection('metcon', true)]
+    const result = validateSectionsForLegacy(sections, t)
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('TOO_MANY_WARMUP:2')
+  })
+
+  it('invalid: 3 sectiuni non-warmup (modelul are doar 2 sloturi skill/skill2)', () => {
+    const sections = [
+      createSection('skill', false), createSection('strength', false), createSection('cooldown', false),
+      createSection('metcon', true),
+    ]
+    const result = validateSectionsForLegacy(sections, t)
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('TOO_MANY_OTHER:3')
+  })
+
+  it('valid: exact 1 warmup + 2 non-warmup (Test 4 din raport - WARM-UP/SKILL/STRENGTH/WORKOUT)', () => {
+    const sections = [
+      createSection('warmup', false), createSection('skill', false), createSection('strength', false),
+      createSection('metcon', true),
+    ]
+    expect(validateSectionsForLegacy(sections, t)).toEqual({ valid: true, errors: [] })
+  })
+
   it('invalid: mai mult de 3 sectiuni non-primare', () => {
     const sections = [
       createSection('warmup', false), createSection('skill', false),
@@ -350,14 +440,11 @@ describe('assignNonPrimarySlots / legacySlotAssignmentAfterSave (Layer 2b.1 hard
     expect(map.size).toBe(0)
   })
 
-  it('an unscored brand-new section still gets stamped (positional fallback slot, warmup first), not just scored ones', () => {
+  it('an unscored brand-new section still gets stamped (positional fallback among non-warmup slots), not just scored ones', () => {
     const primary = createSection('metcon', true)
     const plain = { ...createSection('skill', false), scored: false, movementName: 'Plain' }
-    // Unscored candidates fill 'warmup' first (restCandidati loop order),
-    // matching assignNonPrimarySlots' existing, unchanged positional
-    // fallback - only scored candidates get skill/skill2 priority.
     const map = legacySlotAssignmentAfterSave([plain, primary])
-    expect(map.get(plain.id)).toBe('warmup')
+    expect(map.get(plain.id)).toBe('skill')
   })
 
   it('THE FIX: stamping legacySlot after the first save prevents a later in-session reorder (no reload) from swapping content between slots', () => {
