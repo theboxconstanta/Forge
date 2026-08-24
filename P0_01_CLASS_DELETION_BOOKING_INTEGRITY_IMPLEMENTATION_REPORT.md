@@ -98,4 +98,45 @@ No JS/TS unit test file exists for these three functions today (they are inline 
 
 ---
 
+## 10. Follow-up Correction — Two Edge-Case Invariants Verified
+
+Two additional invariants were requested after the above shipped: (1) past-vs-future classification must use the class's actual scheduled date **and time**, not calendar date alone; (2) a booking with `checked_in = true` must never be destroyable by class deletion, regardless of date/time. **Both were re-checked directly against the deployed trigger's live source and confirmed NOT guaranteed** — the original policy compared `OLD.date < current_date` (date-only) and had no `checked_in` check at all.
+
+**Corrected via `supabase/migrations/20260825130000_p0_01_deletion_policy_time_and_checkin_guard.sql`** — one function replacement (`CREATE OR REPLACE`, same function/trigger name, no new trigger, no schema change), applied directly to production:
+
+```sql
+-- Invariant 2 first, unconditional, independent of date/time:
+IF v_checked_in_count > 0 THEN
+  RAISE EXCEPTION 'cannot delete this class: % booking(s) have recorded
+    attendance (checked_in) - this would destroy attendance history', ...;
+END IF;
+
+-- Invariant 1: full datetime boundary, not date-only:
+v_class_ended := (OLD.date + OLD.end_time) < now();
+IF v_class_ended THEN
+  RAISE EXCEPTION 'cannot delete a past class with % existing booking(s)...';
+END IF;
+```
+
+`(OLD.date + OLD.end_time)` produces a naive timestamp, compared against `now()` (`timestamptz`) — Postgres evaluates this in the session's timezone (confirmed UTC), the same convention every other date/time comparison already in use on this table follows (e.g. `enforce_subscription_sessions` comparing `classes.date` directly) — not a new timezone assumption introduced here.
+
+### Test results (live, disposable data, fully cleaned up afterward)
+
+| Case | Setup | Expected | Result |
+|---|---|---|---|
+| 1 | Class dated **today**, `03:00–04:00` (already ended relative to the actual server time this test ran at, `07:36 UTC`), 1 booking, `checked_in=false` | Blocked (Invariant 1 — same calendar date, but already ended) | ✅ `ERROR: cannot delete a past class with 1 existing booking(s)...` |
+| 2 | Class dated **today**, `20:00–21:00` (not yet ended), 1 booking, `checked_in=false` | Succeeds, cascades (regression check — legitimate same-day-future case must still work) | ✅ Deleted cleanly, booking cascaded, confirmed zero rows left for either |
+| 3 | Class dated **today**, `20:00–21:00` (**not yet ended** — future by the date/time boundary alone), 1 booking, `checked_in=true` | Blocked (Invariant 2 must override/precede the date/time check) | ✅ `ERROR: cannot delete this class: 1 booking(s) have recorded attendance (checked_in)...` — proves the checked-in guard fires independently of the future classification |
+| 4 | Class dated **tomorrow**, 1 booking, `checked_in=true` | Blocked (Invariant 2 applies "regardless of date/time," including clearly-future dates) | ✅ Same error as Case 3 |
+
+Case 3 is the decisive proof for Invariant 2: a class that the date/time logic alone would classify as safely cascadable is still blocked purely because of its `checked_in=true` booking — the two checks are independent, and the attendance guard takes precedence unconditionally.
+
+All 4 test classes and their bookings were fully deleted after verification (bookings removed first, then the — by then bookingless — class rows). The platform-wide orphan count was re-queried immediately after cleanup and confirmed still exactly **480** — unchanged by this second round of testing, same pre-existing legacy rows as before, no new orphan created at any point.
+
+Regression: full test suite and lint were not re-run for this follow-up since no JS/app-layer file changed — only the DB trigger function was replaced. The original §7's app-layer coverage (`stergeClasa`/`stergeClaseleTrecute`/`stergeSeria`) is unaffected by this correction; their behavior toward the trigger is unchanged (they still confirm, still check for the delete's own error, still surface a clear message when the DB rejects a past class with bookings — the rejection now simply also covers the two newly-corrected cases, which is exactly the intended tightening, not a new code path in the app itself).
+
+Both requested invariants are now confirmed held at the database level, verified live, not merely asserted.
+
+---
+
 Stopping here per this task's own instruction. P0-02 or any further audit item has not been started.
