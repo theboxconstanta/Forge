@@ -18,6 +18,7 @@
 // - 'nft'     - Not For Time: doar completat + nota, fara scor
 
 import { convertWeight, secToTime } from './utils'
+import { resolveAthleteGenderKey } from './rxEngine'
 import { classifyRxStatus } from './rxEngine'
 
 // Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
@@ -584,10 +585,26 @@ export const ALL_WEIGHT_COLUMNS = VARIANTE_WEIGHT_BASE.flatMap(v => [`${v.key}_w
 // combinata nu se poate compara cu greutatea individuala logata de un
 // membru). Sursa unica pentru App.jsx (VARIANTE_CONFIG), JurnalList si
 // Clasament, ca sa nu existe mai multe maps hardcodate care pot desincroniza.
+//
+// P0-02 (audit platforma) - inainte, ramura de gen era un ternar inline
+// (`gender === 'feminin' ? 'female' : 'male'`) care trata ORICE valoare
+// non-'feminin' - inclusiv null/undefined/o valoare invalida - ca 'male',
+// silentios. resolveAthleteGenderKey (rxEngine.js) exista deja ca rezolvator
+// null-safe (intoarce null pt gen nesetat/nerecunoscut, nu presupune 'male')
+// dar era folosit doar de fluxul de afisare a textului miscarilor
+// (resolveMovementDisplayText), niciodata aici - doua politici diferite pt
+// exact aceeasi intrebare ("ce gen are membrul asta?"), care puteau
+// interpreta acelasi profil diferit in surse diferite ale aplicatiei. Acum
+// SINGURUL loc care decide gen-ul e resolveAthleteGenderKey; aici doar
+// construim numele coloanei din rezultatul lui. Gen nerezolvat -> null
+// explicit (nicio coloana, deci niciun preset gresit) - politica de "unknown
+// explicit", nu un fallback silentios pe un gen implicit.
 export function weightKeyForVariant(nivel, gender) {
   const v = VARIANTE_WEIGHT_BASE.find(v => v.nivel === nivel)
   if (!v) return null
-  return `${v.key}_weight_${gender === 'feminin' ? 'female' : 'male'}`
+  const genderKey = resolveAthleteGenderKey(gender)
+  if (!genderKey) return null
+  return `${v.key}_weight_${genderKey}`
 }
 
 // scoreMode-ul REAL folosit la logare, nu doar cel din catalog. La Partner

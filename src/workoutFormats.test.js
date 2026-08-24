@@ -136,12 +136,28 @@ describe('weightKeyForVariant', () => {
     expect(weightKeyForVariant('Beginner', 'feminin')).toBe('beginner_weight_female')
     expect(weightKeyForVariant('OnRamp', 'masculin')).toBe('onramp_weight_male')
   })
-  it('gen lipsa/necunoscut cade pe male (fallback existent inainte de completarea profilului)', () => {
-    expect(weightKeyForVariant('RX', undefined)).toBe('rx_weight_male')
+  // P0-02 (audit platforma) - inainte, gen lipsa/necunoscut cadea SILENTIOS
+  // pe 'male' (un ternar inline propriu, diferit de resolveAthleteGenderKey
+  // din rxEngine.js, care intoarce null pt exact acelasi caz) - doua
+  // politici diferite pt aceeasi intrebare, care puteau interpreta acelasi
+  // profil diferit in surse diferite ale aplicatiei. Acum weightKeyForVariant
+  // delega la resolveAthleteGenderKey (SINGURA sursa de adevar pt gen) -
+  // gen nerezolvat -> null explicit (nicio coloana), nu un preset silentios.
+  it('gen lipsa/necunoscut/invalid -> null explicit (nu mai cade silentios pe male)', () => {
+    expect(weightKeyForVariant('RX', undefined)).toBe(null)
+    expect(weightKeyForVariant('RX', null)).toBe(null)
+    expect(weightKeyForVariant('RX', '')).toBe(null)
+    expect(weightKeyForVariant('RX', 'altceva')).toBe(null)
   })
-  it('nivel necunoscut sau lipsa -> null', () => {
+  it('nivel necunoscut sau lipsa -> null, indiferent de gen', () => {
     expect(weightKeyForVariant('Altceva', 'masculin')).toBe(null)
     expect(weightKeyForVariant(undefined, 'masculin')).toBe(null)
+  })
+  it('foloseste EXACT rezolvatorul canonic (resolveAthleteGenderKey) - nu o copie proprie de logica', () => {
+    // masculin/feminin (valorile reale stocate in DB) raman corecte -
+    // singura schimbare de comportament e pe cazul nerezolvat, testat mai sus.
+    expect(weightKeyForVariant('RX', 'masculin')).toBe('rx_weight_male')
+    expect(weightKeyForVariant('RX', 'feminin')).toBe('rx_weight_female')
   })
 })
 
