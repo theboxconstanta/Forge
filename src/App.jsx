@@ -3251,10 +3251,32 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     setSavingClasa(false)
   }
 
+  // P0-01 (audit platformă) - o clasă din trecut cu rezervări existente e
+  // acum blocată la nivel de bază de date (migrația 20260825120000, istoric
+  // de prezență real - vezi checked_in/no_show, citit de get_class_summary/
+  // get_attendance_summary). Un singur DELETE multi-rând ar eșua ÎNTREG in
+  // clipa in care O SINGURĂ clasă din set are rezervări (tranzacție unică,
+  // nu per-rând) - deci filtrăm INAINTE explicit doar la clasele fără nicio
+  // rezervare, si aratam clar adminului cate au fost pastrate si de ce, in
+  // loc sa lasam butonul sa esueze silentios/total sau sa arate succes fals.
   const stergeClaseleTrecute = async () => {
     const azi = new Date()
     const aziS = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
-    await supabase.from('classes').delete().lt('date', aziS)
+    const { data: claseTrecute } = await supabase.from('classes').select('id').lt('date', aziS)
+    const idsTrecute = (claseTrecute || []).map(c => c.id)
+    if (idsTrecute.length === 0) return
+    const { data: bkTrecute } = await supabase.from('bookings').select('class_id').in('class_id', idsTrecute)
+    const idsCuRezervari = new Set((bkTrecute || []).map(b => b.class_id))
+    const idsDeSters = idsTrecute.filter(id => !idsCuRezervari.has(id))
+    const nPastrate = idsTrecute.length - idsDeSters.length
+    if (idsDeSters.length === 0) {
+      showToast(t.adminClassDeletePastNothingToDelete)
+      return
+    }
+    if (!window.confirm(t.adminClassDeletePastConfirm(idsDeSters.length, nPastrate))) return
+    const { error } = await supabase.from('classes').delete().in('id', idsDeSters)
+    if (error) { showToast(t.toastGenericErrorWithFallback(error.message)); return }
+    showToast(t.toastClassDeletePastSummary(idsDeSters.length, nPastrate))
     fetchClase()
   }
 
@@ -3300,13 +3322,35 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     await fetchClase()
   }
 
+  // P0-01 (audit platformă) - ștergerea unei clase nu mai poate orfaniza
+  // silentios rezervările ei (migrația 20260825120000, protecție la nivel
+  // de bază de date: o clasă din trecut cu rezervări e blocată acolo, una
+  // viitoare/de azi e permisă, cu rezervările ei șterse atomic odată cu
+  // clasa). Aici confirmăm explicit ÎNAINTE de orice ștergere reală
+  // (numărul real de rezervări, nu doar "ești sigur?"), și verificăm
+  // dinainte dacă blocarea din DB s-ar aplica - ca adminul să vadă un mesaj
+  // clar în loc de o eroare brută de bază de date. Logica de rambursare a
+  // ședințelor (doar pt clase viitoare cu rezervări) rămâne neschimbată.
   const stergeClasa = async (id) => {
-    // returnăm ședințele doar pentru clase viitoare (nu pentru cele din trecut, deja consumate)
-    const { data: cls } = await supabase.from('classes').select('date').eq('id', id).maybeSingle()
+    const { data: cls } = await supabase.from('classes').select('date, name, start_time').eq('id', id).maybeSingle()
+    if (!cls) return
     const _azis = new Date()
     const aziStr2 = `${_azis.getFullYear()}-${String(_azis.getMonth()+1).padStart(2,'0')}-${String(_azis.getDate()).padStart(2,'0')}`
+    const esteTrecuta = cls.date < aziStr2
     const { data: bks } = await supabase.from('bookings').select('member_id').eq('class_id', id)
-    if (bks?.length > 0 && cls?.date >= aziStr2) {
+    const nRezervari = bks?.length || 0
+
+    if (esteTrecuta && nRezervari > 0) {
+      showToast(t.adminClassDeleteBlockedPastWithBookings(nRezervari))
+      return
+    }
+    const confirmMsg = nRezervari > 0
+      ? t.adminClassDeleteConfirmWithBookings(cls.name, cls.start_time?.slice(0, 5), nRezervari)
+      : t.adminClassDeleteConfirmNoBookings(cls.name, cls.start_time?.slice(0, 5))
+    if (!window.confirm(confirmMsg)) return
+
+    // returnăm ședințele doar pentru clase viitoare (nu pentru cele din trecut, deja consumate)
+    if (nRezervari > 0 && !esteTrecuta) {
       const memberIds = bks.map(b => b.member_id)
       const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
       if (profs?.length > 0) {
@@ -3329,7 +3373,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         }
       }
     }
-    await supabase.from('classes').delete().eq('id', id)
+    const { error } = await supabase.from('classes').delete().eq('id', id)
+    if (error) { showToast(t.toastGenericErrorWithFallback(error.message)); return }
     showToast(t.toastClassDeleted); await fetchClase()
   }
 

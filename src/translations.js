@@ -976,6 +976,22 @@ export const TRANSLATIONS = {
     adminClassSpotsCount: (n) => `${n} locuri`,
     adminClassDeleteSeriesConfirm: (name, time) => `Ștergi toate clasele viitoare „${name}" ${time}?`,
     adminClassDeleteSeriesButton: '🗑️ serie',
+    // P0-01 (audit platformă) - stergerea unei clase cu rezervări existente
+    // nu mai poate orfaniza silentios acele rezervări (protecție la nivel de
+    // bază de date, vezi migrația 20260825120000). Confirmarea arată numărul
+    // real de rezervări; pt o clasă din trecut cu rezervări, baza de date
+    // blochează ștergerea (istoric de prezență), iar UI-ul explică asta
+    // direct, fără să mai încerce operația.
+    adminClassDeleteConfirmNoBookings: (name, time) => `Ștergi „${name}" ${time}?`,
+    adminClassDeleteConfirmWithBookings: (name, time, n) => `Ștergi „${name}" ${time}?\n\nAceastă acțiune afectează ${n} ${n === 1 ? 'rezervare' : 'rezervări'}.`,
+    adminClassDeleteBlockedPastWithBookings: (n) => `Nu poți șterge o clasă din trecut cu ${n} ${n === 1 ? 'rezervare existentă' : 'rezervări existente'} - istoricul de prezență ar fi pierdut.`,
+    adminClassDeletePastConfirm: (toDelete, preserved) => preserved > 0
+      ? `Ștergi ${toDelete} ${toDelete === 1 ? 'clasă trecută fără rezervări' : 'clase trecute fără rezervări'}?\n\n${preserved} ${preserved === 1 ? 'clasă cu rezervări existente va fi păstrată' : 'clase cu rezervări existente vor fi păstrate'} (istoric de prezență).`
+      : `Ștergi ${toDelete} ${toDelete === 1 ? 'clasă trecută' : 'clase trecute'}?`,
+    adminClassDeletePastNothingToDelete: 'Nu există clase trecute fără rezervări de șters. Clasele trecute cu rezervări existente sunt păstrate (istoric de prezență).',
+    toastClassDeletePastSummary: (deleted, preserved) => preserved > 0
+      ? `✓ ${deleted} ${deleted === 1 ? 'clasă ștearsă' : 'clase șterse'}, ${preserved} ${preserved === 1 ? 'păstrată' : 'păstrate'} (au rezervări)`
+      : `✓ ${deleted} ${deleted === 1 ? 'clasă ștearsă' : 'clase șterse'}`,
     adminClassBookingsHeader: (used, total) => `REZERVĂRI (${used}/${total})`,
     adminClassPresentCount: (n, total) => `✓ ${n}/${total} prezenți`,
     adminClassLoading: 'Se încarcă...',
@@ -2119,6 +2135,16 @@ export const TRANSLATIONS = {
     adminClassSpotsCount: (n) => `${n} spots`,
     adminClassDeleteSeriesConfirm: (name, time) => `Delete all future "${name}" classes at ${time}?`,
     adminClassDeleteSeriesButton: '🗑️ series',
+    adminClassDeleteConfirmNoBookings: (name, time) => `Delete "${name}" ${time}?`,
+    adminClassDeleteConfirmWithBookings: (name, time, n) => `Delete "${name}" ${time}?\n\nThis action will affect ${n} ${n === 1 ? 'reservation' : 'reservations'}.`,
+    adminClassDeleteBlockedPastWithBookings: (n) => `Cannot delete a past class with ${n} existing ${n === 1 ? 'booking' : 'bookings'} - historical attendance would be lost.`,
+    adminClassDeletePastConfirm: (toDelete, preserved) => preserved > 0
+      ? `Delete ${toDelete} past ${toDelete === 1 ? 'class' : 'classes'} with no bookings?\n\n${preserved} past ${preserved === 1 ? 'class' : 'classes'} with existing bookings will be kept (attendance history).`
+      : `Delete ${toDelete} past ${toDelete === 1 ? 'class' : 'classes'}?`,
+    adminClassDeletePastNothingToDelete: 'No past classes without bookings to delete. Past classes with existing bookings are kept (attendance history).',
+    toastClassDeletePastSummary: (deleted, preserved) => preserved > 0
+      ? `✓ ${deleted} ${deleted === 1 ? 'class' : 'classes'} deleted, ${preserved} kept (${preserved === 1 ? 'has' : 'have'} bookings)`
+      : `✓ ${deleted} ${deleted === 1 ? 'class' : 'classes'} deleted`,
     adminClassBookingsHeader: (used, total) => `BOOKINGS (${used}/${total})`,
     adminClassPresentCount: (n, total) => `✓ ${n}/${total} present`,
     adminClassLoading: 'Loading...',
