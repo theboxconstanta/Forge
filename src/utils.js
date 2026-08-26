@@ -32,6 +32,22 @@ export function dateWithCurrentTime(dateStr) {
   return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
 }
 
+// Limitele unei zile LOCALE (00:00:00.000 -> 23:59:59.999), convertite in
+// ISO UTC - pentru filtre .gte()/.lte() pe coloane timestamptz (logged_at/
+// created_at) cand se cauta "tot ce s-a intamplat in ziua X". NU trimite
+// direct `${dateStr}T00:00:00` ca string catre Supabase - PostgREST/
+// Postgres il interpreteaza in fusul orar al sesiunii (UTC), nu local
+// (verificat live: sesiunea DB ruleaza in UTC) - acelasi bug de fond ca
+// todayLocalStr() de mai sus, dar manifestat la interogare (un log/
+// abonament creat intre miezul noptii local si ~2-3 dimineata aparea sub
+// ziua GRESITA), nu la citirea "azi".
+export function localDayBoundsUTC(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const start = new Date(y, m - 1, d, 0, 0, 0, 0)
+  const end = new Date(y, m - 1, d, 23, 59, 59, 999)
+  return { startUTC: start.toISOString(), endUTC: end.toISOString() }
+}
+
 // Class Operations - Instant Coach Check-in: atendanta ramane editabila pana
 // la ora de final a clasei + 2 ore (aceeasi fereastra de gratie ca
 // forge-admin-web's isInAttendanceGraceWindow, portata disciplinat aici -

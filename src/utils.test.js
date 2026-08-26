@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -201,6 +201,40 @@ describe('todayLocalStr', () => {
     // am folosi gresit toISOString() intr-un fus orar la est de UTC
     vi.setSystemTime(new Date(2026, 6, 3, 0, 30, 0))
     expect(todayLocalStr()).toBe('2026-07-03')
+  })
+})
+
+describe('localDayBoundsUTC', () => {
+  it('convertaste 00:00:00.000 local si 23:59:59.999 local in instante UTC corecte, nu ca stringuri naive UTC', () => {
+    const { startUTC, endUTC } = localDayBoundsUTC('2026-08-26')
+    // new Date(2026, 7, 26, 0, 0, 0, 0) interpretat de motorul JS al
+    // masinii care ruleaza testul (nedeterminist fata de fus orar) -
+    // verificam ca round-trip-ul prin Date pastreaza exact aceleasi
+    // componente locale, nu ca hardcodam un offset UTC fix.
+    const start = new Date(startUTC)
+    const end = new Date(endUTC)
+    expect(start.getFullYear()).toBe(2026)
+    expect(start.getMonth()).toBe(7)
+    expect(start.getDate()).toBe(26)
+    expect(start.getHours()).toBe(0)
+    expect(start.getMinutes()).toBe(0)
+    expect(start.getSeconds()).toBe(0)
+    expect(end.getDate()).toBe(26)
+    expect(end.getHours()).toBe(23)
+    expect(end.getMinutes()).toBe(59)
+    expect(end.getSeconds()).toBe(59)
+  })
+
+  it('NU produce acelasi string ca simpla concatenare naiva `${date}T00:00:00` - trebuie sa treaca prin conversia reala UTC', () => {
+    const { startUTC } = localDayBoundsUTC('2026-08-26')
+    expect(startUTC).not.toBe('2026-08-26T00:00:00')
+    // startUTC trebuie sa fie un ISO string valid cu sufix Z (instanta UTC reala)
+    expect(startUTC.endsWith('Z')).toBe(true)
+  })
+
+  it('sfarsitul zilei este strict dupa inceputul zilei', () => {
+    const { startUTC, endUTC } = localDayBoundsUTC('2026-08-26')
+    expect(new Date(endUTC).getTime()).toBeGreaterThan(new Date(startUTC).getTime())
   })
 })
 

@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -2914,10 +2914,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       .lte('start_date', azi).gte('end_date', azi)
     const membriActivi = new Set((aboActive || []).map(a => a.member_email?.toLowerCase())).size
 
+    const lunaBounds = { startUTC: localDayBoundsUTC(lunaStart).startUTC, endUTC: localDayBoundsUTC(lunaEnd).endUTC }
     const { count: aboVandute } = await supabase.from('subscriptions')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', lunaStart + 'T00:00:00')
-      .lte('created_at', lunaEnd + 'T23:59:59')
+      .gte('created_at', lunaBounds.startUTC)
+      .lte('created_at', lunaBounds.endUTC)
       .or('is_active.eq.true,queued.eq.true')
 
     // venituriLuna: Financial Domain sursa de adevar (orders/payments, nu
@@ -2931,8 +2932,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       .eq('gym_id', gymId)
       .eq('direction', 'charge')
       .eq('status', 'succeeded')
-      .gte('created_at', lunaStart + 'T00:00:00')
-      .lte('created_at', lunaEnd + 'T23:59:59')
+      .gte('created_at', lunaBounds.startUTC)
+      .lte('created_at', lunaBounds.endUTC)
     const venituriLuna = (paymentsLuna || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 
     setRapoarteData({ membriActivi, aboVandute: aboVandute || 0, venituriLuna })
@@ -7884,8 +7885,9 @@ function App() {
       q = q.eq('wod_id', wodZi.id)
       qSkill = qSkill.eq('wod_id', wodZi.id)
     } else {
-      q = q.gte('logged_at', targetDate + 'T00:00:00').lte('logged_at', targetDate + 'T23:59:59')
-      qSkill = qSkill.gte('logged_at', targetDate + 'T00:00:00').lte('logged_at', targetDate + 'T23:59:59')
+      const { startUTC, endUTC } = localDayBoundsUTC(targetDate)
+      q = q.gte('logged_at', startUTC).lte('logged_at', endUTC)
+      qSkill = qSkill.gte('logged_at', startUTC).lte('logged_at', endUTC)
     }
     const [{ data: wodLogsData }, { data: skillLogsData }] = await Promise.all([q, qSkill])
     const logs = [
