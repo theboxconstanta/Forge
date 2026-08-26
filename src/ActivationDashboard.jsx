@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
-import { daysUntil } from './utils'
+import { daysUntil, todayLocalStr } from './utils'
 
 const EDGE_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
@@ -101,7 +101,10 @@ export default function ActivationDashboard({ gymId, gymName, t, lang, showToast
   useEffect(() => {
     if (!gymId) return
     let cancelled = false
-    const todayStr = new Date().toISOString().slice(0, 10)
+    // P0-03 (audit platformă) - todayLocalStr(), nu toISOString().slice(0,10)
+    // (UTC) - vezi utils.js pt motiv exact (fereastra de ~2-3h dupa
+    // miezul noptii local in care varianta UTC calcula gresit "ieri").
+    const todayStr = todayLocalStr()
 
     const load = async () => {
       const [{ data: activation }, { data: commercial }, { data: waiver }] = await Promise.all([

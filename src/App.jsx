@@ -4993,7 +4993,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminGymsTitle}</div>
           {allGymsPlatform.map(g => {
-            const todayISO = new Date().toISOString().slice(0, 10)
+            const todayISO = todayLocalStr()
             const expired = g.paid_until && g.paid_until < todayISO
             return (
             <div key={g.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
