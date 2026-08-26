@@ -1,0 +1,35 @@
+-- P0-SEC-03 - Post-Remediation Security Verification SEC-05
+--
+-- Root cause (confirmed by reading migration history, not guessed):
+-- wod_logs_with_context was originally created in
+-- 20260812090300_results_phase2_slice2_cascade_fix_and_views.sql WITH
+-- (security_invoker = true) - that migration's own comment even explains
+-- why it's "required, explicitly, not [implied by default]". A later
+-- migration, 20260822096000_wod_logs_with_context_section_aware.sql, did
+-- `create or replace view public.wod_logs_with_context as ...` to fix an
+-- unrelated effective-format precedence bug, but did not repeat the
+-- `WITH (security_invoker = true)` clause - CREATE OR REPLACE VIEW does
+-- not preserve a prior version's storage options when the replacing
+-- statement doesn't restate them, so the option was silently dropped.
+-- The view has owned-by-postgres, RLS-bypassing semantics ever since,
+-- while its 14 sibling views (skill_logs_with_context and the various
+-- Results/Performance summary views) all correctly retained the option
+-- because none of them were ever CREATE OR REPLACE'd without it.
+--
+-- Live-reproduced (Final Pre-Production Security Gate post-remediation
+-- pass): a fully anonymous `anon` role read all 399 real wod_logs rows
+-- through this view - every member's workout results, times, notes,
+-- weights, platform-wide, no authentication required.
+--
+-- Confirmed zero live application consumers (WOD-SIMPLE, forge-admin-web,
+-- all Edge Functions, all SQL functions/views) - forge-admin-web's
+-- results/api.ts queries the raw wod_logs table directly at every call
+-- site and computes the "effective_*" fields client-side instead, so
+-- this is the lowest-risk possible fix: nothing currently depends on this
+-- view's specific row-visibility behavior, so restoring the missing
+-- option cannot regress any live flow.
+--
+-- Fix: restore the missing option via ALTER VIEW (no need to recreate the
+-- view - PostgreSQL supports altering just the storage option directly),
+-- matching the pattern already correctly used by all 14 sibling views.
+alter view public.wod_logs_with_context set (security_invoker = true);
