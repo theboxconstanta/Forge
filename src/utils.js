@@ -91,6 +91,53 @@ export function isWorkoutFetchCurrent(fetchedForDate, currentSelectedDate) {
   return fetchedForDate != null && fetchedForDate === currentSelectedDate
 }
 
+// INC-04 GLOBAL - freeze the identity of the workout currently displayed, at
+// the exact moment the member presses "Log Score" / Skill "Log". The whole
+// logging session (display + save) then derives EVERY identity-bearing value
+// from this snapshot, never from the live wodZiData/wodZiWorkoutV2/dataAcasa
+// which can drift afterward (the [screen] effect resets dataAcasa to today on
+// Home; date fetches resolve async; effects clear state). Generic - no date,
+// workout, variant, or section is special-cased.
+//
+//   displayedWorkout  = workoutForDisplay (wodZiWorkoutV2 || legacy map)
+//   wodZiData         = the legacy `wods` row currently loaded (or null)
+//   wodZiWorkoutV2    = the Engine V2 `workouts` row currently loaded (or null)
+//   businessDate      = dataAcasa (the date label the member sees)
+//
+// The snapshot deep-freezes nothing (React state is treated as immutable by
+// convention) but it captures the object REFERENCES at click time, so a later
+// setWodZiData/setWodZiWorkoutV2 cannot change what the logger sees.
+export function freezeLoggingContext(displayedWorkout, wodZiData, wodZiWorkoutV2, businessDate) {
+  const sections = displayedWorkout?.sections || []
+  return {
+    businessDate: businessDate ?? null,
+    wodZiData: wodZiData ?? null,
+    wodZiWorkoutV2: wodZiWorkoutV2 ?? null,
+    workout: displayedWorkout ?? null,
+    // the metcon (primary) section of the CLICKED workout
+    primarySection: sections.find((s) => s.slotKey === 'metcon') || null,
+    supportingSections: sections.filter((s) => s.slotKey !== 'metcon'),
+    // independently-scored non-primary sections - only when a real Engine V2
+    // row is loaded (synthetic legacy section ids must never be saved)
+    additionalScoredSections: wodZiWorkoutV2
+      ? sections.filter((s) => s.slotKey !== 'metcon' && s.loggingMode === 'required')
+      : [],
+  }
+}
+
+// INC-04 GLOBAL - the exact wod_logs identity for an official-variant save,
+// derived ONLY from a frozen logging context. Returns null-ish fields when the
+// context is incomplete so the caller fails closed (never a today / first-RX
+// fallback). `variantLevel` is e.g. 'RX' | 'Intermediate' | 'Beginner' | 'OnRamp'.
+export function resolveLoggedWorkoutIdentity(logCtx, variantLevel) {
+  if (!logCtx) return { wodId: null, sectionId: null, businessDate: null, variantMovements: [] }
+  const wodId = resolveWodIdForLog(logCtx.wodZiWorkoutV2, logCtx.wodZiData)
+  const sectionId = logCtx.wodZiWorkoutV2 ? (logCtx.primarySection?.id ?? null) : null
+  const key = variantLevel ? `movements_${String(variantLevel).toLowerCase()}` : null
+  const variantMovements = (key && logCtx.wodZiData?.[key]) || []
+  return { wodId, sectionId, businessDate: logCtx.businessDate ?? null, variantMovements }
+}
+
 export function computeWodHeaderLine({ variantaAleasa, wodZiData, varianteNivel, durStr, wodTip, wodDurata, freeLogConfigDesc }) {
   if (variantaAleasa !== null) {
     if (wodZiData) {

@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -6431,6 +6431,17 @@ function App() {
   // mare - vezi activeLogFormatId mai jos). Golit la fel ca editLogId de
   // fiecare data cand ecranul logWOD se inchide/reseteaza.
   const [logTargetSectionId, setLogTargetSectionId] = useState(null)
+  // INC-04 global remediation - the FROZEN logging identity. Captured from the
+  // workout currently displayed at the exact moment a "Log Score" / Skill "Log"
+  // button is pressed. For the whole logWOD / logSkill session, every
+  // identity-bearing value the logger and saveWodLog / saveSkillLog consume
+  // (business date, workout, legacy WOD, section, variant movements/weights,
+  // format) derives from THIS snapshot - never re-read from the live
+  // wodZiData / wodZiWorkoutV2 / dataAcasa, which can drift after the click
+  // (the [screen] effect resets dataAcasa to today on Home; date fetches
+  // resolve async; the INC-02 effect can clear variantaAleasa). Cleared on
+  // leaving the logger. `null` outside a fresh (non-edit) logging session.
+  const [logCtx, setLogCtx] = useState(null)
   const [editLogNotesPrefix, setEditLogNotesPrefix] = useState('')
   const [editLogHeader, setEditLogHeader] = useState('')
   const [editLogFormatId, setEditLogFormatId] = useState(null)
@@ -6873,6 +6884,8 @@ function App() {
     // foarte diferite.
     if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
     if (screen === 'clasament' && user) fetchClasament()
+    // INC-04 - leaving the logger discards the frozen logging context.
+    if (screen !== 'logWOD' && screen !== 'logSkill') setLogCtx(null)
     if (screen === 'home') {
       const d = new Date()
       setDataAcasa(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
@@ -7642,12 +7655,16 @@ function App() {
   }
 
   const saveSkillLog = async () => {
-    if (!wodZiData) return
+    // INC-04 - Skill Work reads the FROZEN logging context (logWodZiData /
+    // logWodZiWorkoutV2 / logSupportingSectionsV), captured when the Skill
+    // "Log" button was pressed - never the live state that can drift to
+    // another day.
+    if (!logWodZiData) return
     setSkillLogSaving(true)
     const esteSlot2 = skillLogSlot === 2
-    const skillType = (esteSlot2 ? wodZiData.skill2_type : wodZiData.skill_type) || 'Weightlifting'
-    const skillMiscari = (esteSlot2 ? wodZiData.skill2 : wodZiData.skill) || []
-    const skillNameCurent = esteSlot2 ? wodZiData.skill2_name : wodZiData.skill_name
+    const skillType = (esteSlot2 ? logWodZiData.skill2_type : logWodZiData.skill_type) || 'Weightlifting'
+    const skillMiscari = (esteSlot2 ? logWodZiData.skill2 : logWodZiData.skill) || []
+    const skillNameCurent = esteSlot2 ? logWodZiData.skill2_name : logWodZiData.skill_name
     const format = getFormat(skillType)
     let setsCurate = null, resultCurat = null, logMeta = null
     if (format.family === 'sets' || format.family === 'mixed') {
@@ -7666,7 +7683,7 @@ function App() {
       // timp - fara verificarea skillLogRoundsCompleted, acele date se
       // pierdeau silentios (nu intrau niciodata pe ramura AMRAP). La For
       // Time/Ladder (sequentialPartial), semnalul e absenta Timpului.
-      const skillFormatConfigCurent = esteSlot2 ? wodZiData.skill2_format_config : wodZiData.skill_format_config
+      const skillFormatConfigCurent = esteSlot2 ? logWodZiData.skill2_format_config : logWodZiData.skill_format_config
       const isSequentialSkill = isSequentialFormat(skillType, skillFormatConfigCurent)
       const useRepsSkill = isSequentialSkill
         ? !skillLogTime.trim()
@@ -7687,22 +7704,23 @@ function App() {
     // skill/skill2 din Workout Engine V2 doar cand exista deja un rand V2
     // real (wodZiWorkoutV2), gasita dupa slotKey (identic cu cum Member View
     // gaseste sectiunea de afisat, vezi workoutForDisplay/supportingSectionsV).
-    const skillSectionIdV2 = wodZiWorkoutV2
-      ? (supportingSectionsV.find(s => s.slotKey === (esteSlot2 ? 'skill2' : 'skill'))?.id || null) : null
+    const skillSectionIdV2 = logWodZiWorkoutV2
+      ? (logSupportingSectionsV.find(s => s.slotKey === (esteSlot2 ? 'skill2' : 'skill'))?.id || null) : null
     // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
     // wodZiData poate fi null chiar cand wodZiWorkoutV2 exista si
     // skillSectionIdV2 e real - accesarea neconditionata a wodZiData.id/
     // .date arunca TypeError, oprind salvarea INAINTE sa ajunga la
     // Supabase.
     const { error } = await supabase.from('skill_logs').upsert({
-      member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(wodZiWorkoutV2, wodZiData), slot: skillLogSlot,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(logWodZiWorkoutV2, logWodZiData), slot: skillLogSlot,
       workout_section_id: skillSectionIdV2,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
       // Acelasi motiv ca la wod_logs mai sus - Skill Work e mereu legat de un
-      // WOD oficial (wodZiData/wodZiWorkoutV2), poate al unei zile trecute
-      // daca membrul a navigat pe Acasa la o zi in urma inainte sa logheze.
-      logged_at: (wodZiWorkoutV2?.date ?? wodZiData?.date) ? dateWithCurrentTime(wodZiWorkoutV2?.date ?? wodZiData?.date) : new Date().toISOString(),
+      // WOD oficial (logWodZiData/logWodZiWorkoutV2 - frozen la click, INC-04),
+      // poate al unei zile trecute daca membrul a navigat pe Acasa la o zi in
+      // urma inainte sa logheze.
+      logged_at: (logWodZiWorkoutV2?.date ?? logWodZiData?.date) ? dateWithCurrentTime(logWodZiWorkoutV2?.date ?? logWodZiData?.date) : new Date().toISOString(),
     }, { onConflict: 'member_id,wod_id,slot' })
     if (error) { showToast(t.toastGenericError); console.error(error); setSkillLogSaving(false); return }
     showToast(t.toastSkillLogSaved)
@@ -8352,8 +8370,11 @@ function App() {
       const noteFullSectiune = [sectionMiscariText || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
       const logFieldsSectiune = composeWodLogFields()
       // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
+      // INC-04 - wod_id from the frozen logging context (logTargetSection was
+      // itself resolved from the frozen section list), so the scored-section
+      // log always belongs to the clicked workout.
       const { error } = await supabase.from('wod_logs').insert({
-        member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(wodZiWorkoutV2, wodZiData),
+        member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(logWodZiWorkoutV2, logWodZiData),
         workout_section_id: logTargetSectionId,
         // Sectiunile suplimentare n-au variante de scalare (RX/Intermediate/
         // Beginner/OnRamp) - o singura prescriptie, tratata drept "RX"
@@ -8387,10 +8408,14 @@ function App() {
       || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
+    // INC-04 - every official-variant identity/content read below comes from
+    // the FROZEN logging context (logWodZiData / logWodZiWorkoutV2 /
+    // logPrimarySectionV), captured when "Log Score" was pressed - never the
+    // live wodZiData/wodZiWorkoutV2 which can drift to another day afterward.
     const cheieVarianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].key : null
-    const miscariWodZi = (cheieVarianta && wodZiData?.[cheieVarianta]) ? (wodMiscariCustom ?? wodZiData[cheieVarianta]) : []
+    const miscariWodZi = (cheieVarianta && logWodZiData?.[cheieVarianta]) ? (wodMiscariCustom ?? logWodZiData[cheieVarianta]) : []
     const miscariFinale = miscariWodZi.length > 0 ? miscariWodZi : wodMiscari
-    const durStr = wodZiData ? formatWodDurata(wodZiData.duration) : ''
+    const durStr = logWodZiData ? formatWodDurata(logWodZiData.duration) : ''
     // La logare libera (fara wod_id), config-ul prescris de membru (ex. Numar
     // runde la RFT) nu are unde sa fie salvat structurat (wod_logs nu are
     // format_config, doar wods) - fara linia asta, valoarea era pierduta
@@ -8410,7 +8435,7 @@ function App() {
     // variantaAleasa !== null, iar accesarea neconditionata a lui .type
     // arunca TypeError, oprind salvarea INAINTE sa ajunga la Supabase.
     const wodHeaderLine = computeWodHeaderLine({
-      variantaAleasa, wodZiData, durStr, wodTip, wodDurata, freeLogConfigDesc,
+      variantaAleasa, wodZiData: logWodZiData, durStr, wodTip, wodDurata, freeLogConfigDesc,
       varianteNivel: variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : null,
     })
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
@@ -8425,16 +8450,18 @@ function App() {
     // Jurnal/Clasament la ziua CURENTA, nu la ziua WOD-ului ales, desi
     // wod_id era deja cel corect. Doar la WOD-uri oficiale - o "Logare
     // Noua" libera ramane "azi, acum", ca inainte (vezi dateWithCurrentTime).
-    const loggedAt = (variantaAleasa !== null && wodZiData?.date) ? dateWithCurrentTime(wodZiData.date) : undefined
+    const loggedAt = (variantaAleasa !== null && logWodZiData?.date) ? dateWithCurrentTime(logWodZiData.date) : undefined
     // Faza 8 - leaga logul de sectiunea primara din Workout Engine V2, DOAR
     // cand exista deja un rand V2 real (wodZiWorkoutV2, nu fallback-ul legacy
     // sintetizat de mapLegacyWodToWorkout, care are id-uri text "legacy:...",
     // nu uuid-uri reale). O "Logare Noua" libera (variantaAleasa === null)
     // nu se leaga de nicio sectiune, la fel ca wod_id mai sus.
-    const sectionIdV2 = (variantaAleasa !== null && wodZiWorkoutV2)
-      ? (primarySectionV?.id || null) : null
+    const sectionIdV2 = (variantaAleasa !== null && logWodZiWorkoutV2)
+      ? (logPrimarySectionV?.id || null) : null
     // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
-    const wodIdPtSalvare = variantaAleasa !== null ? resolveWodIdForLog(wodZiWorkoutV2, wodZiData) : null
+    // INC-04 - resolve from the frozen context so wod_id/section belong to
+    // the clicked workout regardless of later state drift.
+    const wodIdPtSalvare = variantaAleasa !== null ? resolveWodIdForLog(logWodZiWorkoutV2, logWodZiData) : null
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
@@ -8455,10 +8482,10 @@ function App() {
       // WOD-ului zilei - "GET UP" - la o logare libera de tip "Complex"
       // care n-avea nicio legatura cu acel WOD).
       if (variantaAleasa !== null) {
-        const prescribedWeight = varianta ? (wodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
-        const prescribedMovements = varianta ? (wodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
+        const prescribedWeight = varianta ? (logWodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
+        const prescribedMovements = varianta ? (logWodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
         setWorkoutSharePopup({
-          wodName: wodZiData?.name || null,
+          wodName: logWodZiData?.name || null,
           movements: miscariFinale,
           variantLevel: varianta?.nivel || null,
           variantColor: varianta?.culoare || null,
@@ -8760,6 +8787,27 @@ function App() {
   // by sectionIdV2/skillSectionIdV2 below.
   const additionalScoredSectionsV = wodZiWorkoutV2 ? supportingSectionsV.filter(s => s.loggingMode === 'required') : []
 
+  // INC-04 - the business date of the workout actually being DISPLAYED on the
+  // Home card right now. `null` when nothing is loaded. This is the identity
+  // the member sees; a "Log Score" click is only allowed (and is only
+  // captured into logCtx) when it equals the selected date - otherwise the
+  // display is stale (a fetch for the selected date has not landed yet) and
+  // opening the logger would freeze the wrong workout. Never falls back to
+  // today - a mismatch disables the button (fail closed).
+  const displayedWorkoutDate = wodZiWorkoutV2?.date ?? wodZiData?.date ?? null
+  const homeDisplayIsCurrent = displayedWorkoutDate != null && displayedWorkoutDate === dataAcasa
+  // Freeze the exact displayed workout identity at click time (utils.js).
+  const captureLogCtx = () => freezeLoggingContext(workoutForDisplay, wodZiData, wodZiWorkoutV2, dataAcasa)
+  // Whether the current screen is a FRESH (non-edit) logging session with a
+  // frozen context. Every logger/save read below switches to logCtx when true.
+  const inFrozenLogFlow = (screen === 'logWOD' || screen === 'logSkill') && !editLogId && logCtx != null
+  const logWodZiData = inFrozenLogFlow ? logCtx.wodZiData : wodZiData
+  const logWodZiWorkoutV2 = inFrozenLogFlow ? logCtx.wodZiWorkoutV2 : wodZiWorkoutV2
+  const logBusinessDate = inFrozenLogFlow ? logCtx.businessDate : dataAcasa
+  const logPrimarySectionV = inFrozenLogFlow ? logCtx.primarySection : primarySectionV
+  const logSupportingSectionsV = inFrozenLogFlow ? logCtx.supportingSections : supportingSectionsV
+  const logAdditionalScoredSectionsV = inFrozenLogFlow ? logCtx.additionalScoredSections : additionalScoredSectionsV
+
   // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
   // sectiunea primara a modelului de domeniu - logica pura (RX = baza
   // sectiunii, scalingVersions pt restul, greutatea din
@@ -8779,22 +8827,27 @@ function App() {
   // primare/libere, neschimbata). Sectiunile suplimentare n-au variante de
   // scalare (RX/Intermediate/Beginner/OnRamp) - un singur `format`+
   // `movements`, la fel ca Skill Work de dinainte de Layer 1.
-  const logTargetSection = logTargetSectionId ? additionalScoredSectionsV.find(s => s.id === logTargetSectionId) : null
+  // INC-04 - the target section is resolved against the FROZEN section list
+  // (logCtx) during a fresh logging session, so it always belongs to the
+  // clicked workout even if the live workout state drifts afterward.
+  const logTargetSection = logTargetSectionId ? logAdditionalScoredSectionsV.find(s => s.id === logTargetSectionId) : null
   // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
   // ales liber de membru) - inlocuieste vechiul isAmrapLog/miscariPentruAmrapLog,
   // acum generalizat prin catalogul din workoutFormats.js (FormatLogger).
+  // INC-04 - logWodZiData is the frozen wodZiData during a fresh logging
+  // session (identical to wodZiData otherwise).
   const activeLogFormatId = editLogId
     ? (editLogFormatId || 'For Time')
     : logTargetSection ? (logTargetSection.format || 'Weightlifting')
-    : (variantaAleasa !== null ? (wodZiData?.type || 'For Time') : wodTip)
+    : (variantaAleasa !== null ? (logWodZiData?.type || 'For Time') : wodTip)
   const activeLogFormatConfig = editLogId
     ? editLogFormatConfig
     : logTargetSection ? logTargetSection.formatConfig
-    : (variantaAleasa !== null ? wodZiData?.format_config : wodFormatConfig)
+    : (variantaAleasa !== null ? logWodZiData?.format_config : wodFormatConfig)
   const miscariPentruLog = editLogId
     ? editLogMiscari
     : logTargetSection ? (logTargetSection.movements || []).map(m => m.name)
-    : (variantaAleasa !== null && wodZiData ? (wodMiscariCustom ?? wodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
+    : (variantaAleasa !== null && logWodZiData ? (wodMiscariCustom ?? logWodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
   // (logare noua sau editare) - vezi isNotRxd in workoutFormats.js. Pt o
   // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
@@ -8805,7 +8858,7 @@ function App() {
   const prescribedWeightPentruLog = editLogId
     ? editLogPrescribedWeight
     : logTargetSection ? ''
-    : (variantaAleasa !== null ? (wodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
+    : (variantaAleasa !== null ? (logWodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
   // Faza 3 (rxEngine.js) - clasificare RX/Not Rx in timp real, derivata la
   // citire din acelasi text folosit mai sus pt prescribedWeightPentruLog,
   // niciodata dintr-un selector manual de gen. standardKg poate fi null
@@ -9674,7 +9727,7 @@ function App() {
                         skillMovements={(skillSection?.movements || []).map(m => m.name)} skillName={skillSection?.title}
                         skillType={skillSection?.format} skillFormatConfig={skillSection?.formatConfig}
                         logZiSkill={logZiSkill} isOpen={skillDeschis} onToggle={() => setSkillDeschis(!skillDeschis)}
-                        onLogClick={() => { setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        onLogClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setSkillLogSlot(1); setSkillLogNote(logZiSkill?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill?.sets)); setSkillLogResult(logZiSkill?.result || ''); setSkillLogCompleted(!!logZiSkill?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
                         userProfile={userProfile} hiddenFromMembers={wodZiData?.skill_visible === false && (isAdmin || isCoach)}
                         loggable={skillSection?.loggingMode !== 'none'} t={t} />
                     )
@@ -9688,7 +9741,7 @@ function App() {
                         skillMovements={(skill2Section?.movements || []).map(m => m.name)} skillName={skill2Section?.title}
                         skillType={skill2Section?.format} skillFormatConfig={skill2Section?.formatConfig}
                         logZiSkill={logZiSkill2} isOpen={skillDeschis2} onToggle={() => setSkillDeschis2(!skillDeschis2)}
-                        onLogClick={() => { setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
+                        onLogClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setSkillLogSlot(2); setSkillLogNote(logZiSkill2?.notes || ''); setSkillLogSets(normalizeSetsRows(logZiSkill2?.sets)); setSkillLogResult(logZiSkill2?.result || ''); setSkillLogCompleted(!!logZiSkill2?.log_meta?.completed); setSkillLogTime(''); setSkillLogRoundsCompleted(''); setSkillLogPartialReps([]); setSkillPrCandidates(null); setPrevScreen('home'); setScreen('logSkill') }}
                         userProfile={userProfile} hiddenFromMembers={wodZiData?.skill2_visible === false && (isAdmin || isCoach)}
                         loggable={skill2Section?.loggingMode !== 'none'} t={t} />
                     )
@@ -9707,6 +9760,11 @@ function App() {
                         isOpen={scoredSectionsOpen.has(section.id)} onToggle={() => toggleScoredSectionOpen(section.id)}
                         onLogClick={() => {
                           if (log) { setScreen('log'); setLogTab('jurnal'); return }
+                          // INC-04 - only open the logger when the displayed
+                          // workout genuinely matches the selected date, and
+                          // freeze that workout's identity for the session.
+                          if (!homeDisplayIsCurrent) return
+                          setLogCtx(captureLogCtx())
                           setLogTargetSectionId(section.id); setEditLogId(null)
                           setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
                           setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
@@ -9868,8 +9926,12 @@ function App() {
                     }) })()}
                   </div>
                   )}
-                  <button onClick={() => { setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null}
-                    style={{ width: '100%', padding: '12px', background: variantaAleasa !== null ? '#ABE73C' : '#ccc', color: variantaAleasa !== null ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: variantaAleasa !== null ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                  {/* INC-04 - disabled until the displayed workout matches the
+                      selected date (a fetch for the selected day has landed);
+                      clicking freezes that exact workout identity for the
+                      whole logging session. Never falls back to today. */}
+                  <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null || !homeDisplayIsCurrent}
+                    style={{ width: '100%', padding: '12px', background: (variantaAleasa !== null && homeDisplayIsCurrent) ? '#ABE73C' : '#ccc', color: (variantaAleasa !== null && homeDisplayIsCurrent) ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: (variantaAleasa !== null && homeDisplayIsCurrent) ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
                 </div>
@@ -10280,7 +10342,7 @@ function App() {
                   <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>{t.logWodVariantChosen}</div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: VARIANTE_CONFIG[variantaAleasa].culoare, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} /> {VARIANTE_CONFIG[variantaAleasa].nivel}
-                    {wodZiData ? ` — ${wodZiData.type} ${formatWodDurata(wodZiData.duration)}` : ''}
+                    {logWodZiData ? ` — ${logWodZiData.type} ${formatWodDurata(logWodZiData.duration)}` : ''}
                   </div>
                 </div>
               )}
@@ -10317,18 +10379,18 @@ function App() {
                 </div>
               )}
 
-              {variantaAleasa !== null && wodZiData ? (() => {
+              {variantaAleasa !== null && logWodZiData ? (() => {
                 const cheie = VARIANTE_CONFIG[variantaAleasa].key
-                const miscariWod = wodZiData[cheie] || []
+                const miscariWod = logWodZiData[cheie] || []
                 const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{dataAcasa === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(dataAcasa + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: describeFormatConfig(wodZiData.type, wodZiData.format_config, t) ? '2px' : '10px' }}>
-                      {wodZiData.type} {formatWodDurata(wodZiData.duration)}
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{logBusinessDate === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(logBusinessDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: describeFormatConfig(logWodZiData.type, logWodZiData.format_config, t) ? '2px' : '10px' }}>
+                      {logWodZiData.type} {formatWodDurata(logWodZiData.duration)}
                     </div>
-                    {describeFormatConfig(wodZiData.type, wodZiData.format_config, t) && (
-                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px' }}>{describeFormatConfig(wodZiData.type, wodZiData.format_config, t)}</div>
+                    {describeFormatConfig(logWodZiData.type, logWodZiData.format_config, t) && (
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px' }}>{describeFormatConfig(logWodZiData.type, logWodZiData.format_config, t)}</div>
                     )}
                     {miscariAfisate.length > 0 ? (
                       <SortableList
@@ -10405,16 +10467,17 @@ function App() {
 
       {screen === 'logSkill' && (() => {
         const esteSlot2 = skillLogSlot === 2
-        const skillTypeCurent = (esteSlot2 ? wodZiData?.skill2_type : wodZiData?.skill_type) || 'Weightlifting'
-        const skillMiscariCurente = (esteSlot2 ? wodZiData?.skill2 : wodZiData?.skill) || []
-        const skillNameCurent = esteSlot2 ? wodZiData?.skill2_name : wodZiData?.skill_name
-        const skillFormatConfigCurent = esteSlot2 ? wodZiData?.skill2_format_config : wodZiData?.skill_format_config
+        // INC-04 - render the Skill logger from the frozen context (logWodZiData).
+        const skillTypeCurent = (esteSlot2 ? logWodZiData?.skill2_type : logWodZiData?.skill_type) || 'Weightlifting'
+        const skillMiscariCurente = (esteSlot2 ? logWodZiData?.skill2 : logWodZiData?.skill) || []
+        const skillNameCurent = esteSlot2 ? logWodZiData?.skill2_name : logWodZiData?.skill_name
+        const skillFormatConfigCurent = esteSlot2 ? logWodZiData?.skill2_format_config : logWodZiData?.skill_format_config
         return (
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => setScreen(prevScreen || 'home')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>
-              {wodZiData && skillLogs.find(l => l.wod_id === wodZiData.id && (l.slot || 1) === skillLogSlot) ? t.skillLogEditTitle : t.skillLogNewTitle}
+              {logWodZiData && skillLogs.find(l => l.wod_id === (logWodZiWorkoutV2?.legacyWodId ?? logWodZiData.id) && (l.slot || 1) === skillLogSlot) ? t.skillLogEditTitle : t.skillLogNewTitle}
               {esteSlot2 ? ` · ${t.homeWodSkill2Title}` : ''}
             </h1>
           </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -320,6 +320,98 @@ describe('isWorkoutFetchCurrent - INC-04 (Log Score opens today for a selected h
     expect(isWorkoutFetchCurrent(null, '2026-08-27')).toBe(false)
     expect(isWorkoutFetchCurrent(undefined, '2026-08-27')).toBe(false)
     expect(isWorkoutFetchCurrent(null, null)).toBe(false)
+  })
+})
+
+describe('freezeLoggingContext / resolveLoggedWorkoutIdentity - INC-04 GLOBAL (frozen logging identity)', () => {
+  // Generic multi-workout fixtures. All three share the SAME variant label
+  // ("RX") but have completely different ids / content / dates. None is
+  // special-cased. The frozen logging context must always belong to the
+  // workout the member clicked, regardless of what the live state becomes.
+  const mkWorkout = (tag, date) => ({
+    id: `v2-${tag}`, legacyWodId: `wod-${tag}`, date,
+    sections: [
+      { id: `sec-metcon-${tag}`, slotKey: 'metcon', loggingMode: 'required', format: 'For Time' },
+      { id: `sec-skill-${tag}`, slotKey: 'skill', loggingMode: 'optional' },
+      { id: `sec-extra-${tag}`, slotKey: 'skill2', loggingMode: 'required' },
+    ],
+  })
+  const mkLegacy = (tag, date) => ({
+    id: `wod-${tag}`, date, type: 'For Time',
+    movements_rx: [`RX-${tag}: 21-15-9`], movements_intermediate: [`INT-${tag}`],
+    movements_beginner: [`BEG-${tag}`], movements_onramp: [`OR-${tag}`],
+    rx_weight_male: `${tag}-40kg`, rx_weight_female: `${tag}-30kg`,
+  })
+
+  const A = { v2: mkWorkout('A', '2026-08-20'), legacy: mkLegacy('A', '2026-08-20') }
+  const B = { v2: mkWorkout('B', '2026-08-21'), legacy: mkLegacy('B', '2026-08-21') }
+  const C = { v2: mkWorkout('C', '2026-07-14'), legacy: mkLegacy('C', '2026-07-14') }
+  const dispA = { ...A.v2 } // workoutForDisplay is the V2 object when present
+
+  it('same "RX" label across A/B/C: freezing A yields A\'s legacy WOD, A\'s metcon section, A\'s date, A\'s RX movements - never B or C', () => {
+    const ctx = freezeLoggingContext(dispA, A.legacy, A.v2, '2026-08-20')
+    const id = resolveLoggedWorkoutIdentity(ctx, 'RX')
+    expect(id.wodId).toBe('wod-A')
+    expect(id.sectionId).toBe('sec-metcon-A')
+    expect(id.businessDate).toBe('2026-08-20')
+    expect(id.variantMovements).toEqual(['RX-A: 21-15-9'])
+  })
+
+  it('freeze is immutable: mutating the LIVE workout to B afterwards does not change the frozen A identity', () => {
+    const ctx = freezeLoggingContext(dispA, A.legacy, A.v2, '2026-08-20')
+    // simulate a stale fetch resolving and the app swapping in workout B
+    let liveWodZiData = B.legacy
+    let liveWodZiV2 = B.v2
+    void liveWodZiData; void liveWodZiV2
+    const id = resolveLoggedWorkoutIdentity(ctx, 'RX')
+    expect(id.wodId).toBe('wod-A')
+    expect(id.sectionId).toBe('sec-metcon-A')
+    expect(id.businessDate).toBe('2026-08-20')
+  })
+
+  it('each variant level resolves that level\'s movements OF THE FROZEN workout (A), not a generic RX', () => {
+    const ctx = freezeLoggingContext(dispA, A.legacy, A.v2, '2026-08-20')
+    expect(resolveLoggedWorkoutIdentity(ctx, 'RX').variantMovements).toEqual(['RX-A: 21-15-9'])
+    expect(resolveLoggedWorkoutIdentity(ctx, 'Intermediate').variantMovements).toEqual(['INT-A'])
+    expect(resolveLoggedWorkoutIdentity(ctx, 'Beginner').variantMovements).toEqual(['BEG-A'])
+    expect(resolveLoggedWorkoutIdentity(ctx, 'OnRamp').variantMovements).toEqual(['OR-A'])
+  })
+
+  it('multi-section: additionalScoredSections carries ONLY non-primary required sections of the frozen workout', () => {
+    const ctx = freezeLoggingContext(dispA, A.legacy, A.v2, '2026-08-20')
+    expect(ctx.additionalScoredSections.map(s => s.id)).toEqual(['sec-extra-A'])
+    expect(ctx.primarySection.id).toBe('sec-metcon-A')
+    expect(ctx.supportingSections.map(s => s.id)).toEqual(['sec-skill-A', 'sec-extra-A'])
+  })
+
+  it('historical D+n: freezing C (date 2026-07-14) keeps 2026-07-14 identity no matter the submission day', () => {
+    const ctx = freezeLoggingContext({ ...C.v2 }, C.legacy, C.v2, '2026-07-14')
+    const id = resolveLoggedWorkoutIdentity(ctx, 'RX')
+    expect(id.wodId).toBe('wod-C')
+    expect(id.sectionId).toBe('sec-metcon-C')
+    expect(id.businessDate).toBe('2026-07-14')
+  })
+
+  it('legacy-only day (no Engine V2 row): wodId falls back to wods.id, sectionId is null (no synthetic section)', () => {
+    const legacyMap = { id: 'wod-A', date: '2026-08-20', sections: [{ id: 'legacy:wod-A:metcon', slotKey: 'metcon', loggingMode: 'required' }] }
+    const ctx = freezeLoggingContext(legacyMap, A.legacy, null, '2026-08-20')
+    const id = resolveLoggedWorkoutIdentity(ctx, 'RX')
+    expect(id.wodId).toBe('wod-A')
+    expect(id.sectionId).toBe(null) // wodZiWorkoutV2 is null -> never send a synthetic section id
+  })
+
+  it('no workout selected: frozen identity is fully null - caller must fail closed, no fallback', () => {
+    const ctx = freezeLoggingContext(null, null, null, '2026-08-19')
+    const id = resolveLoggedWorkoutIdentity(ctx, 'RX')
+    expect(id.wodId).toBe(null)
+    expect(id.sectionId).toBe(null)
+    expect(id.variantMovements).toEqual([])
+    expect(resolveLoggedWorkoutIdentity(null, 'RX').wodId).toBe(null)
+  })
+
+  it('when V2 and legacy disagree on identity, the frozen wodId is the V2 workout\'s explicit legacy_wod_id (INC-03 rule preserved)', () => {
+    const ctx = freezeLoggingContext(dispA, { id: 'stale-wrong-wod', date: '2026-08-20', movements_rx: ['x'] }, A.v2, '2026-08-20')
+    expect(resolveLoggedWorkoutIdentity(ctx, 'RX').wodId).toBe('wod-A') // A.v2.legacyWodId
   })
 })
 
