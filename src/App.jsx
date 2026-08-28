@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -7689,15 +7689,20 @@ function App() {
     // gaseste sectiunea de afisat, vezi workoutForDisplay/supportingSectionsV).
     const skillSectionIdV2 = wodZiWorkoutV2
       ? (supportingSectionsV.find(s => s.slotKey === (esteSlot2 ? 'skill2' : 'skill'))?.id || null) : null
+    // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
+    // wodZiData poate fi null chiar cand wodZiWorkoutV2 exista si
+    // skillSectionIdV2 e real - accesarea neconditionata a wodZiData.id/
+    // .date arunca TypeError, oprind salvarea INAINTE sa ajunga la
+    // Supabase.
     const { error } = await supabase.from('skill_logs').upsert({
-      member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData.id, slot: skillLogSlot,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(wodZiWorkoutV2, wodZiData), slot: skillLogSlot,
       workout_section_id: skillSectionIdV2,
       notes: skillLogNote.trim() || null,
       sets: setsCurate, result: resultCurat, log_meta: logMeta,
       // Acelasi motiv ca la wod_logs mai sus - Skill Work e mereu legat de un
-      // WOD oficial (wodZiData), poate al unei zile trecute daca membrul a
-      // navigat pe Acasa la o zi in urma inainte sa logheze.
-      logged_at: wodZiData.date ? dateWithCurrentTime(wodZiData.date) : new Date().toISOString(),
+      // WOD oficial (wodZiData/wodZiWorkoutV2), poate al unei zile trecute
+      // daca membrul a navigat pe Acasa la o zi in urma inainte sa logheze.
+      logged_at: (wodZiWorkoutV2?.date ?? wodZiData?.date) ? dateWithCurrentTime(wodZiWorkoutV2?.date ?? wodZiData?.date) : new Date().toISOString(),
     }, { onConflict: 'member_id,wod_id,slot' })
     if (error) { showToast(t.toastGenericError); console.error(error); setSkillLogSaving(false); return }
     showToast(t.toastSkillLogSaved)
@@ -8337,8 +8342,9 @@ function App() {
       const sectionMiscariText = [...(sectionHeaderLine ? [sectionHeaderLine] : []), ...miscariPentruLog].join('\n')
       const noteFullSectiune = [sectionMiscariText || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
       const logFieldsSectiune = composeWodLogFields()
+      // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
       const { error } = await supabase.from('wod_logs').insert({
-        member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodZiData?.id || null,
+        member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(wodZiWorkoutV2, wodZiData),
         workout_section_id: logTargetSectionId,
         // Sectiunile suplimentare n-au variante de scalare (RX/Intermediate/
         // Beginner/OnRamp) - o singura prescriptie, tratata drept "RX"
@@ -8418,8 +8424,10 @@ function App() {
     // nu se leaga de nicio sectiune, la fel ca wod_id mai sus.
     const sectionIdV2 = (variantaAleasa !== null && wodZiWorkoutV2)
       ? (primarySectionV?.id || null) : null
+    // Yesterday-WOD forensic fix - vezi resolveWodIdForLog (utils.js).
+    const wodIdPtSalvare = variantaAleasa !== null ? resolveWodIdForLog(wodZiWorkoutV2, wodZiData) : null
     const { error } = await supabase.from('wod_logs').insert({
-      member_id: user.id, gym_id: userProfile.gym_id, wod_id: variantaAleasa !== null ? (wodZiData?.id || null) : null,
+      member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,

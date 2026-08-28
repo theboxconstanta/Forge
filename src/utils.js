@@ -58,6 +58,23 @@ export function localDayBoundsUTC(dateStr) {
 // neconditionata a wodZiData.type arunca TypeError si oprea salvarea
 // INAINTE sa ajunga la Supabase. Cand nu exista wodZiData, singura
 // informatie reala disponibila e nivelul variantei alese (varianteNivel).
+// Yesterday-WOD forensic fix - `wod_logs`/`skill_logs.wod_id` trebuie
+// mereu sa refere `wods.id` (legacy), niciodata `workouts.id` (Engine
+// V2 - alt tabel). Cand exista deja un rand V2 real (wodZiWorkoutV2),
+// sursa corecta e coloana lui `legacy_wod_id` - aceeasi valoare pe care
+// snapshot_wod_log_context()/echivalentul pt skill_logs o verifica
+// server-side impotriva workout_section_id-ului trimis. O interogare
+// SEPARATA a `wods` dupa data afisata (wodZiData?.id) poate diverge de
+// workouts.legacy_wod_id daca cele doua tabele au ajuns nesincronizate
+// pt aceeasi zi (gasit live: exact un WOD, dintre 45, cu workouts.date
+// si wods.date la o zi distanta pt acelasi legacy_wod_id) - trimiterea
+// unui workout_section_id real cu un wod_id derivat separat (si gresit)
+// era respinsa de trigger cu "workout_section_id X does not belong to
+// wod_id Y", oprind salvarea DUPA ce cererea ajungea deja la Supabase.
+export function resolveWodIdForLog(wodZiWorkoutV2, wodZiData) {
+  return wodZiWorkoutV2?.legacyWodId ?? wodZiData?.id ?? null
+}
+
 export function computeWodHeaderLine({ variantaAleasa, wodZiData, varianteNivel, durStr, wodTip, wodDurata, freeLogConfigDesc }) {
   if (variantaAleasa !== null) {
     if (wodZiData) {

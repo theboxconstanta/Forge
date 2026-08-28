@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -235,6 +235,39 @@ describe('localDayBoundsUTC', () => {
   it('sfarsitul zilei este strict dupa inceputul zilei', () => {
     const { startUTC, endUTC } = localDayBoundsUTC('2026-08-26')
     expect(new Date(endUTC).getTime()).toBeGreaterThan(new Date(startUTC).getTime())
+  })
+})
+
+describe('resolveWodIdForLog - yesterday-WOD forensic regression (workouts.date/wods.date desync)', () => {
+  it('reproduces the exact production incident: Engine V2 loaded (real legacyWodId) but legacy wods lookup is null - uses legacyWodId, not null', () => {
+    // Real anonymized shape of 2026-08-27's actual production workout:
+    // workouts.date = '2026-08-27', legacy_wod_id pointed at a `wods` row
+    // whose OWN date was '2026-08-28' - fetchWodZi('2026-08-27') found
+    // zero rows (wodZiData = null), while fetchWodZiWorkoutV2 succeeded.
+    const wodZiWorkoutV2 = { id: '7daeed8f-24c4-40ab-8f33-215fcabf4692', legacyWodId: '8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95', date: '2026-08-27' }
+    const wodZiData = null
+    expect(resolveWodIdForLog(wodZiWorkoutV2, wodZiData)).toBe('8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95')
+  })
+
+  it('CONTROL: no WOD scheduled at all (original INC-02 scenario) - both sources null, resolves to null without throwing', () => {
+    expect(() => resolveWodIdForLog(null, null)).not.toThrow()
+    expect(resolveWodIdForLog(null, null)).toBe(null)
+  })
+
+  it('CONTROL: pure legacy day (no Engine V2 sync yet) - falls back to wodZiData.id', () => {
+    expect(resolveWodIdForLog(null, { id: 'legacy-wod-id-123' })).toBe('legacy-wod-id-123')
+  })
+
+  it('CONTROL: both sources present and agreeing - either value, same result', () => {
+    const wodZiWorkoutV2 = { id: 'v2-id', legacyWodId: 'shared-wod-id' }
+    const wodZiData = { id: 'shared-wod-id' }
+    expect(resolveWodIdForLog(wodZiWorkoutV2, wodZiData)).toBe('shared-wod-id')
+  })
+
+  it('prefers wodZiWorkoutV2.legacyWodId when the two sources disagree (matches what the DB trigger validates against)', () => {
+    const wodZiWorkoutV2 = { id: 'v2-id', legacyWodId: 'correct-wod-id' }
+    const wodZiData = { id: 'stale-wrong-wod-id' }
+    expect(resolveWodIdForLog(wodZiWorkoutV2, wodZiData)).toBe('correct-wod-id')
   })
 })
 

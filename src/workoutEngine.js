@@ -200,6 +200,19 @@ export function mapV2WorkoutRow(workout, sectionRows) {
   if (!workout) return null
   return {
     id: workout.id, gymId: workout.gym_id, date: workout.date,
+    // Yesterday-WOD forensic fix - `id` de mai sus e id-ul din `workouts`
+    // (Engine V2), NU id-ul din `wods` (legacy) - wod_logs.wod_id se
+    // refera intotdeauna la `wods.id`. legacyWodId e coloana reala
+    // `workouts.legacy_wod_id` (deja selectata de select('*') in
+    // loadFromWorkoutEngineV2, doar neexpusa aici pana acum) - sursa
+    // corecta si autoritativa pt wod_id la salvare (aceeasi valoare pe
+    // care snapshot_wod_log_context() o verifica server-side), spre
+    // deosebire de o interogare separata `wods` dupa data afisata, care
+    // poate diverge daca cele doua tabele au ajuns nesincronizate pt
+    // aceeasi zi (gasit live: un singur WOD, dintre 45, cu exact acest
+    // decalaj - workouts.date si wods.date la o zi distanta pt acelasi
+    // legacy_wod_id).
+    legacyWodId: workout.legacy_wod_id ?? null,
     title: workout.title ?? null, notes: workout.notes ?? null,
     sections: (sectionRows || []).map(mapV2SectionRow).sort((a, b) => a.order - b.order),
     // Workout Aggregation Phase A - null pt orice WOD care nu are unul

@@ -105,7 +105,11 @@ function normalizeForComparison(workout) {
     // (workouts.aggregate_definition, o coloana pe care `wods`, calea
     // legacy, n-o are deloc) - o asimetrie by-design intre cele doua
     // cai, la fel ca id/source de mai jos, nu o eroare de mapare.
-    id: undefined, source: undefined, aggregateDefinition: undefined,
+    // legacyWodId (yesterday-WOD forensic fix) e aceeasi asimetrie -
+    // exista doar pe calea V2 (workouts.legacy_wod_id); calea legacy
+    // ESTE deja randul `wods`, deci propriul ei `.id` joaca acel rol,
+    // fara sa aiba nevoie de un camp separat.
+    id: undefined, source: undefined, aggregateDefinition: undefined, legacyWodId: undefined,
     sections: workout.sections.map((s) => {
       const { legacyWodId, ...metadataRest } = s.metadata || {}
       return {
@@ -231,6 +235,18 @@ describe('mapV2WorkoutRow / mapV2SectionRow', () => {
 
   it('null pt un workout null (nu arunca)', () => {
     expect(mapV2WorkoutRow(null, [])).toBeNull()
+  })
+
+  it('yesterday-WOD forensic fix: expune legacyWodId din coloana reala workouts.legacy_wod_id (nu doar `id`, care e id-ul propriu din `workouts`, alt tabel decat `wods`)', () => {
+    const withLegacy = { ...v2WorkoutFixture, legacy_wod_id: '8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95' }
+    const w = mapV2WorkoutRow(withLegacy, v2SectionRowsFixture)
+    expect(w.legacyWodId).toBe('8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95')
+    expect(w.id).not.toBe(w.legacyWodId)
+  })
+
+  it('legacyWodId e null (nu undefined) cand lipseste coloana - safe pt ?? in resolveWodIdForLog', () => {
+    const w = mapV2WorkoutRow(v2WorkoutFixture, v2SectionRowsFixture)
+    expect(w.legacyWodId).toBeNull()
   })
 
   it('Workout Aggregation Phase A - expune aggregate_definition ca aggregateDefinition, null cand coloana e null', () => {
