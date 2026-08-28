@@ -8,26 +8,40 @@ Type: bounded critical-path validation. **Investigation/verification only — ze
 
 > **CORRECTION (2026-08-28, post-gate):** the owner reproduced a real production
 > bug in the exact historical "Log Score" UI flow that this gate did **not**
-> exercise. Opened as **INC-04 / PRG-05 (P1)**. It was root-caused (HIGH
-> confidence — a client async fetch race, no request-currency guard), fixed
-> app-only, regression-tested, and **deployed live 2026-08-28 (commit `27131a5`)**.
-> §27 is corrected below. With INC-04 fixed and deployed, the gate verdict below
-> stands; the historical-logging PASS is restored at the guard-contract and
-> DB-integrity level, pending the owner's end-to-end browser retest.
+> exercise. Opened as **INC-04 / PRG-05 (P1)**.
+>
+> - **First fix `27131a5`** — a request-currency guard on the workout fetch
+>   (Layer 1). The owner reproduced the split-brain **again**, so INC-04 was
+>   **reopened** as a global remediation.
+> - **Global fix `8501356`** — the logger and save now derive workout identity
+>   **only** from a frozen snapshot captured at "Log Score" click time
+>   (`freezeLoggingContext` / `resolveLoggedWorkoutIdentity` / `logCtx` /
+>   `homeDisplayIsCurrent` gate), fail-closed, covering every workout / date /
+>   format / variant / section and all 4 Log Score entry points. App-only, no DB
+>   change, 14 regression tests (942/942), deployed live, `app_version` bumped.
+>
+> **Historical logging remains FAIL in this gate until the owner completes the
+> manual acceptance checks** in `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`
+> (§ Owner Acceptance): yesterday's workout, today's workout, and another
+> historical date — for each, displayed workout === logger content === save
+> identity. §27 and PRG-05 are corrected below.
 
-**PRODUCTION READINESS: GREEN** (after the INC-04 fix)
+**PRODUCTION READINESS: GREEN for every path except historical Log Score, which is
+FAIL — AWAITING OWNER ACCEPTANCE** (INC-04 global fix `8501356` deployed; not
+owner-verified end-to-end).
 
 Original P0 blockers: 0. Original P1 blockers: 0 as assessed — **corrected to 1
-(INC-04 / PRG-05), now FIXED & DEPLOYED**. Every critical real-user workflow
-(auth → member → membership → booking → attendance → workout delivery → score
-logging → journal → leaderboard → admin → subscription → payment → tenant
-isolation → error handling) verified working. The incident/security fixes shipped
-this session (INC-01, INC-02, INC-03, Financial timezone, INC-04) are holding in
-production — zero post-fix recurrence in Sentry. Remaining findings: 2 × P2, 2 × P3,
-all pre-existing and recoverable.
+(INC-04 / PRG-05); first fix `27131a5` was insufficient, global fix `8501356`
+deployed, status FIX DEPLOYED — AWAITING OWNER ACCEPTANCE**. Every other critical
+real-user workflow (auth → member → membership → booking → attendance → workout
+delivery → score logging → journal → leaderboard → admin → subscription → payment
+→ tenant isolation → error handling) verified working. The incident/security
+fixes shipped this session (INC-01, INC-02, INC-03, Financial timezone, INC-04
+Layer 1 + global) are holding in production — zero post-fix recurrence in Sentry.
+Remaining findings: 2 × P2, 2 × P3, all pre-existing and recoverable.
 
-**FORGE IS READY FOR REAL PRODUCTION USE** (with INC-04 deployed; owner end-to-end
-retest of `28 → 27 → Log Score` recommended to confirm).
+**FORGE IS READY FOR REAL PRODUCTION USE for all paths except historical Log
+Score, which stays FAIL until the owner accepts the INC-04 global fix.**
 
 ---
 
@@ -351,7 +365,7 @@ fabricating data (INC-02 hardening).
 
 ---
 
-## 27. Loading / Retry States — **CORRECTION: FAIL (INC-04)** → fixed 2026-08-28
+## 27. Loading / Retry States — **CORRECTION: FAIL (INC-04)** — global fix deployed, AWAITING OWNER ACCEPTANCE
 
 The original gate wrote: *"Documented latent P2 (INC-03 §17/§25): the two workout
 fetches update two state atoms with no per-request currency guard, so a rapid
@@ -363,10 +377,22 @@ defect… not a blocker."*
 (started when the Home tab mounted) resolved after the historical fetch and
 overwrote `wodZiWorkoutV2`; `workoutForDisplay` and `resolveWodIdForLog` both
 prefer `wodZiWorkoutV2`, so the **save identity** could become today's, not just
-the display → **P1**, not P2. Opened as **INC-04**, root-caused (HIGH confidence),
-fixed app-only with a request-currency guard (`isWorkoutFetchCurrent`), 6 new
-regression tests, deployed live (commit `27131a5`). See
-`FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`.
+the display → **P1**, not P2. Opened as **INC-04**.
+
+- **First fix `27131a5`** — a request-currency guard (`isWorkoutFetchCurrent`),
+  6 regression tests, deployed live. **The owner reproduced the split-brain
+  again** → INC-04 reopened.
+- **Global fix `8501356`** — the architectural root cause was that the logger and
+  `saveWodLog` / `saveSkillLog` reconstructed workout identity from mutable
+  global state *after* the click. Fixed by freezing the displayed workout's
+  identity at click time (`freezeLoggingContext` → `logCtx`), gating the 4 Log
+  Score entry points behind `homeDisplayIsCurrent`, routing every logger + save
+  read through the frozen `logCtx` for the session, and failing closed on an
+  incomplete identity. Generic — no date / id / workout special-cased. 8 more
+  regression tests (942/942 total). App-only, no DB change. Deployed live,
+  `app_version` bumped to `inc-04-global-frozen-logging-identity-20260828`.
+
+See `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`.
 
 **Lesson / test gap:** the gate validated the DB layer for historical logging
 (payload → persistence → trigger rejection of mismatches) but never drove the
@@ -375,9 +401,12 @@ rapid interaction and concurrent in-flight fetches, so the client fetch race nev
 manifested. The gate flagged this exact race in §27 but classified it non-blocking
 because it was unreproduced — which the owner's reproduction corrected.
 
-**Post-INC-04:** historical logging is restored to PASS at the guard-contract and
-DB-integrity level; end-to-end browser confirmation of the owner's exact workflow
-is recommended before treating INC-04 as fully verified in production.
+**Status: FAIL — AWAITING OWNER ACCEPTANCE.** Historical logging stays FAIL in
+this gate until the owner completes the manual acceptance checks (yesterday /
+today / another historical date — displayed workout === logger content === save
+identity for each). The global fix is deployed and contract-level + regression
+tested, but this mission had no logged-in browser session, so end-to-end
+verification is the owner's to perform.
 
 ---
 
@@ -419,7 +448,7 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
 | **PRG-02** | Feed author-fetch `PGRST303` (JWT expired) on stale session | Feed (social, non-core) | **P2** | HIGH | **NO** |
 | **PRG-03** | "TypeError: Failed to fetch" / "Load failed" — network request failures | All (mobile connectivity) | **P3** | HIGH | **NO** |
 | **PRG-04** | Stale script-load error from an old Vercel domain (`forge-delta-ivory`) | PWA shell / service worker | **P3** | MEDIUM | **NO** |
-| **PRG-05** | **INC-04** — historical "Log Score" opens today's workout (async fetch race, no request-currency guard); wrong **save** identity possible | Member PWA — workout fetch / Log Score | **P1** | HIGH | **YES (was)** — **FIXED & DEPLOYED 2026-08-28** (commit `27131a5`); see `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md` |
+| **PRG-05** | **INC-04** — historical "Log Score" opens another workout's content / save identity (async fetch race + logger reconstructing identity from mutable global state after the click) | Member PWA — workout fetch / Log Score | **P1** | HIGH | **YES** — first fix `27131a5` insufficient; **global fix `8501356` DEPLOYED 2026-08-28, status FIX DEPLOYED — AWAITING OWNER ACCEPTANCE**; historical logging stays **FAIL** in this gate until owner-verified; see `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md` |
 
 ### PRG-01 — JWT issued at future
 - **Reproduction:** a browser whose OS clock is behind the server signs in; the
@@ -453,18 +482,31 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
   impact; the app retries / shows error toasts.
 - **Not blocking** — expected failure class (Phase 27).
 
-### PRG-05 — INC-04 historical "Log Score" opens today's workout
-- **Reproduction (owner, 2026-08-28):** Home tab → tap 2026-08-27 chip → "Log
-  Score" → the logger shows today's (2026-08-28) workout.
-- **Root cause:** `fetchWodZi` / `fetchWodZiWorkoutV2` had no request-currency
-  guard; a stale in-flight today-fetch resolved last and overwrote
-  `wodZiData`/`wodZiWorkoutV2`. `workoutForDisplay` and `resolveWodIdForLog` prefer
-  `wodZiWorkoutV2` → wrong display **and** wrong save `wod_id`/`section`.
+### PRG-05 — INC-04 historical "Log Score" opens another workout's content
+- **Reproduction (owner, 2026-08-28):** Home tab → tap a historical chip → "Log
+  Score" → the logger shows/saves a different workout's content (split-brain:
+  correct date label, wrong content, potentially wrong save identity).
+- **Root cause (two layers):**
+  1. `fetchWodZi` / `fetchWodZiWorkoutV2` had no request-currency guard; a stale
+     in-flight today-fetch resolved last and overwrote `wodZiData` /
+     `wodZiWorkoutV2`.
+  2. The logger and `saveWodLog` / `saveSkillLog` reconstructed workout identity
+     from mutable global state (`wodZiData`, `wodZiWorkoutV2`, `dataAcasa`,
+     `variantaAleasa`) **after** the click, instead of carrying the clicked
+     workout's identity.
 - **Severity:** **P1** (wrong persisted workout identity, not display-only).
-- **Status:** FIXED & DEPLOYED (commit `27131a5`) — `isWorkoutFetchCurrent` guard
-  discards responses whose date is no longer selected; 6 regression tests;
-  `app_version` bumped. Full report:
-  `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`.
+- **Status:** **FIX DEPLOYED — AWAITING OWNER ACCEPTANCE.**
+  - `27131a5` (Layer 1): `isWorkoutFetchCurrent` guard discards responses whose
+    date is no longer selected. Owner reproduced again → insufficient alone.
+  - `8501356` (global): `freezeLoggingContext` captures the displayed workout's
+    identity at click time into `logCtx`; `homeDisplayIsCurrent` gates all 4 Log
+    Score entry points; every logger + save read is routed through the frozen
+    `logCtx` for the session; fail-closed on incomplete identity. Generic — no
+    date / id / workout special-cased. 8 more regression tests (942/942). App-only.
+    Deployed, `app_version` → `inc-04-global-frozen-logging-identity-20260828`.
+  - **NOT owner-verified end-to-end** — historical logging stays FAIL in this gate
+    until the owner completes the manual checks in
+    `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md` § Owner Acceptance.
 
 ### PRG-04 — stale script-load error
 - `TypeError: Script https://forge-delta-ivory.vercel.app/…` (issue `134513627`,
@@ -477,9 +519,11 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
 ## 31. P0 / P1
 
 - **Current P0: 0**
-- **Current P1: 0** — *(gate as originally run reported 0; the owner's post-gate
-  reproduction added **INC-04 / PRG-05 (P1)**, which is now FIXED & DEPLOYED
-  2026-08-28, commit `27131a5`. No open P1 remains.)*
+- **Current P1: 1 open — INC-04 / PRG-05.** The gate as originally run reported 0;
+  the owner's post-gate reproduction added **INC-04 / PRG-05 (P1)**. First fix
+  `27131a5` was insufficient; global fix `8501356` is **deployed** but its status
+  is **FIX DEPLOYED — AWAITING OWNER ACCEPTANCE** — it remains an open P1 (and
+  historical logging remains FAIL) until the owner verifies it end-to-end.
 
 ---
 
