@@ -6,17 +6,28 @@ Type: bounded critical-path validation. **Investigation/verification only — ze
 
 ## 1. Executive Verdict
 
-**PRODUCTION READINESS: GREEN**
+> **CORRECTION (2026-08-28, post-gate):** the owner reproduced a real production
+> bug in the exact historical "Log Score" UI flow that this gate did **not**
+> exercise. Opened as **INC-04 / PRG-05 (P1)**. It was root-caused (HIGH
+> confidence — a client async fetch race, no request-currency guard), fixed
+> app-only, regression-tested, and **deployed live 2026-08-28 (commit `27131a5`)**.
+> §27 is corrected below. With INC-04 fixed and deployed, the gate verdict below
+> stands; the historical-logging PASS is restored at the guard-contract and
+> DB-integrity level, pending the owner's end-to-end browser retest.
 
-No current P0 blocker. No current P1 blocker. Every critical real-user workflow
+**PRODUCTION READINESS: GREEN** (after the INC-04 fix)
+
+Original P0 blockers: 0. Original P1 blockers: 0 as assessed — **corrected to 1
+(INC-04 / PRG-05), now FIXED & DEPLOYED**. Every critical real-user workflow
 (auth → member → membership → booking → attendance → workout delivery → score
 logging → journal → leaderboard → admin → subscription → payment → tenant
-isolation → error handling) verified working. The four incident/security fixes
-shipped this session (INC-01, INC-02, INC-03, Financial timezone) are holding in
-production — zero post-fix recurrence in Sentry. 4 non-blocking findings (2 × P2,
-2 × P3), all pre-existing and recoverable.
+isolation → error handling) verified working. The incident/security fixes shipped
+this session (INC-01, INC-02, INC-03, Financial timezone, INC-04) are holding in
+production — zero post-fix recurrence in Sentry. Remaining findings: 2 × P2, 2 × P3,
+all pre-existing and recoverable.
 
-**FORGE IS READY FOR REAL PRODUCTION USE.**
+**FORGE IS READY FOR REAL PRODUCTION USE** (with INC-04 deployed; owner end-to-end
+retest of `28 → 27 → Log Score` recommended to confirm).
 
 ---
 
@@ -340,14 +351,33 @@ fabricating data (INC-02 hardening).
 
 ---
 
-## 27. Loading / Retry States — PASS (with documented P2)
+## 27. Loading / Retry States — **CORRECTION: FAIL (INC-04)** → fixed 2026-08-28
 
-Date-keyed fetches pass the explicit selected date; `workoutForDisplay` re-derives
-from whichever of `wodZiData` / `wodZiWorkoutV2` is loaded. **Documented latent
-P2** (INC-03 report §17/§25): the two workout fetches update two state atoms with
-no per-request currency guard, so a rapid out-of-order response *could* transiently
-desync them. Not reproduced as a real defect, not the reported INC-03 symptom, and
-not a blocker. Recorded in the backlog.
+The original gate wrote: *"Documented latent P2 (INC-03 §17/§25): the two workout
+fetches update two state atoms with no per-request currency guard, so a rapid
+out-of-order response could transiently desync them. Not reproduced as a real
+defect… not a blocker."*
+
+**On 2026-08-28 the owner reproduced it.** Selecting a historical date and pressing
+"Log Score" opened **today's** workout — a stale in-flight fetch for today
+(started when the Home tab mounted) resolved after the historical fetch and
+overwrote `wodZiWorkoutV2`; `workoutForDisplay` and `resolveWodIdForLog` both
+prefer `wodZiWorkoutV2`, so the **save identity** could become today's, not just
+the display → **P1**, not P2. Opened as **INC-04**, root-caused (HIGH confidence),
+fixed app-only with a request-currency guard (`isWorkoutFetchCurrent`), 6 new
+regression tests, deployed live (commit `27131a5`). See
+`FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`.
+
+**Lesson / test gap:** the gate validated the DB layer for historical logging
+(payload → persistence → trigger rejection of mismatches) but never drove the
+actual React UI (bottom-nav → chip → "Log Score" button → modal) with realistic
+rapid interaction and concurrent in-flight fetches, so the client fetch race never
+manifested. The gate flagged this exact race in §27 but classified it non-blocking
+because it was unreproduced — which the owner's reproduction corrected.
+
+**Post-INC-04:** historical logging is restored to PASS at the guard-contract and
+DB-integrity level; end-to-end browser confirmation of the owner's exact workflow
+is recommended before treating INC-04 as fully verified in production.
 
 ---
 
@@ -389,6 +419,7 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
 | **PRG-02** | Feed author-fetch `PGRST303` (JWT expired) on stale session | Feed (social, non-core) | **P2** | HIGH | **NO** |
 | **PRG-03** | "TypeError: Failed to fetch" / "Load failed" — network request failures | All (mobile connectivity) | **P3** | HIGH | **NO** |
 | **PRG-04** | Stale script-load error from an old Vercel domain (`forge-delta-ivory`) | PWA shell / service worker | **P3** | MEDIUM | **NO** |
+| **PRG-05** | **INC-04** — historical "Log Score" opens today's workout (async fetch race, no request-currency guard); wrong **save** identity possible | Member PWA — workout fetch / Log Score | **P1** | HIGH | **YES (was)** — **FIXED & DEPLOYED 2026-08-28** (commit `27131a5`); see `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md` |
 
 ### PRG-01 — JWT issued at future
 - **Reproduction:** a browser whose OS clock is behind the server signs in; the
@@ -422,6 +453,19 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
   impact; the app retries / shows error toasts.
 - **Not blocking** — expected failure class (Phase 27).
 
+### PRG-05 — INC-04 historical "Log Score" opens today's workout
+- **Reproduction (owner, 2026-08-28):** Home tab → tap 2026-08-27 chip → "Log
+  Score" → the logger shows today's (2026-08-28) workout.
+- **Root cause:** `fetchWodZi` / `fetchWodZiWorkoutV2` had no request-currency
+  guard; a stale in-flight today-fetch resolved last and overwrote
+  `wodZiData`/`wodZiWorkoutV2`. `workoutForDisplay` and `resolveWodIdForLog` prefer
+  `wodZiWorkoutV2` → wrong display **and** wrong save `wod_id`/`section`.
+- **Severity:** **P1** (wrong persisted workout identity, not display-only).
+- **Status:** FIXED & DEPLOYED (commit `27131a5`) — `isWorkoutFetchCurrent` guard
+  discards responses whose date is no longer selected; 6 regression tests;
+  `app_version` bumped. Full report:
+  `FORGE_INC_04_HISTORICAL_LOG_SCORE_CONTEXT_REPORT.md`.
+
 ### PRG-04 — stale script-load error
 - `TypeError: Script https://forge-delta-ivory.vercel.app/…` (issue `134513627`,
   x3) — a cached client on an old Vercel domain / stale service worker failing to
@@ -433,7 +477,9 @@ present and enforcing. No RLS / GRANT / security posture change during the gate.
 ## 31. P0 / P1
 
 - **Current P0: 0**
-- **Current P1: 0**
+- **Current P1: 0** — *(gate as originally run reported 0; the owner's post-gate
+  reproduction added **INC-04 / PRG-05 (P1)**, which is now FIXED & DEPLOYED
+  2026-08-28, commit `27131a5`. No open P1 remains.)*
 
 ---
 
