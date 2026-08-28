@@ -2162,13 +2162,18 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
     if (postsData) {
       const ids = postsData.map(p => p.id)
       const postAuthorIds = [...new Set(postsData.map(p => p.member_id))]
-      // feed_posts/feed_comments.member_id has no foreign key to `members`
-      // (only to the legacy `profiles`), so PostgREST's embedded-join
-      // syntax can't resolve against members - each author lookup here is
-      // a separate, explicitly batched query (never per-row) instead.
+      // INC-01 - feed_posts/feed_comments.member_id has a real foreign key
+      // to `profiles`, never to `members` (PostgREST's embedded-join
+      // syntax can't resolve against members here at all - each author
+      // lookup is a separate, explicitly batched query instead), so
+      // `members` was never the architecturally correct table to read from
+      // in the first place; it also happened to be factually stale for 8
+      // real members (members.full_name empty while profiles.full_name has
+      // the real name - member_field_drift, unreconciled), which is what
+      // made this render "Membru" instead of their actual name.
       const [authorsRes, reactRes, commRes] = await Promise.all([
         postAuthorIds.length > 0
-          ? supabase.from('members').select('id, full_name, email, avatar_url').in('id', postAuthorIds)
+          ? supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', postAuthorIds)
           : Promise.resolve({ data: [] }),
         ids.length > 0
           ? supabase.from('feed_reactions').select('post_id, emoji, member_id').in('post_id', ids)
@@ -2201,7 +2206,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
         const commentAuthorIds = [...new Set(commData.map(c => c.member_id))]
         let commentAuthorsMap = {}
         if (commentAuthorIds.length > 0) {
-          const { data: commAuthorsData } = await supabase.from('members').select('id, full_name, avatar_url').in('id', commentAuthorIds)
+          const { data: commAuthorsData } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', commentAuthorIds)
           if (commAuthorsData) commAuthorsData.forEach(a => { commentAuthorsMap[a.id] = a })
         }
         const cMap = {}
@@ -2217,7 +2222,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
 
   useEffect(() => {
     fetchAll(true)
-    supabase.from('members').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
+    supabase.from('profiles').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
       .then(({ data }) => { if (data) setMembriComunitate(data) })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
@@ -2787,8 +2792,14 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // Roster spans two Member Domain tables: memberships (status='active')
     // is what makes a row "currently on this Gym's roster" - the direct
     // equivalent of profiles.gym_id = my_gym_id() under RLS - while
-    // members supplies identity display fields. memberships is the
-    // driving query; members is a batched, deduplicated lookup against it.
+    // profiles supplies identity display fields. memberships is the
+    // driving query; profiles is a batched, deduplicated lookup against it.
+    // INC-01 - identity display fields (full_name/email/avatar_url/
+    // first_name/last_name/birth_date) come from `profiles`, not
+    // `members` - members.full_name was stale for 8 real members
+    // (member_field_drift, unreconciled), showing the wrong/missing name
+    // on this exact roster. gender stays from `members` deliberately -
+    // canonical source established at P0-02, untouched here.
     const { data: membershipsData } = await supabase.from('memberships')
       .select('member_id, waiver_accepted, waiver_accepted_at')
       .eq('status', 'active')
@@ -2796,10 +2807,15 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const memberIds = [...new Set(membershipsData.map(m => m.member_id))]
     let membersMap = {}
     if (memberIds.length > 0) {
-      const { data: membersData } = await supabase.from('members')
-        .select('id, email, full_name, avatar_url, first_name, last_name, birth_date, gender')
-        .in('id', memberIds)
-      if (membersData) membersData.forEach(m => { membersMap[m.id] = m })
+      const [{ data: profilesData }, { data: genderRows }] = await Promise.all([
+        supabase.from('profiles')
+          .select('id, email, full_name, avatar_url, first_name, last_name, birth_date')
+          .in('id', memberIds),
+        supabase.from('members').select('id, gender').in('id', memberIds),
+      ])
+      const genderById = {}
+      if (genderRows) genderRows.forEach(g => { genderById[g.id] = g.gender })
+      if (profilesData) profilesData.forEach(m => { membersMap[m.id] = { ...m, gender: genderById[m.id] ?? null } })
     }
     const merged = membershipsData
       .map(ms => {
@@ -2849,7 +2865,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
     const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
-    const { data: profsData } = await supabase.from('members').select('id, full_name, email, avatar_url').in('id', [...new Set(memberIds)])
+    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', [...new Set(memberIds)])
     const profsMap = {}
     ;(profsData || []).forEach(p => { profsMap[p.id] = p })
     const bookingByMember = {}
@@ -7842,7 +7858,10 @@ function App() {
     const allIds = [...new Set(data.map(b => b.member_id))]
     let profilesMap = {}
     if (allIds.length > 0) {
-      const { data: profiles } = await supabase.from('members').select('id, full_name, avatar_url').in('id', allIds)
+      // INC-01 - `profiles`, nu `members` (members.full_name era stale
+      // pt 8 membri reali cu drift nereconciliat, vezi member_field_drift -
+      // afisa "Membru" desi profiles.full_name avea numele real).
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', allIds)
       if (profiles) profiles.forEach(p => { profilesMap[p.id] = p })
     }
     const result = {}
@@ -7852,7 +7871,7 @@ function App() {
         membri: grouped[id].map(b => ({
           bookingId: b.id,
           memberId: b.member_id,
-          name: profilesMap[b.member_id]?.full_name || 'Membru',
+          name: profilesMap[b.member_id]?.full_name || profilesMap[b.member_id]?.email?.split('@')[0] || 'Membru',
           avatarUrl: profilesMap[b.member_id]?.avatar_url || null,
           checkedIn: b.checked_in || false,
         })),
@@ -7911,9 +7930,19 @@ function App() {
     ]
     if (logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      const { data: profiles } = await supabase.from('members').select('id, full_name, email, gender, avatar_url, weight_unit').in('id', ids)
+      // INC-01 - full_name/email/avatar_url/weight_unit din `profiles`
+      // (members.full_name era stale pt 8 membri reali - member_field_drift
+      // nereconciliat, afisa "Membru"/emailul in loc de numele real).
+      // gender ramane din `members` deliberat - sursa canonica stabilita la
+      // P0-02, neatinsa aici.
+      const [{ data: profiles }, { data: genderRows }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email, avatar_url, weight_unit').in('id', ids),
+        supabase.from('members').select('id, gender').in('id', ids),
+      ])
+      const genderById = {}
+      if (genderRows) genderRows.forEach(g => { genderById[g.id] = g.gender })
       const map = {}
-      if (profiles) profiles.forEach(p => { map[p.id] = p })
+      if (profiles) profiles.forEach(p => { map[p.id] = { ...p, gender: genderById[p.id] ?? null } })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
     } else {
       setClasamentLogs([])
