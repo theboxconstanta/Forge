@@ -55,7 +55,7 @@ Row-creation forensics: `wods 8cd9666b` `created_at = 2026-08-27 06:12:27.406Z`;
 - Logs modified: **NO**.
 - `logged_at` modified: **NO**.
 
-Every log uniquely belongs to workout `7daeed8f` / WOD `8cd9666b` / (where set) section `fc1900b7`. They are legitimate scores for the 2026-08-27 workout, submitted on 2026-08-28. Correcting `wods.date` alone makes all attribution correct with **zero** `wod_logs` writes — `wod_logs` has no date column of its own (only `wod_id`, `workout_section_id`, `logged_at`); day attribution is derived via `wod_id → wods.date`.
+Every log uniquely belongs to workout `7daeed8f` / WOD `8cd9666b` / (where set) section `fc1900b7`. They are legitimate scores for the 2026-08-27 workout, submitted on 2026-08-28. Correcting `wods.date` alone makes all **workout attribution** correct with **zero** `wod_logs` writes — `wod_logs` has no date column of its own (only `wod_id`, `workout_section_id`, `logged_at`); workout attribution is derived via `wod_id → wods.date`. The leaderboard resolves by `wod_id` when a WOD exists for the queried date (`fetchClasament`: `q.eq('wod_id', wodZi.id)`), so post-fix the 4 logs appear on the **2026-08-27** leaderboard. (They also still fall into the generic "no WOD that day" `logged_at`-range bucket if someone opens the 2026-08-28 view — because they were genuinely submitted on 2026-08-28 and `logged_at` must not be rewritten; see §25.)
 
 ---
 
@@ -287,7 +287,7 @@ No save path derives workout identity from the current calendar day. All three l
 
 **Separate, lower-severity items (documented, NOT bundled — no independent reproduction as the incident):**
 - *Latent client async race:* `fetchWodZi` / `fetchWodZiWorkoutV2` write two state atoms with no request-currency (ref-token) guard; rapid date switching could transiently desync them. Optional future hardening; would need its own reproduction + scoped change.
-- *`wod_logs.logged_at` for past-WOD logging:* the client deliberately sets `logged_at = dateWithCurrentTime(workout.date)` (workout date + current time) when logging a past official variant, so the log groups under the workout day in Journal/Leaderboard. This conflates submission time with workout date — the opposite of the Phase 30 ideal (`logged_at` = true submission instant, grouping by `wod_id`). It does **not** violate identity integrity (`wod_id` is always the selected workout's). Changing it is a separate product decision about leaderboard/journal grouping and was **not** touched.
+- *`wod_logs.logged_at` for past-WOD logging:* the primary save path sets `logged_at = dateWithCurrentTime(wodZiData.date)` (workout date + current time) when logging a past official variant, so the log groups under the workout day; the additional-section path sets no `logged_at` (DB `now()`). The 4 existing logs have `logged_at` on 2026-08-28 (submission day). Post-fix the leaderboard for **2026-08-27** correctly includes them (it resolves by `wod_id`); the leaderboard for **2026-08-28** — which now has no WOD — still shows them in its generic `logged_at`-range fallback bucket, because they were genuinely submitted that day and Phase 30 / closure criterion #5 forbid rewriting `logged_at`. This is a leaderboard-grouping nuance, not an identity defect (`wod_id` is always the selected workout's). The broader question — make `logged_at` the true submission instant and always group the leaderboard by `wod_id` — is a separate product decision and was **not** touched.
 
 ---
 
