@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -281,6 +281,45 @@ describe('resolveWodIdForLog - yesterday-WOD forensic regression (workouts.date/
     // "today" / submission-date argument at all:
     expect(resolveWodIdForLog(historicalWorkout, historicalLegacy)).toBe('wod-2026-08-27')
     expect(resolveWodIdForLog.length).toBe(2) // (wodZiWorkoutV2, wodZiData) only
+  })
+})
+
+describe('isWorkoutFetchCurrent - INC-04 (Log Score opens today for a selected historical date)', () => {
+  // Owner repro on 2026-08-28: Home tab -> select 2026-08-27 -> "Log Score"
+  // opened TODAY's workout. Root cause: fetchWodZi / fetchWodZiWorkoutV2 had no
+  // request-currency guard, so an in-flight fetch for the previous date (today,
+  // started when the Home tab mounted) could resolve AFTER the 2026-08-27 fetch
+  // and overwrite wodZiData / wodZiWorkoutV2. This guard discards any response
+  // whose date is no longer the selected one.
+
+  it('applies a response only when its date is still the selected date', () => {
+    expect(isWorkoutFetchCurrent('2026-08-27', '2026-08-27')).toBe(true)
+  })
+
+  it('EXACT INC-04: a late today (2026-08-28) response is discarded when 2026-08-27 is selected', () => {
+    // fetch was issued for today; by the time it resolved the member had
+    // selected the historical date -> must NOT overwrite the historical state
+    expect(isWorkoutFetchCurrent('2026-08-28', '2026-08-27')).toBe(false)
+  })
+
+  it('a stale historical response is discarded once the member returns to today', () => {
+    expect(isWorkoutFetchCurrent('2026-08-27', '2026-08-28')).toBe(false)
+  })
+
+  it('D+n: a response for workout date D is still applied when D is selected, whatever "today" is', () => {
+    expect(isWorkoutFetchCurrent('2026-08-01', '2026-08-01')).toBe(true) // selected D, response for D
+    expect(isWorkoutFetchCurrent('2026-09-03', '2026-08-01')).toBe(false) // late "today" response, D still selected
+  })
+
+  it('rapid date switching (27 -> 26 -> 27): the first 27 response still applies (same date selected again)', () => {
+    expect(isWorkoutFetchCurrent('2026-08-27', '2026-08-27')).toBe(true)
+    expect(isWorkoutFetchCurrent('2026-08-26', '2026-08-27')).toBe(false) // the intermediate 26 response is dropped
+  })
+
+  it('null / undefined fetch date never counts as current (fails safe, no today fallback)', () => {
+    expect(isWorkoutFetchCurrent(null, '2026-08-27')).toBe(false)
+    expect(isWorkoutFetchCurrent(undefined, '2026-08-27')).toBe(false)
+    expect(isWorkoutFetchCurrent(null, null)).toBe(false)
   })
 })
 

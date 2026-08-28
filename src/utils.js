@@ -75,6 +75,22 @@ export function resolveWodIdForLog(wodZiWorkoutV2, wodZiData) {
   return wodZiWorkoutV2?.legacyWodId ?? wodZiData?.id ?? null
 }
 
+// INC-04 - request-currency guard for the two independent workout fetches
+// (fetchWodZi / fetchWodZiWorkoutV2). Both resolve async and unconditionally
+// call setWodZiData / setWodZiWorkoutV2. When the member navigates fast
+// (Home tab -> historical date chip -> "Log Score"), an in-flight fetch for
+// the PREVIOUS date (usually today, started when the Home tab mounted) can
+// resolve AFTER the newly-selected date's fetch and overwrite wodZiData /
+// wodZiWorkoutV2 with the wrong day's workout - so the Log Score screen (and
+// resolveWodIdForLog, which prefers wodZiWorkoutV2.legacyWodId) end up bound
+// to today instead of the explicitly-selected historical workout.
+// A fetch's result is only applied when the date it was issued for is still
+// the selected date. Stale responses are discarded (never fall back to
+// today - see the null handling in the callers).
+export function isWorkoutFetchCurrent(fetchedForDate, currentSelectedDate) {
+  return fetchedForDate != null && fetchedForDate === currentSelectedDate
+}
+
 export function computeWodHeaderLine({ variantaAleasa, wodZiData, varianteNivel, durStr, wodTip, wodDurata, freeLogConfigDesc }) {
   if (variantaAleasa !== null) {
     if (wodZiData) {

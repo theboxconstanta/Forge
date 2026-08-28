@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -7957,8 +7957,12 @@ function App() {
 
   const fetchWodZi = async (data_param) => {
     const _fwd = new Date()
-    const data_str = data_param || dataAcasa || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
+    const data_str = data_param || dataAcasaRef.current || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
     const { data } = await supabase.from('wods').select('*').eq('date', data_str).maybeSingle()
+    // INC-04 - discard a response whose date is no longer the selected one
+    // (member switched dates while this request was in flight). Never let a
+    // stale today response overwrite an explicitly-selected historical day.
+    if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
     setWodZiData(data || null)
   }
 
@@ -7970,12 +7974,17 @@ function App() {
   const fetchWodZiWorkoutV2 = async (data_param) => {
     if (!userProfile?.gym_id) return
     const _fwd = new Date()
-    const data_str = data_param || dataAcasa || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
+    const data_str = data_param || dataAcasaRef.current || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
     try {
       const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, data_str)
+      // INC-04 - same request-currency guard as fetchWodZi. workoutForDisplay
+      // and resolveWodIdForLog both PREFER wodZiWorkoutV2, so a stale V2
+      // response is what actually bound the logger to the wrong day.
+      if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
       setWodZiWorkoutV2(v2)
     } catch (err) {
       console.error('fetchWodZiWorkoutV2 failed (cade pe fallback legacy, vezi workoutForDisplay):', err)
+      if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
       setWodZiWorkoutV2(null)
     }
   }
