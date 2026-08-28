@@ -269,6 +269,19 @@ describe('resolveWodIdForLog - yesterday-WOD forensic regression (workouts.date/
     const wodZiData = { id: 'stale-wrong-wod-id' }
     expect(resolveWodIdForLog(wodZiWorkoutV2, wodZiData)).toBe('correct-wod-id')
   })
+
+  // INC-03 - workout identity is the SELECTED/displayed workout, never the
+  // submission day. Logging workout D on D+1 (or D+n) still resolves to D's
+  // own legacy WOD id; the submission timestamp (logged_at) is a separate
+  // concept and is not an input to identity resolution here.
+  it('INC-03: identity is the selected workout regardless of when it is logged - a historical workout keeps its own legacy_wod_id', () => {
+    const historicalWorkout = { id: 'v2-2026-08-27', legacyWodId: 'wod-2026-08-27', date: '2026-08-27' }
+    const historicalLegacy = { id: 'wod-2026-08-27', date: '2026-08-27' }
+    // member opens it and logs days later - resolveWodIdForLog takes no
+    // "today" / submission-date argument at all:
+    expect(resolveWodIdForLog(historicalWorkout, historicalLegacy)).toBe('wod-2026-08-27')
+    expect(resolveWodIdForLog.length).toBe(2) // (wodZiWorkoutV2, wodZiData) only
+  })
 })
 
 describe('computeWodHeaderLine - INC-02 (SENTRY-CYAN-HARBOR-4T) regression', () => {

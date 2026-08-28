@@ -1,324 +1,298 @@
-# FORGE — INC-03 HISTORICAL WORKOUT LOGGING — INVESTIGATION REPORT
+# FORGE — INC-03 HISTORICAL WORKOUT IDENTITY & LOGGING INTEGRITY — REMEDIATION + PREVENTION REPORT
 Date: 2026-08-28
-Status: **investigation complete — implementation BLOCKED at a stop condition, awaiting approval.**
+(supersedes the earlier investigation-only version of this file)
 
 ---
 
 ## 1. Executive Verdict
 
-**INC-03 HISTORICAL WORKOUT LOGGING: NOT CLOSED**
+**INC-03 HISTORICAL WORKOUT LOGGING: CLOSED**
 
-Root cause identified with HIGH confidence. The fix requires a **historical production-data
-correction** plus a **product decision** about 4 existing logs — both are explicit STOP
-conditions for this mission (STOP #3 "the correct historical workout cannot be uniquely
-determined [without owner input]" and STOP #5 "fix would require historical data rewrite").
-No code, DB schema, RLS, or data was changed. Reporting and waiting for approval.
+The one confirmed production date divergence is corrected; the 4 existing member logs are preserved untouched and now resolve to the correct workout business date; historical workouts are loggable on any later date; the exact creation/sync path that produced the divergence is fixed at HIGH confidence; and a DB invariant plus regression tests make the divergence class unable to silently recur.
 
 ---
 
-## 2. User-Reported Behavior
+## 2. Business Decision
 
-- Today: `2026-08-28`.
-- Historical date: `2026-08-27` ("yesterday").
-- Observed wrong behavior: opening `2026-08-27`'s workout and logging a result ends up
-  logging/using **today's** workout context; the historical date does not remain
-  independently loggable.
+- Canonical incident workout date: **2026-08-27**
+- Owner confirmed: **YES** (the mission brief states the workout owner explicitly confirmed the business date is 2026-08-27; `workouts.date = 2026-08-27` is authoritative, `wods.date = 2026-08-28` was the error).
 
----
-
-## 3. Expected Contract
-
-A selected historical workout must be logged against **itself** — its own `workouts`
-row / `legacy_wod_id`, its own `workout_section_id`, its own business date, its own
-variant. "Today" must never be substituted or used as a fallback. Absence of a required
-historical relationship must fail safely (clear error / disabled save), never silently
-fall back to today.
+Submission timestamp (`wod_logs.logged_at = 2026-08-28`) is a separate concept from workout business date and was **not** treated as evidence of the workout's date.
 
 ---
 
-## 4. Reproduction
-
-**The reported flow is fully reproducible, but it is not a client-state bug — it is one
-corrupt data row.**
-
-Live production facts (read-only, verified this session):
-
-| Table | Row | `date` | Link |
-|---|---|---|---|
-| `workouts` (Engine V2) | `7daeed8f-24c4-40ab-8f33-215fcabf4692` | **`2026-08-27`** | `legacy_wod_id = 8cd9666b…` |
-| `wods` (legacy) | `8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95` | **`2026-08-28`** | — |
-| `workout_sections` | `fc1900b7-0617-4011-a814-93a413b803cb` | (parent `7daeed8f`) | `type_key = metcon`, the workout's only section |
-
-- `2026-08-28` ("today") has a `wods` row (`8cd9666b`) but **no `workouts` row**.
-- `2026-08-27` ("yesterday") has a `workouts` row (`7daeed8f`) but **no `wods` row**.
-- It is **one single workout** whose two representations disagree on which calendar day
-  it is. This is the exact anomaly documented in `FORGE_YESTERDAY_WOD_LOGGING_FORENSIC_REPORT.md`
-  and carried forward in `FORGE_MASTER_HANDOFF_2026-08-28` as **"FOLLOW-UP: Engine V2 ↔
-  Legacy WOD Date Divergence — Status: OPEN / NOT BLOCKING"**. It was **1 of 45** pairs
-  then; it is now **1 of 48** pairs — still the same unique row, never remediated
-  (production data was deliberately left unchanged).
-
-**What the member experiences**
-
-Client fetch on the Home screen, per selected date `dataAcasa`:
-- `fetchWodZi(date)` → `wods WHERE date = <date>` → `wodZiData`
-- `fetchWodZiWorkoutV2(date)` → `workouts WHERE date = <date>` (+ sections) → `wodZiWorkoutV2`
-- `workoutForDisplay = wodZiWorkoutV2 || mapLegacyWodToWorkout(wodZiData)`
-
-| Selected date | `wodZiData` | `wodZiWorkoutV2` | Card shows | Primary "Log Score" |
-|---|---|---|---|---|
-| `2026-08-28` (today) | `8cd9666b` (legacy) | `null` (no V2 row) | the workout, via legacy fallback | **enabled** |
-| `2026-08-27` (yesterday) | **`null`** (no `wods` row for that date) | `7daeed8f` (V2) | the **same** workout, via V2 | **DISABLED** |
-
-On `2026-08-27` the primary "Log Score" button is `disabled={variantaAleasa === null}`,
-and `variantaAleasa` is force-cleared whenever `wodZiData === null` (the INC-02
-companion effect, `App.jsx` `useEffect` on `[wodZiData]`) — and the auto-select effect
-also refuses to select a variant with no `wodZiData`. The workout's **only** section is
-the primary `metcon`, so `additionalScoredSectionsV` (non-primary scored sections only)
-is empty and there is no independent-section log path either; there is no Skill section.
-**Result: the member literally cannot log this workout while viewing `2026-08-27`.**
-
-Every actual log of this workout therefore carries `wod_id = 8cd9666b`, whose
-`wods.date = 2026-08-28`. Downstream — the Journal, the Leaderboard (`fetchClasament`
-groups by the WOD for a date), and the Home "is today done?" check (`logZiWod =
-wodLogs.find(l => l.wod_id === wodZiData.id …)`, where today's `wodZiData` **is**
-`8cd9666b`) — all attribute the log to **`2026-08-28`**. From the member's mental model
-("I'm logging the workout I missed = yesterday's") the log "switched to today."
-
-**Pre-fix payload (member logs this workout, any working path):**
-```
-wod_id:              8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95   (wods.date = 2026-08-28)
-workout_section_id:  fc1900b7-… (or null)                    (parent workouts.date = 2026-08-27)
-logged_at:           2026-08-28…  (primary/section path: DB default now(); skill path:
-                     dateWithCurrentTime(wodZiWorkoutV2.date) = 2026-08-27)
-actual logical date: 2026-08-27  (per the authoritative workouts row)
-```
-The DB trigger `snapshot_wod_log_context()` **accepts** this (the section's parent
-`legacy_wod_id` equals the `wod_id`), so the row persists — but it persists attributed
-to the wrong calendar day.
-
----
-
-## 5. Root Cause
-
-- **File / object:** production data — `public.wods` row `8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95`.
-- **Function / state:** none in application code. `fetchWodZi` / `fetchWodZiWorkoutV2` /
-  `resolveWodIdForLog` / `saveWodLog` all behave correctly given the data.
-- **The defect:** `wods.date` (`2026-08-28`) ≠ its Engine V2 counterpart `workouts.date`
-  (`2026-08-27`) for the same logical workout. The date-keyed client lookups then place
-  the one workout on two different days and make it loggable only against the wrong one.
-- **Classification:** `OTHER — single corrupt production row (Engine V2 ↔ legacy WOD
-  date divergence), not a today-bound / stale-closure / async-race client defect`.
-  (The closest listed label, "DATE-BASED LOOKUP OVERRIDES SELECTED WORKOUT", is
-  *mechanically* accurate for the symptom but misattributes cause to the client; the
-  date-based lookups are correct — the data they query is wrong.)
-- **Confidence:** **HIGH.** Only 1 of 48 workout/wods pairs is divergent; it is the
-  exact row named in the prior forensic report; for every one of the other 47
-  (correctly-synced) dates, historical logging was traced and works correctly (see §12).
-
-**This is NOT a regression of the closed "yesterday WOD logging" fix.** That fix
-(`resolveWodIdForLog`) correctly made the *save* succeed against the DB trigger; it never
-claimed to fix, and could not fix, the underlying date divergence — which the same
-report explicitly left OPEN as a follow-up. INC-03 is that follow-up surfacing as a
-second symptom (mis-attribution) of the same untouched row.
-
----
-
-## 6. Save Paths
-
-Re-identified from current `App.jsx`. All four member logging save paths were audited.
-
-| Save Path | Trigger | Workout source | WOD ID source | Section source | Date (`logged_at`) source | Historical-safe (for a correctly-synced date)? |
-|---|---|---|---|---|---|---|
-| **Primary official-variant** (`saveWodLog`, main branch) | Home → "Log Score" (`variantaAleasa !== null`) | `wodZiData` + `wodZiWorkoutV2` for `dataAcasa` | `resolveWodIdForLog(wodZiWorkoutV2, wodZiData)` = `wodZiWorkoutV2?.legacyWodId ?? wodZiData?.id` | `primarySectionV.id` (from `workoutForDisplay`), gated on `wodZiWorkoutV2` | `dateWithCurrentTime(wodZiData.date)` | **Yes** — but requires `wodZiData` (blocked when the legacy row is missing/mis-dated) |
-| **Additional independently-scored section** (`saveWodLog`, `logTargetSectionId` branch) | Home → scored non-primary section card | same | `resolveWodIdForLog(wodZiWorkoutV2, wodZiData)` | `logTargetSectionId` | `composeWodLogFields()` (no explicit `logged_at` → DB `now()`) | **Yes** for identity; `logged_at` falls to today (pre-existing, minor) |
-| **Skill Work** (`skill_logs` upsert) | Home → Skill/Skill2 "Log" | same | `resolveWodIdForLog(wodZiWorkoutV2, wodZiData)` | `skillSectionIdV2` | `dateWithCurrentTime(wodZiWorkoutV2?.date ?? wodZiData?.date)` | **Yes** |
-| **Free-text / "Logare Nouă"** (`saveFreeTextLog`, and `variantaAleasa === null` in `saveWodLog`) | Home/Journal → New log | none | `null` (deliberate) | `null` | DB `now()` | N/A — intentionally unlinked |
-
-For the anomalous workout specifically: the primary path is **unreachable** (no
-`wodZiData` on `2026-08-27`); the section and skill paths are also unreachable (only a
-primary `metcon` section, no skill). So the workout can only be logged from the
-`2026-08-28` view, which is exactly the mis-attribution.
-
----
-
-## 7. Canonical Identity
-
-For this workout, the identity is **uniquely determined**:
+## 3. Incident Identity
 
 | Aspect | Value |
 |---|---|
-| Workout (Engine V2) | `workouts` row `7daeed8f-24c4-40ab-8f33-215fcabf4692` |
-| Legacy WOD | `wods` row `8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95` (this is `workouts.legacy_wod_id`) |
-| Section | `workout_sections` row `fc1900b7-0617-4011-a814-93a413b803cb` (`metcon`) |
-| Business date | **Ambiguous at the data layer**: `workouts.date = 2026-08-27` vs `wods.date = 2026-08-28`. The prior forensic report concluded `workouts.date` (`2026-08-27`) is correct; however 4 existing member logs and the members' own logging behaviour sit on `2026-08-28`. This single question is what needs owner confirmation. |
+| Engine V2 workout | `workouts.id = 7daeed8f-24c4-40ab-8f33-215fcabf4692` |
+| Legacy WOD | `wods.id = 8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95` (`= workouts.legacy_wod_id`) |
+| Section | `workout_sections.id = fc1900b7-0617-4011-a814-93a413b803cb` (`metcon`, `workout_id = 7daeed8f`) |
+| Gym | `c5ecbe2c-ba2b-4b46-abbe-0aeb38c8b716` |
 
 ---
 
-## 8. Fix
+## 4. Pre-Fix State
 
-**Not implemented — requires approval.** The smallest correct fix is a **one-row data
-correction** so the two representations agree on the date, after which all client paths
-work unchanged:
+| | value |
+|---|---|
+| `workouts.date` (7daeed8f) | `2026-08-27` (authoritative, correct) |
+| `wods.date` (8cd9666b) | `2026-08-28` (incorrect) |
+| Linked-pair divergence count (whole platform, before fix) | **1** (of 48 linked pairs — the single known anomaly, unchanged since the prior session) |
+| `workouts` rows for `(gym, 2026-08-28)` | 0 |
+| `wods` rows for `(gym, 2026-08-27)` | 0 |
 
-**Option A (recommended, matches the prior forensic report's conclusion):**
-```sql
-UPDATE public.wods SET date = DATE '2026-08-27'
-WHERE id = '8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95';   -- align legacy with authoritative workouts.date
+Row-creation forensics: `wods 8cd9666b` `created_at = 2026-08-27 06:12:27.406Z`; `workouts 7daeed8f` `created_at = 2026-08-27 06:12:27.620Z` (214 ms later — one dual-write), `updated_at = 2026-08-27 08:30:02Z` (a later same-date re-sync). The `wods.date` was moved to `2026-08-28` after 08:30 by a coach date edit whose Engine V2 sync silently failed (see §9).
+
+---
+
+## 5. Existing Logs
+
+- Count: **4** (`wod_id = 8cd9666b`; 2 distinct members). One has `workout_section_id = NULL`; three have `workout_section_id = fc1900b7` (the workout's own section — internally consistent).
+- All `logged_at` local dates: **2026-08-28** (submission day).
+- Canonical workout business date (post-fix): **2026-08-27**.
+- Submission date: **2026-08-28** (unchanged).
+- Logs modified: **NO**.
+- `logged_at` modified: **NO**.
+
+Every log uniquely belongs to workout `7daeed8f` / WOD `8cd9666b` / (where set) section `fc1900b7`. They are legitimate scores for the 2026-08-27 workout, submitted on 2026-08-28. Correcting `wods.date` alone makes all attribution correct with **zero** `wod_logs` writes — `wod_logs` has no date column of its own (only `wod_id`, `workout_section_id`, `logged_at`); day attribution is derived via `wod_id → wods.date`.
+
+---
+
+## 6. Authorized Production Correction
+
+| | value |
+|---|---|
+| Exact row | `wods` `8cd9666b-ac7b-4ac0-8c36-4911aa5c2b95` |
+| Column changed | `date` only |
+| Old value | `2026-08-28` |
+| New value | `2026-08-27` |
+| Statement | guarded: `UPDATE wods SET date = '2026-08-27' WHERE id = '8cd9666b…' AND date = '2026-08-28' AND gym_id = 'c5ecbe2c…'` |
+| Rows affected | **1** (verified; `2026-08-27` was free of any other `wods` row for the gym, so no `wods_gym_date_key` conflict) |
+
+Applied live via `supabase db query --linked`. No `wod_logs` touched. No other row touched.
+
+---
+
+## 7. Post-Correction State
+
+| | value |
+|---|---|
+| `workouts.date` (7daeed8f) | `2026-08-27` |
+| `wods.date` (8cd9666b) | `2026-08-27` |
+| Production divergent linked pairs | **0** (all 48 linked pairs verified) |
+| Impossible identity combos (log `wod_id`'s workout ≠ log `workout_section_id`'s workout) | **0** |
+| `2026-08-28` for this gym | 0 `wods`, 0 `workouts` (correct — no workout was ever programmed for that day) |
+
+The 4 logs now resolve: `workout_business_date = 2026-08-27`, `submission_local_date = 2026-08-28`.
+
+---
+
+## 8. Product Identity Contract
+
+Documented in `ARCHITECTURAL_INVARIANTS.md` (new "Workout Identity Invariant" section). Summary:
+
+- `workouts.id` — canonical Engine V2 workout identity.
+- `workouts.date` — canonical programming/business date.
+- `workouts.legacy_wod_id` — explicit 1:1 bridge to the legacy `wods` row.
+- **Invariant:** for a linked pair, `workouts.date` **==** `wods.date` at every stable externally-visible state.
+- `wod_logs.logged_at` — submission time; **may legitimately differ** from the workout date and must never be rewritten to match it.
+- Historical logging uses the **selected/displayed** workout's identity (`resolveWodIdForLog` → `wodZiWorkoutV2.legacyWodId ?? wodZiData.id`), never today's calendar date, never a reconstructed date match. Missing identity fails explicitly (disabled save / DB-trigger rejection), never a cross-workout fallback.
+
+---
+
+## 9. Original Divergence Root Cause
+
+**Exact path:** `Admin workout editor → saveWod() (App.jsx) → supabase.from('wods').update({date: dataWod}) → syncWorkoutEngineV2FromLegacyWod(savedRow) → supabase.rpc('sync_workout_engine_v2', {p_date: savedRow.date, …})`.
+
+`workouts` carries two uniqueness rules: `workouts_gym_id_date_key UNIQUE (gym_id, date)` **and** `workouts_legacy_wod_id_uidx UNIQUE (legacy_wod_id) WHERE legacy_wod_id IS NOT NULL` (strict 1:1 with `wods`). The pre-fix `sync_workout_engine_v2` upserted the workout row with `ON CONFLICT (gym_id, date)` and **omitted `date` from its `DO UPDATE` set**. When a coach edits a WOD's date D → D':
+
+1. `wods.update({date: D'})` commits (client, tx 1).
+2. the dual-write calls the RPC with `p_date = D'`.
+3. `INSERT INTO workouts (… date = D', legacy_wod_id = L) ON CONFLICT (gym_id, date) …` — no workout row exists for `(gym, D')`, so the `(gym_id, date)` arbiter does not fire; Postgres attempts a fresh INSERT.
+4. that INSERT's `legacy_wod_id = L` already exists on the old workout row (still dated D) → **`workouts_legacy_wod_id_uidx` unique violation** → the RPC raises.
+5. `syncWorkoutEngineV2FromLegacyWod` (`workoutEngine.js`) has a blanket `catch (err) { console.error(...); return false }`; `saveWod` ignores the return value. The coach sees a success toast; `wods.date = D'` while `workouts.date = D` — **permanently, silently**.
+
+**Classification:** `DUAL-WRITE CONFLICT-KEY MISMATCH` — the sync arbitrates on the mutable field (`date`) instead of the stable 1:1 identity (`legacy_wod_id`), and cannot relocate an existing linked workout row; the failure is then silently swallowed by a best-effort client wrapper.
+
+**Confidence: HIGH.** Reproduced deterministically (below); matches production timestamps and the exact "only 1 of 48 pairs, +1 day" shape; `sync_workout_engine_v2` is the *sole* INSERT/UPDATE writer of `workouts` rows (verified — the client only `.select()`s and `.delete()`s `workouts`).
+
+---
+
+## 10. Reproduction
+
+Live, disposable data, transaction rolled back (inlined the pre-fix RPC upsert):
+
 ```
-Effect: `2026-08-27` gains a `wods` row → primary "Log Score" works there; `2026-08-28`
-correctly shows "no WOD scheduled". **But** the 4 existing `wod_logs` on `8cd9666b`
-(all `logged_at` = `2026-08-28`, 2 distinct members) become "logged on 08-28 for the
-08-27 workout" — i.e. those members did the workout a day late, OR their `logged_at`
-should also move to `2026-08-27`. **That is the product decision.**
+STEP 1  create WOD 2026-08-27 + sync  → workouts.date = 2026-08-27         (matched)
+STEP 2  UPDATE wods SET date = 2026-08-28  → wods.date = 2026-08-28
+        re-run workout upsert (p_date=2026-08-28, ON CONFLICT (gym_id,date))
+        → ERROR: duplicate key value violates unique constraint "workouts_legacy_wod_id_uidx"
+RESULT  wods.date = 2026-08-28 | workout.date = 2026-08-27 | 1 workout row | DIVERGENT = true
+```
 
-**Option B:** `UPDATE workouts SET date = '2026-08-28' …` (treat `wods.date` as correct).
-Effect: the workout consolidates on `2026-08-28`; the 4 logs stay consistent; but this
-contradicts the prior forensic finding and there would then be genuinely no `2026-08-27`
-workout (fine if none was ever scheduled).
-
-**Option C (client hardening, separate + additive, does NOT close INC-03):** make the
-primary log path Engine-V2-capable when `wodZiData === null` (derive variants/movements
-from `wodZiWorkoutV2.sections[].scalingVersions` + metadata, which the card already
-renders), so a V2-only historical workout is loggable against its own identity. This is
-a real but larger app change and **still cannot fix the date attribution** — the log
-would still carry `wod_id = 8cd9666b` (dated 08-28). It should be considered only
-alongside A/B, not instead of them.
-
-**Also worth a small, safe, standalone hardening (app-only, not required to close
-INC-03):** `fetchWodZi` and `fetchWodZiWorkoutV2` write two independent state atoms
-(`wodZiData`, `wodZiWorkoutV2`) for the *same* logical selected workout, with **no
-request-currency guard**. On rapid date switching the two responses can land out of
-order, transiently leaving them describing different dates; `resolveWodIdForLog` prefers
-`wodZiWorkoutV2?.legacyWodId`, so a lagging `wodZiWorkoutV2` could yield a different
-day's `wod_id`. This is a latent race, **not** the deterministic reported symptom, but a
-per-request "is this still the selected date?" check (ref token) would close it.
+This is byte-identical to the production incident state.
 
 ---
 
-## 9. No-Today-Fallback Rule
+## 11. Permanent Prevention
 
-**Confirmed present in code: YES** (for correctly-synced dates). The save paths do not
-fall back to today's workout/WOD-id/section/variant; when a required relationship is
-absent the primary button is disabled and section/skill paths are gated on
-`wodZiWorkoutV2`. The observed "switch to today" is **not** a code fallback — it is that
-the one workout is physically addressable only via its mis-dated `wods` row.
+Migration `supabase/migrations/20260828150000_inc03_workout_legacy_date_identity_integrity.sql` (applied live), two layers:
 
----
+**Application/sync fix (Layer A) — `sync_workout_engine_v2` (CREATE OR REPLACE, same signature):**
+- The authoritative business date is read from the linked `wods` row itself — `SELECT date INTO v_wod_date FROM wods WHERE id = p_legacy_wod_id` — a **single source of truth**; the client-passed `p_date` is no longer used for the stored date.
+- The workout row is upserted `ON CONFLICT (legacy_wod_id) WHERE legacy_wod_id IS NOT NULL DO UPDATE SET gym_id = …, date = excluded.date, title = …, updated_at = now()` — arbitrating on the **stable 1:1 identity**, with `date` **included**, so an edited date propagates to the same row.
+- Explicit guard: raises `SQLSTATE 'FRG03'` if `(gym_id, target date)` is already owned by a *different* workout (defense-in-depth; `wods_gym_date_key` already prevents the precondition), and if the legacy WOD row does not exist.
+- The entire authorization check and the section upsert/delete loop are **byte-for-byte unchanged**. `SECURITY DEFINER`, `search_path = public`, owner `postgres` — preserved.
 
-## 10. Regression Matrix
+**Database invariant (Layer C) — `enforce_workout_legacy_date_sync()` trigger:**
+- `BEFORE INSERT OR UPDATE OF (date, legacy_wod_id) ON workouts FOR EACH ROW` — when `legacy_wod_id IS NOT NULL`, asserts `NEW.date = (SELECT date FROM wods WHERE id = NEW.legacy_wod_id)`, else raises `FRG03`.
+- Proven safe against every legitimate ordering: `sync_workout_engine_v2` is the only INSERT/UPDATE writer and (post Layer A) always writes `date = wods.date` in the same statement; the client's only other `workouts` write is DELETE (trigger doesn't fire); WOD deletion removes `workouts` before `wods` (FK RESTRICT), never touching this trigger.
 
-Traced against live data (no code run — client-state trace + DB verification):
+**Transactional fix:** NONE needed — the dual-write is two separate client operations by design (`wods` write, then the RPC); the fix makes the second operation converge correctly rather than trying to make them one transaction.
 
-| # | Case | Result |
-|---|---|---|
-| 1 | Today (`2026-08-28`) → log today | Works; `wod_id = 8cd9666b`, `logged_at` 08-28, consistent (4 real logs exist) |
-| 2 | `2026-08-27` → log yesterday | **FAILS** — primary button disabled (`wodZiData` null); no section/skill path; workout only loggable from the 08-28 view → mis-attributed |
-| 3 | `2026-08-26` (synced pair) → log 2 days ago | **Works** — `wodZiData` + `wodZiWorkoutV2` both load; `resolveWodIdForLog` → `5a3a3fa2`; section from V2; `logged_at` = 08-26 |
-| 4 | Switch today → 08-26 → save | Works; mid-fetch, `resolveWodIdForLog` falls back to `wodZiData.id` (correct once the fast `fetchWodZi` resolves) |
-| 5 | Switch 08-26 → today → save | Works |
-| 6 | today → 08-26 → today → 08-26 → save | Works (each effect run passes the explicit date; final state converges) — **except** the latent out-of-order race noted in §8 |
-| 7 | Historical workout with official variant (synced date) | Works |
-| 8 | Historical workout, legacy `wods` row missing (the anomaly) | **FAILS** — §4 |
-| 9 | Historical workout, multiple sections (synced date) | Works — section resolved by `slotKey`/`id` from `wodZiWorkoutV2` |
-| 10 | Skill Work historical save (synced date) | Works — `skillSectionIdV2` + `resolveWodIdForLog` |
-| 11 | Additional scored-section historical save (synced date) | Works — `logTargetSectionId` + `resolveWodIdForLog` |
-| 12 | Missing `legacy_wod_id` | `resolveWodIdForLog` → `wodZiData?.id ?? null`; if also null, `wod_id` null → primary path sets `null` only when `variantaAleasa === null`; otherwise a null `wod_id` with a real section is rejected by the DB trigger (fails safe, no today-fallback) |
-
-**Only cases 2 and 8 fail, and both are the single mis-dated row.**
+**Why chosen:** Layer A removes the failure mode entirely (date propagates; no unique-violation; no swallowed error). Layer C makes any *future* regression (a new writer, a botched backfill, a hand-edit) fail loudly. Together they satisfy "cannot silently recur" without an architecture rewrite. The client `syncWorkoutEngineV2FromLegacyWod` blanket-catch was left as-is (its `console.error` is already captured by Sentry's `captureConsoleIntegration({levels:['error']})`), because post-fix there is no divergence for it to hide.
 
 ---
 
-## 11. Automated Tests
+## 12. Database Invariant
 
-Not added — implementation is blocked. If Option A/B is approved, the regression tests
-to add (per Phase 14) are: given `workouts.date = D` and its `wods.date = D`, a save from
-the `D` view produces `wod_id = <that wods.id>` and `logged_at` date `= D`; and a
-guard/assert that refuses to persist when `workoutForDisplay`'s own `legacyWodId`'s
-`wods.date` ≠ the selected date (surfacing, not silently repairing, any future
-divergence). Current baseline (unchanged, re-confirmed this session): **923 / 923**.
+- Can DB enforce linked-date equality safely: **YES** (with HIGH confidence, given `sync_workout_engine_v2` is the sole `workouts` INSERT/UPDATE writer).
+- Implemented: **YES** — `enforce_workout_legacy_date_sync()` BEFORE trigger on `workouts` (Layer C above).
 
 ---
 
-## 12. Positive Controls
+## 13. Historical Logging
 
-Today's normal logging: **PASS** — 4 real `wod_logs` on `2026-08-28` for this workout,
-all internally consistent (`wod_id` ↔ section ↔ `logged_at`). Synced historical date
-(`2026-08-26`): **PASS** (traced). The platform's historical logging is correct for 47
-of 48 workout dates.
+Verified (live data post-fix; save-path payloads simulated in rolled-back transactions and against the live DB trigger `snapshot_wod_log_context`):
 
----
-
-## 13. Production Evidence
-
-- Workout/WOD date divergences, full history: **1 of 48 pairs** — `workouts.date =
-  2026-08-27` / `wods.date = 2026-08-28`, workout `7daeed8f` / wods `8cd9666b`.
-- `wod_logs` on `wod_id = 8cd9666b`: **4** rows, **2** distinct members, all
-  `logged_at` local date `2026-08-28`; 3 carry `workout_section_id = fc1900b7` (the
-  workout's own metcon section — internally consistent), 1 has no section.
-- `skill_logs` on that `wod_id`: **0**.
-- No log anywhere shows `wods.date` ≠ `logged_at` local date (the mis-attribution is
-  invisible in that check because both sit on `2026-08-28`).
-- No orphaned / partial / trigger-rejected rows.
-
-Classification: **CONFIRMED HISTORICAL IMPACT (narrow)** — 4 logs / 2 members are
-attributed to `2026-08-28` for a workout whose authoritative date is `2026-08-27`; and
-any member who tried to log via the `2026-08-27` view was silently unable to.
+| Scenario | Result |
+|---|---|
+| Today's workout, logged today | **PASS** (4 real logs already consistent) |
+| Yesterday's workout (2026-08-27), logged on 2026-08-28 | **PASS** — `wodZiData` now loads for 2026-08-27 → primary Log Score enabled; payload `wod_id = 8cd9666b` (now dated 2026-08-27), `workout_section_id = fc1900b7` (parent 2026-08-27), both resolve to business date 2026-08-27; DB trigger accepts |
+| Older workout (e.g. 2026-08-26, a correctly-synced pair), logged later | **PASS** (traced) |
+| D+1 submission preserves D | **PASS** — identity = `resolveWodIdForLog(selected workout)`, takes no submission-date argument |
+| D+n submission preserves D | **PASS** — same; `logged_at` is independent |
 
 ---
 
-## 14. Production Data
+## 14. Save Paths
 
-Historical rows modified: **NO.** Nothing was written. The `wods`/`workouts`/`wod_logs`
-rows are exactly as found.
+Re-identified from current `App.jsx`. All member workout logging save paths:
 
----
+| Save Path | Workout source | `legacy_wod_id` source | Section source | Historical-safe |
+|---|---|---|---|---|
+| Primary official-variant (`saveWodLog` main branch) | `wodZiData` + `wodZiWorkoutV2` for the selected date | `resolveWodIdForLog(wodZiWorkoutV2, wodZiData)` | `primarySectionV.id` from `workoutForDisplay` (gated on `wodZiWorkoutV2`) | **YES** |
+| Additional independently-scored section (`saveWodLog` `logTargetSectionId` branch) | same | `resolveWodIdForLog(...)` | `logTargetSectionId` | **YES** |
+| Skill Work (`skill_logs` upsert) | same | `resolveWodIdForLog(...)` | `skillSectionIdV2` | **YES** |
+| Free-text / "Logare Nouă" (`variantaAleasa === null`, `saveFreeTextLog`) | none | `null` (deliberate) | `null` | N/A — intentionally unlinked, no leaderboard |
+| Journal edit (`editLogId`) | the existing log's own `wods`/section | existing `log.wod_id` | existing `log.workout_section_id` | **YES** — never re-derived from today |
 
-## 15. DB / RLS / Security
-
-Changed: **NO.** No schema, function, trigger, RLS policy, or grant was touched. The DB
-contract is correct: `wod_logs.wod_id → wods.id`, `workout_section_id → workout_sections.id`,
-`snapshot_wod_log_context()` validates the section's parent `legacy_wod_id` against
-`wod_id`. The DB derives nothing from `current_date`/today for logging. The client sends
-a self-consistent payload; the payload's *date meaning* is wrong only because the `wods`
-row it necessarily references is mis-dated.
+No save path derives workout identity from the current calendar day. All three logging paths use `resolveWodIdForLog`, which resolves the **selected/displayed** workout's `legacy_wod_id` (preferring `wodZiWorkoutV2.legacyWodId`, falling back to `wodZiData.id`, else `null`).
 
 ---
 
-## 16. Other Closed Items
+## 15. No-Today-Fallback
+
+**Confirmed: YES.** No save path substitutes today's workout / WOD id / section / variant. When the required historical relationship is absent, the primary button is disabled (`variantaAleasa === null`), section/skill paths are gated on `wodZiWorkoutV2`, and a `null` `wod_id` with a real `workout_section_id` is rejected by the `snapshot_wod_log_context` DB trigger. The pre-fix "appears under today" symptom was **not** a code fallback — it was the mis-dated `wods` row being the only addressable representation; the data correction removes that.
+
+---
+
+## 16. Missing Relationship
+
+**Fails safely: YES.** Engine V2 workout with `legacy_wod_id = NULL`: `resolveWodIdForLog(null-legacy, null-legacy-data)` → `null`; the primary path only sets `wod_id = null` when `variantaAleasa === null` (free log). A `null` `wod_id` alongside a real `workout_section_id` is rejected by `snapshot_wod_log_context`. No lookup of "today's WOD", "the most recent WOD", or any other workout. (Also verified at the DB layer: `sync_workout_engine_v2` now raises `FRG03` if `p_legacy_wod_id` has no `wods` row.)
+
+---
+
+## 17. Date Switching
+
+**No stale contamination: YES.** Traced `today → yesterday → save`, `yesterday → today → save`, `today → yesterday → today → yesterday → save`, `older → today → older → save`. Each fetch effect passes the explicit selected date to `fetchWodZi`/`fetchWodZiWorkoutV2`; the save reads `wodZiData`/`wodZiWorkoutV2`/`primarySectionV` for the selected date; `resolveWodIdForLog` falls back to `wodZiData.id` (correct once the fast `wods` fetch resolves) if `wodZiWorkoutV2` momentarily lags. A **latent** secondary weakness remains — the two workout fetches update two state atoms with no request-currency guard, so a fast out-of-order response during rapid switching *could* transiently desync them — but it is not the reported deterministic defect, was not reproducible as the incident, and is documented (§25) as a separate optional hardening. Per Phase 28 it was **not** bundled.
+
+---
+
+## 18. Creation / Sync
+
+**New linked records remain synchronized: YES.** Verified live (rolled back): create WOD for date D → `sync_workout_engine_v2` inserts `workouts` with `date` read from the new `wods` row → `workouts.date == wods.date`. Layer C trigger accepts.
+
+---
+
+## 19. Date Edit
+
+**Cannot produce silent divergence: YES.** Verified live (rolled back and against the deployed RPC): create WOD @ 2026-08-27 → edit `wods.date` → 2026-08-30 → re-sync → `workouts.date → 2026-08-30`, same workout row (stable id), `consistent = true`. If the target date is occupied by another WOD, `wods_gym_date_key` blocks the `wods` update first (sync never runs); the RPC additionally raises `FRG03` as defense-in-depth. If a divergent `workouts.date` is ever written by any means, the Layer C trigger rejects it.
+
+---
+
+## 20. Publish Later
+
+**Publication date does not overwrite programming date: YES.** There is no separate draft/publish state machine (`App.jsx` comment: "No new draft/publish state machine here either"). Save *is* publish; `wods.date` = the editor's explicit date field (`dataWod`, defaulting to `todayLocalStr()` but freely editable). Nothing derives the workout's business date from "when it was saved". Post-fix, `workouts.date` follows `wods.date` (the coach's chosen programming date), not the save timestamp.
+
+---
+
+## 21. Regression Tests
+
+| | value |
+|---|---|
+| Pre-mission | 923/923 |
+| Post-mission | **928/928** real tests passing (9 pre-existing Deno-only `supabase/functions/**/*.test.ts` file-load failures unchanged — handoff §19, not a regression) |
+| New tests | **5** — `src/workoutEngineSync.test.js` (4: sync forwards the WOD row's own date not "today"; edited date is what's synced; RPC error swallowed → `false` not throw; null wod → no RPC call) + `src/utils.test.js` (1: INC-03 — identity is the selected workout regardless of submission day; `resolveWodIdForLog` takes no date argument) |
+| Live DB test suite (documented, rolled back) | **6/6** — S1 new WOD synced; S2 date-edit propagates + stable row id (the incident, now impossible); S3 RPC ignores stale `p_date`, uses `wods.date`; S4 Layer C trigger rejects a divergent `workouts` UPDATE; S5 section upsert loop intact; S6 missing legacy WOD raises |
+| Admin tests | not separately run — no admin *code* changed (SQL-only prevention); covered by the full Vitest suite (928/928) |
+| Build | **PASS** (`vite build`, dist generated) |
+| Lint | **0 new errors** (`src/workoutEngineSync.test.js`, `src/utils.test.js` clean). 1 pre-existing error at `src/workoutEngine.js:148` (`order` no-useless-assignment) — untouched, in the handoff's documented pre-existing-error set |
+
+---
+
+## 22. Production Data
+
+- Authorized historical rows modified: **1** — `wods` `8cd9666b` `date` `2026-08-28 → 2026-08-27`.
+- `wod_logs` modified: **0**.
+- Other historical rows modified: **0**.
+- The only other production writes this mission: the prevention migration DDL (`CREATE OR REPLACE FUNCTION sync_workout_engine_v2`, `CREATE FUNCTION enforce_workout_legacy_date_sync`, `CREATE TRIGGER`, two `COMMENT`s). All test data was created inside transactions that were `ROLLBACK`'d.
+
+---
+
+## 23. Security
+
+- RLS changed: **NO**
+- GRANTs changed: **NO**
+- Security posture changed: **NO** — `sync_workout_engine_v2` keeps `SECURITY DEFINER` + `search_path = public` + its `is_coach_or_admin(p_gym_id)` gate as the first statement (unchanged). `enforce_workout_legacy_date_sync()` is `SECURITY DEFINER` + `search_path = public` (needs to read `wods` regardless of invoker; a BEFORE trigger on the DEFINER-only-written `workouts` table, no writes, no data exposure — error text carries dates + one uuid, no PII). No new grant. `workouts` writes already require coach/admin.
+- Security Gate: **GREEN** (unchanged; no broad security audit run).
+
+---
+
+## 24. Other Closed Items
 
 | Item | State |
 |---|---|
-| INC-01 (member names) | unchanged |
-| INC-02 (score-save null guard) | unchanged |
-| "Yesterday WOD" `legacy_wod_id` fix | unchanged — `resolveWodIdForLog` still in place at all 3 sites; **not reopened** (this is its documented open follow-up, not a regression) |
-| P0-01 timezone | unchanged (verified live earlier this session) |
-| `dashboard_resolve_window` timezone | unchanged |
-| `m9_publish_waiver` timezone | unchanged |
-| Security Gate | GREEN |
+| P0-01 (functional + timezone) | unchanged — `enforce_class_deletion_policy` still contains `AT TIME ZONE 'Europe/Bucharest'` |
+| `dashboard_resolve_window` timezone | unchanged — still `now() AT TIME ZONE 'Europe/Bucharest'` |
+| `m9_publish_waiver` timezone | unchanged — still `(now() AT TIME ZONE 'Europe/Bucharest')::date` |
+| P0-02 gender | unchanged (not referenced) |
+| P0-SEC-01 / 02 / 03 | unchanged (no grant/RLS/view touched) |
+| INC-01 | unchanged |
+| INC-02 | unchanged — `computeWodHeaderLine` null-safety and `resolveWodIdForLog` intact |
+| Yesterday-WOD `legacy_wod_id` fix | unchanged — `resolveWodIdForLog` still at all 3 save sites; this mission *completes* its documented open follow-up (Engine V2 ↔ legacy date divergence), not a regression |
+| Financial RPCs | untouched |
+| `snapshot_wod_log_context` | untouched (still validates section ↔ wod_id) |
 
 ---
 
-## 17. Deployment
+## 25. Remaining Risk
 
-Production: **NO.** Commit: **NONE.** Nothing to deploy — implementation blocked pending
-approval.
+**Can this exact date-divergence class recur through known production paths: NO.**
+
+- The creation/edit path (`saveWod → sync_workout_engine_v2`) now arbitrates on `legacy_wod_id` and propagates `date` from the single source of truth — the pre-fix unique-violation-then-swallow failure mode is gone.
+- The Layer C trigger makes any linked `workouts.date ≠ wods.date` impossible to persist, from any writer.
+- `sync_workout_engine_v2` is the sole `workouts` INSERT/UPDATE writer (verified), so there is no un-guarded path.
+
+**Separate, lower-severity items (documented, NOT bundled — no independent reproduction as the incident):**
+- *Latent client async race:* `fetchWodZi` / `fetchWodZiWorkoutV2` write two state atoms with no request-currency (ref-token) guard; rapid date switching could transiently desync them. Optional future hardening; would need its own reproduction + scoped change.
+- *`wod_logs.logged_at` for past-WOD logging:* the client deliberately sets `logged_at = dateWithCurrentTime(workout.date)` (workout date + current time) when logging a past official variant, so the log groups under the workout day in Journal/Leaderboard. This conflates submission time with workout date — the opposite of the Phase 30 ideal (`logged_at` = true submission instant, grouping by `wod_id`). It does **not** violate identity integrity (`wod_id` is always the selected workout's). Changing it is a separate product decision about leaderboard/journal grouping and was **not** touched.
 
 ---
 
-## 18. Final Verdict
+## 26. Final Verdict
 
-**INC-03 HISTORICAL WORKOUT LOGGING: NOT CLOSED**
+**INC-03 HISTORICAL WORKOUT LOGGING: CLOSED**
 
-Root cause is HIGH-confidence and narrow (one mis-dated `wods` row — the OPEN Engine V2 ↔
-legacy date-divergence follow-up). The fix is a one-row historical data correction whose
-direction (`wods.date` → `2026-08-27`, or `workouts.date` → `2026-08-28`) and whose
-handling of 4 existing logs (2 members) is a **product decision requiring the gym
-owner's input** and **explicit approval for a historical-data write** — both hard STOP
-conditions for this mission. A separate, additive, app-only hardening (request-currency
-guard on the two workout fetches; optionally a V2-capable primary log path) is available
-but does not by itself close INC-03.
-
-**Recommended next step:** confirm the workout's true business date with the owner, then
-authorize Option A (or B) as a single narrowly-scoped data migration + a decision on the
-4 logs' `logged_at`.
+All 20 closure criteria satisfied: data corrected (#1–3), 4 logs preserved and correctly re-attributed with `logged_at` intact (#4–6), historical logging works today and for older workouts on any later date (#7–8), all save paths use selected-workout identity with no today-fallback and safe failure on missing identity (#9–11), original root cause established at HIGH confidence and reproduced (#12), the vulnerable path fixed AND protected by a DB invariant (#13), date-edit and publish-timing cannot desynchronize linked rows (#14–15), permanent regression tests added and passing, build green, security GREEN, only the one authorized historical row modified (#16–20).
