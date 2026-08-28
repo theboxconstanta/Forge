@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -235,6 +235,62 @@ describe('localDayBoundsUTC', () => {
   it('sfarsitul zilei este strict dupa inceputul zilei', () => {
     const { startUTC, endUTC } = localDayBoundsUTC('2026-08-26')
     expect(new Date(endUTC).getTime()).toBeGreaterThan(new Date(startUTC).getTime())
+  })
+})
+
+describe('computeWodHeaderLine - INC-02 (SENTRY-CYAN-HARBOR-4T) regression', () => {
+  it('varianta oficiala selectata + wodZiData NULL (starea exacta din productie care arunca TypeError inainte de fix) - nu arunca, foloseste nivelul variantei', () => {
+    expect(() =>
+      computeWodHeaderLine({
+        variantaAleasa: 0, wodZiData: null, varianteNivel: 'RX',
+        durStr: '', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+      })
+    ).not.toThrow()
+    const result = computeWodHeaderLine({
+      variantaAleasa: 0, wodZiData: null, varianteNivel: 'RX',
+      durStr: '', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+    })
+    expect(result).toBe('RX')
+  })
+
+  it('varianta oficiala selectata + wodZiData NULL, alt nivel (Intermediate) - foloseste nivelul corect, nu un fallback generic', () => {
+    const result = computeWodHeaderLine({
+      variantaAleasa: 1, wodZiData: null, varianteNivel: 'Intermediate',
+      durStr: '', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+    })
+    expect(result).toBe('Intermediate')
+  })
+
+  it('CONTROL POZITIV: varianta oficiala + wodZiData prezent - comportament neschimbat (type + durata + nume WOD)', () => {
+    const result = computeWodHeaderLine({
+      variantaAleasa: 0, wodZiData: { type: 'AMRAP', name: 'GET UP' }, varianteNivel: 'RX',
+      durStr: '20:00', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+    })
+    expect(result).toBe('AMRAP · 20:00 — "GET UP"')
+  })
+
+  it('CONTROL POZITIV: varianta oficiala + wodZiData prezent, fara durata/nume - doar type', () => {
+    const result = computeWodHeaderLine({
+      variantaAleasa: 0, wodZiData: { type: 'For Time', name: null }, varianteNivel: 'RX',
+      durStr: '', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+    })
+    expect(result).toBe('For Time')
+  })
+
+  it('CONTROL POZITIV: logare libera (fara varianta oficiala) - comportament neschimbat, ignora wodZiData complet', () => {
+    const result = computeWodHeaderLine({
+      variantaAleasa: null, wodZiData: { type: 'AMRAP', name: 'GET UP' }, varianteNivel: null,
+      durStr: '20:00', wodTip: 'EMOM', wodDurata: '15:00', freeLogConfigDesc: '3 runde',
+    })
+    expect(result).toBe('EMOM · 15:00 · 3 runde')
+  })
+
+  it('logare libera + fara config/durata - string gol, nu crapa', () => {
+    const result = computeWodHeaderLine({
+      variantaAleasa: null, wodZiData: null, varianteNivel: null,
+      durStr: '', wodTip: '', wodDurata: '', freeLogConfigDesc: '',
+    })
+    expect(result).toBe('')
   })
 })
 

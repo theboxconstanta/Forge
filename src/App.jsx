@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -6900,6 +6900,21 @@ function App() {
     if (idx !== -1) setVariantaAleasa(idx)
   }, [wodZiData, userProfile?.usual_level])
 
+  // INC-02 (SENTRY-CYAN-HARBOR-4T) - efectul de mai sus doar SELECTEAZA o
+  // varianta cand apare un WOD oficial; nimic nu o CURATA cand acel WOD
+  // dispare (navigare la alta zi fara WOD oficial, sau sesiune PWA lasata
+  // deschisa peste miezul noptii - dataAcasa avanseaza, fetchWodZi()
+  // gaseste zero randuri, wodZiData devine null). Fara acest efect,
+  // variantaAleasa ramanea "agatata" de o varianta ce nu mai corespunde
+  // niciunui WOD real, stare care nu trebuia sa fie posibila - saveWodLog
+  // e acum defensiv fata de ea (vezi wodHeaderLine mai jos), dar prevenirea
+  // starii insesi (nu doar tratarea simptomului) evita orice alta
+  // suprafata neverificata care ar presupune aceeasi implicatie.
+  useEffect(() => {
+    if (wodZiData || variantaAleasa === null) return
+    setVariantaAleasa(null); setWodMiscariCustom(null)
+  }, [wodZiData])
+
   useEffect(() => {
     if (!user || claseDB.length === 0) return
     const ids = claseDB.filter(c => c.date === dataAcasa).map(c => c.id)
@@ -8346,9 +8361,14 @@ function App() {
     // ("GET UP") si subtitlul lui ("Build to Heavy/1RM 20:00"), pt ca
     // wod_id era setat oricum la wodZiData.id, doar pentru ca exista un WOD
     // oficial azi - indiferent ca userul alesese sa loga separat.
-    const wodHeaderLine = variantaAleasa !== null
-      ? `${wodZiData.type}${durStr ? ' · ' + durStr : ''}${wodZiData.name ? ' — "' + wodZiData.name + '"' : ''}`
-      : `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}`
+    // INC-02 (SENTRY-CYAN-HARBOR-4T) - vezi computeWodHeaderLine (utils.js)
+    // pt explicatia completa: wodZiData poate fi null aici chiar cand
+    // variantaAleasa !== null, iar accesarea neconditionata a lui .type
+    // arunca TypeError, oprind salvarea INAINTE sa ajunga la Supabase.
+    const wodHeaderLine = computeWodHeaderLine({
+      variantaAleasa, wodZiData, durStr, wodTip, wodDurata, freeLogConfigDesc,
+      varianteNivel: variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa].nivel : null,
+    })
     const miscariText = [...(wodHeaderLine ? [wodHeaderLine] : []), ...miscariFinale].join('\n')
     const noteFull = [miscariText || null, wodNote || null].filter(Boolean).join('\n---\n')
     const varianta = variantaAleasa !== null ? VARIANTE_CONFIG[variantaAleasa] : null

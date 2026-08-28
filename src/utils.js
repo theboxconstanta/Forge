@@ -48,6 +48,26 @@ export function localDayBoundsUTC(dateStr) {
   return { startUTC: start.toISOString(), endUTC: end.toISOString() }
 }
 
+// INC-02 (SENTRY-CYAN-HARBOR-4T) - textul de antet compus pt un log de WOD,
+// extras din saveWodLog (App.jsx) exact ca sa fie testabil izolat. Bug real:
+// wodZiData poate fi null chiar cand variantaAleasa !== null (fetchWodZi
+// face setWodZiData(null) cand nu exista niciun WOD oficial pt data
+// afisata, iar variantaAleasa - auto-selectata din usual_level cand WOD-ul
+// EXISTA - nu se reseteaza cand acesta dispare ulterior, ex. navigare la
+// alta zi sau sesiune PWA lasata deschisa peste miezul noptii). Accesarea
+// neconditionata a wodZiData.type arunca TypeError si oprea salvarea
+// INAINTE sa ajunga la Supabase. Cand nu exista wodZiData, singura
+// informatie reala disponibila e nivelul variantei alese (varianteNivel).
+export function computeWodHeaderLine({ variantaAleasa, wodZiData, varianteNivel, durStr, wodTip, wodDurata, freeLogConfigDesc }) {
+  if (variantaAleasa !== null) {
+    if (wodZiData) {
+      return `${wodZiData.type}${durStr ? ' · ' + durStr : ''}${wodZiData.name ? ' — "' + wodZiData.name + '"' : ''}`
+    }
+    return varianteNivel
+  }
+  return `${wodTip}${wodDurata ? ' · ' + wodDurata : ''}${freeLogConfigDesc ? ' · ' + freeLogConfigDesc : ''}`
+}
+
 // Class Operations - Instant Coach Check-in: atendanta ramane editabila pana
 // la ora de final a clasei + 2 ore (aceeasi fereastra de gratie ca
 // forge-admin-web's isInAttendanceGraceWindow, portata disciplinat aici -
