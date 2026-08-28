@@ -2,8 +2,13 @@
 
 ## Status
 
-**PROPOSED — OWNER APPROVAL REQUIRED.**
-Not accepted. Not implemented. No production change has been or will be made under this mission.
+**F-01 — ACCEPTED & IMPLEMENTED** (migration `20260828160000`, deployed 2026-08-28)
+**F-02 — ACCEPTED & IMPLEMENTED** (same migration)
+**F-03 — ACCEPTED & IMPLEMENTED** (same migration)
+**F-04 — DEFERRED** — remains PENDING a future accounting/business decision; **not** implemented, **not** decided; the generic "Financial date/time policy" is therefore **not** globally closed.
+
+Owner decision recorded 2026-08-28: F-01 APPROVED, F-02 APPROVED, F-03 APPROVED, F-04 DEFERRED.
+Implementation report: `FORGE_FINANCIAL_TIMEZONE_IMPLEMENTATION_REPORT.md`.
 
 ---
 
@@ -382,4 +387,20 @@ a single re-deploy of the prior function body. No historical backfill to undo.
 
 ## Decision
 
-**PENDING OWNER APPROVAL.**
+**F-01 / F-02 / F-03: ACCEPTED and implemented** in one migration
+(`supabase/migrations/20260828160000_financial_business_date_timezone_safe.sql`,
+deployed live 2026-08-28). Each `current_date` used for a gym business-date
+decision became `(now() AT TIME ZONE 'Europe/Bucharest')::date`; all business
+rules, signatures, return shapes, auth checks, the FRG02 guard, money handling,
+and security attributes are byte-identical. Pre-fix defect reproduced
+deterministically (session-tz-dependent under Pacific/Kiritimati vs UTC);
+post-fix verified session-tz-independent across UTC / Europe/Bucharest /
+Pacific/Kiritimati / America/New_York; DST winter/summer + month/year rollover
+correct; money amounts and `end_date` pass-through unchanged; no historical
+data modified; Security Gate GREEN.
+
+**F-04: DEFERRED.** No payment/revenue/accounting/VAT/fiscal-period logic was
+touched. The "which gym-local day / which fiscal period does a payment instant
+belong to?" question is recorded as a prerequisite decision for any future
+revenue-reporting feature and must involve the owner (and an accountant if
+relevant). This ADR makes no default and no Romanian tax-law assumption for it.
