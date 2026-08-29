@@ -359,6 +359,38 @@ export function variantHasStructuredPrescription(doc, variantKey) {
   return !!(vObj && Array.isArray(vObj.movements) && vObj.movements.length > 0)
 }
 
+/** P8 - one-way `wods` -> Workout Engine V2 mirror. Maps a variant's structured
+ * instances into the `workout_sections.movements` jsonb shape the V2 tables
+ * already declare (`{ name, reps, weight, distance, calories, equipment,
+ * canonicalName }`), enriched with `instanceId` + the full structured
+ * `prescription`. Gender-neutral (both values), since the V2 row is shared by
+ * every member; member resolution still happens at read time via
+ * resolveMovementInstance. Returns [] for an absent/empty variant. */
+export function movementObjectsForV2(instances) {
+  return (instances || []).map((mv) => {
+    const reps = resolveSpec(mv.reps, null)
+    const load = resolveSpec(mv.load, null)
+    const distance = resolveSpec(mv.distance, null)
+    const calories = resolveSpec(mv.calories, null)
+    return {
+      name: mv.name,
+      instanceId: mv.instanceId ?? null,
+      canonicalName: mv.canonicalMovementId ?? null,
+      reps: reps ? (reps.mode === 'text' ? reps.text : measureToken(reps)) : null,
+      weight: load ? `${measureToken(load)}${load.unit || 'kg'}` : null,
+      distance: distance ? `${measureToken(distance)}${distance.unit || 'm'}` : null,
+      calories: calories ? measureToken(calories) : null,
+      equipment: [],
+      prescription: {
+        reps: mv.reps ?? null,
+        load: mv.load ?? null,
+        distance: mv.distance ?? null,
+        calories: mv.calories ?? null,
+      },
+    }
+  })
+}
+
 // ============================================================================
 // Paste parser — text -> structured rows (P7 wires the UI; the parser lives
 // here so both repos share it and it is unit-tested in isolation)
@@ -469,5 +501,10 @@ function num(s) {
 }
 
 function titleWord(s) {
-  return String(s).replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bDb\b/g, 'DB').replace(/\bKb\b/g, 'KB')
+  // Capitalise the first letter of each SPACE-separated word only - never after
+  // a hyphen ("Pull-ups" stays "Pull-ups", not "Pull-Ups").
+  return String(s)
+    .replace(/(^|\s)([a-z])/g, (_m, p, c) => p + c.toUpperCase())
+    .replace(/\bDb\b/g, 'DB')
+    .replace(/\bKb\b/g, 'KB')
 }

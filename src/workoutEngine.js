@@ -17,6 +17,7 @@
 // ca restul codebase-ului (composeAmrapResult etc in workoutFormats.js),
 // testabile direct cu fixture-uri, fara mock pe supabase.
 import { supabase } from './supabase.js'
+import { movementObjectsForV2 } from './prescriptionContract.js'
 
 // ============================================================
 // Derivarea score_type din format - SINGURA sursa "vie" e catalogul
@@ -54,8 +55,15 @@ function legacyMovementText(text) {
   }
 }
 
-function legacyScalingVersion(level, movements, notes) {
-  return { level, movements: (movements || []).map(legacyMovementText), notes: notes ?? null }
+// P8 - one-way `wods` -> Workout Engine V2 mirror. When a variant carries a
+// structured prescription, emit structured movement objects (with instanceId +
+// full prescription spec); otherwise fall back to the legacy free-text mapping,
+// byte-identical to before. Gender-neutral - member resolution stays at read
+// time (resolveMovementInstance).
+function variantMovementsForMirror(wod, variantKey, legacyLines) {
+  const inst = wod?.movement_prescriptions?.variants?.[variantKey]?.movements
+  if (Array.isArray(inst) && inst.length > 0) return movementObjectsForV2(inst)
+  return (legacyLines || []).map(legacyMovementText)
 }
 
 /** O sectiune sintetizata dintr-o coloana array a lui `wods` (warmup/skill/
@@ -93,21 +101,22 @@ function legacySectionFromArray(wodId, type, slotKey, order, movementsArr, title
  * incarcare live (WOD-uri create dupa backfill, care n-au trecut prin
  * migratie). */
 function legacyMetconSection(wod, order) {
+  const hasStructured = (k) => (wod?.movement_prescriptions?.variants?.[k]?.movements?.length || 0) > 0
   const scalingVersions = []
-  if ((wod.movements_intermediate && wod.movements_intermediate.length) || wod.notes_intermediate) {
-    scalingVersions.push(legacyScalingVersion('intermediate', wod.movements_intermediate, wod.notes_intermediate))
+  if ((wod.movements_intermediate && wod.movements_intermediate.length) || wod.notes_intermediate || hasStructured('intermediate')) {
+    scalingVersions.push({ level: 'intermediate', movements: variantMovementsForMirror(wod, 'intermediate', wod.movements_intermediate), notes: wod.notes_intermediate ?? null })
   }
-  if ((wod.movements_beginner && wod.movements_beginner.length) || wod.notes_beginner) {
-    scalingVersions.push(legacyScalingVersion('beginner', wod.movements_beginner, wod.notes_beginner))
+  if ((wod.movements_beginner && wod.movements_beginner.length) || wod.notes_beginner || hasStructured('beginner')) {
+    scalingVersions.push({ level: 'beginner', movements: variantMovementsForMirror(wod, 'beginner', wod.movements_beginner), notes: wod.notes_beginner ?? null })
   }
-  if ((wod.movements_onramp && wod.movements_onramp.length) || wod.notes_onramp) {
-    scalingVersions.push(legacyScalingVersion('on_ramp', wod.movements_onramp, wod.notes_onramp))
+  if ((wod.movements_onramp && wod.movements_onramp.length) || wod.notes_onramp || hasStructured('onramp')) {
+    scalingVersions.push({ level: 'on_ramp', movements: variantMovementsForMirror(wod, 'onramp', wod.movements_onramp), notes: wod.notes_onramp ?? null })
   }
   return {
     id: `legacy:${wod.id}:metcon`,
     type: 'metcon', slotKey: 'metcon', title: null, description: wod.notes_rx ?? null, order,
     format: wod.type ?? null, formatConfig: wod.format_config ?? {},
-    movements: (wod.movements_rx || []).map(legacyMovementText),
+    movements: variantMovementsForMirror(wod, 'rx', wod.movements_rx),
     scalingVersions,
     loggingMode: 'required',
     scoreType: wod.type ? deriveScoreType(wod.type) : null,
@@ -145,7 +154,7 @@ export function mapLegacyWodToWorkout(wod) {
   if (wod.skill2 && wod.skill2.length) {
     sections.push(legacySectionFromArray(wod.id, 'skill', 'skill2', order++, wod.skill2, wod.skill2_name || 'Skill 2', wod.skill2_type, wod.skill2_format_config, wod.skill2_scored ? 'required' : 'optional'))
   }
-  sections.push(legacyMetconSection(wod, order++))
+  sections.push(legacyMetconSection(wod, order))
 
   return {
     id: wod.id, gymId: wod.gym_id, date: wod.date, title: wod.name ?? null, notes: null,

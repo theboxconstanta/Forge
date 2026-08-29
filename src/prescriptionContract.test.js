@@ -13,6 +13,7 @@ import {
   buildLegacyArtifactsForVariant,
   buildPrescriptionSnapshot,
   variantHasStructuredPrescription,
+  movementObjectsForV2,
   parsePastedMovementLine,
   parseWorkoutPaste,
   PRESCRIPTION_CONTRACT_VERSION,
@@ -256,5 +257,21 @@ describe('prescriptionContract — render matches resolve (single engine, I-14)'
     })
     expect(manual).toBe(resolved.line)
     expect(manual).toBe('21-15-9 Thruster @ 30 kg')
+  })
+})
+
+describe('movementObjectsForV2 — P8 one-way mirror', () => {
+  it('maps structured instances to the V2 movements shape + carries instanceId + prescription', () => {
+    const objs = movementObjectsForV2([
+      { instanceId: 'mi_a', name: 'Power Clean', canonicalMovementId: 'pc', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 60, female: 40, unit: 'kg' } },
+      { instanceId: 'mi_b', name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
+    ])
+    expect(objs[0]).toMatchObject({ name: 'Power Clean', instanceId: 'mi_a', canonicalName: 'pc', reps: '10', weight: '60/40kg', equipment: [] })
+    expect(objs[0].prescription.load).toEqual({ mode: 'sex_specific', male: 60, female: 40, unit: 'kg' })
+    expect(objs[1]).toMatchObject({ name: 'Row', calories: '15/12', weight: null, distance: null })
+  })
+  it('empty -> []', () => {
+    expect(movementObjectsForV2([])).toEqual([])
+    expect(movementObjectsForV2(null)).toEqual([])
   })
 })
