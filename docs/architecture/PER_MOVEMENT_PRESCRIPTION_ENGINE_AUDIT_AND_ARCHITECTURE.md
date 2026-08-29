@@ -2,7 +2,22 @@
 
 **Phase 1 (Forensic Audit) + Phase 2 (UX Design) + Phase 3 (Target Data Model)**
 Date: 2026-08-29
-Status: **PHASE 1–3 REVIEW — DIRECTION APPROVED. Decisions locked in §0. Implementation P3a→P14 in progress. Original STOP conditions maintained: no production backfill, no destructive schema change, no historical guessing, no unrelated refactor.**
+Status: **IMPLEMENTATION IN PROGRESS. Decisions locked in §0. Original STOP conditions maintained: no production backfill, no destructive schema change, no historical guessing, no unrelated refactor.**
+
+**Progress:**
+| Phase | State |
+|---|---|
+| P3a — foundation schema | ✅ SHIPPED live (`20260829090000`), trigger 10/10, no data change |
+| P3b — capability seed | ✅ SHIPPED live (`20260829090500`), 465 platform movements classified, 59 explicit-unknown |
+| P4 — shared contract module | ✅ SHIPPED both repos (WOD-SIMPLE `src/prescriptionContract.js`, forge-admin-web `.ts` port); shared `prescriptionFixtures.json`; parity 51/51; WOD-SIMPLE 1004 tests, admin 1142 |
+| P5 / P5′ — builder UI (both editors) | ⏳ NOT STARTED |
+| P6 — Generate Variants on structured prescriptions | ⏳ |
+| P7 — Quick Paste UI + confidence/review | ⏳ (parser done in P4) |
+| P8 — `sync_workout_engine_v2` structured mapper | ⏳ |
+| P9 — member render + logger + `logCtx` prescription + snapshot write | ⏳ (HIGH risk — INC-04 territory) |
+| P10 — Journal / `isNotRxd` / results snapshot-first | ⏳ |
+| P11 — server validation (done P3a) re-verify + tenant test | ⏳ |
+| P12–P14 — test matrix / manual acceptance / prod verify + report | ⏳ |
 
 ---
 
