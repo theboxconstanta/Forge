@@ -15,9 +15,11 @@ Status: **IMPLEMENTATION IN PROGRESS. Decisions locked in §0. Original STOP con
 | P6 — Generate Variants on structured prescriptions | ✅ SHIPPED both repos. `generateVariantInstancesFromRx` — deep-independent structured generation; Regenerate-with-AI parses AI text back to instances. |
 | P7 — Quick Paste UI + confidence/review | ✅ SHIPPED both repos. Paste into the row list; low-confidence rows flagged "Review"; no invented values. |
 | P8 — `wods` → V2 structured mirror | ✅ SHIPPED both repos. `movementObjectsForV2` in the mapper; one-way; `legacy_wod_id` untouched. |
-| **P5–P8 review checkpoint** | ⏳ **AWAITING OWNER REVIEW.** HARD STOP before P9. |
-| P9 — member render + logger + `logCtx` prescription + snapshot write | ⏳ BLOCKED on P5–P8 review (HIGH risk — INC-04 territory) |
-| P10 — Journal / `isNotRxd` / results snapshot-first | ⏳ |
+| **P5–P8 review** | ✅ APPROVED 2026-08-29. |
+| **P9 pre-guard** | ✅ SHIPPED. `buildLegacyArtifactsForVariant({ inlineLoad:false })` — regenerated legacy lines stay plain; structured workout's legacy render = status quo, no confusing inline. |
+| **P9 — member render + frozen logger prescription + snapshot write** | ✅ SHIPPED (report `..._P9_REPORT.md`). Structured-first member display via `resolveVariantDisplayLines` + `members.gender`; `freezeLoggingContext` captures `prescriptionDoc` by ref + `frozenAt`; `wod_logs.prescription_snapshot` written from the frozen doc only. `app_version` = `prescription-engine-p9-20260829`. **Owner manual browser acceptance OUTSTANDING** (§L). |
+| **P9 review checkpoint** | ⏳ **AWAITING OWNER REVIEW.** HARD STOP before P10. |
+| P10 — Journal / `isNotRxd` / results snapshot-first | ⏳ BLOCKED on P9 review |
 | P11 — server validation (done P3a) re-verify + tenant test | ⏳ |
 | P12–P14 — test matrix / manual acceptance / prod verify + report | ⏳ |
 
