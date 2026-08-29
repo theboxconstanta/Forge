@@ -2,13 +2,54 @@
 
 **Phase 1 (Forensic Audit) + Phase 2 (UX Design) + Phase 3 (Target Data Model)**
 Date: 2026-08-29
-Status: **AUDIT COMPLETE — BLOCKED ON ARCHITECTURE DECISION. No code, no migration, no production data changed.**
+Status: **PHASE 1–3 REVIEW — DIRECTION APPROVED. Decisions locked in §0. Implementation P3a→P14 in progress. Original STOP conditions maintained: no production backfill, no destructive schema change, no historical guessing, no unrelated refactor.**
+
+---
+
+## 0. Decisions Locked (Phase 1–3 review, 2026-08-29)
+
+### D-1 / D-2 recap (explicitly surfaced per review point 12)
+
+- **D-1 — Data model: OPTION B, APPROVED.** New structured authoring
+  representation is an **additive `wods.movement_prescriptions jsonb`** column.
+  `wods` remains the authoring source of truth. Legacy `movements_{variant}
+  text[]`, the 8 global `{variant}_weight_{male,female}` columns, and all existing
+  historical readers **remain available as a controlled compatibility fallback** —
+  **no destructive removal in this initiative**.
+- **D-2 — Workout Engine V2: NOT promoted.** V2 (`workouts`/`workout_sections`)
+  is **not** made the canonical authoring source. Its structured movement fields
+  (currently 100% null) are **corrected/populated as a downstream mirror** from
+  the authoritative `wods` prescription, with the **mirror direction defined and
+  tested explicitly** (`wods` → V2, one-way). No second competing authoring model
+  is created.
+
+### Review adjustments folded into this document
+
+| # | Adjustment | Where applied |
+|---|---|---|
+| 1 | Option B; `wods` authority preserved; legacy fallback retained; no destructive removal | §0 D-1, §C.3, §H |
+| 2 | No automatic historical backfill; future separately-reviewed classification only; no guessing | §E, §G, §H |
+| 3 | `prescription_snapshot` **must** originate from the frozen prescription the member saw in the logger — never re-read from mutable `wods` at submit. Full identity+prescription invariant. Explicit P1→P2 race test. Reuse INC-04 frozen logging-target architecture. | §C.6, §F, §H P9, §L |
+| 4 | Capability model must have **one canonical representation** — no self-contradiction. Adopted: `movements.allowed_prescription_metrics text[]` + `movements.default_prescription_metric text` (nullable, CHECK-constrained ⊆ allowed). Metadata-driven, **no movement-name conditionals**. | §C.4, §C.5 |
+| 5 | Prescription identity = **movement INSTANCE**, not canonical name. Same canonical movement may appear N times in one variant with different prescriptions (`10 Power Cleans @ 60/40` … `@ 70/47.5` … `@ 80/55`). Stable `instanceId` survives edit / reorder / duplicate / repeat / Generate Variants / logger snapshot / V2 mirror. | §C.5, §C.6 |
+| 6 | Units: store `value` + `unit` as separate fields. **No automatic kg↔lb conversion in this initiative.** Display in the coach-authored unit. Architecture stays capable of future unit preferences. | §C.5, §D.5, §C.4-units |
+| 7 | `movement_prescriptions` is a **strict typed contract**, not loose JSON. One canonical schema (`§C.5`), validated at every write boundary (client validator + DB trigger). Universal vs missing-sex-specific are **distinct semantic states**. No authoritative meaning encoded only in formatted strings. | §C.5, §H P3a/P4 |
+| 8 | Leaderboard/Journal immutability: new snapshotted logs use the immutable snapshot for historical interpretation; old logs keep controlled legacy fallback; no invented snapshots. Audit + update **all** readers: `isNotRxd`, Journal, leaderboard, history, performance/PR. Editing today's workout must not reclassify a snapshotted historical result. | §B.8, §F, §H P10 |
+| 9 | Cross-client parity: one canonical typed contract + identical resolver semantics + shared fixtures/contract cases + parity tests across both clients. Editors must never serialize different shapes. Physical code-sharing preferred where feasible without broad restructuring. | §C.7, §H P4 |
+| 10 | UX: progressive disclosure as specified; keyboard-speed / minimum-interaction priority; Wall Ball load-only (no target height); bodyweight = no controls. | §D |
+| 11 | V2 mirror: null structured fields ≠ V2 canonical. Mirror populated from authoritative `wods` prescription. Mirror direction defined + tested. | §0 D-2, §H P8 |
+| 12 | D-1/D-2 surfaced above before P3a. Proceed P3a→P14 only if no conflict (none found). | §0 |
+
+**Quality bar (owner, verbatim):** a coach can naturally program multiple
+instances of multiple movements with different prescriptions; a member receives
+exactly the prescription appropriate to the selected workout/variant; that exact
+prescription is frozen through score logging and historical interpretation.
 
 ---
 
 ## A. Executive Result
 
-**Status: BLOCKED (awaiting owner architecture decision).**
+**Status: DIRECTION APPROVED — implementing P3a→P14 (see §0, §H).**
 
 The forensic audit is complete and confirms the mission's premise **exactly**, with
 live production evidence. The current model stores **one `{male, female}` weight
@@ -449,14 +490,24 @@ Concretely:
    stay, written as a convenience mirror of the first weighted movement's load
    (or left as-is on legacy rows).
 
-2. **Capability layer (`movements`):** add
-   `default_metrics jsonb` (or discrete columns `supports_load bool,
-   supports_distance bool, supports_calories bool, optional_metrics text[]`) —
-   **decision D-4 below**. Seed deterministically from `category` /
-   `movement_pattern` / the `CARDIO_MISCARI` / `CARDIO_CU_CALORII` lists +
-   a curated override list for the ~40 common movements the mission enumerates.
-   A movement with no catalog match → **all metrics optional, none default**
-   (coach sees a "Metric" chooser, progressive disclosure).
+2. **Capability layer (`movements`) — ONE canonical representation (review point 4):**
+   add exactly two columns:
+   - `allowed_prescription_metrics text[] NOT NULL DEFAULT '{}'` — the closed set
+     of metrics valid for this movement. Element domain: `reps | load | distance |
+     calories` (CHECK-enforced).
+   - `default_prescription_metric text` (nullable) — the one metric whose control
+     the builder shows immediately. **CHECK: `default_prescription_metric IS NULL
+     OR default_prescription_metric = ANY(allowed_prescription_metrics)`** — the
+     default can never contradict the allowed set (no dual authority).
+   Semantics: a metric in `allowed` but ≠ `default` is an **optional** capability
+   (Weighted Pull-up: `allowed = {reps,load}`, `default = reps`). Empty `allowed`
+   = bodyweight-only, no prescription controls (Burpee). `default = NULL` with
+   `allowed = {distance,calories}` = coach must pick (Row). A movement with no
+   catalog row, or a gym movement with `allowed = {}` **and never seeded**, is
+   treated by the resolver as *unknown* → builder shows a `None | Reps | Load |
+   Distance | Calories` chooser (default None). Seeded deterministically (§C.4).
+   **No movement-name conditionals anywhere in resolution or UI** — everything
+   reads these two columns.
 
 3. **V2 mirror:** `sync_workout_engine_v2` already writes
    `workout_sections.movements` — extend the mapper so it emits the **structured**
@@ -490,20 +541,191 @@ with ~7 live readers across two repos and the sync RPC. B is purely additive.
 **Why B over D:** D does not satisfy the mission (no authored per-movement M/F, no
 universal/sex-specific distinction, no calorie/distance M/F, can't snapshot).
 
-### C.4 What this deliberately does NOT build
+### C.4 Capability seed (deterministic, `gym_id IS NULL` platform rows only)
+
+Priority order per movement, first match wins:
+
+1. **Curated override map** (~55 entries) for every movement the mission
+   enumerates + the obvious high-frequency ones. Verbatim from the mission where
+   it is explicit:
+   - `load`-default: Snatch, Clean, Clean & Jerk, Deadlift, Front Squat, Back
+     Squat, Thruster, Dumbbell Snatch, Dumbbell Clean, Dumbbell Thruster,
+     Kettlebell Swing, Wall Ball (+ Power/Hang/Squat variants, Push Press, Push
+     Jerk, Overhead Squat, SDHP, …) → `allowed = {reps,load}`, `default = load`.
+   - `reps`-only: Pull-up, Chest-to-Bar, Toes-to-Bar, Burpee, Box Jump, Double
+     Under (+ Push-up, HSPU, Sit-up, Air Squat, Lunge (unloaded), Muscle-up, …)
+     → `allowed = {reps}`, `default = reps`. **Wall Ball is NOT here — load only,
+     no target height (review point 10).**
+   - `distance`-only: Run → `allowed = {distance}`, `default = distance`.
+   - `distance`+`calories`: Row, SkiErg, BikeErg → `allowed = {distance,calories}`,
+     `default = NULL` (coach picks).
+   - `calories`-only: Air Bike (Assault/Echo/Air) → `allowed = {calories}`,
+     `default = calories` (mission: "AIR BIKE default: calories").
+   - optional-load: Pull-up variants that are commonly weighted, Lunge, Sit-up,
+     Step-up → `allowed = {reps,load}`, `default = reps`.
+2. **`CARDIO_MISCARI` / `CARDIO_CU_CALORII`** (from `src/movements.js`) — any
+   cardio machine not covered above → `{distance,calories}`; Run → `{distance}`.
+3. **`category` / `movement_pattern`** — `barbell`/`dumbbell`/`kettlebell` or
+   pattern `olympic`/`hinge`/`press` (not already covered) → `{reps,load}`,
+   `default = reps` (conservative: load is *available* but coach opts in);
+   `bodyweight`/`gymnastic` → `{reps}`, `default = reps`.
+4. **No match** → leave `allowed = {}`, `default = NULL` → resolver treats as
+   *unknown* (chooser in the builder). **Not a guess, an explicit "unknown".**
+
+Seed migration reports exact counts per bucket. Gym-created movements are **not**
+seeded (coach can set their capability, or leave it unknown).
+
+### C.5 Canonical Typed Contract v1 (`wods.movement_prescriptions`)
+
+**Strict.** One schema, validated at every write boundary — the shared client
+validator (`validateMovementPrescriptions`, §C.7) **and** a DB
+`BEFORE INSERT OR UPDATE` trigger on `wods` (structure/enum/type only; completeness
+is a client publish-gate, §D.1). Loose/arbitrary JSON is rejected.
+
+```jsonc
+// wods.movement_prescriptions  —  jsonb NOT NULL DEFAULT '{"version":1,"variants":{}}'
+{
+  "version": 1,                         // integer, currently exactly 1
+  "variants": {                         // keys ⊆ {"rx","intermediate","beginner","onramp"}; absent key = variant has no structured prescription (legacy fallback applies)
+    "rx": {
+      "movements": [                    // ORDERED array; array index = display order
+        {
+          "instanceId": "mi_8vК2p…",    // REQUIRED, string, stable, unique within this variant array (§C.6)
+          "name": "Power Clean",         // REQUIRED, non-empty string (display + legacy-line source + resolver fallback)
+          "canonicalMovementId": "…",    // string (movements.id) or null — identity of the CANONICAL movement, NOT the instance
+          "reps":     { "mode": "universal",    "value": 10 },
+          "load":     { "mode": "sex_specific", "male": 60, "female": 40, "unit": "kg" }
+          // "distance", "calories" — same shape, omitted here
+        },
+        { "instanceId": "mi_j3Lq…", "name": "Power Clean", "canonicalMovementId": "…",
+          "reps": { "mode": "universal", "value": 10 },
+          "load": { "mode": "sex_specific", "male": 70, "female": 47.5, "unit": "kg" } },
+        { "instanceId": "mi_Za91…", "name": "Power Clean", "canonicalMovementId": "…",
+          "reps": { "mode": "universal", "value": 10 },
+          "load": { "mode": "sex_specific", "male": 80, "female": 55, "unit": "kg" } }
+      ]
+    }
+    // "intermediate", "beginner", "onramp" — same shape, independent arrays, independent instanceIds
+  }
+}
+```
+
+**Spec value types (each is a discriminated union on `mode`):**
+
+| Metric | `universal` | `sex_specific` | notes |
+|---|---|---|---|
+| `reps` | `{mode:"universal", value:number\|null}` | `{mode:"sex_specific", male:number\|null, female:number\|null}` | also `{mode:"text", text:string}` for `"Max"`, `"21-15-9"`, `"AMRAP"` — preserves anything non-numeric, **flattens nothing**; workout-level scheme stays in `wods.type`/`format_config`, untouched |
+| `load` | `{mode:"universal", value:number\|null, unit:"kg"\|"lb"}` | `{mode:"sex_specific", male:number\|null, female:number\|null, unit:"kg"\|"lb"}` | `unit` REQUIRED; **no conversion** (review point 6) |
+| `distance` | `{mode:"universal", value:number\|null, unit:"m"\|"km"\|"ft"\|"mi"}` | `{mode:"sex_specific", male, female, unit}` | `m` is the only seeded unit; others reserved |
+| `calories` | `{mode:"universal", value:number\|null}` | `{mode:"sex_specific", male:number\|null, female:number\|null}` | no unit (calories is the unit) |
+
+**Hard rules (trigger + validator):**
+- `version === 1`; `variants` is an object; every key ∈ the 4 allowed; every
+  `variant.movements` is an array.
+- every movement: `instanceId` non-empty string, unique within its array; `name`
+  non-empty string; `canonicalMovementId` string-or-null.
+- every present spec: `mode ∈ {universal, sex_specific}` (reps also `text`);
+  numeric fields are `number` or `null`; `load`/`distance` carry a `unit` in the
+  allowed set.
+- a movement may carry **only** metrics in its canonical movement's
+  `allowed_prescription_metrics` **at author time** — the builder enforces this;
+  the trigger does **not** (a movement's capability could be edited later; the
+  stored prescription stays valid and the resolver simply renders what's there).
+- **`universal` vs missing-`sex_specific`-value are distinct:**
+  `{mode:"universal", value:500}` ≠ `{mode:"sex_specific", male:500, female:null}`.
+  The second is an **incomplete draft** (blocked at publish, §D.1) and is
+  **never** rendered as "female uses male".
+- **`null` numeric = "not yet entered"** (draft). A metric with all-`null` values
+  is dropped on save (equivalent to the key being absent).
+
+**Derived artifacts written alongside (never read as truth):**
+- `wods.movements_{variant} text[]` — regenerated from the structure on every
+  save as human lines (`"10 Power Clean @ 60/40 kg"`, gender-neutral `x/y` form).
+  Legacy readers unaffected.
+- `wods.{variant}_weight_{male,female}` — for a prescription-authored variant,
+  set to the **first `load`-bearing movement's** male/female value as a *lossy
+  legacy mirror* (so old readers still show *a* weight); left as-authored on
+  legacy rows. Documented as lossy.
+
+### C.6 Movement Instance Identity + prescription freeze (review points 3, 5)
+
+- **`instanceId`** is generated client-side when a movement row is created in the
+  builder (`mi_` + a 21-char url-safe random id — same discipline as the existing
+  `newSectionId()`). It is **stable** across: editing any field, reordering,
+  Duplicate Movement (the copy gets a **new** `instanceId`), repeating the same
+  canonical movement (each occurrence has its own `instanceId`), save/reload.
+- **Generate Variants** produces target-variant movements with **fresh**
+  `instanceId`s — generated variants are independent copies with no back-pointer
+  (Invariant 7). No cross-variant instance correspondence is modeled (that is the
+  unbuilt `MovementOverride`-slot concept; out of scope).
+- **V2 mirror** carries `instanceId` through into
+  `workout_sections.movements[].instanceId` so the mirror is addressable and
+  diff-able (`wods` → V2, one-way).
+- **Logger snapshot** (`wod_logs.prescription_snapshot`): at the moment the member
+  taps "Log Score", the **already-frozen INC-04 `logCtx`** is extended to carry
+  the **resolved-for-this-member** prescription for the frozen variant+section —
+  computed once, from `logCtx` state, **never re-read from `wods` at submit**.
+  On save, that frozen object is written verbatim to `prescription_snapshot`.
+  Shape:
+  ```jsonc
+  {
+    "version": 1,
+    "variant": "rx",
+    "gender": "female" | "male" | null,        // members.gender at log time
+    "resolvedAt": "<logCtx freeze time>",
+    "movements": [
+      { "instanceId": "mi_…", "name": "Power Clean", "canonicalMovementId": "…",
+        "reps": { "value": 10 },
+        "load": { "value": 40, "unit": "kg", "mode": "sex_specific" },   // RESOLVED to this member
+        "displayLine": "10 Power Clean @ 40 kg" }
+    ],
+    "source": "structured" | "legacy_global" | "legacy_text"  // which tier produced it
+  }
+  ```
+  `source` records the fallback tier so downstream readers know the fidelity.
+- **Invariant (review point 3), tested end-to-end:**
+  ```
+  DISPLAYED WORKOUT = DISPLAYED VARIANT = DISPLAYED SECTION = DISPLAYED PRESCRIPTION
+    = LOGGER WORKOUT = LOGGER VARIANT = LOGGER SECTION = LOGGER PRESCRIPTION
+    = SAVED PRESCRIPTION SNAPSHOT = SAVE TARGET
+  ```
+  Race test: member opens W (P1) → opens logger → admin edits W to P2 → member
+  submits ⇒ `prescription_snapshot` is **P1** (resolved from the frozen `logCtx`,
+  not the now-P2 `wods` row). Identity is never reconstructed from `wods.date`, a
+  fresh current-workout lookup, or mutable global state.
+
+### C.7 Cross-client parity (review point 9)
+
+- **One canonical typed contract** = §C.5, authored once, lived in a shared
+  location. Physical sharing preference, in order: (a) a tiny published contract
+  module if the repos can consume one without restructuring; (b) if not — a
+  **single source file** (`prescriptionContract.*`) with the types + pure
+  functions, **ported byte-for-byte** to both repos (the established Forge
+  pattern: `scalingEngine.ts`↔`.js`, `workoutEngine.js`↔`workoutMapping.ts`), plus
+  a **shared fixture set** (`prescriptionFixtures.json`) checked into both and a
+  **parity test** in each repo asserting identical resolver output over every
+  fixture.
+- **Identical resolver semantics:** `resolveMovementPrescription(instance,
+  gender, unitPref)` and `validateMovementPrescriptions(json)` and
+  `renderPrescriptionLine(spec)` produce byte-identical output in both repos —
+  enforced by the shared fixtures, run in both CI suites.
+- Neither builder may serialize a shape the other cannot parse — the parity test
+  round-trips builder-state → `movement_prescriptions` JSON → builder-state in
+  both.
+
+### C.8 What this deliberately does NOT build
 
 - No `WorkoutVersion` immutable-lineage table, no `RenderRuleSet` versioning, no
-  `LoadProfile.prescriptionType: 'formula'` (bodyweight-relative) — all from the
+  `LoadProfile.prescriptionType: 'formula'` (bodyweight-relative) — from the
   unbuilt `VARIANT_GENERATION_ENGINE.md`; out of scope, architecture stays
   compatible with adding them later.
-- No unit-conversion engine. `unit` is stored (`kg` today; `lb` allowed in the
-  shape) and displayed as authored. Member `unitPref` display conversion is a
-  **thin** `kg↔lb` format helper only if the member profile already carries a
-  unit preference (it does — `profiles`/`members` unit field per i18n work);
-  otherwise display-as-authored.
-- No Wall Ball target height, watts, pace, RPM, cadence, tempo, HR — explicitly
-  excluded by the mission.
-- No EAV, no rules engine, no expression evaluator.
+- **No unit-conversion engine, no automatic kg↔lb member-profile conversion**
+  (review point 6). `unit` is stored and displayed **exactly as the coach
+  authored it**. Future unit-preference work is explicitly separate so it never
+  drags rounding / leaderboard / snapshot semantics into this change.
+- No Wall Ball target height, watts, pace, RPM, cadence, tempo, HR.
+- No EAV, no rules engine, no expression evaluator, no movement-name switch
+  statements.
 
 ---
 
@@ -722,7 +944,10 @@ builder changed it during the logger session.
 | "backfill cannot be proven deterministic" | **YES** | ~9–11 of 23 rows are ambiguous. Recommendation: **no automated backfill** (§E). Owner decision D-5. |
 | "migration would silently change meaning of historical logged workouts" | **YES if done wrong** | Adding the engine without the §F snapshot would make every historical score's prescribed standard editable. The snapshot (D-3) prevents it. This is why §F is non-optional. |
 
-**This is the checkpoint.** No migration or code is written until §I is answered.
+**Checkpoint cleared (2026-08-29):** direction approved (§0). All three STOP
+conditions remain **honored** by the locked design — no backfill, no destructive
+change, snapshot-from-`logCtx` mandatory, Option B avoids the V2-authoring
+migration.
 
 ---
 
@@ -733,9 +958,9 @@ phase ships + is verified before the next.
 
 | Phase | Scope | Repo(s) | Risk |
 |---|---|---|---|
-| **P3a** | Migration: `wods.movement_prescriptions jsonb DEFAULT '{}'`; `wod_logs.prescription_snapshot jsonb`; `skill_logs.prescription_snapshot jsonb`; `movements` capability columns. Additive only. No backfill. | supabase | low |
-| **P3b** | `movements` capability seed (deterministic, `gym_id IS NULL`, from category/pattern/cardio lists + curated overrides). Reported counts. | supabase | low |
-| **P4** | Shared domain: `prescription` type + `resolveMovementPrescription` + `parseWorkoutPaste` + capability resolver. Ported identically to both repos. Pure, unit-tested first. | both | low |
+| **P3a** | Migration `20260829…_movement_prescription_engine_foundation.sql`: `wods.movement_prescriptions jsonb NOT NULL DEFAULT '{"version":1,"variants":{}}'`; `wod_logs.prescription_snapshot jsonb`; `skill_logs.prescription_snapshot jsonb`; `movements.allowed_prescription_metrics text[] NOT NULL DEFAULT '{}'` + `movements.default_prescription_metric text` (+ CHECKs, §C.4); `validate_movement_prescriptions()` trigger fn + `BEFORE INSERT OR UPDATE` trigger on `wods` (structure/enum/type only, §C.5). Additive only. No backfill. | supabase | low |
+| **P3b** | `movements` capability seed (deterministic, `gym_id IS NULL` only, priority: curated map → cardio lists → category/pattern → unknown; §C.4). Reports exact per-bucket counts. | supabase | low |
+| **P4** | Shared contract module (`prescriptionContract`, §C.7): typed schema + `validateMovementPrescriptions` + `resolveMovementPrescription` + `renderPrescriptionLine` + `resolveMovementCapability` + `parseWorkoutPaste`. Ported byte-for-byte to both repos + shared `prescriptionFixtures.json` + parity test in each. Pure, unit-tested first. | both | low |
 | **P5** | forge-admin-web builder: movement row list + progressive disclosure + universal/M-F toggles + replacement/metric-change safety + publish validation. Dual-write `movement_prescriptions` **and** the legacy `movements_{v} text[]` + global cols (rendered from structure). | forge-admin-web | med |
 | **P5′** | WOD-SIMPLE in-app Admin editor — same builder changes (cross-client parity). | WOD-SIMPLE | med |
 | **P6** | Generate Variants on structured prescriptions. | both | low |
@@ -750,32 +975,16 @@ phase ships + is verified before the next.
 
 ---
 
-## I. Owner Decision Points (required before Phase 3)
+## I. Owner Decision Points — RESOLVED (Phase 1–3 review, 2026-08-29)
 
-1. **D-1 — Data model.** Approve **Option B** (additive `wods.movement_prescriptions
-   jsonb` + legacy text/global-cols as fallback), or direct Option A / C / a full
-   Workout Engine V2 authoring migration.
-
-2. **D-2 — V2 relationship.** Confirm the V2 mirror is *corrected* (its structured
-   fields finally populated by the sync RPC) but **not** promoted to authoring
-   source of truth in this mission.
-
-3. **D-3 — Historical immutability.** Approve **prescription snapshot on the log
-   row** (`wod_logs.prescription_snapshot`) as the policy, with live-fallback for
-   pre-migration logs. (This also hardens a hole that exists today.)
-
-4. **D-4 — Capability storage.** `movements.default_metrics jsonb` (flexible) **or**
-   discrete `supports_load / supports_distance / supports_calories bool +
-   optional_metrics text[]` (queryable, constraint-friendly). Recommendation:
-   **discrete booleans + `optional_metrics text[]`.**
-
-5. **D-5 — Backfill.** Confirm **no automated backfill** of the 23 global-weight
-   rows; legacy fallback stays. (Optionally: a later, separately-approved,
-   per-row-reviewed pass for the ~8–10 deterministic rows.)
-
-6. **D-6 — Unit preference.** Confirm scope: store `unit` (`kg`/`lb`), display
-   **as authored** + a thin `kg↔lb` format conversion **only** if the member
-   profile already carries a unit preference; **no** unit-conversion engine.
+| Decision | Resolution |
+|---|---|
+| **D-1 — Data model** | **Option B, APPROVED.** Additive `wods.movement_prescriptions jsonb`; `wods` stays authoring source of truth; legacy text + global cols + historical readers kept as controlled fallback; no destructive removal. |
+| **D-2 — V2 relationship** | **NOT promoted.** V2 corrected as a one-way downstream mirror from authoritative `wods` prescription; mirror direction defined + tested; no second authoring model. |
+| **D-3 — Historical immutability** | **APPROVED with stronger invariant.** `wod_logs.prescription_snapshot` + `skill_logs.prescription_snapshot`, written **from the frozen INC-04 `logCtx`** (never re-read from `wods` at submit); full identity+prescription invariant (§C.6); live-fallback for pre-migration logs; no invented snapshots. |
+| **D-4 — Capability storage** | **Revised to one canonical representation:** `movements.allowed_prescription_metrics text[]` + `movements.default_prescription_metric text` (nullable, CHECK ⊆ allowed). No discrete booleans, no separate `optional_metrics[]`, no dual authority, no name conditionals (§C.4). |
+| **D-5 — Backfill** | **NONE.** Confirmed. Legacy fallback stays. Future separately-reviewed classification (deterministic / ambiguous / manual) may follow; no guessing. |
+| **D-6 — Units** | Store `value` + `unit` separately; **no automatic kg↔lb conversion in this initiative**; display as coach-authored; architecture stays future-capable. |
 
 ---
 
