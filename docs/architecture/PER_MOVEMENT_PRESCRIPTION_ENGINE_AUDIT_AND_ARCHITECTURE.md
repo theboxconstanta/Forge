@@ -10,14 +10,21 @@ Status: **IMPLEMENTATION IN PROGRESS. Decisions locked in §0. Original STOP con
 | P3a — foundation schema | ✅ SHIPPED live (`20260829090000`), trigger 10/10, no data change |
 | P3b — capability seed | ✅ SHIPPED live (`20260829090500`), 465 platform movements classified, 59 explicit-unknown |
 | P4 — shared contract module | ✅ SHIPPED both repos (WOD-SIMPLE `src/prescriptionContract.js`, forge-admin-web `.ts` port); shared `prescriptionFixtures.json`; parity 51/51; WOD-SIMPLE 1004 tests, admin 1142 |
-| P5 / P5′ — builder UI (both editors) | ⏳ NOT STARTED |
-| P6 — Generate Variants on structured prescriptions | ⏳ |
-| P7 — Quick Paste UI + confidence/review | ⏳ (parser done in P4) |
-| P8 — `sync_workout_engine_v2` structured mapper | ⏳ |
-| P9 — member render + logger + `logCtx` prescription + snapshot write | ⏳ (HIGH risk — INC-04 territory) |
+| P5 — forge-admin-web structured builder | ✅ SHIPPED. MovementRow/MovementRowList; capability-driven; universal/M-F; replace/metric safety; publish gate; canonical `instances` + regenerated legacy artifacts. |
+| P5′ — WOD-SIMPLE editor parity | ✅ SHIPPED. wodSections.js data-layer parity (shared contract + fixtures); MovementRowPWA/MovementRowListPWA in App.jsx (VariantEditorBody). Member render + logger UNCHANGED. |
+| P6 — Generate Variants on structured prescriptions | ✅ SHIPPED both repos. `generateVariantInstancesFromRx` — deep-independent structured generation; Regenerate-with-AI parses AI text back to instances. |
+| P7 — Quick Paste UI + confidence/review | ✅ SHIPPED both repos. Paste into the row list; low-confidence rows flagged "Review"; no invented values. |
+| P8 — `wods` → V2 structured mirror | ✅ SHIPPED both repos. `movementObjectsForV2` in the mapper; one-way; `legacy_wod_id` untouched. |
+| **P5–P8 review checkpoint** | ⏳ **AWAITING OWNER REVIEW.** HARD STOP before P9. |
+| P9 — member render + logger + `logCtx` prescription + snapshot write | ⏳ BLOCKED on P5–P8 review (HIGH risk — INC-04 territory) |
 | P10 — Journal / `isNotRxd` / results snapshot-first | ⏳ |
 | P11 — server validation (done P3a) re-verify + tenant test | ⏳ |
 | P12–P14 — test matrix / manual acceptance / prod verify + report | ⏳ |
+
+**Deployed but DORMANT (2026-08-29):** the engine activates only when a coach
+edits a workout with the new builder. Live: 51 wods / **0 structured**, 0
+prescription snapshots, 406 movements seeded, 0 V2 sections with `prescription`.
+`app_version` bumped to `prescription-engine-p3-p8-20260829`.
 
 ---
 
