@@ -32,7 +32,7 @@ describe('Per-Movement Prescription Engine (P5′) — wodSections parity', () =
     const payload = legacyPayloadFromSections(sections)
     expect(payload.movement_prescriptions.variants.rx.movements).toHaveLength(2)
     expect(payload.movement_prescriptions.variants.intermediate).toBeUndefined()
-    expect(payload.movements_rx).toEqual(['20 Power Clean @ 60/40 kg', '20 Pull-ups'])
+    expect(payload.movements_rx).toEqual(['20 Power Clean', '20 Pull-ups']) // P9 pre-guard: plain
     expect(payload.rx_weight_male).toBe('60')
     expect(payload.rx_weight_female).toBe('40')
   })

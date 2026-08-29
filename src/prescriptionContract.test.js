@@ -199,7 +199,7 @@ describe('prescriptionContract — legacy artifacts (regenerated, never truth)',
       { name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
     ]
     const art = buildLegacyArtifactsForVariant(movements)
-    expect(art.lines).toEqual(['20 Snatch @ 45/30 kg', '15/12 Cal Row'])
+    expect(art.lines).toEqual(['20 Snatch', '15/12 Cal Row']) // P9 pre-guard: plain lines, load stays in movement_prescriptions
     expect(art.weightMale).toBe('45')
     expect(art.weightFemale).toBe('30')
   })

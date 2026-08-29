@@ -296,13 +296,23 @@ export function resolveVariantForMember(doc, variantKey, gender) {
 
 /** For one variant's movement list, produce the legacy `movements_{variant}`
  * text lines (gender-neutral) + a lossy `{male,female}` global weight mirror
- * (first load-bearing movement). */
-export function buildLegacyArtifactsForVariant(movements) {
+ * (first load-bearing movement).
+ *
+ * P9 PRE-GUARD (owner-required, 2026-08-29): `opts.inlineLoad` defaults FALSE,
+ * so the regenerated legacy line is PLAIN ("20 Snatch", no `@ x/y`). A
+ * structured workout's pre-P9 legacy render is then plain lines + one weight
+ * badge = the exact status quo for any multi-weighted workout today, with no
+ * confusing gender-neutral inline value competing with the badge. The full
+ * per-movement prescription is preserved in `movement_prescriptions` and is
+ * surfaced by the P9 structured member renderer. P9's member render never reads
+ * these lines for a structured workout, so this stays FALSE. */
+export function buildLegacyArtifactsForVariant(movements, opts = {}) {
+  const inlineLoad = opts.inlineLoad === true
   const lines = (movements || []).map((mv) => {
     const resolved = {
       name: mv.name,
       reps: resolveSpec(mv.reps, null),
-      load: resolveSpec(mv.load, null),
+      load: inlineLoad ? resolveSpec(mv.load, null) : null,
       distance: resolveSpec(mv.distance, null),
       calories: resolveSpec(mv.calories, null),
     }
