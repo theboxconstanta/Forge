@@ -7,7 +7,7 @@
 // overrides, and gym-local "Create New Movement".
 import { supabase } from './supabase'
 
-const MOVEMENT_COLUMNS = 'id, gym_id, name, aliases, equipment, category, movement_pattern, default_substitutions, created_by, created_at, updated_at'
+const MOVEMENT_COLUMNS = 'id, gym_id, name, aliases, equipment, category, movement_pattern, default_substitutions, allowed_prescription_metrics, default_prescription_metric, created_by, created_at, updated_at'
 
 export class DuplicateMovementError extends Error {
   constructor(name) {

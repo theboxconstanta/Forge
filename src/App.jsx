@@ -54,13 +54,18 @@ import {
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
   sectionsFromLegacyWod, legacyPayloadFromSections, validateSectionsForLegacy, legacySlotAssignmentAfterSave,
+  hydrateInstancesFromLegacy,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
 import { buildAggregateLeaderboard } from './aggregateLeaderboard'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
 import { ComposedWorkoutView } from './ComposedWorkoutView'
-import { generateVariantsFromRx, buildScalingOverrides } from './scalingEngine'
+import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
+import {
+  resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
+  newMovementInstance, parseWorkoutPaste,
+} from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
 class ErrorBoundary extends Component {
@@ -934,65 +939,205 @@ function ComposedWorkoutPreview({ section, t }) {
   )
 }
 
+// ===========================================================================
+// Per-Movement Prescription Engine (P5') - structured movement row list for the
+// PWA WOD editor. Semantic parity with forge-admin-web's MovementRowList/
+// MovementRow (shared prescriptionContract + fixtures prove it); the UI is
+// PWA-native (inline styles), not a component copy.
+// ===========================================================================
+const pmpeNumInput = { width: '52px', padding: '6px 4px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }
+const pmpeLink = { background: 'none', border: 'none', color: '#888', fontSize: '10px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }
+const pmpeIconBtn = { width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', color: '#666', cursor: 'pointer', flexShrink: 0 }
+const PMPE_QTY = ['reps', 'distance', 'calories']
+
+function pmpeToNum(s) { const t = String(s).trim().replace(',', '.'); if (t === '') return null; const n = parseFloat(t); return Number.isFinite(n) ? n : null }
+const pmpeNumStr = (v) => (v === null || v === undefined ? '' : String(v))
+
+function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove }) {
+  const mode = spec?.mode ?? defaultMode
+  const unit = spec?.unit ?? (metric === 'load' ? 'kg' : metric === 'distance' ? 'm' : undefined)
+  const showUnit = metric === 'load' || metric === 'distance'
+  const isText = metric === 'reps' && mode === 'text'
+  const carry = showUnit ? { unit } : {}
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: '#999' }}>{label}</span>
+      {isText ? (
+        <input style={{ ...pmpeNumInput, width: '76px' }} value={spec?.text ?? ''} placeholder="21-15-9" aria-label={`${label} scheme`} onChange={e => onChange({ mode: 'text', text: e.target.value })} />
+      ) : mode === 'sex_specific' ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+          <span style={{ color: '#bbb', fontSize: '11px' }}>M</span>
+          <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.male)} aria-label={`${label} men`} onChange={e => onChange({ ...spec, mode: 'sex_specific', male: pmpeToNum(e.target.value), ...carry })} />
+          <span style={{ color: '#bbb', fontSize: '11px' }}>F</span>
+          <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.female)} aria-label={`${label} women`} onChange={e => onChange({ ...spec, mode: 'sex_specific', female: pmpeToNum(e.target.value), ...carry })} />
+        </span>
+      ) : (
+        <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.value)} aria-label={label} onChange={e => onChange({ ...spec, mode: 'universal', value: pmpeToNum(e.target.value), ...carry })} />
+      )}
+      {showUnit && (
+        <select style={{ fontSize: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', padding: '3px' }} value={unit} aria-label={`${label} unit`} onChange={e => onChange({ ...spec, mode: spec?.mode ?? defaultMode, unit: e.target.value })}>
+          {metric === 'load' ? <><option value="kg">kg</option><option value="lb">lb</option></> : <><option value="m">m</option><option value="km">km</option><option value="ft">ft</option><option value="mi">mi</option></>}
+        </select>
+      )}
+      {!isText && mode === 'universal' && <button style={pmpeLink} onClick={() => onChange({ mode: 'sex_specific', male: spec?.value ?? null, female: null, ...carry })}>Different M/F</button>}
+      {!isText && mode === 'sex_specific' && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: spec?.male ?? spec?.value ?? null, ...carry })}>Same for all</button>}
+      {metric === 'reps' && !isText && <button style={pmpeLink} onClick={() => onChange({ mode: 'text', text: '' })}>Scheme</button>}
+      {isText && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: null })}>Single count</button>}
+      {onRemove && <button style={pmpeLink} onClick={onRemove}>remove</button>}
+    </span>
+  )
+}
+
+function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, capabilityFor, suggestions, needsReview }) {
+  const [nameFocused, setNameFocused] = useState(false)
+  const [justPicked, setJustPicked] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const cap = useMemo(() => capabilityFor(instance.name), [capabilityFor, instance.name])
+  const present = PMPE_QTY.concat('load').filter(k => instance[k])
+  const active = new Set(present.length ? present : (cap.default ? (cap.default === 'load' && cap.allowed.includes('reps') ? ['load', 'reps'] : [cap.default]) : []))
+  const nameSug = justPicked || !nameFocused ? [] : suggestions(instance.name)
+  const quantityMetric = PMPE_QTY.find(k => active.has(k)) || null
+  const quantityChoices = PMPE_QTY.filter(k => cap.allowed.includes(k))
+
+  const seed = (next, metric) => {
+    if (metric === 'reps') next.reps = { mode: 'universal', value: null }
+    else if (metric === 'load') { next.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }; if (cap.allowed.includes('reps') && !next.reps) next.reps = { mode: 'universal', value: null } }
+    else if (metric === 'distance') next.distance = { mode: 'universal', value: null, unit: 'm' }
+    else if (metric === 'calories') next.calories = { mode: 'sex_specific', male: null, female: null }
+  }
+  const changeName = (name) => {
+    const next = { ...instance, name, canonicalMovementId: null }
+    const nc = capabilityFor(name)
+    if (nc.allowed.length) for (const k of ['reps', 'load', 'distance', 'calories']) if (next[k] && !nc.allowed.includes(k)) delete next[k]
+    const bare = !['reps', 'load', 'distance', 'calories'].some(k => next[k])
+    if (bare && nc.default) seed(next, nc.default)
+    onChange(next)
+  }
+  const setQuantity = (metric) => { const next = { ...instance }; for (const k of PMPE_QTY) delete next[k]; seed(next, metric); onChange(next) }
+  const patch = (p) => onChange({ ...instance, ...p })
+
+  return (
+    <div style={{ border: `1px solid ${needsReview ? '#f0c674' : '#ececec'}`, borderRadius: '10px', padding: '8px', background: '#fff', marginBottom: '6px' }}>
+      {needsReview && <div style={{ fontSize: '10px', fontWeight: 600, color: '#b7791f', marginBottom: '4px' }}>Review — couldn’t parse this line confidently</div>}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <button style={pmpeIconBtn} disabled={isFirst} onClick={onMoveUp} aria-label="Move movement up">↑</button>
+          <button style={pmpeIconBtn} disabled={isLast} onClick={onMoveDown} aria-label="Move movement down">↓</button>
+        </div>
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <input value={instance.name} placeholder="Movement" aria-label="Movement name"
+            onFocus={() => { setNameFocused(true); setJustPicked(false) }} onBlur={() => setTimeout(() => setNameFocused(false), 120)}
+            onChange={e => changeName(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          {nameSug.length > 0 && <MovementSuggestions suggestions={nameSug} onSelect={(s) => { setJustPicked(true); changeName(s) }} />}
+        </div>
+        <button style={pmpeIconBtn} onClick={onDuplicate} aria-label="Duplicate movement">⧉</button>
+        <button style={pmpeIconBtn} onClick={onRemove} aria-label="Remove movement">✕</button>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginTop: '7px', paddingLeft: '38px' }}>
+        {quantityChoices.length > 1 && (
+          <span style={{ display: 'inline-flex', border: '1px solid #e0e0e0', borderRadius: '7px', overflow: 'hidden' }}>
+            {quantityChoices.map(m => (
+              <button key={m} onClick={() => setQuantity(m)} style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer', background: quantityMetric === m ? '#0E0E0E' : '#fff', color: quantityMetric === m ? '#fff' : '#666' }}>
+                {m === 'distance' ? 'Distance' : m === 'calories' ? 'Calories' : 'Reps'}
+              </button>
+            ))}
+          </span>
+        )}
+        {quantityMetric && <PmpeMetricEditor label={quantityMetric === 'reps' ? 'Reps' : quantityMetric === 'distance' ? 'Distance' : 'Calories'} metric={quantityMetric} spec={instance[quantityMetric]} defaultMode={quantityMetric === 'calories' ? 'sex_specific' : 'universal'} onChange={s => patch({ [quantityMetric]: s })} />}
+        {active.has('load') ? (
+          <PmpeMetricEditor label="Load" metric="load" spec={instance.load} defaultMode="sex_specific" onChange={s => patch({ load: s })} onRemove={cap.default !== 'load' ? () => { const n = { ...instance }; delete n.load; onChange(n) } : undefined} />
+        ) : cap.allowed.includes('load') ? (
+          <button style={pmpeLink} onClick={() => patch({ load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } })}>+ Load</button>
+        ) : null}
+        {cap.unknown && active.size === 0 && (
+          <span style={{ position: 'relative' }}>
+            <button style={pmpeLink} onClick={() => setMenuOpen(v => !v)}>+ Add prescription</button>
+            {menuOpen && (
+              <span style={{ position: 'absolute', zIndex: 10, marginTop: '4px', display: 'flex', flexDirection: 'column', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                {['reps', 'load', 'distance', 'calories'].map(m => (
+                  <button key={m} style={{ ...pmpeLink, textDecoration: 'none', padding: '6px 12px', textAlign: 'left', textTransform: 'capitalize', fontSize: '11px' }} onClick={() => { setMenuOpen(false); m === 'load' ? patch({ load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } }) : setQuantity(m) }}>{m}</button>
+                ))}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MovementRowListPWA({ instances, onChange, catalog }) {
+  const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
+  const suggestions = (text) => catalog?.suggestions?.(text) ?? []
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
+  const [reviewIds, setReviewIds] = useState(() => new Set())
+  const replaceAt = (i, next) => {
+    if (next.name !== instances[i].name && reviewIds.has(instances[i].instanceId)) {
+      setReviewIds(p => { const n = new Set(p); n.delete(instances[i].instanceId); return n })
+    }
+    onChange(instances.map((m, j) => (j === i ? next : m)))
+  }
+  const removeAt = (i) => onChange(instances.filter((_, j) => j !== i))
+  const dupAt = (i) => { const c = JSON.parse(JSON.stringify(instances[i])); c.instanceId = newMovementInstance().instanceId; const n = [...instances]; n.splice(i + 1, 0, c); onChange(n) }
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= instances.length) return; const n = [...instances]; [n[i], n[j]] = [n[j], n[i]]; onChange(n) }
+  const applyPaste = () => {
+    const { movements } = parseWorkoutPaste(pasteText, { lookupCanonical: (name) => catalog?.lookupForParse?.(name) ?? null })
+    if (movements.length) {
+      onChange([...instances, ...movements.map(m => m.instance)])
+      setReviewIds(p => { const n = new Set(p); for (const m of movements) if (!m.confident) n.add(m.instance.instanceId); return n })
+    }
+    setPasteText(''); setPasteOpen(false)
+  }
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+        <button style={pmpeLink} onClick={() => setPasteOpen(v => !v)}>{pasteOpen ? 'Close paste' : 'Paste workout'}</button>
+      </div>
+      {pasteOpen && (
+        <div style={{ background: '#fafafa', border: '1px solid #eee', borderRadius: '8px', padding: '8px', marginBottom: '8px' }}>
+          <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={3} aria-label="Paste workout text"
+            placeholder={'20 Snatches @ 45/30kg\n15/12 Cal Row'}
+            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+          <div style={{ textAlign: 'right', marginTop: '6px' }}>
+            <button onClick={applyPaste} disabled={!pasteText.trim()} style={{ padding: '6px 12px', borderRadius: '8px', background: pasteText.trim() ? '#0E0E0E' : '#ccc', color: '#fff', border: 'none', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Add movements</button>
+          </div>
+        </div>
+      )}
+      {instances.map((inst, i) => (
+        <MovementRowPWA key={inst.instanceId} instance={inst} needsReview={reviewIds.has(inst.instanceId)} onChange={(n) => replaceAt(i, n)} onRemove={() => removeAt(i)} onDuplicate={() => dupAt(i)}
+          onMoveUp={() => move(i, -1)} onMoveDown={() => move(i, 1)} isFirst={i === 0} isLast={i === instances.length - 1}
+          capabilityFor={capabilityFor} suggestions={suggestions} />
+      ))}
+      {instances.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movements yet — add one, or paste a workout.</div>}
+      <button onClick={() => onChange([...instances, newMovementInstance()])} style={{ marginTop: '4px', padding: '8px 12px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '12px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add movement</button>
+    </div>
+  )
+}
+
 // Rendering for a single scaling variant's editable body (weight/movements/
 // quick-add/paste/notes) - factored out of the old VARIANT_LEVELS.map stack
 // so PrimarySectionBody can render exactly one active tab's variant instead
 // of all four stacked vertically. Behavior/markup unchanged from before the
 // tab-bar conversion (Coach Quick Create Phase 1).
 function VariantEditorBody({ v, sv, section, updateVariant, movementCatalog, t }) {
+  // Per-Movement Prescription Engine (P5') - `instances` is the canonical
+  // editable representation. The old per-variant weight M/F inputs + free-text
+  // movement list + quick-add + paste-textarea are replaced by the structured
+  // MovementRowListPWA (capability-driven per-movement prescription). Fast text
+  // authoring stays first-class via the row list's "Paste workout". Legacy
+  // `movements`/`weight`/`quickAdd`/`paste` fields are regenerated from
+  // `instances` at save (legacyPayloadFromSections) and not shown here.
+  void section
   return (
     <div style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-      {['scored', 'mixed'].includes(getFormat(section.format)?.family) ? (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <input value={sv.weight.male} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, male: e.target.value } })}
-            placeholder={`${t.adminWodWeightLabel} M (${t.adminWodWeightPlaceholderMale})`}
-            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-          <input value={sv.weight.female} onChange={e => updateVariant(v.key, { weight: { ...sv.weight, female: e.target.value } })}
-            placeholder={`${t.adminWodWeightLabel} F (${t.adminWodWeightPlaceholderFemale})`}
-            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-        </div>
-      ) : (
-        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '8px' }}>{t.adminWodWeightUnavailableHint}</div>
-      )}
-      <SortableList
-        items={sv.movements}
-        onReorder={(items) => updateVariant(v.key, { movements: items })}
-        onRemove={(i) => updateVariant(v.key, (cv) => ({ movements: cv.movements.filter((_, j) => j !== i) }))}
+      <MovementRowListPWA
+        instances={sv.instances || []}
+        onChange={(instances) => updateVariant(v.key, { instances })}
+        catalog={movementCatalog}
       />
-      <MiscareQuickAdd value={sv.quickAdd} onChange={(val) => updateVariant(v.key, { quickAdd: val })}
-        onAdd={(text) => {
-          // Forma functie (nu obiect simplu) - vezi comentariul din
-          // updateVariant (SectionCard) - MiscareQuickAdd.add() cheama
-          // onAdd si apoi onChange('') (golirea inputului) sincron,
-          // in aceeasi tranzactie; fara forma functie aici, al doilea
-          // apel ar suprascrie miscarea abia adaugata (bug real gasit
-          // in aceeasi sesiune).
-          updateVariant(v.key, (cv) => {
-            const gasita = extractGreutateDinMiscare(text)
-            return {
-              movements: [...cv.movements, text],
-              weight: (cv.weight.male || cv.weight.female) || !gasita ? cv.weight : gasita,
-            }
-          })
-        }}
-        placeholder={t.logWodMovementPlaceholder('kg')} weightUnit="kg" t={t} hideWeight catalog={movementCatalog} />
-      <textarea value={sv.paste} onChange={e => updateVariant(v.key, { paste: e.target.value })}
-        placeholder={t.adminWodVariantPastePlaceholder} rows={3}
-        style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
-      {sv.paste.trim() && (
-        <button onClick={() => {
-          const linii = sv.paste.split('\n').map(l => l.trim()).filter(Boolean).map(parseMiscareLinePasta)
-          const gasita = linii.map(extractGreutateDinMiscare).find(Boolean)
-          updateVariant(v.key, {
-            movements: [...sv.movements, ...linii], paste: '',
-            weight: (sv.weight.male || sv.weight.female) || !gasita ? sv.weight : gasita,
-          })
-        }}
-          style={{ marginTop: '6px', padding: '7px 14px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '12px', fontWeight: '600', color: '#555', cursor: 'pointer' }}>
-          {t.adminWodVariantPasteButton}
-        </button>
-      )}
       <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
         placeholder={t.adminWodNotesPlaceholder}
@@ -1027,33 +1172,25 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
 
   const orderedLevels = [...VARIANT_LEVELS].reverse() // rx, intermediate, beginner, onramp
   const activeLevel = orderedLevels.find(v => v.key === activeTab) || orderedLevels[0]
-  const rxHasMovements = section.variants.rx.movements.length > 0
+  const rxHasMovements = (section.variants.rx.instances || []).length > 0
+  const renderRxLine = (i) => renderInstanceLine({ name: i.name, reps: resolveSpec(i.reps, null), load: resolveSpec(i.load, null), distance: resolveSpec(i.distance, null), calories: resolveSpec(i.calories, null) })
 
   const generateVariants = () => {
-    const rx = section.variants.rx
-    // Coach Quick Create Phase 2 - gym-created movements with a
-    // default_substitutions entry (movementsApi.js) take precedence over
-    // the static SCALING_SUBSTITUTIONS table via generateVariantsFromRx's
-    // overrides param; movements with no DB entry fall through to the
-    // static table exactly as before (zero behavior change for those).
-    const generated = generateVariantsFromRx({
-      movements: rx.movements, weight: rx.weight, note: rx.note,
-      format: section.format || '', formatConfig: section.formatConfig,
-    }, buildScalingOverrides(movementCatalog?.movements || []))
-    // generated.<tier>.formatConfig (o ajustare de time-cap per-tier) nu se
-    // aplica deliberat aici - wods.format_config e o singura valoare
-    // comuna tuturor celor 4 variante (section.formatConfig, un singur
-    // camp, nu unul per nivel de scalare), deci nu exista un slot per-tier
-    // in care sa fie salvata azi. Engine-ul tot o calculeaza si o
-    // testeaza (scalingEngine.test.js) fiindca e corecta independent si ar
-    // putea sta la baza unei viitoare sugestii de time-cap - doar ca nu e
-    // inca persistata (acelasi compromis disclosed ca in forge-admin-web).
+    // Per-Movement Prescription Engine (P6/P5') - structured generation. Each
+    // generated variant is a fresh, independent instance list (new instanceIds,
+    // no shared object references). Gym-created movements' default_substitutions
+    // still take precedence over the static SCALING_SUBSTITUTIONS table.
+    const generated = generateVariantInstancesFromRx(
+      section.variants.rx.instances || [],
+      buildScalingOverrides(movementCatalog?.movements || []),
+      (name) => movementCatalog?.lookupForParse?.(name) ?? null,
+    )
     onChange((s) => ({
       variants: {
         ...s.variants,
-        intermediate: { ...s.variants.intermediate, movements: generated.intermediate.movements, weight: generated.intermediate.weight },
-        beginner: { ...s.variants.beginner, movements: generated.beginner.movements, weight: generated.beginner.weight },
-        onramp: { ...s.variants.onramp, movements: generated.onramp.movements, weight: generated.onramp.weight },
+        intermediate: { ...s.variants.intermediate, instances: generated.intermediate },
+        beginner: { ...s.variants.beginner, instances: generated.beginner },
+        onramp: { ...s.variants.onramp, instances: generated.onramp },
       },
     }))
   }
@@ -1065,12 +1202,13 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
     try {
       const rx = section.variants.rx
       const result = await regenerateVariantApi({
-        rxSection: { movements: rx.movements, weight: rx.weight, note: rx.note, format: section.format || '' },
+        rxSection: { movements: (rx.instances || []).map(renderRxLine), weight: rx.weight, note: rx.note, format: section.format || '' },
         targetTier: tier,
         gymMovementContext: (movementCatalog?.movements || []).map(m => m.name),
       })
+      const { movements } = parseWorkoutPaste((result.movements || []).join('\n'), { lookupCanonical: (name) => movementCatalog?.lookupForParse?.(name) ?? null })
       onChange((s) => ({
-        variants: { ...s.variants, [tier]: { ...s.variants[tier], movements: result.movements, weight: result.weight, note: result.note } },
+        variants: { ...s.variants, [tier]: { ...s.variants[tier], instances: movements.map(m => m.instance), note: result.note } },
       }))
     } catch (e) {
       console.error('regenerateVariant failed:', e)
@@ -2737,12 +2875,30 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // for a single call site (PrimarySectionBody's MiscareQuickAdd).
   const movementCatalog = useMemo(() => {
     const names = Array.from(new Set([...MISCARI, ...gymMovements.map(m => m.name)]))
+    // Per-Movement Prescription Engine (P5') - case-insensitive, alias-aware
+    // match with DB<->Dumbbell / KB<->Kettlebell expansions, mirroring
+    // forge-admin-web's MovementCatalogProvider.matchMovementRow exactly.
+    const matchRow = (rawName) => {
+      const n = (rawName || '').trim().toLowerCase()
+      if (!n) return null
+      const cands = [n, n.replace(/\bdb\b/g, 'dumbbell'), n.replace(/\bkb\b/g, 'kettlebell'), n.replace(/\bdumbbell\b/g, 'db'), n.replace(/\bkettlebell\b/g, 'kb'), n.replace(/s$/, '')]
+      for (const c of cands) {
+        const hit = gymMovements.find(r => r.name.toLowerCase() === c || (r.aliases || []).some(a => a.toLowerCase() === c))
+        if (hit) return hit
+      }
+      return null
+    }
     return {
       suggestions: (text) => {
         const word = text.trim().split(/\s+/).pop()
         if (!word || word.length < 2) return []
         const lower = word.toLowerCase()
         return names.filter(m => m.toLowerCase().includes(lower)).slice(0, 5)
+      },
+      capabilityFor: (name) => resolveMovementCapability(matchRow(name)),
+      lookupForParse: (name) => {
+        const row = matchRow(name)
+        return row ? { id: row.id, name: row.name, capability: resolveMovementCapability(row) } : null
       },
       createMovement: async (name) => {
         try {
@@ -3689,9 +3845,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     primary.formatConfig = { rounds: 5, timeCapSec: 18 * 60 }
     primary.open = true
     const movements = ['10 pull-ups', '15 push-ups', '20 air squats'].map(parseMiscareLinePasta)
-    primary.variants = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [
-      v.key, { movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' },
-    ]))
+    const mkVar = () => ({ instances: hydrateInstancesFromLegacy(movements, { male: null, female: null }), movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' })
+    primary.variants = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, mkVar()]))
     setWodSections([primary])
     if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
     setShowQuickCreate(false)

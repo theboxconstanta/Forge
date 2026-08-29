@@ -3,7 +3,51 @@ import {
   createSection, DEFAULT_NEW_WOD_SECTIONS, sectionsFromLegacyWod,
   legacyPayloadFromSections, validateSectionsForLegacy, validateMovementPerformanceMetadata,
   assignNonPrimarySlots, legacySlotAssignmentAfterSave,
+  hydrateInstancesFromLegacy, validatePrescriptionCompleteness,
 } from './wodSections'
+
+describe('Per-Movement Prescription Engine (P5′) — wodSections parity', () => {
+  it('hydrateInstancesFromLegacy: legacy lines -> structured instances + global weight on first loaded movement', () => {
+    const inst = hydrateInstancesFromLegacy(['20 Snatches', '20 Wall Balls', '15 Cal Row'], { male: '43kg', female: '30kg' })
+    expect(inst).toHaveLength(3)
+    expect(inst[0].name).toBe('Snatches')
+    expect(inst[0].load).toEqual({ mode: 'sex_specific', male: 43, female: 30, unit: 'kg' })
+    expect(inst[1].load).toBeUndefined()
+    expect(inst[2].calories).toEqual({ mode: 'universal', value: 15 })
+  })
+
+  it('sectionsFromLegacyWod hydrates instances; legacyPayloadFromSections emits movement_prescriptions + regenerates legacy artifacts', () => {
+    const wod = {
+      type: 'RFT', duration: '20:0', name: 'X', format_config: null,
+      movements_rx: ['20 Power Clean @ 60/40kg', '20 Pull-ups'], movements_intermediate: null, movements_beginner: null, movements_onramp: null,
+      rx_weight_male: '60kg', rx_weight_female: '40kg',
+      notes_rx: null, notes_intermediate: null, notes_beginner: null, notes_onramp: null,
+      warmup: null, skill: null, skill2: null,
+    }
+    const sections = sectionsFromLegacyWod(wod)
+    const primary = sections.find((s) => s.isPrimary)
+    expect(primary.variants.rx.instances).toHaveLength(2)
+    expect(primary.variants.rx.instances[0].load).toEqual({ mode: 'sex_specific', male: 60, female: 40, unit: 'kg' })
+
+    const payload = legacyPayloadFromSections(sections)
+    expect(payload.movement_prescriptions.variants.rx.movements).toHaveLength(2)
+    expect(payload.movement_prescriptions.variants.intermediate).toBeUndefined()
+    expect(payload.movements_rx).toEqual(['20 Power Clean @ 60/40 kg', '20 Pull-ups'])
+    expect(payload.rx_weight_male).toBe('60')
+    expect(payload.rx_weight_female).toBe('40')
+  })
+
+  it('validatePrescriptionCompleteness: blocks a half-entered sex-specific load, allows a blank reps', () => {
+    const mk = (instances) => { const s = createSection('metcon', true); s.variants.rx.instances = instances; return [s] }
+    expect(validatePrescriptionCompleteness(mk([{ instanceId: 'a', name: 'Snatch', load: { mode: 'sex_specific', male: 45, female: null, unit: 'kg' } }])).some((e) => /Snatch.*women's load/.test(e))).toBe(true)
+    expect(validatePrescriptionCompleteness(mk([{ instanceId: 'a', name: 'Thruster', reps: { mode: 'universal', value: null }, load: { mode: 'sex_specific', male: 43, female: 30, unit: 'kg' } }]))).toEqual([])
+    expect(validatePrescriptionCompleteness([createSection('metcon', true)])).toEqual([])
+  })
+
+  it('createSection primary variants carry an empty instances array', () => {
+    expect(createSection('metcon', true).variants.rx.instances).toEqual([])
+  })
+})
 
 // Traduceri fake, doar functiile folosite de validateSectionsForLegacy.
 const t = {
@@ -120,7 +164,11 @@ describe('legacyPayloadFromSections', () => {
     const payload = legacyPayloadFromSections(sections)
     expect(payload.type).toBe('For Time')
     expect(payload.name).toBe('NED')
-    expect(payload.movements_rx).toEqual(wodFixtureNoExtras.movements_rx)
+    // Per-Movement Prescription Engine (P5') - movements_rx is now REGENERATED
+    // from the structured instances hydrated from the legacy lines. Coach casing
+    // is preserved; a cardio metric normalises "1000m" -> "1000 m".
+    expect(payload.movements_rx).toEqual(['7 rounds for time of:', '11 Back Squats', '1000 m Row'])
+    expect(payload.movement_prescriptions.variants.rx.movements).toHaveLength(3)
     expect(payload.warmup).toEqual([])
     expect(payload.skill).toEqual([])
     expect(payload.skill2).toEqual([])
@@ -135,7 +183,8 @@ describe('legacyPayloadFromSections', () => {
     expect(payload.skill2).toEqual(wodFixtureWithExtras.skill2)
     expect(payload.skill2_name).toBe(wodFixtureWithExtras.skill2_name)
     expect(payload.skill2_visible).toBe(false)
-    expect(payload.movements_rx).toEqual(wodFixtureWithExtras.movements_rx)
+    // movements_rx regenerated from structured instances (P5') - see the note above.
+    expect(payload.movements_rx).toEqual(['7 rounds for time of:', '11 Back Squats', '1000 m Row'])
   })
 
   // Fix SKILL Sections Rendering as WARM-UP - mapare-a NU mai e strict

@@ -501,10 +501,8 @@ function num(s) {
 }
 
 function titleWord(s) {
-  // Capitalise the first letter of each SPACE-separated word only - never after
-  // a hyphen ("Pull-ups" stays "Pull-ups", not "Pull-Ups").
-  return String(s)
-    .replace(/(^|\s)([a-z])/g, (_m, p, c) => p + c.toUpperCase())
-    .replace(/\bDb\b/g, 'DB')
-    .replace(/\bKb\b/g, 'KB')
+  // Preserve the coach's own casing (mission: "preserve user input safely") -
+  // only normalise the DB/KB abbreviations. A catalog match replaces the name
+  // with the canonical form instead; this branch is the no-match fallback.
+  return String(s).trim().replace(/\bdb\b/gi, 'DB').replace(/\bkb\b/gi, 'KB')
 }

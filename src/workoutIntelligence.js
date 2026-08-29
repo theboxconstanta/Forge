@@ -23,7 +23,7 @@
 // lipsa, format nerecunoscut, benchmark neconcludent) - nicio schimbare de
 // prompt/schema in edge function.
 
-import { createSection, newSectionId, emptySectionVariants, VARIANT_LEVELS } from './wodSections'
+import { createSection, newSectionId, emptySectionVariants, hydrateInstancesFromLegacy, VARIANT_LEVELS } from './wodSections'
 import { WORKOUT_FORMATS, getFormat } from './workoutFormats'
 import { CARDIO_MISCARI } from './movements'
 
@@ -168,8 +168,10 @@ function pickVariantWeight(movements) {
 function buildVariants(aiSection) {
   const variants = emptySectionVariants()
   const rxWeight = pickVariantWeight(aiSection.movements)
+  const rxLines = (aiSection.movements || []).map(composeMovementLine).filter(Boolean)
   variants.rx = {
-    movements: (aiSection.movements || []).map(composeMovementLine).filter(Boolean),
+    instances: hydrateInstancesFromLegacy(rxLines, { male: null, female: null }),
+    movements: rxLines,
     quickAdd: '', paste: '',
     weight: { male: rxWeight.male, female: rxWeight.female },
     note: aiSection.description || '',
@@ -178,8 +180,10 @@ function buildVariants(aiSection) {
     const editorKey = AI_LEVEL_TO_EDITOR_KEY[sv.level]
     if (!editorKey || !KNOWN_SCALING_KEYS.includes(editorKey)) continue // ex. 'masters' - fara slot in editor, vezi deriveReviewFlags
     const w = pickVariantWeight(sv.movements)
+    const lines = (sv.movements || []).map(composeMovementLine).filter(Boolean)
     variants[editorKey] = {
-      movements: (sv.movements || []).map(composeMovementLine).filter(Boolean),
+      instances: hydrateInstancesFromLegacy(lines, { male: null, female: null }),
+      movements: lines,
       quickAdd: '', paste: '',
       weight: { male: w.male, female: w.female },
       note: sv.notes || '',

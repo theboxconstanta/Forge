@@ -136,3 +136,26 @@ describe('buildScalingOverrides', () => {
     expect(scaleMovementLine('10 Deadlifts @ 100kg', 'onramp', overrides)).toBe('7 Good Mornings')
   })
 })
+
+import { generateVariantInstancesFromRx } from './scalingEngine'
+import { newMovementInstance as mkInst } from './prescriptionContract'
+
+describe('generateVariantInstancesFromRx (P6/P5′) — structured, independent', () => {
+  const rx = [
+    { ...mkInst({ name: 'Deadlift' }), reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 100, female: 70, unit: 'kg' } },
+    { ...mkInst({ name: 'Deadlift' }), reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 140, female: 95, unit: 'kg' } },
+  ]
+  it('scales load per tier, keeps each instance independent with fresh ids', () => {
+    const g = generateVariantInstancesFromRx(rx)
+    expect(g.intermediate[0].load).toMatchObject({ male: 80, female: 56 })
+    expect(g.intermediate[1].load).toMatchObject({ male: 112, female: 76 })
+    const ids = [rx[0].instanceId, ...g.intermediate.map((m) => m.instanceId), ...g.beginner.map((m) => m.instanceId)]
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+  it('mutating a generated instance never touches RX or another tier', () => {
+    const g = generateVariantInstancesFromRx(rx)
+    g.beginner[0].load.male = 999
+    expect(g.intermediate[0].load.male).toBe(80)
+    expect(rx[0].load.male).toBe(100)
+  })
+})

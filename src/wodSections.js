@@ -17,6 +17,12 @@
 // componenta React.
 
 import { VARIANTE_WEIGHT_BASE, AUTO_DURATION_FORMAT_IDS, estimateTotalDurationSec } from './workoutFormats'
+import {
+  buildLegacyArtifactsForVariant,
+  parsePastedMovementLine,
+  validatePrescriptionsForPublish,
+  emptyPrescriptions,
+} from './prescriptionContract.js'
 
 // Extrage greutatea dintr-o linie de miscare deja normalizata (ex. "21
 // Thrusters @ 43kg" sau "21 Thrusters @ 61/43kg") - "X/Y" e conventia RX
@@ -48,8 +54,40 @@ let sectionIdSeq = 0
 export const newSectionId = () => `sec-${Date.now()}-${sectionIdSeq++}`
 
 export const emptySectionVariants = () => Object.fromEntries(
-  VARIANTE_WEIGHT_BASE.map(v => [v.key, { movements: [], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' }])
+  VARIANTE_WEIGHT_BASE.map(v => [v.key, { instances: [], movements: [], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' }])
 )
+
+// Per-Movement Prescription Engine (P5') - hydrate a legacy variant's editable
+// instance list from its `movements_{k}` text lines + optional shared
+// `{k}_weight_{male,female}` global pair. Same contract + shared parser as
+// forge-admin-web's sectionEditing.ts (hydrateInstancesFromLegacy). Pure,
+// best-effort, never persisted until the coach saves (architecture doc C.9.1).
+const LOADED_NAME_RE_PWA = /\b(snatch|clean|jerk|deadlift|thruster|squat|press|swing|lunge|carry|wall ?ball|barbell|dumbbell|kettlebell|db|kb|complex|shrug|curl|good morning|high pull|overhead)\b/i
+export const hydrateInstancesFromLegacy = (lines, globalWeight) => {
+  const instances = []
+  for (const line of lines || []) {
+    const parsed = parsePastedMovementLine(line)
+    if (parsed) instances.push(parsed.instance)
+  }
+  const gm = parseWeightTextPwa(globalWeight?.male)
+  const gf = parseWeightTextPwa(globalWeight?.female)
+  const anyInlineLoad = instances.some(i => i.load)
+  // Only apply the shared global weight pair when NO line already carried an
+  // inline `@ x/y` load - a coach uses one convention or the other, not both.
+  if ((gm.value != null || gf.value != null) && !anyInlineLoad) {
+    const unit = gm.unit || gf.unit || 'kg'
+    const spec = { mode: 'sex_specific', male: gm.value, female: gf.value, unit }
+    let target = instances.find(i => !i.load && !i.distance && !i.calories && LOADED_NAME_RE_PWA.test(i.name))
+    if (!target) target = instances.find(i => !i.load && !i.distance && !i.calories)
+    if (target) target.load = spec
+  }
+  return instances
+}
+const parseWeightTextPwa = (raw) => {
+  const m = (raw || '').trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*(kg|lb|lbs)?/i)
+  if (!m) return { value: null, unit: null }
+  return { value: parseFloat(m[1]), unit: m[2] ? (/lb/i.test(m[2]) ? 'lb' : 'kg') : null }
+}
 
 // O sectiune "primara" (isPrimary) e singura care poate purta variante de
 // scalare + durata + nume WOD - restul (non-primare) sunt format+o singura
@@ -157,12 +195,15 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
     id: newSectionId(), typeKey: 'metcon', isPrimary: true, scored: true, visible: true, open,
     title: '', format: w.type || 'AMRAP', formatConfig: w.format_config || {},
     movementName: '', text: '', durationMin: dMin || '20', durationSec: dSec || '0', name: w.name || '',
-    variants: Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, {
-      movements: w[`movements_${v.key}`] || [],
-      quickAdd: '', paste: '',
-      weight: { male: w[`${v.key}_weight_male`] || '', female: w[`${v.key}_weight_female`] || '' },
-      note: w[`notes_${v.key}`] || '',
-    }])),
+    variants: Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => {
+      const legacyLines = w[`movements_${v.key}`] || []
+      const weight = { male: w[`${v.key}_weight_male`] || '', female: w[`${v.key}_weight_female`] || '' }
+      const structuredMovements = w.movement_prescriptions?.variants?.[v.key]?.movements
+      const instances = Array.isArray(structuredMovements) && structuredMovements.length > 0
+        ? structuredMovements.map(m => ({ ...m }))
+        : hydrateInstancesFromLegacy(legacyLines, weight)
+      return [v.key, { instances, movements: legacyLines, quickAdd: '', paste: '', weight, note: w[`notes_${v.key}`] || '' }]
+    })),
   })
   return sections
 }
@@ -293,12 +334,26 @@ export const legacyPayloadFromSections = (sections) => {
     ? `${Math.floor(autoDurationSec / 60)}:${String(autoDurationSec % 60).padStart(2, '0')}`
     : `${parseInt(primary.durationMin) || 0}:${String(parseInt(primary.durationSec) || 0).padStart(2, '0')}`
 
+  // Per-Movement Prescription Engine (P5') - `instances` is canonical. For each
+  // variant with instances: emit the structured prescription AND regenerate the
+  // legacy movements_{k} lines + lossy {k}_weight_{male,female} mirror from that
+  // same structure (identical to forge-admin-web's legacyPayloadFromSections).
   const variantFields = {}
+  const prescriptions = emptyPrescriptions()
   for (const v of VARIANTE_WEIGHT_BASE) {
-    const sv = primary.variants?.[v.key] || { movements: [], weight: { male: '', female: '' }, note: '' }
-    variantFields[`movements_${v.key}`] = sv.movements || []
-    variantFields[`${v.key}_weight_male`] = (sv.weight?.male || '').trim() || null
-    variantFields[`${v.key}_weight_female`] = (sv.weight?.female || '').trim() || null
+    const sv = primary.variants?.[v.key] || { instances: [], movements: [], weight: { male: '', female: '' }, note: '' }
+    const instances = sv.instances || []
+    if (instances.length > 0) {
+      prescriptions.variants[v.key] = { movements: instances }
+      const art = buildLegacyArtifactsForVariant(instances)
+      variantFields[`movements_${v.key}`] = art.lines
+      variantFields[`${v.key}_weight_male`] = art.weightMale
+      variantFields[`${v.key}_weight_female`] = art.weightFemale
+    } else {
+      variantFields[`movements_${v.key}`] = sv.movements || []
+      variantFields[`${v.key}_weight_male`] = (sv.weight?.male || '').trim() || null
+      variantFields[`${v.key}_weight_female`] = (sv.weight?.female || '').trim() || null
+    }
     variantFields[`notes_${v.key}`] = (sv.note || '').trim() || null
   }
 
@@ -307,6 +362,7 @@ export const legacyPayloadFromSections = (sections) => {
     duration: durationStr,
     format_config: Object.keys(primary.formatConfig || {}).length > 0 ? primary.formatConfig : null,
     name: primary.name.trim() || null,
+    movement_prescriptions: prescriptions,
     ...nonPrimaryFields('warmup', warmupS),
     ...nonPrimaryFields('skill', skillS),
     ...nonPrimaryFields('skill2', skill2S),
@@ -386,5 +442,24 @@ export const validateSectionsForLegacy = (sections, t) => {
     if (otherCount > 2) errors.push(t.wodSectionsErrorTooManyOther(otherCount))
   }
   errors.push(...validateMovementPerformanceMetadata(sections, t))
+  errors.push(...validatePrescriptionCompleteness(sections))
   return { valid: errors.length === 0, errors }
+}
+
+// Per-Movement Prescription Engine save gate (P5') - `wods` has no draft state,
+// so completeness is enforced at save (architecture doc C.9.2): a load /
+// distance / calories the coach started must be fully filled; a blank reps
+// never blocks (it is workout structure, the scheme may carry the count). Only
+// variants with structured instances are checked. Same rules as
+// forge-admin-web's validatePrescriptionCompleteness (shared contract).
+export const validatePrescriptionCompleteness = (sections) => {
+  const primary = sections.find(s => s.isPrimary)
+  if (!primary) return []
+  const doc = emptyPrescriptions()
+  for (const v of VARIANTE_WEIGHT_BASE) {
+    const inst = primary.variants?.[v.key]?.instances || []
+    if (inst.length > 0) doc.variants[v.key] = { movements: inst }
+  }
+  if (Object.keys(doc.variants).length === 0) return []
+  return validatePrescriptionsForPublish(doc).errors
 }

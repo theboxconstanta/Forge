@@ -11,11 +11,16 @@
 // manually in sync, not shared, per this codebase's own established
 // cross-repo module boundary (no build-time link between the two apps).
 //
+// (P6 import - structured variant generation reuses the tested scaleMovementLine
+// via a render->scale->reparse round-trip. See generateVariantInstancesFromRx.)
+//
 // SCALING_SUBSTITUTIONS is a curated starting set, not exhaustive - any
 // movement without an entry (or without a tier-specific entry) falls
 // through to TIER_RULES[tier].defaultLoadRatio (name kept, load scaled).
 // This is a disclosed, visible-in-the-UI degrade, not a silent gap -
 // extending the table over time never requires an algorithm change.
+
+import { renderInstanceLine, resolveSpec, parsePastedMovementLine, newInstanceId } from './prescriptionContract.js'
 
 export const TIER_RULES = {
   intermediate: { volumeReductionPct: 0.1, timeCapIncreasePct: 0.15, defaultLoadRatio: 0.8 },
@@ -238,6 +243,36 @@ export function buildScalingOverrides(movements) {
     if (m.default_substitutions) overrides[m.name] = m.default_substitutions
   }
   return overrides
+}
+
+/**
+ * Per-Movement Prescription Engine (P6/P5') - structured variant generation.
+ * Port of forge-admin-web's generateVariantInstancesFromRx. For each RX
+ * instance: render to a gender-neutral line, run the tested scaleMovementLine
+ * (substitution + load ratio + volume reduction), re-parse to a NEW independent
+ * instance (fresh instanceId). Generated variants share no object references
+ * with RX or each other. Distance / calorie / rep-scheme lines round-trip.
+ */
+export function generateVariantInstancesFromRx(rxInstances, overrides, lookupCanonical) {
+  const tiers = ['intermediate', 'beginner', 'onramp']
+  const out = {}
+  for (const tier of tiers) {
+    out[tier] = (rxInstances || []).map((inst) => {
+      const line = renderInstanceLine({
+        name: inst.name,
+        reps: resolveSpec(inst.reps, null),
+        load: resolveSpec(inst.load, null),
+        distance: resolveSpec(inst.distance, null),
+        calories: resolveSpec(inst.calories, null),
+      })
+      const parsed = parsePastedMovementLine(scaleMovementLine(line, tier, overrides), { lookupCanonical })
+      if (parsed) return parsed.instance
+      const copy = JSON.parse(JSON.stringify(inst))
+      copy.instanceId = newInstanceId()
+      return copy
+    })
+  }
+  return out
 }
 
 /** Pure. Never mutates `rx`; never touches Supabase. */
