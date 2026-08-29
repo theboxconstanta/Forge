@@ -728,6 +728,64 @@ is a client publish-gate, §D.1). Loose/arbitrary JSON is rejected.
   round-trips builder-state → `movement_prescriptions` JSON → builder-state in
   both.
 
+### C.9 Pre-P5 clarifications (owner-required, 2026-08-29)
+
+#### C.9.1 — Canonical vs legacy text authoring. "Replace the textarea" ≠ remove fast text entry.
+
+The metcon **free-text textarea** is replaced by a **structured movement-row
+list** as the *editing surface*. The fast text / Quick-Paste **authoring path is
+kept and is first-class** — it is an *input method into* the structured rows, not
+a competing representation.
+
+| Question | Answer |
+|---|---|
+| Canonical representation for a new/edited structured workout | **`wods.movement_prescriptions` (JSON, §C.5).** The only independently-editable semantic representation. |
+| What Quick Paste produces | The **`movement_prescriptions` structure** (via `parseWorkoutPaste`, P4). Paste → structured rows → the coach lands in the row builder → edit → save. Never a parallel editable text blob. |
+| How legacy text is retained | `wods.movements_{variant} text[]` + the 8 `{variant}_weight_{male,female}` columns are **DERIVED artifacts**, regenerated from `movement_prescriptions` on **every save** (`buildLegacyArtifactsForVariant`, P4). Read-only outputs. Legacy readers (pre-P9 member app, any other consumer) keep working unchanged. |
+| How display text is regenerated | Member/logger/Journal render via `resolveMovementInstance` (P4). The `movements_{variant}` text[] is the gender-neutral rendered form for legacy readers only — never the source of truth. |
+| Two independently-editable canonicals? | **No.** Once `movement_prescriptions.variants[v]` has content, `movements_{v}` for that variant is *always* regenerated on save and is *never* an edit target. Before it has content (pure legacy row) `movements_{v}` is the only representation. There is never a window where both are independently editable → **no silent divergence**. |
+| Incomplete parse | The row is created with the raw text preserved in `name` + a **"Review"** flag; **no invented values**; the coach resolves it in the row builder before save. Worst case a row is name-only and renders back as that text — no data loss. |
+| Opening an OLD legacy-only workout to edit | The builder **hydrates** the row list from `movements_{variant} text[]` using the *same* `parsePastedMovementLine`. The coach sees editable rows. **Nothing is persisted until the coach saves.** Open-and-close ⇒ the legacy row is byte-untouched. Save ⇒ `movement_prescriptions` is now populated, `movements_{v}` + global cols are regenerated from it (global cols become the documented *lossy* first-load mirror). Non-destructive forward migration, per workout, only on an explicit save. |
+| Scope | The engine covers the **primary metcon section's four variants** only. `warmup` / `skill` / `skill2` sections keep their current free-text editing untouched. |
+
+UX intent: **paste OR build → structured rows → edit visually → save.** Not
+"textarea removed, rebuild everything by hand."
+
+#### C.9.2 — `reps` semantics: STRUCTURE, not a prescription characteristic.
+
+Two distinct concepts, kept **explicitly distinct** in the contract:
+
+| Concept | Contract field(s) | Meaning | Sex-specific? | Completeness-gated at publish? |
+|---|---|---|---|---|
+| **Movement quantity / target** ("how much of this movement") | exactly ONE of `reps` \| `distance` \| `calories` per movement (or a `reps` `text` scheme) | the count/target the coach composed into the workout | `reps` almost always universal; `distance`/`calories` commonly sex-specific for cardio (`15/12 Cal Row`) | `distance`/`calories`: **yes**. `reps`: **no** (blank never blocks — see below). |
+| **Intensity / resistance** ("how heavy") | `load` (optional, orthogonal) | the weight each rep is performed at | often sex-specific (`45/30 kg`) | **yes** |
+
+- `reps` is **workout structure**: the per-movement count *within* a scheme. The
+  **scheme itself** (21-15-9, rounds, AMRAP/EMOM timing) stays **exclusively** in
+  `wods.type` + `wods.format_config` — the prescription engine **does not touch
+  it**. `21-15-9 Thrusters` is authored either as `reps: {mode:'text', text:'21-15-9'}`
+  **or** with `reps` blank and the scheme in `format_config` — coach's choice,
+  both valid.
+- A **blank `reps` never blocks publish** (the scheme may carry the count). The
+  only `reps` case the publish gate flags is a genuine **sex_specific half-entry**
+  (one side typed, the other blank) — an obvious mistake. `load` / `distance` /
+  `calories` keep full completeness checks. *(Contract adjustment applied to
+  `validatePrescriptionsForPublish` in both repos, 3 new fixtures — P4 follow-up
+  commit; no schema change.)*
+- **`allowed_prescription_metrics`** (the live capability column) lists *which
+  metric fields a movement can carry* — an **authoring/UI hint**, not a claim
+  that `reps` and `load` are the same kind of concept. Including `reps` in it is
+  correct (a Plank carries neither `reps` nor `load`; a Snatch carries both; a
+  Row carries neither `reps` nor `load` — it carries `distance`/`calories`). The
+  builder renders `reps` under a **"Quantity"** affordance and `load` under a
+  distinct **"Load"** affordance so the coach sees the distinction.
+- **Live schema is semantically correct — no correction, no migration.** The JSON
+  keys `reps` / `load` / `distance` / `calories` are separate and unambiguous;
+  workout schemes are untouched; `wod_logs` performed-result capture
+  (`sets`/`result`/`weight_logged`) is untouched; P9's `prescription_snapshot`
+  will carry the prescribed quantity as *reference* data, adding nothing that
+  weakens logging.
+
 ### C.8 What this deliberately does NOT build
 
 - No `WorkoutVersion` immutable-lineage table, no `RenderRuleSet` versioning, no

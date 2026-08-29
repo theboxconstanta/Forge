@@ -146,12 +146,23 @@ export function validateMovementPrescriptions(doc) {
   return { valid: errors.length === 0, errors }
 }
 
-/** Completeness gate for publishing/saving-live. A metric a coach has started
- * (spec present) must be fully filled: universal.value non-null, or BOTH
- * sex_specific values non-null. `universal` vs "female missing" stay distinct —
- * this only flags the incomplete-draft case. Returns { valid, errors } with
- * human-readable, movement-named messages. `variantsToCheck` defaults to every
- * present variant. */
+/** Completeness gate for publishing/saving-live.
+ *
+ * `load` / `distance` / `calories` are PRESCRIPTION CHARACTERISTICS (the target
+ * / intensity the athlete is judged against) — a present spec must be fully
+ * filled: universal.value non-null, or BOTH sex_specific values non-null.
+ * `universal` vs "one side missing" stay distinct — this only flags the
+ * incomplete-draft case.
+ *
+ * `reps` is WORKOUT STRUCTURE (the per-movement quantity/count), not a
+ * prescription characteristic — a blank reps NEVER blocks publish (the workout
+ * scheme in wods.type / format_config may carry the count, e.g. 21-15-9). The
+ * ONLY reps case flagged is a genuine sex_specific half-entry (one side typed,
+ * the other left blank) — an obvious mistake, not a deliberate "scheme handles
+ * it".
+ *
+ * Returns { valid, errors } with human-readable, movement-named messages.
+ * `variantsToCheck` defaults to every present variant. */
 export function validatePrescriptionsForPublish(doc, variantsToCheck = null) {
   const errors = []
   const struct = validateMovementPrescriptions(doc)
@@ -166,11 +177,18 @@ export function validatePrescriptionsForPublish(doc, variantsToCheck = null) {
         const spec = mv[mk]
         if (!spec) continue
         if (mk === 'reps' && spec.mode === 'text') continue
+        const missM = spec.male === null || spec.male === undefined
+        const missF = spec.female === null || spec.female === undefined
+        if (mk === 'reps') {
+          // structure, not a characteristic: only flag a sex_specific half-entry
+          if (spec.mode === 'sex_specific' && (missM !== missF)) {
+            errors.push(`${mv.name || 'A movement'} (${vk}): ${missM ? "men's" : "women's"} rep count is missing.`)
+          }
+          continue
+        }
         if (spec.mode === 'universal') {
           if (spec.value === null || spec.value === undefined) errors.push(`${mv.name || 'A movement'} (${vk}): ${label[mk]} is missing a value.`)
         } else {
-          const missM = spec.male === null || spec.male === undefined
-          const missF = spec.female === null || spec.female === undefined
           if (missM && missF) errors.push(`${mv.name || 'A movement'} (${vk}): ${label[mk]} is missing.`)
           else if (missM) errors.push(`${mv.name || 'A movement'} (${vk}): men's ${label[mk]} is missing.`)
           else if (missF) errors.push(`${mv.name || 'A movement'} (${vk}): women's ${label[mk]} is missing.`)

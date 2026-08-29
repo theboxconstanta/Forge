@@ -125,7 +125,10 @@
     { "name": "complete rx passes", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } ] } } }, "valid": true },
     { "name": "missing women load blocks publish", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "load": { "mode": "sex_specific", "male": 45, "female": null, "unit": "kg" } } ] } } }, "valid": false },
     { "name": "universal missing value blocks publish", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Row", "distance": { "mode": "universal", "value": null, "unit": "m" } } ] } } }, "valid": false },
-    { "name": "no metric at all is fine (bodyweight)", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Burpee", "reps": { "mode": "universal", "value": 20 } } ] } } }, "valid": true }
+    { "name": "no metric at all is fine (bodyweight)", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Burpee", "reps": { "mode": "universal", "value": 20 } } ] } } }, "valid": true },
+    { "name": "blank reps does NOT block publish (structure, scheme carries the count)", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Thruster", "reps": { "mode": "universal", "value": null }, "load": { "mode": "sex_specific", "male": 43, "female": 30, "unit": "kg" } } ] } } }, "valid": true },
+    { "name": "reps sex_specific half-entry IS flagged", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Double Under", "reps": { "mode": "sex_specific", "male": 50, "female": null } } ] } } }, "valid": false },
+    { "name": "reps text scheme never blocks", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Thruster", "reps": { "mode": "text", "text": "21-15-9" }, "load": { "mode": "sex_specific", "male": 43, "female": 30, "unit": "kg" } } ] } } }, "valid": true }
   ],
   "parse": [
     { "name": "snatch @ 45/30kg", "line": "20 Snatches @ 45/30kg", "expect": { "name": "Snatches", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } },
