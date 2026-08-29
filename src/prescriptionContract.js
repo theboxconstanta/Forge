@@ -288,6 +288,27 @@ export function resolveVariantForMember(doc, variantKey, gender) {
   return vObj.movements.map((mv) => resolveMovementInstance(mv, gender))
 }
 
+/** P9 - the member-resolved DISPLAY LINES for one variant, or null when this
+ * variant has no structured prescription (caller falls back to legacy text).
+ * `gender`: 'male' | 'female' | null (unknown -> "45/30" both). This is the
+ * single source of the member's per-movement prescription text. */
+export function resolveVariantDisplayLines(doc, variantKey, gender) {
+  const resolved = resolveVariantForMember(doc, variantKey, gender)
+  if (!resolved || resolved.length === 0) return null
+  return resolved.map((r) => r.line)
+}
+
+/** P9 - normalise a display-side scaling level ('rx'|'intermediate'|'beginner'|
+ * 'on_ramp' | 'onramp' | 'RX' | ...) to the canonical contract variant key. */
+export function variantKeyFromLevel(level) {
+  const l = String(level || '').toLowerCase().replace(/[_\s-]/g, '')
+  if (l === 'rx') return 'rx'
+  if (l === 'intermediate') return 'intermediate'
+  if (l === 'beginner') return 'beginner'
+  if (l === 'onramp') return 'onramp'
+  return null
+}
+
 // ============================================================================
 // Legacy artifacts — regenerated from structure on every save (never read as
 // truth). Keeps `wods.movements_{variant}` text[] and the 8 global weight

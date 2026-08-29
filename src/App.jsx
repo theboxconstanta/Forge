@@ -64,7 +64,8 @@ import { ComposedWorkoutView } from './ComposedWorkoutView'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
-  newMovementInstance, parseWorkoutPaste,
+  newMovementInstance, parseWorkoutPaste, resolveVariantDisplayLines, variantKeyFromLevel,
+  buildPrescriptionSnapshot, variantHasStructuredPrescription,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
@@ -7866,6 +7867,13 @@ function App() {
     // skillSectionIdV2 e real - accesarea neconditionata a wodZiData.id/
     // .date arunca TypeError, oprind salvarea INAINTE sa ajunga la
     // Supabase.
+    // P9-M - skill_logs.prescription_snapshot is deliberately NOT written. The
+    // Per-Movement Prescription Engine is scoped to the primary metcon
+    // section's variants (architecture doc C.9.1); Skill Work sections carry a
+    // format/target (e.g. "Build to a heavy single"), not a structured
+    // movement_prescriptions document. Populating the column with an invented
+    // prescription would be wrong - it stays null and P10 keeps the existing
+    // skill-log rendering unchanged.
     const { error } = await supabase.from('skill_logs').upsert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: resolveWodIdForLog(logWodZiWorkoutV2, logWodZiData), slot: skillLogSlot,
       workout_section_id: skillSectionIdV2,
@@ -8617,12 +8625,39 @@ function App() {
     // INC-04 - resolve from the frozen context so wod_id/section belong to
     // the clicked workout regardless of later state drift.
     const wodIdPtSalvare = variantaAleasa !== null ? resolveWodIdForLog(logWodZiWorkoutV2, logWodZiData) : null
+
+    // P9 - IMMUTABLE PRESCRIPTION SNAPSHOT. Built ONLY from the frozen logging
+    // target (logCtx.prescriptionDoc, captured by reference at "Log Score"
+    // click) + the frozen variant + the member's canonical gender. NEVER
+    // re-read from live wodZiData at submit; a coach edit to the workout after
+    // the logger opened cannot change what is stored here. null for a free log
+    // (no variant) or a workout with no structured prescription for this
+    // variant - downstream (P10) then keeps the existing legacy fallback.
+    // Determinism: identical (frozen doc, variant, gender) -> identical snapshot.
+    const frozenDocForSnapshot = logCtx?.prescriptionDoc ?? logWodZiData?.movement_prescriptions ?? null
+    const snapshotVariantKey = varianta ? variantKeyFromLevel(varianta.nivel) : null
+    let prescriptionSnapshot = null
+    if (variantaAleasa !== null && snapshotVariantKey && variantHasStructuredPrescription(frozenDocForSnapshot, snapshotVariantKey)) {
+      // Save-boundary consistency (P9-N): the snapshot's variant/date/wod_id
+      // are the FROZEN ones, and the doc came from the frozen ref - not a fresh
+      // wods lookup. We validate identity/origin, never current-prescription
+      // equivalence (that would defeat immutability).
+      prescriptionSnapshot = buildPrescriptionSnapshot({
+        doc: frozenDocForSnapshot,
+        variantKey: snapshotVariantKey,
+        gender: memberGenderKey,
+        resolvedAt: logCtx?.frozenAt ?? null,
+        source: 'structured',
+      })
+    }
+
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
       variant_level: tipSalvat,
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
+      ...(prescriptionSnapshot ? { prescription_snapshot: prescriptionSnapshot } : {}),
       ...(loggedAt ? { logged_at: loggedAt } : {}),
       ...logFields,
     })
@@ -8963,17 +8998,41 @@ function App() {
   const logSupportingSectionsV = inFrozenLogFlow ? logCtx.supportingSections : supportingSectionsV
   const logAdditionalScoredSectionsV = inFrozenLogFlow ? logCtx.additionalScoredSections : additionalScoredSectionsV
 
+  // P9 - member gender key (canonical members.gender, mapped via rxEngine's
+  // resolveAthleteGenderKey: 'masculin'->'male', 'feminin'->'female', else
+  // null). NEVER profiles.gender, NEVER a male fallback.
+  const memberGenderKey = resolveAthleteGenderKey(userProfile?.gender)
+  // P9 - the structured prescription document in play. During a frozen logging
+  // session it is logCtx.prescriptionDoc (captured by reference at "Log Score"
+  // click, NEVER re-read from live wodZiData). On the Home card it is the live
+  // wods row's doc. `logWodZiData?.movement_prescriptions` resolves to the same
+  // frozen ref inside a frozen flow (logWodZiData === logCtx.wodZiData).
+  const activePrescriptionDoc = inFrozenLogFlow
+    ? (logCtx.prescriptionDoc ?? null)
+    : (wodZiData?.movement_prescriptions ?? null)
+
   // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
   // sectiunea primara a modelului de domeniu - logica pura (RX = baza
   // sectiunii, scalingVersions pt restul, greutatea din
   // metadata.legacyWeights) traieste in workoutEngine.js
   // (metconScalingVariantsForDisplay, testata separat) - aici doar
-  // adaugam stilizarea (culoare/bg), treaba UI-ului. Greutatea nu era
-  // afisata nicaieri in cardul WOD nici inainte de Faza 7 (folosita doar
-  // la selectarea variantei, pt comparatia din Logare - wodZiData ramane
-  // sursa aceea, neschimbata) - dusa mai departe aici doar pt completitudine.
-  const metconVariantsForDisplay = (section) =>
-    metconScalingVariantsForDisplay(section).map((v, i) => ({ ...VARIANTE_CONFIG[i], ...v }))
+  // adaugam stilizarea (culoare/bg), treaba UI-ului.
+  //
+  // P9 - STRUCTURED-FIRST: when the variant has a structured per-movement
+  // prescription (`movement_prescriptions`), the displayed movement lines are
+  // the member-RESOLVED lines (resolveVariantDisplayLines: male -> "45 kg",
+  // female -> "30 kg", unknown -> "45/30 kg"), and the legacy variant-level
+  // Weight M/F is NOT surfaced as a competing prescription (weightMale/Female
+  // dropped). Otherwise the legacy behaviour is byte-identical.
+  const metconVariantsForDisplay = (section, doc = activePrescriptionDoc, genderKey = memberGenderKey) =>
+    metconScalingVariantsForDisplay(section).map((v, i) => {
+      const vk = variantKeyFromLevel(v.level)
+      const structuredLines = vk ? resolveVariantDisplayLines(doc, vk, genderKey) : null
+      if (structuredLines && structuredLines.length) {
+        return { ...VARIANTE_CONFIG[i], ...v, movements: structuredLines, weightMale: null, weightFemale: null, structured: true }
+      }
+      return { ...VARIANTE_CONFIG[i], ...v }
+    })
 
   // Layer 2a - sectiunea suplimentara (additionalScoredSectionsV) fiind
   // logata, cand logTargetSectionId e setat. Prioritate sub editLogId (o
@@ -8999,10 +9058,19 @@ function App() {
     ? editLogFormatConfig
     : logTargetSection ? logTargetSection.formatConfig
     : (variantaAleasa !== null ? logWodZiData?.format_config : wodFormatConfig)
+  // P9 - the member-resolved structured lines for the frozen variant, or null
+  // (legacy fallback). Read from activePrescriptionDoc which, in a frozen flow,
+  // is logCtx.prescriptionDoc (frozen at click) - never re-resolved from live wods.
+  const frozenVariantKey = variantaAleasa !== null ? variantKeyFromLevel(VARIANTE_CONFIG[variantaAleasa]?.nivel) : null
+  const structuredLogLines = (variantaAleasa !== null && frozenVariantKey)
+    ? resolveVariantDisplayLines(activePrescriptionDoc, frozenVariantKey, memberGenderKey)
+    : null
   const miscariPentruLog = editLogId
     ? editLogMiscari
     : logTargetSection ? (logTargetSection.movements || []).map(m => m.name)
-    : (variantaAleasa !== null && logWodZiData ? (wodMiscariCustom ?? logWodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? []) : wodMiscari)
+    : (variantaAleasa !== null && logWodZiData
+        ? (wodMiscariCustom ?? (structuredLogLines && structuredLogLines.length ? structuredLogLines : (logWodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? [])))
+        : wodMiscari)
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
   // (logare noua sau editare) - vezi isNotRxd in workoutFormats.js. Pt o
   // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
@@ -9021,7 +9089,7 @@ function App() {
   // "multi" (mai multe miscari cu greutati distincte - fara clasificare,
   // vezi isMixedCategory mai jos in fisier pt tratamentul existent al
   // acestui caz).
-  const activeAthleteGenderKey = resolveAthleteGenderKey(userProfile?.gender)
+  const activeAthleteGenderKey = memberGenderKey
   const activeRxStandardKg = resolveSectionStandardKg({
     movements: miscariPentruLog,
     legacyWeightText: prescribedWeightPentruLog,
@@ -10536,7 +10604,12 @@ function App() {
 
               {variantaAleasa !== null && logWodZiData ? (() => {
                 const cheie = VARIANTE_CONFIG[variantaAleasa].key
-                const miscariWod = logWodZiData[cheie] || []
+                // P9 - structured-first: the logger shows the member-RESOLVED
+                // prescription lines for the FROZEN variant (structuredLogLines,
+                // from logCtx.prescriptionDoc), identical to what the member saw
+                // on the Home card. Legacy text only when no structured
+                // prescription exists.
+                const miscariWod = (structuredLogLines && structuredLogLines.length) ? structuredLogLines : (logWodZiData[cheie] || [])
                 const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>

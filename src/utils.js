@@ -114,6 +114,16 @@ export function freezeLoggingContext(displayedWorkout, wodZiData, wodZiWorkoutV2
     wodZiData: wodZiData ?? null,
     wodZiWorkoutV2: wodZiWorkoutV2 ?? null,
     workout: displayedWorkout ?? null,
+    // P9 - the structured per-movement prescription document (canonical typed
+    // contract v1), captured BY REFERENCE from the wods row at click time. The
+    // log snapshot is built from THIS, never re-read from live wodZiData at
+    // submit. null when the workout has no structured prescription (legacy
+    // fallback path).
+    prescriptionDoc: wodZiData?.movement_prescriptions ?? null,
+    // wall-clock instant the logging target was frozen (recorded on the
+    // snapshot so a later reader knows when this member's prescription was
+    // resolved).
+    frozenAt: new Date().toISOString(),
     // the metcon (primary) section of the CLICKED workout
     primarySection: sections.find((s) => s.slotKey === 'metcon') || null,
     supportingSections: sections.filter((s) => s.slotKey !== 'metcon'),

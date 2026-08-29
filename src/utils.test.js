@@ -413,6 +413,34 @@ describe('freezeLoggingContext / resolveLoggedWorkoutIdentity - INC-04 GLOBAL (f
     const ctx = freezeLoggingContext(dispA, { id: 'stale-wrong-wod', date: '2026-08-20', movements_rx: ['x'] }, A.v2, '2026-08-20')
     expect(resolveLoggedWorkoutIdentity(ctx, 'RX').wodId).toBe('wod-A') // A.v2.legacyWodId
   })
+
+  // P9 - the frozen context captures the structured prescription doc BY
+  // REFERENCE at click; a later mutation of the source wods row cannot change
+  // what the logger/snapshot sees.
+  it('P9: freezeLoggingContext captures movement_prescriptions by reference (immutable vs a later live edit)', () => {
+    const wodRow = {
+      id: 'wod-A', date: '2026-08-20', type: 'For Time',
+      movement_prescriptions: { version: 1, variants: { rx: { movements: [
+        { instanceId: 'mi_1', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
+      ] } } },
+    }
+    const ctx = freezeLoggingContext(dispA, wodRow, A.v2, '2026-08-20')
+    expect(ctx.prescriptionDoc).toBe(wodRow.movement_prescriptions)
+    expect(typeof ctx.frozenAt).toBe('string')
+    // coach edits the LIVE row after the logger opened
+    const p2 = { version: 1, variants: { rx: { movements: [
+      { instanceId: 'mi_1', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 60, female: 45, unit: 'kg' } },
+    ] } } }
+    // simulate a fresh fetch replacing wodZiData; the frozen ctx is unaffected
+    const freshRow = { ...wodRow, movement_prescriptions: p2 }
+    expect(ctx.prescriptionDoc).not.toBe(freshRow.movement_prescriptions)
+    expect(ctx.prescriptionDoc.variants.rx.movements[0].load.female).toBe(30) // still P1
+  })
+
+  it('P9: freezeLoggingContext prescriptionDoc is null when the workout has no structured prescription', () => {
+    const ctx = freezeLoggingContext(dispA, { id: 'wod-A', date: '2026-08-20' }, A.v2, '2026-08-20')
+    expect(ctx.prescriptionDoc).toBe(null)
+  })
 })
 
 describe('computeWodHeaderLine - INC-02 (SENTRY-CYAN-HARBOR-4T) regression', () => {

@@ -275,3 +275,85 @@ describe('movementObjectsForV2 — P8 one-way mirror', () => {
     expect(movementObjectsForV2(null)).toEqual([])
   })
 })
+
+import { resolveVariantDisplayLines, variantKeyFromLevel } from './prescriptionContract.js'
+
+describe('P9 — member resolution + snapshot from frozen doc', () => {
+  const doc = {
+    version: 1,
+    variants: {
+      rx: { movements: [
+        { instanceId: 'mi_a', name: 'Snatch', canonicalMovementId: 'sn', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
+        { instanceId: 'mi_b', name: 'Wall Ball', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 9, female: 6, unit: 'kg' } },
+        { instanceId: 'mi_c', name: 'DB Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 22.5, female: 15, unit: 'kg' } },
+        { instanceId: 'mi_d', name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
+        { instanceId: 'mi_e', name: 'Run', distance: { mode: 'universal', value: 400, unit: 'm' } },
+      ] },
+    },
+  }
+
+  it('male / female / unknown display lines (never male fallback for unknown)', () => {
+    expect(resolveVariantDisplayLines(doc, 'rx', 'male')).toEqual(['20 Snatch @ 45 kg', '20 Wall Ball @ 9 kg', '20 DB Snatch @ 22.5 kg', '15 Cal Row', '400 m Run'])
+    expect(resolveVariantDisplayLines(doc, 'rx', 'female')).toEqual(['20 Snatch @ 30 kg', '20 Wall Ball @ 6 kg', '20 DB Snatch @ 15 kg', '12 Cal Row', '400 m Run'])
+    expect(resolveVariantDisplayLines(doc, 'rx', null)).toEqual(['20 Snatch @ 45/30 kg', '20 Wall Ball @ 9/6 kg', '20 DB Snatch @ 22.5/15 kg', '15/12 Cal Row', '400 m Run'])
+  })
+
+  it('universal Row distance is the same for everyone; sex-specific Row calories differs', () => {
+    expect(resolveVariantDisplayLines(doc, 'rx', 'male')[4]).toBe('400 m Run')
+    expect(resolveVariantDisplayLines(doc, 'rx', 'female')[4]).toBe('400 m Run')
+    expect(resolveVariantDisplayLines(doc, 'rx', 'male')[3]).toBe('15 Cal Row')
+    expect(resolveVariantDisplayLines(doc, 'rx', 'female')[3]).toBe('12 Cal Row')
+  })
+
+  it('null for a variant with no structured prescription', () => {
+    expect(resolveVariantDisplayLines(doc, 'beginner', 'male')).toBe(null)
+    expect(resolveVariantDisplayLines(null, 'rx', 'male')).toBe(null)
+  })
+
+  it('variantKeyFromLevel normalises every display-side level spelling', () => {
+    expect(variantKeyFromLevel('RX')).toBe('rx')
+    expect(variantKeyFromLevel('OnRamp')).toBe('onramp')
+    expect(variantKeyFromLevel('on_ramp')).toBe('onramp')
+    expect(variantKeyFromLevel('Intermediate')).toBe('intermediate')
+    expect(variantKeyFromLevel('nonsense')).toBe(null)
+  })
+
+  it('repeated same movement, different loads — female resolves 40 / 47.5 / 55, ids survive', () => {
+    const laddDoc = { version: 1, variants: { rx: { movements: [
+      { instanceId: 'p1', name: 'Power Clean', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 60, female: 40, unit: 'kg' } },
+      { instanceId: 'p2', name: 'Power Clean', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 70, female: 47.5, unit: 'kg' } },
+      { instanceId: 'p3', name: 'Power Clean', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 80, female: 55, unit: 'kg' } },
+    ] } } }
+    expect(resolveVariantDisplayLines(laddDoc, 'rx', 'female')).toEqual(['10 Power Clean @ 40 kg', '10 Power Clean @ 47.5 kg', '10 Power Clean @ 55 kg'])
+    const snap = buildPrescriptionSnapshot({ doc: laddDoc, variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    expect(snap.movements.map((m) => m.instanceId)).toEqual(['p1', 'p2', 'p3'])
+    expect(snap.movements.map((m) => m.load.value)).toEqual([40, 47.5, 55])
+  })
+
+  it('snapshot: RX variant identity + programmed-vs-resolved both recoverable, universal/sex-specific distinguishable', () => {
+    const snap = buildPrescriptionSnapshot({ doc, variantKey: 'rx', gender: 'female', resolvedAt: 't0', source: 'structured' })
+    expect(snap.variant).toBe('rx')
+    expect(snap.gender).toBe('female')
+    // "what applied to this athlete"
+    expect(snap.movements[0].load.value).toBe(30)
+    // "what the coach programmed" (both values)
+    expect(snap.movements[0].load.bothValues).toEqual([45, 30])
+    expect(snap.movements[0].load.mode).toBe('sex_specific')
+    // universal distance did not become {male:400, female:null}
+    expect(snap.movements[4].distance.mode).toBe('universal')
+    expect(snap.movements[4].distance.value).toBe(400)
+    // decimals survive
+    expect(snap.movements[2].load.value).toBe(15)
+    expect(snap.movements[2].displayLine).toBe('20 DB Snatch @ 15 kg')
+  })
+
+  it('snapshot P1->P2 race: built from a frozen doc, unaffected by a later mutation', () => {
+    const frozen = JSON.parse(JSON.stringify(doc))
+    const snap = buildPrescriptionSnapshot({ doc: frozen, variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    doc.variants.rx.movements[0].load = { mode: 'sex_specific', male: 60, female: 45, unit: 'kg' } // coach edit
+    expect(snap.movements[0].load.value).toBe(30) // still P1
+    expect(snap.movements[0].displayLine).toBe('20 Snatch @ 30 kg')
+    // restore for other tests
+    doc.variants.rx.movements[0].load = { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' }
+  })
+})
