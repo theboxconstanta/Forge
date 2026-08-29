@@ -1,0 +1,141 @@
+{
+  "_comment": "Shared cross-repo fixtures for the per-movement prescription contract. Checked into BOTH WOD-SIMPLE and forge-admin-web verbatim. Each repo's prescriptionContract.parity.test asserts identical output. Do not edit in one repo only.",
+  "resolveLine": [
+    {
+      "name": "sex_specific load, male",
+      "instance": { "instanceId": "a", "name": "Snatch", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } },
+      "gender": "male",
+      "expected": "20 Snatch @ 45 kg"
+    },
+    {
+      "name": "sex_specific load, female",
+      "instance": { "instanceId": "a", "name": "Snatch", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } },
+      "gender": "female",
+      "expected": "20 Snatch @ 30 kg"
+    },
+    {
+      "name": "sex_specific load, unknown gender shows BOTH not male",
+      "instance": { "instanceId": "a", "name": "Snatch", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } },
+      "gender": null,
+      "expected": "20 Snatch @ 45/30 kg"
+    },
+    {
+      "name": "wall ball load only, female",
+      "instance": { "instanceId": "b", "name": "Wall Ball", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 9, "female": 6, "unit": "kg" } },
+      "gender": "female",
+      "expected": "20 Wall Ball @ 6 kg"
+    },
+    {
+      "name": "decimal load, male",
+      "instance": { "instanceId": "c", "name": "Dumbbell Snatch", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 22.5, "female": 15, "unit": "kg" } },
+      "gender": "male",
+      "expected": "20 Dumbbell Snatch @ 22.5 kg"
+    },
+    {
+      "name": "row calories sex_specific, male",
+      "instance": { "instanceId": "d", "name": "Row", "calories": { "mode": "sex_specific", "male": 15, "female": 12 } },
+      "gender": "male",
+      "expected": "15 Cal Row"
+    },
+    {
+      "name": "row calories sex_specific, female",
+      "instance": { "instanceId": "d", "name": "Row", "calories": { "mode": "sex_specific", "male": 15, "female": 12 } },
+      "gender": "female",
+      "expected": "12 Cal Row"
+    },
+    {
+      "name": "row calories sex_specific, unknown -> both",
+      "instance": { "instanceId": "d", "name": "Row", "calories": { "mode": "sex_specific", "male": 15, "female": 12 } },
+      "gender": null,
+      "expected": "15/12 Cal Row"
+    },
+    {
+      "name": "row distance universal, everyone the same",
+      "instance": { "instanceId": "e", "name": "Row", "distance": { "mode": "universal", "value": 500, "unit": "m" } },
+      "gender": "female",
+      "expected": "500 m Row"
+    },
+    {
+      "name": "row distance universal, unknown gender still 500",
+      "instance": { "instanceId": "e", "name": "Row", "distance": { "mode": "universal", "value": 500, "unit": "m" } },
+      "gender": null,
+      "expected": "500 m Row"
+    },
+    {
+      "name": "row distance sex_specific, female",
+      "instance": { "instanceId": "f", "name": "Row", "distance": { "mode": "sex_specific", "male": 500, "female": 400, "unit": "m" } },
+      "gender": "female",
+      "expected": "400 m Row"
+    },
+    {
+      "name": "run distance universal",
+      "instance": { "instanceId": "g", "name": "Run", "distance": { "mode": "universal", "value": 400, "unit": "m" } },
+      "gender": "male",
+      "expected": "400 m Run"
+    },
+    {
+      "name": "bodyweight burpee, no prescription",
+      "instance": { "instanceId": "h", "name": "Burpee", "reps": { "mode": "universal", "value": 20 } },
+      "gender": "male",
+      "expected": "20 Burpee"
+    },
+    {
+      "name": "reps sex_specific, unknown -> both",
+      "instance": { "instanceId": "i", "name": "Pull-up", "reps": { "mode": "sex_specific", "male": 15, "female": 12 } },
+      "gender": null,
+      "expected": "15/12 Pull-up"
+    },
+    {
+      "name": "reps scheme text preserved",
+      "instance": { "instanceId": "j", "name": "Thruster", "reps": { "mode": "text", "text": "21-15-9" }, "load": { "mode": "sex_specific", "male": 43, "female": 30, "unit": "kg" } },
+      "gender": "male",
+      "expected": "21-15-9 Thruster @ 43 kg"
+    },
+    {
+      "name": "same canonical movement, different instance loads (Power Clean ladder), male",
+      "instance": { "instanceId": "k", "name": "Power Clean", "reps": { "mode": "universal", "value": 10 }, "load": { "mode": "sex_specific", "male": 70, "female": 47.5, "unit": "kg" } },
+      "gender": "male",
+      "expected": "10 Power Clean @ 70 kg"
+    },
+    {
+      "name": "incomplete draft - female load missing, unknown gender shows the present side only",
+      "instance": { "instanceId": "l", "name": "Snatch", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": null, "unit": "kg" } },
+      "gender": null,
+      "expected": "20 Snatch @ 45 kg"
+    },
+    {
+      "name": "lb unit respected, not converted",
+      "instance": { "instanceId": "m", "name": "Deadlift", "reps": { "mode": "universal", "value": 5 }, "load": { "mode": "sex_specific", "male": 225, "female": 155, "unit": "lb" } },
+      "gender": "female",
+      "expected": "5 Deadlift @ 155 lb"
+    }
+  ],
+  "validateStructure": [
+    { "name": "empty v1 is valid", "doc": { "version": 1, "variants": {} }, "valid": true },
+    { "name": "bad version", "doc": { "version": 2, "variants": {} }, "valid": false },
+    { "name": "unknown variant key", "doc": { "version": 1, "variants": { "elite": { "movements": [] } } }, "valid": false },
+    { "name": "duplicate instanceId", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "A" }, { "instanceId": "x", "name": "B" } ] } } }, "valid": false },
+    { "name": "missing instanceId", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "name": "A" } ] } } }, "valid": false },
+    { "name": "non-numeric load", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "A", "load": { "mode": "universal", "value": "heavy", "unit": "kg" } } ] } } }, "valid": false },
+    { "name": "bad load unit", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "A", "load": { "mode": "universal", "value": 40, "unit": "stone" } } ] } } }, "valid": false },
+    { "name": "valid full doc", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "canonicalMovementId": null, "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } ] } } }, "valid": true },
+    { "name": "null numerics allowed (draft)", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "load": { "mode": "sex_specific", "male": 45, "female": null, "unit": "kg" } } ] } } }, "valid": true }
+  ],
+  "validatePublish": [
+    { "name": "complete rx passes", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } ] } } }, "valid": true },
+    { "name": "missing women load blocks publish", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Snatch", "load": { "mode": "sex_specific", "male": 45, "female": null, "unit": "kg" } } ] } } }, "valid": false },
+    { "name": "universal missing value blocks publish", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Row", "distance": { "mode": "universal", "value": null, "unit": "m" } } ] } } }, "valid": false },
+    { "name": "no metric at all is fine (bodyweight)", "doc": { "version": 1, "variants": { "rx": { "movements": [ { "instanceId": "x", "name": "Burpee", "reps": { "mode": "universal", "value": 20 } } ] } } }, "valid": true }
+  ],
+  "parse": [
+    { "name": "snatch @ 45/30kg", "line": "20 Snatches @ 45/30kg", "expect": { "name": "Snatches", "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } },
+    { "name": "snatch 45/30 kg no @", "line": "20 Snatches 45/30 kg", "expect": { "reps": { "mode": "universal", "value": 20 }, "load": { "mode": "sex_specific", "male": 45, "female": 30, "unit": "kg" } } },
+    { "name": "db snatch decimal", "line": "20 DB Snatches @ 22.5/15kg", "expect": { "load": { "mode": "sex_specific", "male": 22.5, "female": 15, "unit": "kg" } } },
+    { "name": "cal row sex-specific", "line": "15/12 Cal Row", "expect": { "name": "Row", "calories": { "mode": "sex_specific", "male": 15, "female": 12 } } },
+    { "name": "500m row", "line": "500m Row", "expect": { "name": "Row", "distance": { "mode": "universal", "value": 500, "unit": "m" } } },
+    { "name": "500 m row spaced", "line": "500 m Row", "expect": { "distance": { "mode": "universal", "value": 500, "unit": "m" } } },
+    { "name": "20 cal row universal", "line": "20 Cal Row", "expect": { "calories": { "mode": "universal", "value": 20 } } },
+    { "name": "400m run", "line": "400m Run", "expect": { "name": "Run", "distance": { "mode": "universal", "value": 400, "unit": "m" } } },
+    { "name": "comma decimal load", "line": "10 Power Clean @ 61,5kg", "expect": { "load": { "mode": "universal", "value": 61.5, "unit": "kg" } } }
+  ]
+}
