@@ -1142,3 +1142,130 @@ reads (P10).
 and read only by `isNotRxd`. Snapshot-first historical readers, Journal detail
 reconstruction from the overlay, leaderboard rep-structure policy for modified
 work, and performance analytics over performed data are all **deferred**.
+
+---
+
+# INC-P9.5.2-01 — PRODUCTION BOOT/RENDER REGRESSION
+
+## A. INCIDENT
+
+Immediately after the P9.5.2 deploy (`9574714`, bundle `index-CLh-9WPx.js`,
+`app_version` `prescription-engine-p9-5-2-performed-prescription-20260830`) the
+live member PWA rendered the global error boundary on **every route**. The
+crash was a synchronous exception thrown during `App()`'s render, so no screen
+ever mounted.
+
+## B. USER-VISIBLE SYMPTOM
+
+"Something went wrong / Try refreshing the page." (the `ErrorBoundary` fallback
+in `App.jsx`) on Home, login, and every other route. A hard refresh (service-
+worker bypass) that fetched the previous bundle rendered normally.
+
+## C. AFFECTED DEPLOYMENT
+
+`9574714` only. Previous known-good: `581fdb6` (P9.5.1, `index-0pB26WbC.js`).
+
+## D. ROLLBACK
+
+1. `git revert 9574714` → `15deff0`, pushed to `main` → Vercel auto-deployed
+   `index-DzeYhQet.js` (P9.5.1 source, byte-identical to `581fdb6` for the whole
+   tree; the hash differs only because the bundle embeds `VERCEL_GIT_COMMIT_SHA`).
+2. `app_version` set to `p9-5-2-rollback-to-p9-5-1-20260830` to nudge live PWA
+   sessions to update their service worker onto the reverted bundle.
+3. **DB migration `20260831090000` NOT rolled back** — additive, `NULL` default,
+   the reverted frontend does not read the column.
+4. Verified in a real browser (hard reload): Home, Log/Journal, Leaderboard
+   (real historical data for Fri Aug 28 — 2 RX participants, `sortSectionLogs` +
+   `isNotRxd`), PRs (`fetchWodLogs` `select('*')` including the new column,
+   benchmark/movement history) all render; auth intact; no error boundary.
+
+## E. ROOT CAUSE
+
+**Temporal Dead Zone in a hook dependency array.**
+
+The P9.5.2 lazy movement-catalog effect was inserted into `App()` at line ~6580:
+
+```js
+useEffect(() => {
+  if ((screen !== 'logWOD' && screen !== 'logSkill') || !userProfile?.gym_id || memberGymMovements.length > 0) return
+  ...
+}, [screen, userProfile?.gym_id, memberGymMovements.length])   // <-- evaluated synchronously during render
+```
+
+but `const [memberGymMovements, setMemberGymMovements] = useState([])` was declared
+at line ~6787 and `const [userProfile] = useState(null)` at line ~6930 — **both
+after** the effect. `const` bindings are not hoisted, so evaluating the
+dependency array during the first render threw:
+
+```
+ReferenceError: Cannot access 'memberGymMovements' before initialization
+```
+
+`App()` re-throws on every render → `ErrorBoundary.getDerivedStateFromError` →
+global fallback on every route. The migration was **not** involved; the reverted
+P9.5.1 app is healthy with the column present.
+
+## F. WHY AUTOMATED TESTS MISSED IT
+
+| Gate | Why it passed |
+|---|---|
+| `vite build` (rolldown) | Only bundles. `const` used before its declaration in the same scope is valid **syntax**; TDZ is a **runtime** error. |
+| `eslint` | `no-use-before-define` is not enabled for this pattern; `react-hooks/exhaustive-deps` validates the array's *contents* against the closure, not declaration order. |
+| 1303 unit tests | **No test mounted `<App/>`.** Every suite exercises pure functions (`prescriptionContract`, `workoutFormats`, `scoreDefinition`) or isolated components (`UniversalScoreInput`, `FormatLogger`). `App()`'s render body — where the throw lives — never executed under test. |
+| My own post-deploy check | I grepped the **deployed bundle** for P9.5.2 strings and confirmed the code shipped — but never loaded the running app. Confirming a deploy shipped ≠ confirming it boots. |
+
+## G. FIX (`b08d6f5`)
+
+Moved the effect to sit immediately after the `userProfile` declaration (next to
+the `myGymIdRef` effect), so `screen`, `memberGymMovements`, and `userProfile`
+are all initialised before its dependency array is evaluated, and it still
+precedes `App()`'s first conditional return (`if (authLoading)` at ~line 9540),
+keeping hook order stable. Pure code motion — no behaviour change. The DB
+migration is unchanged and retained.
+
+## H. REGRESSION TEST ADDED (`src/appHookOrderIntegrity.test.js`, 3 tests)
+
+Statically parses the `App()` function body, maps every `const`/`let` binding to
+its declaration line, and fails if any `useEffect` / `useMemo` / `useCallback`
+dependency array references a binding declared on a **later** line. Verified:
+**fails on `9574714`** (pinpoints `userProfile` line 6587→6930 and
+`memberGymMovements` 6587→6787), **passes on `b08d6f5`**. Deterministic, no
+mocking. Closes the "nothing renders `App()`" hole for this failure class.
+
+## I. DB STATUS
+
+`wod_logs.performed_prescription` migration (`20260831090000`) **retained**.
+Rows changed: **0** (verified before and after: 412 rows, 0 non-null). The
+validation trigger `validate_wod_log_performed_prescription()` is retained.
+
+## J. PREVIEW VALIDATION
+
+The Vercel branch preview for `fix/inc-p9-5-2-01` is behind Vercel SSO
+(deployment protection) and not reachable headless. Validated instead with a
+local production build (`npm run build` + `vite preview`, same bundle, real prod
+Supabase URL baked in): the fixed `<App/>` renders the login screen — `App()`
+completed its full hook phase with no error boundary. `eslint` clean, `vite
+build` clean, **1303 tests pass** (+ the 9 pre-existing Deno `@std/assert`
+file-resolution failures, unrelated).
+
+## K. PRODUCTION VALIDATION
+
+(filled after promote + smoke test)
+
+## L. FINAL COMMIT
+
+`b08d6f5` (fixed reapply), merged to `main`.
+
+## M. BUNDLE
+
+(filled after deploy)
+
+## N. APP_VERSION
+
+`prescription-engine-p9-5-2-inc01-fixed-20260830`
+
+## HARD STOP
+
+Incident remediation only. **P10 NOT STARTED.** Owner manual acceptance of
+P9.5.2 (report §K, the 8-step checklist) is still required — the incident fix
+does not constitute acceptance.
