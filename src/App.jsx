@@ -981,8 +981,14 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
           {metric === 'load' ? <><option value="kg">kg</option><option value="lb">lb</option></> : <><option value="m">m</option><option value="km">km</option><option value="ft">ft</option><option value="mi">mi</option></>}
         </select>
       )}
-      {!isText && mode === 'universal' && <button style={pmpeLink} onClick={() => onChange({ mode: 'sex_specific', male: spec?.value ?? null, female: null, ...carry })}>Different M/F</button>}
-      {!isText && mode === 'sex_specific' && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: spec?.male ?? spec?.value ?? null, ...carry })}>Same for all</button>}
+      {/* reps is workout STRUCTURE (per-movement quantity), not a prescription
+          characteristic - it does NOT get a "Different M/F" toggle. Only
+          load / distance / calories (the intensity/target the athlete is
+          judged against) can differ by sex. A rep scheme like 21-15-9 uses
+          the "Scheme" text mode. */}
+      {!isText && metric !== 'reps' && mode === 'universal' && <button style={pmpeLink} onClick={() => onChange({ mode: 'sex_specific', male: spec?.value ?? null, female: null, ...carry })}>Different M/F</button>}
+      {!isText && metric !== 'reps' && mode === 'sex_specific' && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: spec?.male ?? spec?.value ?? null, ...carry })}>Same for all</button>}
+      {metric === 'reps' && !isText && mode === 'sex_specific' && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: spec?.male ?? spec?.value ?? null })}>Single value</button>}
       {metric === 'reps' && !isText && <button style={pmpeLink} onClick={() => onChange({ mode: 'text', text: '' })}>Scheme</button>}
       {isText && <button style={pmpeLink} onClick={() => onChange({ mode: 'universal', value: null })}>Single count</button>}
       {onRemove && <button style={pmpeLink} onClick={onRemove}>remove</button>}
@@ -990,7 +996,7 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
   )
 }
 
-function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, capabilityFor, suggestions, needsReview }) {
+function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, capabilityFor, catalogRowFor, suggestions, needsReview }) {
   const [nameFocused, setNameFocused] = useState(false)
   const [justPicked, setJustPicked] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1001,18 +1007,22 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
   const quantityMetric = PMPE_QTY.find(k => active.has(k)) || null
   const quantityChoices = PMPE_QTY.filter(k => cap.allowed.includes(k))
 
-  const seed = (next, metric) => {
+  // `capForSeed` - the capability of the metric being seeded (NOT the stale
+  // render-scope `cap`, which is keyed on the OLD instance.name when this runs
+  // from changeName right after a rename).
+  const seed = (next, metric, capForSeed) => {
     if (metric === 'reps') next.reps = { mode: 'universal', value: null }
-    else if (metric === 'load') { next.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }; if (cap.allowed.includes('reps') && !next.reps) next.reps = { mode: 'universal', value: null } }
+    else if (metric === 'load') { next.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }; if (capForSeed.allowed.includes('reps') && !next.reps) next.reps = { mode: 'universal', value: null } }
     else if (metric === 'distance') next.distance = { mode: 'universal', value: null, unit: 'm' }
     else if (metric === 'calories') next.calories = { mode: 'sex_specific', male: null, female: null }
   }
   const changeName = (name) => {
-    const next = { ...instance, name, canonicalMovementId: null }
     const nc = capabilityFor(name)
+    const hit = catalogRowFor(name)
+    const next = { ...instance, name, canonicalMovementId: hit?.id ?? null }
     if (nc.allowed.length) for (const k of ['reps', 'load', 'distance', 'calories']) if (next[k] && !nc.allowed.includes(k)) delete next[k]
     const bare = !['reps', 'load', 'distance', 'calories'].some(k => next[k])
-    if (bare && nc.default) seed(next, nc.default)
+    if (bare && nc.default) seed(next, nc.default, nc)
     onChange(next)
   }
   const setQuantity = (metric) => { const next = { ...instance }; for (const k of PMPE_QTY) delete next[k]; seed(next, metric); onChange(next) }
@@ -1071,6 +1081,7 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
 
 function MovementRowListPWA({ instances, onChange, catalog }) {
   const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
+  const catalogRowFor = (name) => catalog?.lookupForParse?.(name) ?? null
   const suggestions = (text) => catalog?.suggestions?.(text) ?? []
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
@@ -1110,7 +1121,7 @@ function MovementRowListPWA({ instances, onChange, catalog }) {
       {instances.map((inst, i) => (
         <MovementRowPWA key={inst.instanceId} instance={inst} needsReview={reviewIds.has(inst.instanceId)} onChange={(n) => replaceAt(i, n)} onRemove={() => removeAt(i)} onDuplicate={() => dupAt(i)}
           onMoveUp={() => move(i, -1)} onMoveDown={() => move(i, 1)} isFirst={i === 0} isLast={i === instances.length - 1}
-          capabilityFor={capabilityFor} suggestions={suggestions} />
+          capabilityFor={capabilityFor} catalogRowFor={catalogRowFor} suggestions={suggestions} />
       ))}
       {instances.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movements yet — add one, or paste a workout.</div>}
       <button onClick={() => onChange([...instances, newMovementInstance()])} style={{ marginTop: '4px', padding: '8px 12px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '12px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add movement</button>
@@ -4892,6 +4903,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 onMove={(dir) => moveSection(s.id, dir)}
                 onMakePrimary={() => makePrimarySection(s.id)}
                 onSave={() => saveSection(sectionTypes.find(st => st.key === s.typeKey)?.label || s.typeKey)}
+                movementCatalog={movementCatalog}
                 savingWod={savingWod} t={t} />
             ))}
 
