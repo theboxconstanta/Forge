@@ -1311,7 +1311,6 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
       )}
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-      <ComposedWorkoutPreview section={section} t={t} />
 
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #e0e0e0', marginBottom: '10px' }}>
         {orderedLevels.map(v => (
@@ -1354,6 +1353,14 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
       )}
 
       <VariantEditorBody v={activeLevel} sv={section.variants[activeTab]} section={section} updateVariant={updateVariant} movementCatalog={movementCatalog} t={t} />
+
+      {/* PREVIEW (how the athlete will read this) - the LAST, read-only block of
+          the variant editor. Same source/projection as before (composeSection
+          -> ComposedWorkoutView, RX reference); only its position moved so the
+          coach finishes all authoring before reviewing. */}
+      <div style={{ marginTop: '18px', paddingTop: '4px', borderTop: '1px solid #e0e0e0' }}>
+        <ComposedWorkoutPreview section={section} t={t} />
+      </div>
     </div>
   )
 }
