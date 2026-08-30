@@ -6574,18 +6574,6 @@ function App() {
   // wodLogs/skillLogs.sets_movement_ids. Same batched-by-id shape as
   // benchmarksById above; never used for identity resolution itself
   // (Phase 1's own server-side trigger already did that at write time).
-  // P9.5.2 - load the gym movement catalog the first time the athlete opens a
-  // Log WOD / Log Skill screen (the focused Edit mode's substitution picker
-  // needs canonical rows + ids). One fetch, best-effort.
-  useEffect(() => {
-    if ((screen !== 'logWOD' && screen !== 'logSkill') || !userProfile?.gym_id || memberGymMovements.length > 0) return
-    let cancelled = false
-    fetchMovementsForGym(userProfile.gym_id)
-      .then(rows => { if (!cancelled) setMemberGymMovements(rows || []) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [screen, userProfile?.gym_id, memberGymMovements.length])
-
   const [movementsById, setMovementsById] = useState(new Map())
   useEffect(() => {
     const idsFrom = (logs) => logs.flatMap(l => l.sets_movement_ids ? Object.values(l.sets_movement_ids) : [])
@@ -6782,8 +6770,11 @@ function App() {
   const [performedDraft, setPerformedDraft] = useState(null)
   const [logWodEditMode, setLogWodEditMode] = useState(false)
   // Member-side movement catalog index (for the Edit-mode substitution picker).
-  // Lazily fetched once, only when the athlete actually opens a Log WOD screen -
-  // never blocks anything if it fails (substitution just stays unavailable).
+  // The lazy fetch that fills `memberGymMovements` lives further down, AFTER the
+  // `userProfile` declaration it reads - see the effect next to `myGymIdRef`
+  // (INC-P9.5.2-01: an earlier placement read `userProfile` / `memberGymMovements`
+  // in a dependency array before their `const` bindings were initialised -
+  // temporal dead zone - and threw during render on every route).
   const [memberGymMovements, setMemberGymMovements] = useState([])
   const memberMovementIndex = useMemo(() => buildMovementIndex(memberGymMovements), [memberGymMovements])
   // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
@@ -6935,6 +6926,19 @@ function App() {
   // (null, userProfile inca nefetch-uit atunci).
   const myGymIdRef = useRef(null)
   useEffect(() => { myGymIdRef.current = userProfile?.gym_id ?? null }, [userProfile])
+  // P9.5.2 - load the gym movement catalog the first time the athlete opens a
+  // Log WOD / Log Skill screen (the focused Edit mode's substitution picker
+  // needs canonical rows + ids). One fetch, best-effort. Declared HERE, after
+  // `userProfile`, so its dependency array never reads a binding in the
+  // temporal dead zone (INC-P9.5.2-01).
+  useEffect(() => {
+    if ((screen !== 'logWOD' && screen !== 'logSkill') || !userProfile?.gym_id || memberGymMovements.length > 0) return
+    let cancelled = false
+    fetchMovementsForGym(userProfile.gym_id)
+      .then(rows => { if (!cancelled) setMemberGymMovements(rows || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [screen, userProfile?.gym_id, memberGymMovements.length])
   const [showOnboarding, setShowOnboarding] = useState(false)
   // Citit de fetchUserProfile insusi (apelat repetat acum - polling 5s,
   // onVisible, subscriptii, broadcast - vezi cele patru efecte care il
