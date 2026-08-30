@@ -3,9 +3,18 @@ import snapshot from './movementCapabilitySnapshot.json'
 import iconMap from './movementIconMap.json'
 import { resolveMovementIconKey, ICON_KEYS, ICON_KEY_SET } from './movementIcons.js'
 
-// P9.5 — catalog-wide movement icon integrity. Every one of the current 465
-// platform movements must deterministically resolve to a known ICON_KEY or the
-// explicit OTHER fallback — never undefined / null / a broken key.
+// P9.5 / P9.5.1 — catalog-wide movement-icon-KEY integrity.
+//
+// P9.5.1 (owner acceptance): movement icons were REMOVED from Log WOD — they
+// didn't look good in the product. The icon *component* (movementIcons.jsx) is
+// deleted. This map + resolver + test are RETAINED as a harmless, tested
+// catalog artifact (like movementCapabilitySnapshot.json) — a deterministic
+// canonicalMovementId -> semantic-family classification, useful for a future
+// non-Log-WOD surface (movement library, journal). No production code consumes
+// it today.
+//
+// Every one of the current 465 platform movements must deterministically
+// resolve to a known ICON_KEY or the explicit OTHER fallback — never undefined.
 
 const byId = new Map(snapshot.map((m) => [m.id, m.name]))
 

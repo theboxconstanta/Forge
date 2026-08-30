@@ -10,7 +10,7 @@ afterEach(cleanup)
 // A harness that mirrors App.jsx: it holds the score value and exposes it so a
 // test can assert the SUBMITTED payload shape after interactions.
 function Harness({ def, movements = [], prescribedWeight = null, initial = {}, formatId = 'RFT' }) {
-  const [value, setValue] = useState({ result: '', time: '', roundsCompleted: '', partialReps: [], sets: {}, completed: false, weightLogged: '', stages: [], ...initial })
+  const [value, setValue] = useState({ result: '', time: '', roundsCompleted: '', additionalReps: '', partialReps: [], sets: {}, completed: false, weightLogged: '', stages: [], ...initial })
   return (
     <>
       <UniversalScoreInput def={def} formatId={formatId} config={{}} movements={movements}
@@ -43,52 +43,74 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
     expect(val().time).toBe('17:42')
   })
 
-  it('Finished -> Time Capped CLEARS the finish time from the payload (no stale time)', () => {
+  it('§13 — only one mode is shown at a time (never time AND rounds/reps together)', () => {
+    render(<Harness def={def} movements={['12 Wall Ball']} />)
+    expect(screen.getByLabelText('Finish time minutes')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Rounds completed')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
+    expect(screen.queryByLabelText('Finish time minutes')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Rounds completed')).toBeInTheDocument()
+    expect(screen.getByLabelText('Additional reps')).toBeInTheDocument()
+  })
+
+  it('§14 — Finished -> Time Capped CLEARS the finish time (no stale time in payload)', () => {
     render(<Harness def={def} movements={['12 Wall Ball']} />)
     fireEvent.change(screen.getByLabelText('Finish time minutes'), { target: { value: '17' } })
     fireEvent.change(screen.getByLabelText('Finish time seconds'), { target: { value: '42' } })
     expect(val().time).toBe('17:42')
     fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
-    expect(val().time).toBe('')            // stale finish time dropped
-    fireEvent.change(screen.getByLabelText('Rounds completed'), { target: { value: '2' } })
+    expect(val().time).toBe('')
+    const rounds = screen.getByLabelText('Rounds completed')
+    fireEvent.focus(rounds); fireEvent.change(rounds, { target: { value: '2' } }); fireEvent.blur(rounds)
+    const add = screen.getByLabelText('Additional reps')
+    fireEvent.focus(add); fireEvent.change(add, { target: { value: '43' } }); fireEvent.blur(add)
     expect(val().roundsCompleted).toBe('2')
-    expect(val().time).toBe('')            // still no time in the capped payload
+    expect(val().additionalReps).toBe('43')
+    expect(val().time).toBe('')
   })
 
-  it('Time Capped -> Finished CLEARS rounds + partial reps (no stale capped work)', () => {
-    render(<Harness def={def} movements={['12 Wall Ball', '21 Power Clean']} />)
+  it('§14 — Time Capped -> Finished CLEARS rounds + additional reps (no stale capped work)', () => {
+    render(<Harness def={def} movements={['12 Wall Ball']} />)
     fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
-    fireEvent.change(screen.getByLabelText('Rounds completed'), { target: { value: '2' } })
-    fireEvent.change(screen.getByLabelText('12 Wall Ball reps'), { target: { value: '9' } })
+    const rounds = screen.getByLabelText('Rounds completed')
+    fireEvent.focus(rounds); fireEvent.change(rounds, { target: { value: '2' } }); fireEvent.blur(rounds)
+    const add = screen.getByLabelText('Additional reps')
+    fireEvent.focus(add); fireEvent.change(add, { target: { value: '43' } }); fireEvent.blur(add)
     expect(val().roundsCompleted).toBe('2')
     fireEvent.click(screen.getByRole('radio', { name: /finished/i }))
     expect(val().roundsCompleted).toBe('')
-    expect(val().partialReps).toEqual([])
+    expect(val().additionalReps).toBe('')
     fireEvent.change(screen.getByLabelText('Finish time minutes'), { target: { value: '18' } })
     expect(val().time).toBe('18:00')
   })
 
-  it('shows the time-cap value and per-movement partial rows in capped mode', () => {
+  it('shows the time-cap value, no calculation/formula/leaderboard text (§4)', () => {
     render(<Harness def={{ ...def }} movements={['12 Wall Ball', '32 Cal Row']} />)
     fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
     expect(screen.getByText(/time cap: 20:00/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('12 Wall Ball reps')).toBeInTheDocument()
-    expect(screen.getByLabelText('32 Cal Row reps')).toBeInTheDocument()
+    expect(screen.queryByText(/calculated automatically/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/total work/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/×|leaderboard/i)).not.toBeInTheDocument()
+    // no per-movement partial-reps rows
+    expect(screen.queryByLabelText('12 Wall Ball reps')).not.toBeInTheDocument()
   })
 
-  it('a capped-shaped edit opens on Time Capped', () => {
-    render(<Harness def={def} movements={['12 Wall Ball']} initial={{ roundsCompleted: '2', partialReps: ['43'] }} />)
+  it('a capped-shaped edit draft opens on Time Capped', () => {
+    render(<Harness def={def} movements={['12 Wall Ball']} initial={{ roundsCompleted: '2', additionalReps: '43' }} />)
     expect(screen.getByRole('radio', { name: /time capped/i })).toHaveAttribute('aria-checked', 'true')
   })
 })
 
 describe('P9.5 — UniversalScoreInput · other kinds', () => {
-  it('ROUNDS_REPS: rounds + per-movement partial reps', () => {
+  it('ROUNDS_REPS (AMRAP): rounds completed + a single additional-reps field, no per-movement rows', () => {
     render(<Harness def={scoreDefinitionFor('AMRAP', { durationSec: 900 })} movements={['10 Pull-up', '15 Push-up']} />)
-    fireEvent.change(screen.getByLabelText('Rounds'), { target: { value: '7' } })
-    fireEvent.change(screen.getByLabelText('10 Pull-up reps'), { target: { value: '6' } })
+    const rounds = screen.getByLabelText('Rounds completed')
+    fireEvent.focus(rounds); fireEvent.change(rounds, { target: { value: '7' } }); fireEvent.blur(rounds)
+    const add = screen.getByLabelText('Additional reps')
+    fireEvent.focus(add); fireEvent.change(add, { target: { value: '12' } }); fireEvent.blur(add)
     expect(val().roundsCompleted).toBe('7')
-    expect(val().partialReps).toEqual(['6'])
+    expect(val().additionalReps).toBe('12')
+    expect(screen.queryByLabelText('10 Pull-up reps')).not.toBeInTheDocument()
   })
 
   it('REPS: integer only', () => {

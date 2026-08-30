@@ -1,12 +1,15 @@
-// P9.5 — Movement icon identity resolution (presentation only).
+// P9.5 — Movement icon-family identity resolution (presentation metadata only).
 //
-// resolveMovementIconKey is IDENTITY-FIRST: canonicalMovementId ->
-// movementIconMap.json -> iconKey. No runtime fuzzy name matching (name
-// matching was used ONCE, offline, to seed the map). A movement with no id /
-// not in the map -> 'OTHER' (the required generic fallback).
+// P9.5.1 (owner acceptance): the icon COMPONENT was removed from Log WOD (icons
+// didn't look good). This resolver + movementIconMap.json + the integrity test
+// are retained as a harmless, tested catalog artifact — a deterministic
+// canonicalMovementId -> semantic-family classification for a possible future
+// non-Log-WOD surface. Nothing in production consumes it today.
 //
-// Icons NEVER influence capability / identity / scoring / logging / snapshot /
-// RX / leaderboard / analytics (owner directive §4 / §20).
+// resolveMovementIconKey is IDENTITY-FIRST: canonicalMovementId -> map ->
+// iconKey. No runtime fuzzy name matching (name matching was used ONCE, offline,
+// to seed the map). No id / not in map -> 'OTHER'. It NEVER influences
+// capability / identity / scoring / logging / snapshot / RX / leaderboard.
 
 import ICON_MAP from './movementIconMap.json'
 

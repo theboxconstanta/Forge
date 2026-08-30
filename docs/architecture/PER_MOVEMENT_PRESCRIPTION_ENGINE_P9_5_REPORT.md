@@ -1,9 +1,11 @@
 # Per-Movement Prescription Engine — P9.5 Universal Log WOD + Scoring UX + Movement Icons
 
 Date: 2026-08-30
-Status: **PHASE A–K complete. Owner-approved 2026-08-30. Universal Log WOD +
-adaptive score input + movement-icon system SHIPPED. NO migration, zero
-production data. Owner manual acceptance pending.** **P10 NOT STARTED.**
+Status: **PHASE A–K complete + P9.5.1 owner-acceptance corrections (icons removed
+from Log WOD, Finished/Time-Capped finalised to Rounds + single Additional-reps,
+capped leaderboard verified end-to-end). The Edit feature is HARD-STOPPED for
+owner approval of an additive `wod_logs.performed_prescription` contract — see
+P9.5.1 §G. NO migration, zero production data.** **P10 NOT STARTED.**
 
 > §A–T below = the pre-implementation audit/architecture (PHASE A–C).
 > The **P9.5 IMPLEMENTATION REPORT (PHASE D–K)** is appended at the end.
@@ -703,3 +705,288 @@ forge-admin-web: **no change** (P9.5 is WOD-SIMPLE only).
 **P10 NOT STARTED.** Journal / leaderboard / `isNotRxd` historical semantics /
 performance readers / snapshot-first reads — untouched. Owner manual acceptance
 required before P9.5 is declared closed.
+
+---
+---
+
+# P9.5.1 — OWNER ACCEPTANCE CORRECTIONS (2026-08-30)
+
+## A. OWNER FEEDBACK
+
+After reviewing the live P9.5 Log WOD (commit 9d4c27f):
+1. **Remove movement icons** — they don't look good in the product.
+2. Verify **Finished / Time Capped** end-to-end against the live save + leaderboard.
+3. For capped/incomplete: derive **total work completed** for leaderboard
+   ranking from the actual structured workout — but **never show the
+   calculation** in the UI.
+4. Add a small **Edit** action (BTWB-style *programmed* vs *performed*).
+
+## B. ICON REMOVAL — DONE (PHASE C)
+
+`App.jsx` Log WOD movement rows: `<MovementIcon>` + the icon column removed.
+Rows are now clean typography + a hairline top separator:
+
+```
+12 Wall Ball                         @ 9 kg
+21 Power Clean                       @ 61 kg
+32 Cal Row
+Alternating Dumbbell Power Snatch    @ 22.5 kg
+12 Push-up
+```
+
+No bullets, dots, handles, emojis. `splitPrescriptionLine()` still right-aligns
+the `@ …` part; long names wrap (`wordBreak`), no horizontal scroll.
+
+`src/movementIcons.jsx` (the SVG component — the rejected part) is **deleted**.
+`src/movementIconMap.json` + `src/movementIcons.js` (`resolveMovementIconKey`,
+id-first, `OTHER` fallback) + `src/movementIconIntegrity.test.js` are **retained**
+as a harmless, tested catalog artifact (a deterministic canonicalMovementId ->
+semantic-family classification, like `movementCapabilitySnapshot.json`) — nothing
+in production consumes it now; it's available if a future non-Log-WOD surface
+(movement library, journal) wants it. Bundle **shrank** ~26 KB
+(index-DZL5OHDe -> index-<new>).
+
+## C. CAPPED SCORING AUDIT (PHASE A)
+
+Traced `composeAmrapResult` / `parseAmrapResult` / `parseRoundsScore` /
+`partialRepsOfLog` / `sortSectionLogs` / `composeFortimeOrAmrapFields` /
+`completion_state`.
+
+- **Finished (RFT/For Time + cap):** `time_result = "mm:ss"`, `completion_state
+  = 'completed'`, `result = "N runde complete"` (auto).
+- **Capped:** `time_result = null`, `completion_state = 'capped'`, `result =
+  "N runde + <partial>"`. Historically the partial was a per-movement string
+  (`composeAmrapResult` -> `"2 runde + 5/12 Wall Ball, 3/21 Power Clean"`).
+- **`completion_state` live:** 369 null · 38 completed · 5 capped.
+- **`prescription_snapshot` live:** 0 rows (no structured workout logged in prod
+  yet). **`weight_logged`:** 122 rows. **`movements_snapshot`:** 109 rows,
+  written by the DB trigger `snapshot_wod_log_context_trg` (frozen PROGRAMMED
+  provenance — **not** a performed store).
+
+## D. EXACT LEADERBOARD PROGRESS SEMANTICS
+
+`sortSectionLogs` (`workoutFormats.js`), non-sequential `scored` cohort:
+
+1. `finished(a) !== finished(b)` -> **finishers first** (`completion_state ??
+   !!time_result`).
+2. Both finished -> by `parseTimeResult(time_result)` (faster first).
+3. Both capped -> by **`parseRoundsScore(result)`** (the leading number =
+   completed rounds), then by **`partialRepsOfLog(result)`** (sum of the numbers
+   in the partial segment).
+4. Tie -> `logged_at`.
+
+**Capped results are NEVER converted to an artificial time** — verified.
+Ranking is model **B (hybrid `(rounds, partialSum)` lexicographic)**, NOT a
+persisted total.
+
+## E. TOTAL WORK — DERIVED, NOT PERSISTED
+
+**`(completedRounds, additionalReps)` lexicographic ordering IS mathematically
+equivalent to `totalWork = completedRounds × workPerRound + additionalReps`
+ordering** — because `additionalReps < workPerRound` by definition (a partial
+round can't contain a full round's work). A higher round count always beats any
+partial, so `workPerRound` is **never needed** and no total is stored.
+
+Owner's example (round = 87 reps):
+
+| athlete | entered | totalWork | `(rounds, partial)` | rank |
+|---|---|---|---|---|
+| C | 3 + 5 | 266 | (3, 5) | 1 |
+| B | 2 + 58 | 232 | (2, 58) | 2 |
+| A | 2 + 43 | 217 | (2, 43) | 3 |
+
+`sortSectionLogs` produces C, B, A. **No `total_reps` / `total_work` /
+`log_meta.*` field added** (owner §7).
+
+## F. MIXED-UNIT POLICY
+
+`partialRepsOfLog` sums the raw numbers the athlete entered into the partial
+round **unit-agnostically** — "10 into 32 Cal Row" contributes 10, "5 into
+15 Wall Balls" contributes 5. Forge already treats calories/reps/metres as
+equivalent *progress units* within a partial round; there is **no universal
+"total reps" arithmetic across heterogeneous movements** and P9.5.1 does not
+invent one. For a mixed 3-RFT (Pull-ups / Run / Wall Balls) the ranking is
+still `(rounds, partial-progress-sum)` — preserved (owner §10).
+
+## G. EDIT ARCHITECTURE — **HARD STOP (PHASE B / owner §25)**
+
+**Structured member-side "performed" editing (per-movement performed load,
+movement substitution with canonical identity) CANNOT be persisted truthfully
+without an additive storage contract. STOPPED before implementation, per the
+brief.** No fake Edit UI was added (owner §26).
+
+### G.1 Current storage model
+
+| performed concept | where it lives today | limitation |
+|---|---|---|
+| performed **load** (one value) | `wod_logs.weight_logged` (text) | **single value** — cannot express "Power Clean @ 50 but Wall Ball @ 9" |
+| performed **movement list** | `wod_logs.notes` `---`-prefixed text (from `wodMiscariCustom`) | free text, **no `canonicalMovementId`**, no per-movement structure |
+| RX / Modified | `isNotRxd(weight_logged vs prescribed, …)` — derived at read | works for the single-load case |
+| **programmed** prescription | `prescription_snapshot` (P9.1, frozen) + `movements_snapshot` (trigger) | correct — must not be overwritten |
+
+The **single-load** performed-weight case already works today: the P9.5
+`UniversalScoreInput` shows a **Weight** field (with the live RX / Not-Rx badge)
+whenever the variant has a prescribed load; the athlete types their actual
+weight, `isNotRxd` flags it. No Edit button is needed for that.
+
+### G.2 Missing representation
+
+- **Per-movement** performed load / distance / calories.
+- **Movement substitution** carrying `canonicalMovementId` (P9.3 identity).
+- Enough **provenance** to keep the programmed prescription readable alongside
+  the performed one.
+
+### G.3 Proposed minimal additive contract (for owner approval)
+
+Additive, non-destructive, one new nullable jsonb column:
+
+```
+wod_logs.performed_prescription  jsonb NULL
+```
+
+Shape = a clone of the P9.4/P9.1 movement-instance list with the athlete's
+overrides applied (same contract as `prescription_snapshot.movements` +
+`substitutedFrom?: { canonicalMovementId, name }`):
+
+```
+{ version: 1, variant: 'rx', source: 'performed',
+  movements: [
+    { instanceId, canonicalMovementId, name, load?: {…}, distance?…, calories?…,
+      substitutedFrom?: { canonicalMovementId, name } }, … ] }
+```
+
+- `prescription_snapshot` stays **exactly** the PROGRAMMED frozen truth
+  (unchanged meaning). `performed_prescription` is the performed overlay; `null`
+  = "performed as programmed" (every existing + most future rows).
+- Frozen at Log WOD open as a deep value clone of `logCtx.prescriptionDoc`
+  (P9.1/P9.4 rules); Edit mutates the clone only; the programmed `wods` /
+  Engine-V2 `workouts` are never touched.
+
+### G.4 RX / Modified implications
+
+`isNotRxd` currently reads `weight_logged` (text) vs a single prescribed value.
+With `performed_prescription`, RX/Modified would be derived per-movement (any
+movement whose performed load < programmed, or any substitution, -> Modified).
+**This is a P10-adjacent reader change** — do not do it in P9.5.1. For P9.5.1,
+if the Edit contract is approved, RX/Modified would keep reading `weight_logged`
+(the single-value athlete weight) as today, and per-movement Modified detection
+would land with P10's snapshot-first readers.
+
+### G.5 Journal implications
+
+Journal reads `notes` + `result` today. `performed_prescription` would be an
+additional read for a "performed" line; the edit path (`.update`) must be
+extended to carry it. `null` rows are byte-identical to today.
+
+### G.6 Leaderboard implications (owner §32/§33)
+
+**This is the real architecture question.** `sortSectionLogs` compares
+`(rounds, partialSum)` **directly from `result` text — it has no knowledge of
+workout structure or whether an athlete modified.** If athlete X scaled the
+reps-per-round and athlete Y did not, comparing their `"2 rounds"` directly is
+**not** apples-to-apples.
+
+Current Forge policy (verified): the leaderboard already **groups by weight**
+(RX vs each scaled load as a sub-group, `weightGroups` in `App.jsx`) — modified
+athletes are *partly* separated. But there is **no policy for a performed
+*rep-structure* change**, and the brief's model A (rank vs programmed structure)
+vs model B (rank in a Modified context) is **not currently decided in code**.
+
+**Recommendation:** approve `performed_prescription` for **load / substitution**
+only (which does not change rep-per-round structure, so capped `(rounds,
+partialSum)` stays valid). **Do NOT** allow performed edits that change
+**reps-per-round** from this lightweight flow — that would make `2 + 43`
+ambiguous across athletes and needs an explicit leaderboard policy (P10). This
+keeps P9.5.1 Edit safe and defers the ranking-policy decision.
+
+### G.7 Migration required
+
+**Yes** — one additive `ALTER TABLE public.wod_logs ADD COLUMN
+performed_prescription jsonb;` (nullable, no backfill, no historical rewrite,
+no trigger). **Awaiting owner approval before applying.**
+
+## H. PROGRAMMED VS PERFORMED CONTRACT (proposed)
+
+| | PROGRAMMED | PERFORMED |
+|---|---|---|
+| source | `wods` / `workouts` (coach) | member Edit, per-log |
+| frozen | `logCtx.prescriptionDoc` at Log WOD open (P9.1/P9.4) | clone of the above + overrides |
+| persisted | `prescription_snapshot` (unchanged) | `performed_prescription` (new, `null` = as-programmed) |
+| mutable by member | **never** | yes, in Edit mode, local draft until Save |
+| leaderboard | current `(rounds, partialSum)` / time | same (load/substitution don't change rep structure) |
+
+## I. RX / MODIFIED BEHAVIOR
+
+Unchanged in P9.5.1. `isNotRxd(weight_logged vs prescribed)` still runs; the
+live RX / Not-Rx badge on the Weight field is intact. Per-movement Modified
+detection is deferred with the `performed_prescription` reader work (P10).
+
+## J. SNAPSHOT BEHAVIOR
+
+`prescription_snapshot` write path (`buildPrescriptionSnapshot` from the frozen
+`logCtx.prescriptionDoc`) is **byte-unchanged**. P9.4's `logger displayLine ==
+prescription_snapshot displayLine` invariant still holds.
+
+## K. HISTORICAL D+N PROOF
+
+`logWodPrimaryPath` reads `logBusinessDate` / `logCtx` / `logWodZiData` — frozen
+at Log WOD open. `wod_id` from `resolveWodIdForLog(logCtx…)`. `loggedAt =
+dateWithCurrentTime(logWodZiData.date)`. A workout from date D logged on D+n
+still saves against D. No `todayLocalStr()` in the Log WOD render or save.
+Covered by the existing INC-04 suite + `p95ScoreMatrix.test.js`.
+
+## L. TESTS
+
+| file | change | n |
+|---|---|---|
+| `universalScoreInput.test.jsx` | rewritten for the Rounds + single Additional-reps model; §13 one-mode-at-a-time; §14 toggle payload correctness; §4 no calculation/formula/leaderboard text; no per-movement rows | 14 |
+| `p95ScoreMatrix.test.js` | +7: `composeCappedRoundsResult` / `parseCappedRoundsResult` round-trip; plain-form leaderboard order (3+5 > 2+58 > 2+43 > 2+31); total-work-is-derived; `parsePartialText` lone-number edit recovery | 16 |
+| `movementIconIntegrity.test.js` | header updated (component removed; map retained) | 49 |
+| `workoutFormats.test.js` | `parsePartialText` lone-number branch — regression green | — |
+
+WOD-SIMPLE `vitest run`: **1280 passed**, the **9 pre-existing Deno-only
+`supabase/functions/*` `@std/assert` failures** unchanged/unrelated.
+`vite build` + `eslint` (P9.5.1 files) clean.
+
+## M. PRODUCTION DATA IMPACT
+
+| | |
+|---|---|
+| migrations | **NONE** (the `performed_prescription` migration is PROPOSED, not applied — awaiting approval) |
+| production rows modified | **0** |
+| `wods` modified | **0** |
+| `workouts` modified | **0** |
+| `wod_logs` modified | **0** |
+| `movements` modified | **0** |
+
+## N. DEPLOYMENT
+
+Commit `<hash>` · bundle `<hash>` · `app_version` ->
+`p9-5-1-logwod-corrections-20260830`. forge-admin-web: no change.
+
+## O. MANUAL ACCEPTANCE
+
+1. Capped RFT -> **Finished** -> `17:42`. Save. `completion_state = completed`,
+   `time_result = 17:42`, no rounds/reps in the row.
+2. Same -> **Time Capped** -> Rounds `2`, Additional reps `43`. Save.
+   `completion_state = capped`, `time_result = null`, `result = "2 runde + 43"`.
+3. Leaderboard for that workout: finishers first by time; then
+   `CAP 2+58 > CAP 2+43 > CAP 2+31`.
+4. Log WOD screen shows **no** icons, **no** "Calculated automatically", **no**
+   formula, **no** leaderboard explanation, **no** Quick Add.
+5. Movement rows: long name ("Alternating Dumbbell Power Snatch") wraps, no
+   overflow at 320 px.
+6. A single-load workout: the **Weight** field + RX/Not-Rx badge still lets the
+   athlete record their actual load (`50` vs prescribed `61` -> Not Rx).
+7. A workout from a past date, logged today, still attaches to that date.
+8. **Edit action is NOT present** — deferred pending owner approval of the
+   `wod_logs.performed_prescription` additive contract (§G).
+
+## HARD STOP
+
+**P10 NOT STARTED.** Journal / leaderboard / `isNotRxd` historical semantics /
+performance readers / snapshot-first reads — untouched.
+
+**PHASE F (Edit) is BLOCKED at the §25 HARD STOP** — a `wod_logs.performed_
+prescription` additive migration + contract is required. §G is the proposal.
+Awaiting owner approval before implementing Edit persistence.

@@ -90,6 +90,27 @@ function PartialRepsRows({ movements, partialReps, onChange, t }) {
   )
 }
 
+// P9.5.1 — Rounds completed + a SINGLE "additional reps" number (owner §11/§12).
+// The athlete never computes a total; the leaderboard derives it from
+// (rounds, additionalReps) — see composeCappedRoundsResult / sortSectionLogs.
+// No formula, no "calculated automatically" text.
+function RoundsAndAdditionalReps({ v, patch, t, roundsPlaceholder, repsPlaceholder }) {
+  return (
+    <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ flex: 1 }}>
+        <div style={label}>{t?.logWodRoundsCompletedLabel || 'Rounds completed'}</div>
+        <NumRow value={v.roundsCompleted} integer ariaLabel="Rounds completed"
+          onCommit={(x) => patch({ roundsCompleted: x })} placeholder={roundsPlaceholder} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={label}>{t?.logWodAdditionalRepsLabel || 'Additional reps'}</div>
+        <NumRow value={v.additionalReps} integer ariaLabel="Additional reps"
+          onCommit={(x) => patch({ additionalReps: x })} placeholder={repsPlaceholder} />
+      </div>
+    </div>
+  )
+}
+
 // [Finished] [Time Capped] — selected state communicated by fill AND weight
 // (not colour alone), owner §35.
 function FinishedCappedToggle({ mode, onPick, t }) {
@@ -159,13 +180,7 @@ export default function UniversalScoreInput({
     return (
       <div style={card}>
         {weightBlock}
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ flex: 1 }}>
-            <div style={label}>{t?.logWodRoundsCompletedLabel || 'Rounds'}</div>
-            <NumRow value={v.roundsCompleted} integer ariaLabel={t?.logWodRoundsCompletedLabel || 'Rounds'} onCommit={(x) => patch({ roundsCompleted: x })} placeholder="7" />
-          </div>
-        </div>
-        <PartialRepsRows movements={movements} partialReps={v.partialReps} onChange={(x) => patch({ partialReps: x })} t={t} />
+        <RoundsAndAdditionalReps v={v} patch={patch} t={t} roundsPlaceholder="7" repsPlaceholder="12" />
       </div>
     )
   }
@@ -196,7 +211,7 @@ export default function UniversalScoreInput({
 
 function TimeScoreBlock({ def, movements, v, patch, t }) {
   const hasTime = !!(v.time || '').trim()
-  const hasCappedWork = !!((v.roundsCompleted || '').toString().trim() || (v.partialReps || []).some(x => (x || '').toString().trim()))
+  const hasCappedWork = !!((v.roundsCompleted || '').toString().trim() || (v.additionalReps || '').toString().trim() || (v.partialReps || []).some(x => (x || '').toString().trim()))
   // NEW log -> Finished; an edit whose draft already carries capped work -> Time Capped.
   const [mode, setMode] = useState(hasCappedWork && !hasTime ? 'capped' : 'finished')
   const capable = def.kind === 'TIME_CAPPED'
@@ -204,8 +219,8 @@ function TimeScoreBlock({ def, movements, v, patch, t }) {
   const pick = (next) => {
     if (next === mode) return
     setMode(next)
-    // PAYLOAD CORRECTNESS (owner §3): never submit stale incompatible fields.
-    if (next === 'finished') patch({ roundsCompleted: '', partialReps: [] })
+    // PAYLOAD CORRECTNESS (owner §14): never submit stale incompatible fields.
+    if (next === 'finished') patch({ roundsCompleted: '', additionalReps: '', partialReps: [] })
     else patch({ time: '' })
   }
 
@@ -232,15 +247,7 @@ function TimeScoreBlock({ def, movements, v, patch, t }) {
           {def.sequential ? (
             <PartialRepsRows movements={movements} partialReps={v.partialReps} onChange={(x) => patch({ partialReps: x })} t={t} />
           ) : (
-            <>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={label}>{t?.logWodRoundsCompletedLabel || 'Rounds'}</div>
-                  <NumRow value={v.roundsCompleted} integer ariaLabel="Rounds completed" onCommit={(x) => patch({ roundsCompleted: x })} placeholder="2" />
-                </div>
-              </div>
-              <PartialRepsRows movements={movements} partialReps={v.partialReps} onChange={(x) => patch({ partialReps: x })} t={t} />
-            </>
+            <RoundsAndAdditionalReps v={v} patch={patch} t={t} roundsPlaceholder="2" repsPlaceholder="43" />
           )}
           {def.timeCapSec ? (
             <div style={{ fontSize: '12px', color: '#9A9A9A', marginTop: '12px' }}>

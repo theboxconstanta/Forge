@@ -49,7 +49,7 @@ import {
   isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
-  sortSectionLogs,
+  sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -72,8 +72,6 @@ import {
   resolveNumericInput, composeStructuredWorkoutDisplay,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
-import { MovementIcon } from './movementIcons.jsx'
-import { resolveMovementIconKey } from './movementIcons.js'
 import { scoreDefinitionFor } from './scoreDefinition'
 import UniversalScoreInput from './UniversalScoreInput'
 
@@ -6640,6 +6638,10 @@ function App() {
   const [wodResult, setWodResult] = useState('')
   const [wodRoundsCompleted, setWodRoundsCompleted] = useState('')
   const [wodPartialReps, setWodPartialReps] = useState([])
+  // P9.5.1 - the Universal Log WOD "Time Capped" / rounds+reps input: a single
+  // "additional reps" number (not a per-movement breakdown). Legacy FormatLogger
+  // flows never touch this.
+  const [wodAdditionalReps, setWodAdditionalReps] = useState('')
   // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
   // cu greutatea prescrisa a variantei alese pentru a detecta "Not RXd" (vezi
   // isNotRxd in workoutFormats.js). Semanata direct cu prescrisul la alegerea
@@ -8548,6 +8550,10 @@ function App() {
       const { result, time_result, completionState } = composeFortimeOrAmrapFields({
         wodTime, wodRoundsCompleted, wodPartialReps, movements: miscariPentruLog,
         rounds: activeLogFormatConfig?.rounds, wodResult,
+        // P9.5.1 - the Universal Log WOD "Time Capped" input yields one
+        // "additional reps" number; the legacy FormatLogger flows keep the
+        // per-movement partial array (wodAdditionalReps stays undefined there).
+        wodAdditionalReps: logWodPrimaryPath ? wodAdditionalReps : undefined,
       })
       return { result, time_result, completion_state: completionState, sets: null, log_meta: null, weight_logged: wodWeightLogged.trim() || null }
     }
@@ -8575,7 +8581,13 @@ function App() {
       const miscariPtCompunere = format.ascending
         ? ascendingMovementsForRound(miscariPentruLog, (parseInt(wodRoundsCompleted) || 0) + 1, activeLogFormatConfig?.startReps, activeLogFormatConfig?.incrementReps)
         : miscariPentruLog
-      rezultatFinal = composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
+      // P9.5.1 - AMRAP (incl. Ascending) through the Universal Log WOD uses the
+      // single "additional reps" number ("7 runde + 12"); every FormatLogger
+      // flow keeps the per-movement composeAmrapResult. Same parseRoundsScore /
+      // partialRepsOfLog reads -> identical ranking.
+      rezultatFinal = logWodPrimaryPath
+        ? composeCappedRoundsResult(wodRoundsCompleted, wodAdditionalReps)
+        : composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPtCompunere)
       completionState = null
     } else {
       // Ramas doar pt sequentialPartial terminat (For Time-Sequence/Chipper/
@@ -8609,7 +8621,7 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
       return
@@ -8657,7 +8669,7 @@ function App() {
         showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
         setScreen(prevScreen === 'log' ? 'log' : 'home'); if (prevScreen === 'log') setLogTab('jurnal')
         setLogTargetSectionId(null)
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
       }
       setWodSaving(false)
       return
@@ -8804,7 +8816,7 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
     }
     setWodSaving(false)
@@ -10136,7 +10148,7 @@ function App() {
                           if (!homeDisplayIsCurrent) return
                           setLogCtx(captureLogCtx())
                           setLogTargetSectionId(section.id); setEditLogId(null)
-                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
                           setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
                         }} t={t} />
                     )
@@ -10678,13 +10690,18 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               // Layer 2a - la fel ca editLogId mai sus: formatul e deja fixat
               // de sectiune, nu exista pas "compose" de revenit la el - back
               // navigheaza direct in afara ecranului.
-              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setScreen(prevScreen || 'home') }
-              else if (logWodStep === 'score') { setLogWodStep('compose') }
-              else { setScreen(prevScreen || 'home') }
+              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setScreen(prevScreen || 'home') }
+              else if (!logWodPrimaryPath && logWodStep === 'score') { setLogWodStep('compose') }
+              else {
+                // P9.5.1 - clear the score draft when leaving the single-screen
+                // Universal Log WOD without saving, so the next workout opens clean.
+                if (logWodPrimaryPath) { setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('') }
+                setScreen(prevScreen || 'home')
+              }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
             <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editLogId ? t.logWodEditTitle : logTargetSection ? (logTargetSection.title || t.wodSectionScoredBadge) : t.logWodNewTitle}</h1>
           </div>
@@ -10708,14 +10725,16 @@ function App() {
           ) : logWodPrimaryPath ? (() => {
             // P9.5 - Universal Log WOD (structured or legacy programmed workout).
             // ONE clean screen: variant badge -> read-only workout (P9.4
-            // projection + icons) -> YOUR SCORE (adaptive) -> SAVE. No "Chosen
-            // variant" card, no "TODAY'S WORKOUT", no SortableList/drag, no
-            // Quick Add, no salmon. Frozen identity (logCtx) untouched.
+            // projection) -> YOUR SCORE (adaptive) -> SAVE. No "Chosen variant"
+            // card, no "TODAY'S WORKOUT", no SortableList/drag, no Quick Add, no
+            // salmon. P9.5.1 - no movement icons (owner acceptance): clean
+            // typography + hairline separators only. Frozen identity (logCtx)
+            // untouched.
             const cheie = VARIANTE_CONFIG[variantaAleasa].key
             const structuredDisplay = composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })
             const rows = structuredDisplay
-              ? structuredDisplay.movements.map(m => ({ line: m.line, iconKey: resolveMovementIconKey(m) }))
-              : (logWodZiData[cheie] || []).map(line => ({ line, iconKey: 'OTHER' }))
+              ? structuredDisplay.movements.map(m => ({ line: m.line }))
+              : (logWodZiData[cheie] || []).map(line => ({ line }))
             const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig)
             const scheduleLines = formatMemberScheduleLines(activeLogFormatId, activeLogFormatConfig, t)
             const dispatchScorePatch = (patch) => {
@@ -10723,6 +10742,7 @@ function App() {
               if ('time' in patch) setWodTime(patch.time)
               if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
               if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
+              if ('additionalReps' in patch) setWodAdditionalReps(patch.additionalReps)
               if ('sets' in patch) setWodSets(patch.sets)
               if ('stages' in patch) setWodChainedStages(patch.stages)
               if ('completed' in patch) setWodCompleted(patch.completed)
@@ -10745,10 +10765,9 @@ function App() {
                       {rows.map((r, i) => {
                         const { namePart, rxPart } = splitPrescriptionLine(r.line)
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '10px 0', borderTop: i > 0 ? '1px solid #F3F4F6' : 'none' }}>
-                            <MovementIcon iconKey={r.iconKey} size={22} style={{ color: '#0E0E0E', flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: '14px', color: '#0E0E0E', lineHeight: 1.4, minWidth: 0, wordBreak: 'break-word' }}>{namePart}</span>
-                            {rxPart && <span style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', flexShrink: 0, whiteSpace: 'nowrap' }}>@ {rxPart}</span>}
+                          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '12px', padding: '11px 0', borderTop: i > 0 ? '1px solid #F3F4F6' : 'none' }}>
+                            <span style={{ flex: 1, fontSize: '15px', color: '#0E0E0E', lineHeight: 1.4, minWidth: 0, wordBreak: 'break-word' }}>{namePart}</span>
+                            {rxPart && <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', flexShrink: 0, whiteSpace: 'nowrap' }}>@ {rxPart}</span>}
                           </div>
                         )
                       })}
@@ -10763,7 +10782,7 @@ function App() {
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
                   movements={miscariPentruLog} prescribedWeight={prescribedWeightPentruLog} rxStatus={liveRxStatus}
-                  value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
+                  value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
                   onChange={dispatchScorePatch}
                   weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
 

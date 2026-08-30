@@ -362,7 +362,13 @@ export function parsePartialText(text, movements) {
     // Compatibilitate cu rezultate vechi, deja salvate inainte de acest fix
     // (fara "/", numarul dublat direct in fata textului miscarii).
     const simplu = trimmed.match(/^(\d+)\s+(.+)$/)
-    if (simplu) { const idx = movements.indexOf(simplu[2].trim()); if (idx !== -1) partialArr[idx] = simplu[1] }
+    if (simplu) { const idx = movements.indexOf(simplu[2].trim()); if (idx !== -1) { partialArr[idx] = simplu[1]; return } }
+    // P9.5.1 - the "N runde + M" plain form (Universal Log WOD single
+    // "additional reps"): a lone number with no movement name -> attribute the
+    // whole partial to the first movement so composeAmrapResult re-emits an
+    // equal sum on edit. partialRepsOfLog reads the same total either way.
+    const lone = trimmed.match(/^(\d+(?:\.\d+)?)$/)
+    if (lone && movements.length > 0 && partialArr.every(v => !v)) partialArr[0] = lone[1]
   })
   return partialArr
 }
@@ -436,13 +442,51 @@ export function normalizeCompletionState(fields) {
 // nimic din logica generica se aplica diferit aici) - singura schimbare reala
 // e ca Timpul introdus e acum garantat autoritar peste Runde completate
 // manual (shouldLogRoundsInsteadOfTime), indiferent de sursa payload-ului.
-export function composeFortimeOrAmrapFields({ wodTime, wodRoundsCompleted, wodPartialReps, movements, rounds, wodResult }) {
+export function composeFortimeOrAmrapFields({ wodTime, wodRoundsCompleted, wodPartialReps, movements, rounds, wodResult, wodAdditionalReps }) {
   if (shouldLogRoundsInsteadOfTime(wodTime, wodRoundsCompleted)) {
-    return { result: composeAmrapResult(wodRoundsCompleted, wodPartialReps, movements) || null, time_result: null, completionState: deriveDurationCompletionState(true) }
+    // P9.5.1 - the Universal Log WOD "Time Capped" input collects ONE
+    // "additional reps" number (not a per-movement breakdown). When present,
+    // compose the plain "N runde + M" form. parseRoundsScore() -> N and
+    // partialRepsOfLog() -> M both read it unchanged (it is a simpler subset of
+    // the existing result grammar), so leaderboard order is identical. The
+    // per-movement composeAmrapResult path stays for the FormatLogger flows.
+    const result = wodAdditionalReps !== undefined
+      ? composeCappedRoundsResult(wodRoundsCompleted, wodAdditionalReps)
+      : (composeAmrapResult(wodRoundsCompleted, wodPartialReps, movements) || null)
+    return { result: result || null, time_result: null, completionState: deriveDurationCompletionState(true) }
   }
   const finishedRoundsText = composeFinishedRoundsText(rounds)
   const time = (wodTime || '').toString().trim()
   return { result: (finishedRoundsText ?? (wodResult || '').toString().trim()) || null, time_result: time || null, completionState: deriveDurationCompletionState(false) }
+}
+
+// P9.5.1 - "2 full rounds + 43 additional reps" -> "2 runde + 43". No additional
+// reps -> "N runde complete" (matches composeFinishedRoundsText for finishers).
+export function composeCappedRoundsResult(roundsCompleted, additionalReps) {
+  const r = (roundsCompleted ?? '').toString().trim()
+  if (!r) return ''
+  const a = (additionalReps ?? '').toString().trim()
+  return a && parseFloat(a) > 0 ? `${r} runde + ${a}` : `${r} runde complete`
+}
+
+// Inverse, for re-opening a capped result in the editor. Reads the plain
+// "N runde + M" form AND the legacy per-movement "N runde + 43/12 X, ..." form
+// (additional = summed partial, same as partialRepsOfLog).
+export function parseCappedRoundsResult(resultStr) {
+  const s = (resultStr || '').toString()
+  const roundsMatch = s.match(/^(\d+)/)
+  const rounds = roundsMatch ? roundsMatch[1] : ''
+  const plusIdx = s.indexOf('+')
+  let additional = ''
+  if (plusIdx !== -1) {
+    const seg = s.slice(plusIdx + 1)
+    const sum = seg.split(',').reduce((acc, part) => {
+      const m = part.trim().match(/^(\d+(\.\d+)?)/)
+      return m ? acc + parseFloat(m[1]) : acc
+    }, 0)
+    if (sum > 0) additional = String(sum)
+  }
+  return { rounds, additional }
 }
 
 // Text de rezultat pt un log 'fortime_or_amrap' TERMINAT (are Timp) la un

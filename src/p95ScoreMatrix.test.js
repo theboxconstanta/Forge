@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   composeFortimeOrAmrapFields, composeAmrapResult, deriveDurationCompletionState,
-  partialRepsOfLog, sortSectionLogs, parseAmrapResult,
+  partialRepsOfLog, sortSectionLogs, parseAmrapResult, parseRoundsScore,
 } from './workoutFormats'
 import { scoreDefinitionFor } from './scoreDefinition'
 
@@ -95,5 +95,74 @@ describe('P9.5 §39 — time-cap edge cases (payload correctness)', () => {
     const f = composeFortimeOrAmrapFields({ wodTime: '', wodRoundsCompleted: '2', wodPartialReps: [], movements: [], rounds: 3, wodResult: '' })
     expect(f.time_result).toBeNull()
     expect(f.completionState).toBe('capped')
+  })
+})
+
+// ============================================================================
+// P9.5.1 — capped "N runde + M" plain form (single "additional reps" field)
+// ============================================================================
+import { composeCappedRoundsResult, parseCappedRoundsResult, parsePartialText } from './workoutFormats'
+
+describe('P9.5.1 — composeCappedRoundsResult / parse round-trip', () => {
+  it('2 rounds + 43 additional reps -> "2 runde + 43"; parseRoundsScore + partialRepsOfLog read it', () => {
+    const r = composeCappedRoundsResult('2', '43')
+    expect(r).toBe('2 runde + 43')
+    expect(parseRoundsScore(r)).toBe(2)
+    expect(partialRepsOfLog({ result: r }, false)).toBe(43)
+  })
+
+  it('no additional reps -> "N runde complete" (same as a finisher rounds text)', () => {
+    expect(composeCappedRoundsResult('3', '')).toBe('3 runde complete')
+    expect(composeCappedRoundsResult('3', '0')).toBe('3 runde complete')
+  })
+
+  it('blank rounds -> empty (save gate rejects)', () => {
+    expect(composeCappedRoundsResult('', '43')).toBe('')
+  })
+
+  it('parseCappedRoundsResult recovers both the plain and the legacy per-movement form', () => {
+    expect(parseCappedRoundsResult('2 runde + 43')).toEqual({ rounds: '2', additional: '43' })
+    expect(parseCappedRoundsResult('2 runde complete')).toEqual({ rounds: '2', additional: '' })
+    // legacy per-movement: additional = summed partial (same as partialRepsOfLog)
+    expect(parseCappedRoundsResult('2 runde + 5/12 Wall Ball, 3/21 Power Clean')).toEqual({ rounds: '2', additional: '8' })
+  })
+
+  it('composeFortimeOrAmrapFields with wodAdditionalReps uses the plain form; without it keeps per-movement', () => {
+    const plain = composeFortimeOrAmrapFields({ wodTime: '', wodRoundsCompleted: '2', wodPartialReps: [], movements: ['12 Wall Ball'], rounds: 3, wodResult: '', wodAdditionalReps: '43' })
+    expect(plain.result).toBe('2 runde + 43')
+    expect(plain.completionState).toBe('capped')
+    const perMovement = composeFortimeOrAmrapFields({ wodTime: '', wodRoundsCompleted: '2', wodPartialReps: ['43'], movements: ['12 Wall Ball'], rounds: 3, wodResult: '' })
+    expect(perMovement.result).toMatch(/^2 runde \+ 43\/12 Wall Ball/)
+  })
+
+  it('editing a "2 runde + 43" log: parsePartialText recovers 43 into movement[0] so re-save preserves the sum', () => {
+    const arr = parsePartialText('43', ['12 Wall Ball', '21 Power Clean'])
+    expect(arr).toEqual(['43', ''])
+    // re-compose -> "2 runde + 43/12 Wall Ball" -> partialRepsOfLog still 43
+    const re = composeAmrapResult('2', arr, ['12 Wall Ball', '21 Power Clean'])
+    expect(partialRepsOfLog({ result: re }, false)).toBe(43)
+  })
+})
+
+describe('P9.5.1 §39 — leaderboard order with the plain "N runde + M" form', () => {
+  it('CAP 3+5 > CAP 2+58 > CAP 2+43 > CAP 2+31; finishers still first', () => {
+    const logs = [
+      { member_id: 'w', time_result: '15:00', result: '3 runde complete', completion_state: 'completed', logged_at: '2026-08-30T10:00:00Z' },
+      { member_id: 'a', time_result: null, result: '2 runde + 31', completion_state: 'capped', logged_at: '2026-08-30T10:01:00Z' },
+      { member_id: 'b', time_result: null, result: '2 runde + 58', completion_state: 'capped', logged_at: '2026-08-30T10:02:00Z' },
+      { member_id: 'c', time_result: null, result: '3 runde + 5', completion_state: 'capped', logged_at: '2026-08-30T10:03:00Z' },
+      { member_id: 'd', time_result: null, result: '2 runde + 43', completion_state: 'capped', logged_at: '2026-08-30T10:04:00Z' },
+    ]
+    const ranked = sortSectionLogs(logs, 'RFT', { rounds: 3, timeCapSec: 1200 })
+    expect(ranked.map((l) => l.member_id)).toEqual(['w', 'c', 'b', 'd', 'a'])
+    for (const l of ranked) if (l.completion_state === 'capped') expect(l.time_result).toBeNull()
+  })
+
+  it('total work is DERIVED from (rounds, additional) — no persisted total_reps / total_work / log_meta key', () => {
+    // (rounds, additional) lexicographic == totalWork order because additional < workPerRound always.
+    const key = (r) => [parseRoundsScore(r.result) || 0, partialRepsOfLog(r, false)]
+    expect(key({ result: '3 runde + 5' })).toEqual([3, 5])
+    expect(key({ result: '2 runde + 58' })).toEqual([2, 58])
+    expect(key({ result: '2 runde + 58' })[0]).toBeLessThan(key({ result: '3 runde + 5' })[0])
   })
 })
