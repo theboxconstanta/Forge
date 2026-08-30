@@ -70,8 +70,6 @@ import {
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
   resolveNumericInput, composeStructuredWorkoutDisplay,
-  buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
-  performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
@@ -972,122 +970,6 @@ function ComposedWorkoutPreview({ section, t }) {
 // legacy free-text movements_rx path.
 function memberMovementLine(line, structured, genderKey) {
   return structured ? line : cleanMovementDisplayText(resolveMovementDisplayText(line, genderKey))
-}
-
-// ===========================================================================
-// P9.5.2 - PERFORMED PRESCRIPTION editor (member PWA). A focused "what I
-// actually performed" overlay on the FROZEN programmed prescription. The
-// athlete may change only their own performed load / distance / calories, or
-// substitute a whole movement (canonical identity). Reps / rounds / format /
-// order / time cap are NOT editable in V1. Nothing here ever mutates the
-// programmed workout (wods / Engine V2) - it edits a LOCAL DRAFT only, which
-// the parent persists to wod_logs.performed_prescription on Save.
-// ===========================================================================
-const PERFORMED_METRIC_LABEL = { load: 'Load', distance: 'Distance', calories: 'Calories' }
-
-function performedResolvedValue(spec, gender) {
-  const r = resolveSpec(spec, gender)
-  if (!r) return { value: null, unit: null }
-  if (r.value !== null && r.value !== undefined) return { value: r.value, unit: r.unit ?? null }
-  const [m, f] = r.bothValues || [null, null]
-  return { value: gender === 'female' ? f : gender === 'male' ? m : (m ?? f), unit: r.unit ?? null }
-}
-
-function PerformedEditRow({ inst, gender, movementIndex, onChange, t }) {
-  const [subOpen, setSubOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const rows = movementIndex?.rows ?? []
-  const matches = query.trim().length >= 2
-    ? rows.filter(r => r.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6)
-    : []
-  const repsSpec = resolveSpec(inst.reps, gender)
-  const repsText = repsSpec ? (repsSpec.mode === 'text' ? repsSpec.text : (repsSpec.value ?? repsSpec.bothValues?.filter(v => v != null).join('/'))) : null
-  const presentMetrics = PERFORMED_EDITABLE_METRICS.filter(k => inst[k])
-  const pickSubstitute = (row) => {
-    onChange(applyPerformedSubstitution(inst, row, resolveMovementCapability(row)))
-    setSubOpen(false); setQuery('')
-  }
-  return (
-    <div style={{ padding: '14px 0', borderTop: '1px solid #F3F4F6' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name}</div>
-          {repsText != null && repsText !== '' && (
-            <div style={{ fontSize: '12px', color: '#9A9A9A', marginTop: '2px' }}>{t.performedEditRepsLocked(repsText)}</div>
-          )}
-          {inst.substitutedFrom && (
-            <div style={{ fontSize: '11px', color: '#B7791F', marginTop: '3px' }}>{t.performedEditSubstitutedFrom(inst.substitutedFrom.name)}</div>
-          )}
-        </div>
-        <button onClick={() => setSubOpen(v => !v)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '12px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-          {subOpen ? t.performedEditSubCancel : t.performedEditSubstitute}
-        </button>
-      </div>
-
-      {subOpen && (
-        <div style={{ marginTop: '8px', position: 'relative' }}>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder={t.performedEditSubPlaceholder} autoFocus
-            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
-          {matches.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: '1px solid #E4E4E4', overflow: 'hidden' }}>
-              {matches.map((r) => (
-                <div key={r.id} onClick={() => pickSubstitute(r)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px' }}>{r.name}</div>
-              ))}
-            </div>
-          )}
-          {query.trim().length >= 2 && matches.length === 0 && (
-            <div style={{ fontSize: '11px', color: '#9A9A9A', marginTop: '6px' }}>{t.performedEditSubNoMatch}</div>
-          )}
-        </div>
-      )}
-
-      {presentMetrics.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '10px' }}>
-          {presentMetrics.map((metric) => {
-            const { value, unit } = performedResolvedValue(inst[metric], gender)
-            return (
-              <label key={metric} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', color: '#9A9A9A', textTransform: 'uppercase' }}>
-                  {t[`performedEditMetric_${metric}`] || PERFORMED_METRIC_LABEL[metric]}
-                </span>
-                <PmpeNumField
-                  style={{ width: '64px', padding: '8px 6px', borderRadius: '8px', border: '1px solid #E4E4E4', fontSize: '13px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }}
-                  integer={metric === 'calories'}
-                  value={typeof value === 'number' ? value : null}
-                  ariaLabel={`${inst.name} performed ${metric}`}
-                  onCommit={(n) => onChange(setPerformedMetricValue(inst, metric, n, unit))}
-                />
-                {(metric === 'load' || metric === 'distance') && unit && (
-                  <span style={{ fontSize: '12px', color: '#6B7280' }}>{unit}</span>
-                )}
-              </label>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PerformedEditPanel({ draft, gender, movementIndex, onChange, onCancel, onDone, t }) {
-  const movements = draft?.movements ?? []
-  const patchInstance = (idx, nextInst) => onChange({ ...draft, movements: movements.map((m, i) => (i === idx ? nextInst : m)) })
-  return (
-    <div>
-      <div style={{ fontSize: '16px', fontWeight: 700, color: '#0E0E0E', marginBottom: '4px' }}>{t.performedEditTitle}</div>
-      <div style={{ fontSize: '12px', color: '#9A9A9A', marginBottom: '14px', lineHeight: 1.5 }}>{t.performedEditSubtitle}</div>
-      <div style={{ borderBottom: '1px solid #F3F4F6' }}>
-        {movements.map((inst, idx) => (
-          <PerformedEditRow key={inst.instanceId} inst={inst} gender={gender} movementIndex={movementIndex}
-            onChange={(next) => patchInstance(idx, next)} t={t} />
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-        <button onClick={onCancel} style={{ flex: 1, padding: '13px', background: '#fff', color: '#0E0E0E', border: '1px solid #E4E4E4', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditCancel}</button>
-        <button onClick={onDone} style={{ flex: 1, padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>{t.performedEditDone}</button>
-      </div>
-    </div>
-  )
 }
 
 // ===========================================================================
@@ -6574,18 +6456,6 @@ function App() {
   // wodLogs/skillLogs.sets_movement_ids. Same batched-by-id shape as
   // benchmarksById above; never used for identity resolution itself
   // (Phase 1's own server-side trigger already did that at write time).
-  // P9.5.2 - load the gym movement catalog the first time the athlete opens a
-  // Log WOD / Log Skill screen (the focused Edit mode's substitution picker
-  // needs canonical rows + ids). One fetch, best-effort.
-  useEffect(() => {
-    if ((screen !== 'logWOD' && screen !== 'logSkill') || !userProfile?.gym_id || memberGymMovements.length > 0) return
-    let cancelled = false
-    fetchMovementsForGym(userProfile.gym_id)
-      .then(rows => { if (!cancelled) setMemberGymMovements(rows || []) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [screen, userProfile?.gym_id, memberGymMovements.length])
-
   const [movementsById, setMovementsById] = useState(new Map())
   useEffect(() => {
     const idsFrom = (logs) => logs.flatMap(l => l.sets_movement_ids ? Object.values(l.sets_movement_ids) : [])
@@ -6772,20 +6642,6 @@ function App() {
   // "additional reps" number (not a per-movement breakdown). Legacy FormatLogger
   // flows never touch this.
   const [wodAdditionalReps, setWodAdditionalReps] = useState('')
-  // P9.5.2 - the athlete's PERFORMED-prescription overlay for the current Log
-  // WOD session. `performedCommitted` is what "Done" in the focused Edit mode
-  // produced (null = performed as programmed); `performedDraft` is the working
-  // copy while that focused mode is open; `logWodEditMode` toggles the focused
-  // UI. All three reset with the rest of the score draft. Programmed data
-  // (wods / Engine V2 workouts / prescription_snapshot) is NEVER touched.
-  const [performedCommitted, setPerformedCommitted] = useState(null)
-  const [performedDraft, setPerformedDraft] = useState(null)
-  const [logWodEditMode, setLogWodEditMode] = useState(false)
-  // Member-side movement catalog index (for the Edit-mode substitution picker).
-  // Lazily fetched once, only when the athlete actually opens a Log WOD screen -
-  // never blocks anything if it fails (substitution just stays unavailable).
-  const [memberGymMovements, setMemberGymMovements] = useState([])
-  const memberMovementIndex = useMemo(() => buildMovementIndex(memberGymMovements), [memberGymMovements])
   // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
   // cu greutatea prescrisa a variantei alese pentru a detecta "Not RXd" (vezi
   // isNotRxd in workoutFormats.js). Semanata direct cu prescrisul la alegerea
@@ -7290,12 +7146,7 @@ function App() {
     if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
     if (screen === 'clasament' && user) fetchClasament()
     // INC-04 - leaving the logger discards the frozen logging context.
-    // P9.5.2 - and the athlete's PERFORMED overlay draft (re-entry starts clean;
-    // an existing log's overlay is re-seeded by onEditWod).
-    if (screen !== 'logWOD' && screen !== 'logSkill') {
-      setLogCtx(null)
-      setPerformedCommitted(null); setPerformedDraft(null); setLogWodEditMode(false)
-    }
+    if (screen !== 'logWOD' && screen !== 'logSkill') setLogCtx(null)
     if (screen === 'home') {
       const d = new Date()
       setDataAcasa(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
@@ -8918,19 +8769,6 @@ function App() {
       })
     }
 
-    // P9.5.2 - the athlete's PERFORMED overlay. Persisted ONLY when it
-    // materially differs from the frozen programmed prescription for this
-    // member (performedIsModified) - an untouched / reverted edit stores NULL
-    // (= performed as programmed). Fail closed: a structurally invalid draft is
-    // dropped rather than written. Never touches prescription_snapshot (that
-    // stays PROGRAMMED provenance) or the wods / Engine V2 rows.
-    let performedToSave = null
-    if (variantaAleasa !== null && snapshotVariantKey && performedCommitted
-        && performedIsModified(performedCommitted, frozenDocForSnapshot, snapshotVariantKey, memberGenderKey)
-        && validatePerformedPrescription(performedCommitted).valid) {
-      performedToSave = performedCommitted
-    }
-
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
@@ -8938,7 +8776,6 @@ function App() {
       format_type: variantaAleasa === null ? wodTip : null,
       notes: noteFull || null,
       ...(prescriptionSnapshot ? { prescription_snapshot: prescriptionSnapshot } : {}),
-      ...(performedToSave ? { performed_prescription: performedToSave } : {}),
       ...(loggedAt ? { logged_at: loggedAt } : {}),
       ...logFields,
     })
@@ -8973,9 +8810,7 @@ function App() {
           variantBg: varianta?.bg || null,
           result: logFields.result, timeResult: logFields.time_result,
           loggedAt: new Date().toISOString(),
-          // P9.5.2 - carry the just-saved performed overlay so isNotRxd sees it
-          // (a Modified performed workout is Not RX regardless of weight match).
-          notRxd: isNotRxd({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, activeLogFormatId, activeLogFormatConfig, miscariFinale, prescribedMovements),
+          notRxd: isNotRxd(logFields, prescribedWeight, activeLogFormatId, activeLogFormatConfig, miscariFinale, prescribedMovements),
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
@@ -10416,8 +10251,6 @@ function App() {
                           const dejaSelectata = variantaAleasa === i
                           setVariantaAleasa(dejaSelectata ? null : i); setWodMiscariCustom(null)
                           setWodWeightLogged(dejaSelectata ? '' : (wodZiData?.[weightKeyForVariant(v.nivel, userProfile?.gender)] || ''))
-                          // P9.5.2 - the performed overlay is variant-specific.
-                          setPerformedCommitted(null); setPerformedDraft(null); setLogWodEditMode(false)
                         }}
                           style={{
                             background: '#fff', border: '1px solid #ECECEC', borderRadius: '20px', boxSizing: 'border-box',
@@ -10817,11 +10650,6 @@ function App() {
                 setWodNote(parts.length > 1 ? parts[1] : '')
                 setWodWeightLogged(log.weight_logged || '')
                 setEditLogPrescribedWeight(log.wods?.[weightKeyForVariant(log.variant_level, userProfile?.gender)] || '')
-                // P9.5.2 - carry the log's performed overlay through the edit so
-                // it survives an .update (which never writes the column) and the
-                // Not-RX badge stays consistent. V1 has no structured re-edit UI
-                // on the edit-existing path, so it is read-through only.
-                setPerformedCommitted(log.performed_prescription || null); setPerformedDraft(null); setLogWodEditMode(false)
                 setPrevScreen('log')
                 setScreen('logWOD')
               }}
@@ -10904,46 +10732,9 @@ function App() {
             // untouched.
             const cheie = VARIANTE_CONFIG[variantaAleasa].key
             const structuredDisplay = composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })
-            // P9.5.2 - the athlete's committed PERFORMED overlay, if it
-            // materially differs from what was programmed. When active, the
-            // read-only workout rows below show what THEY did; the programmed
-            // prescription stays untouched in activePrescriptionDoc / snapshot.
-            const performedActive = !!performedCommitted && performedIsModified(performedCommitted, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
-            const performedDisplay = performedActive
-              ? composeStructuredWorkoutDisplay({ instances: performedCommitted.movements, mode: 'member', gender: memberGenderKey })
-              : structuredDisplay
-            const rows = performedDisplay
-              ? performedDisplay.movements.map(m => ({ line: m.line }))
+            const rows = structuredDisplay
+              ? structuredDisplay.movements.map(m => ({ line: m.line }))
               : (logWodZiData[cheie] || []).map(line => ({ line }))
-            // Edit is offered ONLY for a structured variant with a KNOWN member
-            // gender (§57 - an unknown gender against sex-specific prescriptions
-            // is a HARD STOP for this path: hide Edit rather than guess). Legacy
-            // free-text workouts (no structuredDisplay) never show Edit (§42).
-            const editEligible = !!structuredDisplay && memberGenderKey != null && !!frozenVariantKey
-            const openPerformedEdit = () => {
-              setPerformedDraft(performedCommitted
-                ? snapshotPrescriptionDoc(performedCommitted)
-                : buildPerformedPrescriptionDraft({ doc: activePrescriptionDoc, variantKey: frozenVariantKey }))
-              setLogWodEditMode(true)
-            }
-            const commitPerformedEdit = () => {
-              const draft = performedDraft
-              const check = validatePerformedPrescription(draft)
-              if (!check.valid) { showToast(t.performedEditInvalid); return }
-              const matches = performedMatchesProgrammed(draft, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
-              setPerformedCommitted(matches ? null : draft)
-              setPerformedDraft(null)
-              setLogWodEditMode(false)
-            }
-            if (logWodEditMode) {
-              return (
-                <PerformedEditPanel
-                  draft={performedDraft} gender={memberGenderKey} movementIndex={memberMovementIndex}
-                  onChange={setPerformedDraft}
-                  onCancel={() => { setPerformedDraft(null); setLogWodEditMode(false) }}
-                  onDone={commitPerformedEdit} t={t} />
-              )
-            }
             const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig)
             const scheduleLines = formatMemberScheduleLines(activeLogFormatId, activeLogFormatConfig, t)
             const dispatchScorePatch = (patch) => {
@@ -10959,22 +10750,9 @@ function App() {
             }
             return (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #ECECEC', background: '#fff' }}>
-                    <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} size={6} />
-                    <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
-                  </div>
-                  {performedActive && (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: '999px', background: '#FEF3E2', border: '1px solid #F5D9AE' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.04em', color: '#B7791F' }}>{t.performedModifiedTag}</span>
-                    </div>
-                  )}
-                  {editEligible && (
-                    <button onClick={openPerformedEdit}
-                      style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', textDecoration: 'underline', textUnderlineOffset: '3px', cursor: 'pointer', padding: '4px 0' }}>
-                      {performedActive ? t.performedEditAdjust : t.performedEditOpen}
-                    </button>
-                  )}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #ECECEC', background: '#fff', marginBottom: '20px' }}>
+                  <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} size={6} />
+                  <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
                 </div>
 
                 <div style={{ marginBottom: '26px' }}>
