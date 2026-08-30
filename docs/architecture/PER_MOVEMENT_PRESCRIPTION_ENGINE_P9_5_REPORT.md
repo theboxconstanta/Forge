@@ -1286,3 +1286,185 @@ rollback interim `index-DzeYhQet.js`.
 Incident remediation only. **P10 NOT STARTED.** Owner manual acceptance of
 P9.5.2 (report §K, the 8-step checklist) is still required — the incident fix
 does not constitute acceptance.
+
+---
+
+# P9.5.3 — LOG WOD SCORE UX OWNER ACCEPTANCE FIX
+
+Narrow owner-acceptance correction on the live structured Log WOD (`logWodPrimaryPath`).
+**No DB change. No scoring-engine change. No new App.jsx effect/hook.**
+Deployed `2fac678`, bundle `index-CXLgBTlB.js`, `app_version`
+`prescription-engine-p9-5-3-score-ux-20260830`.
+
+## A. OWNER FINDINGS
+
+1. A global **`Weight [ ] kg`** field still rendered inside YOUR SCORE for a
+   structured per-movement metcon — redundant now that each movement shows its
+   own load and the P9.5.2 Edit flow records performed loads per movement.
+2. **`3 RFT / Time cap 20:00`** showed the time inputs directly, with no
+   explicit **Finished / Did not finish** choice. Completion was inferred from
+   which field held a value.
+
+Owner's exact workout: `wods` `addce155-…` (2026-08-30, CrossFit C15) — RFT,
+`duration "20:00"`, `format_config {rounds: 3}`, structured `movement_prescriptions`
+(Wall Ball @ 9/6, Power Clean @ 61/43, Row 32/43 cal, DB Power Snatch @ 22.5/15,
+Push-up).
+
+## B. ROOT CAUSE — AUXILIARY WEIGHT
+
+`App.jsx` computes `prescribedWeightPentruLog = (structuredHasLoad ? 'structured' : '')`
+for a structured variant and passes it to `<UniversalScoreInput prescribedWeight=…>`.
+`UniversalScoreInput` renders its `weightBlock` whenever `prescribedWeight` is
+truthy — so `'structured'` (a gate sentinel) forced the field on for every
+structured metcon with any load. For this multi-load workout the RX standard is
+`MULTI_LOAD_STANDARD` → `liveRxStatus` null → a bare Weight box with no badge,
+pure noise. The field is legacy-auxiliary (`weight_logged`), never the score.
+
+## C. ROOT CAUSE — MISSING COMPLETION SELECTOR
+
+`scoreDefinitionFor(formatId, formatConfig)` only ever received `format_config`.
+The cap-family formats store their cap in **`wods.duration`** ("20:00"), NOT
+`format_config.timeCapSec` — verified across production: **RFT 15/15** have a
+`duration`, **0** have `timeCapSec` or `durationSec`; For Time 15/16 have a
+`duration`, 1 has `timeCapSec`. So `scoreDefinitionFor('RFT', {rounds: 3})` saw
+no cap → returned `{ kind: 'TIME' }` → `TimeScoreBlock` `capable = false` → the
+`FinishedCappedToggle` was never rendered. The "20:00" the owner saw comes from
+`WorkoutFormatHeader`'s `legacyDuration` prop, a display-only path that
+`scoreDefinition` does not consume.
+
+## D. FIX
+
+- **`scoreDefinition.js`** — new `opts.legacyDurationSec` (the WOD's canonical
+  stated time in seconds). In the `fortime_or_amrap` branch:
+  `cap = timeCapOf(config) || (TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) && legacyDurationSec > 0 ? legacyDurationSec : null)`.
+  Same fallback chain as `estimateTotalDurationSec`. Never parses rendered text —
+  `wods.duration` is a structured column. `TIME_CAP_LABEL_FORMAT_IDS`
+  (`For Time / Chipper / Ladder / RFT / Partner WOD`) is now exported from
+  `workoutFormats.js`. AMRAP (and Partner WOD w/ `baseFormat: 'AMRAP'`) is not in
+  the set → its `durationSec` is a prescribed duration, not a cap → no toggle.
+- **`App.jsx` `logWodPrimaryPath`** (2 lines, at the component boundary, no new
+  hook):
+  - `scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig, { legacyDurationSec: timeToSec(logWodZiData?.duration) })`
+  - `primaryPrescribedWeight = structuredDisplay ? '' : prescribedWeightPentruLog`
+    → passed to `<UniversalScoreInput>` instead of `prescribedWeightPentruLog`.
+    Structured metcon → no global Weight; legacy/non-structured → unchanged.
+- **`UniversalScoreInput.jsx`** — toggle copy `"Time Capped"` → **`"Did not finish"`**
+  (`logWodDidNotFinishLabel`, RO "Nu am terminat"). Presentation only: the
+  internal `mode` stays `'finished'`/`'capped'`, `completion_state` stays
+  `completed`/`capped`, `scoreDefinition.kind` stays `TIME_CAPPED`.
+
+## E. WEIGHT_LOGGED COMPATIBILITY
+
+`wod_logs.weight_logged` — column, validator, historical rows, legacy readers,
+`composeWodLogFields` — **all untouched**. This removes a redundant UI
+affordance from one structured path only. A legacy / non-structured workout
+still gets its Weight field (`primaryPrescribedWeight === prescribedWeightPentruLog`
+when `structuredDisplay` is null). The non-primary logger (`<FormatLogger>`,
+compose/score step, section-scored, free-log, edit-existing) is not touched —
+it still receives `prescribedWeightPentruLog`.
+
+## F. SCORE KIND = LOAD COMPATIBILITY
+
+`kind: 'LOAD'` (1RM / max load) renders its own `Result [ ] kg` field —
+independent of `weightBlock`. `logWodPrimaryPath` never passes
+`opts.singleValueUnit`, so a `single_value` programmed workout resolves to
+`FREE` and delegates to `<FormatLogger>` unchanged. A structured single-load
+lift edited to a scaled load uses the P9.5.2 Edit flow. Test §41 asserts a
+`LOAD` def with `prescribedWeight=''` still shows the kg Result input.
+
+## G. FINISHED SEMANTICS
+
+`Finished` selected → `TimeScoreBlock` shows only `<TimeRow>`; `pick('finished')`
+clears `roundsCompleted` / `additionalReps` / `partialReps`. Save →
+`composeFortimeOrAmrapFields` → `completion_state = completed`, valid
+`time_result`, no capped payload. Unchanged from P9.5.1.
+
+## H. DID NOT FINISH SEMANTICS
+
+`Did not finish` selected → shows `<RoundsAndAdditionalReps>` (non-sequential) or
+`<PartialRepsRows>` (sequential) + the `Time cap: mm:ss` reminder;
+`pick('capped')` clears `time`. Save → `completion_state = capped`,
+`time_result = null`, `result` = the existing P9.5.1 canonical
+`composeCappedRoundsResult` form ("2 runde + 43"). No fake finishing time. No
+`total_work` / `total_reps` field. Leaderboard sorting unchanged (§21).
+
+## I. EDIT COMPATIBILITY
+
+The P9.5.2 **Edit** link, `PerformedEditPanel`, movement substitution,
+`performed_prescription` contract, and Modified / Not-RX classification are all
+unchanged. Verified live: Edit link present on the owner's workout with the new
+score UX.
+
+## J. LEGACY COMPATIBILITY
+
+Non-structured workouts, free-log, skill logs, section-scored flows, and
+historical edit flows all keep their existing Weight behaviour and their
+existing logger (`<FormatLogger>` for non-primary; `scoreKindForExistingLog`
+unchanged). The `legacyDurationSec` fallback only ever *adds* a `TIME_CAPPED`
+resolution where a stated cap exists; a For Time with no stated time at all
+stays `TIME` (§14).
+
+## K. TESTS
+
+- `src/p953LogWodScoreUx.test.jsx` (11) — the owner's exact case: no Weight
+  field, Finished / Did-not-finish selector present, "Time Capped" copy gone,
+  Finished→time-only, Did-not-finish→rounds+additional-reps+"Time cap: 20:00",
+  toggle both directions no stale leakage, Weight NOT globally removed (legacy +
+  `LOAD`), For Time with no cap → no selector.
+- `src/scoreDefinition.test.js` +5 — `legacyDurationSec` for RFT / For Time /
+  Chipper / Ladder / Partner WOD(For Time); NOT for AMRAP; `0` / `NaN` / missing
+  → `TIME`; explicit `format_config.timeCapSec` still wins.
+- `src/universalScoreInput.test.jsx` — 5 role matchers updated
+  `/time capped/i` → `/did not finish/i`.
+- Suite **1317 pass** (+ 9 pre-existing Deno `@std/assert` file failures,
+  unrelated). `eslint` + `vite build` clean. `appHookOrderIntegrity.test.js`
+  (INC-P9.5.2-01 regression) still green. forge-admin-web untouched (no shared
+  contract file changed).
+
+## L. PRODUCTION IMPACT
+
+| | |
+|---|---|
+| migrations | **0** |
+| rows modified | **0** |
+| `wods` | untouched |
+| `workouts` | untouched |
+| `wod_logs` | untouched (schema + rows) |
+| `movements` | untouched |
+
+Only `app_version` (`current` row) was updated, and only to signal clients.
+
+## M. DEPLOYMENT
+
+- commit `2fac678` (branch `fix/p9-5-3-score-ux` → fast-forward `main`)
+- prod bundle `index-CXLgBTlB.js` — verified contains `Did not finish` /
+  `Nu am terminat` / `legacyDurationSec`, and still `performedEditTitle`
+  (P9.5.2 intact)
+- `app_version` `prescription-engine-p9-5-3-score-ux-20260830`
+- **Production smoke test** (real logged-in session, the owner's Aug-30
+  structured RFT, hard reload): header `3 RFT / Time cap 20:00` + `Edit` link;
+  movement rows `12 Wall Ball @ 9 kg` … `@ 22.5 kg`; YOUR SCORE →
+  `[ Finished ] [ Did not finish ]`, **no Weight field**; Finished → `TIME
+  17 : 42` only; Did not finish → `ROUNDS COMPLETED 2` / `ADDITIONAL REPS 43` /
+  `Time cap: 20:00`, time hidden; no calculation text, no icons; nav back to
+  Home clean, no error boundary; nothing saved.
+
+## N. OWNER MANUAL ACCEPTANCE
+
+1. Open the **3 RFT + 20:00 cap** workout (2026-08-30).
+2. Confirm: **no Weight box** in YOUR SCORE.
+3. Confirm: **Finished / Did not finish** selector visible.
+4. **Finished** -> `17:42` -> Save. (Journal shows a finish time.)
+5. **Did not finish** -> `2` rounds + `43` reps -> Save. (Journal / leaderboard
+   show the capped result; no time.)
+6. **Edit** -> Power Clean `61` -> `50` -> Done -> Save, then reopen the log.
+7. Open a **1RM / max-load** workout -> confirm the `kg` score input is still
+   there.
+8. Open a **legacy** (non-structured) workout -> confirm the logger and its
+   Weight field still work.
+
+## HARD STOP
+
+**P10 NOT STARTED.** The entire P9 series is **not** declared closed — owner
+manual acceptance (§N above, plus the P9.5.2 §K checklist) remains the final
+gate.
