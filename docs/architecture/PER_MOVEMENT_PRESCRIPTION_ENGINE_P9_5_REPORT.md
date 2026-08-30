@@ -1271,8 +1271,11 @@ Smoke test in a real browser (hard reload → SW bypass onto the fixed bundle):
 
 ## M. BUNDLE
 
-`index-CId6cNID.js` (was `index-CLh-9WPx.js` crashing; rollback interim was
-`index-DzeYhQet.js`).
+Browser-verified fixed app code: `index-CId6cNID.js` (commit `cf8e94e`). Current
+prod: `index-QKZIf9U0.js` (commit `4b5cc09` — this closure doc; app JS identical
+to `cf8e94e` bar the embedded `VERCEL_GIT_COMMIT_SHA` string, which is why the
+content hash changes on every commit). Crashing bundle was `index-CLh-9WPx.js`;
+rollback interim `index-DzeYhQet.js`.
 
 ## N. APP_VERSION
 
