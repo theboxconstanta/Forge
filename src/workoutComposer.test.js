@@ -287,3 +287,45 @@ describe('composeSection - scaling variants', () => {
     expect(beginner.blocks[0].movements).toEqual(['Thrusters @ 20kg', 'Ring Rows'])
   })
 })
+
+// P9.4 - the shared structured-workout projection feeds composeSection its
+// movement lines (Coach Preview) instead of the legacy text array.
+describe('composeSection - P9.4 structured lines', () => {
+  const s = {
+    isPrimary: true, format: 'RFT', formatConfig: { rounds: 3 }, name: 'Test',
+    variants: { rx: { movements: ['STALE legacy line'] } },
+  }
+  const structuredLines = ['20 Power Snatch @ 45/30 kg', '200 m Run', '20 DB Snatch @ 22.5/15 kg']
+
+  it('uses the passed structured lines as the block movements, ignoring legacy text', () => {
+    const out = composeSection(s, 'rx', structuredLines)
+    expect(out.blocks[0].movements).toEqual(structuredLines)
+    expect(out.primary.text).toBe('3 ROUNDS FOR TIME') // heading still from format
+    expect(out.identity).toEqual({ name: 'Test' })
+  })
+
+  it('null structured lines -> unchanged legacy behaviour', () => {
+    const out = composeSection(s, 'rx', null)
+    expect(out.blocks[0].movements).toEqual(['STALE legacy line'])
+  })
+
+  it('scheme hoisting still applies to structured lines (common leading number)', () => {
+    const out = composeSection(
+      { isPrimary: true, format: 'RFT', formatConfig: { rounds: 3 }, name: '', variants: { rx: { movements: [] } } },
+      'rx',
+      ['20 Power Snatch @ 45 kg', '20 DB Snatch @ 22.5 kg', '20 Wallball @ 9 kg'],
+    )
+    expect(out.blocks[0].scheme).toBe('20')
+    expect(out.blocks[0].movements).toEqual(['Power Snatch @ 45 kg', 'DB Snatch @ 22.5 kg', 'Wallball @ 9 kg'])
+  })
+
+  it('mixed reps (a distance line breaks the common prefix) -> no hoist, reps stay per line', () => {
+    const out = composeSection(
+      { isPrimary: true, format: 'RFT', formatConfig: { rounds: 3 }, name: '', variants: { rx: { movements: [] } } },
+      'rx',
+      structuredLines,
+    )
+    expect(out.blocks[0].scheme).toBe(null)
+    expect(out.blocks[0].movements).toEqual(structuredLines)
+  })
+})

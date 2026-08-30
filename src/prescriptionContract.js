@@ -420,11 +420,19 @@ export function renderInstanceLine({ name, reps, load, distance, calories }) {
   return line
 }
 
+/** Resolve a raw INSTANCE array (not a variant doc) to display objects — the
+ * same engine as resolveVariantForMember, for surfaces that hold the instance
+ * list directly (the builder's Coach Preview). */
+export function resolveInstancesForDisplay(instances, gender) {
+  if (!Array.isArray(instances)) return null
+  return instances.map((mv) => resolveMovementInstance(mv, gender))
+}
+
 /** Convenience: resolve + render one variant's whole movement list for a member. */
 export function resolveVariantForMember(doc, variantKey, gender) {
   const vObj = doc?.variants?.[variantKey]
   if (!vObj || !Array.isArray(vObj.movements)) return null
-  return vObj.movements.map((mv) => resolveMovementInstance(mv, gender))
+  return resolveInstancesForDisplay(vObj.movements, gender)
 }
 
 /** P9 - the member-resolved DISPLAY LINES for one variant, or null when this
@@ -435,6 +443,38 @@ export function resolveVariantDisplayLines(doc, variantKey, gender) {
   const resolved = resolveVariantForMember(doc, variantKey, gender)
   if (!resolved || resolved.length === 0) return null
   return resolved.map((r) => r.line)
+}
+
+// ============================================================================
+// P9.4 — THE one shared structured-workout presentation projection.
+//
+// Coach Preview, Member workout display, logger and the prescription snapshot
+// ALL resolve their movement lines through resolveMovementInstance /
+// renderInstanceLine. This is the single entry point every surface calls; the
+// ONLY difference between them is the resolution CONTEXT:
+//
+//   mode 'coach'             -> gender-neutral    "20 Power Snatch @ 45/30 kg"
+//   mode 'member' + gender   -> that athlete      "@ 45 kg"  /  "@ 30 kg"
+//   mode 'member', no gender -> gender-neutral    (identical to coach)
+//
+// It owns: movement order, per-movement reps, load / distance / calorie
+// formatting, universal vs sex-specific display, repeated instances, decimals,
+// units. TITLE / SCHEME is the caller's format layer (workoutComposer for the
+// coach preview, formatMemberScheduleLines for the member screen) — it is fed
+// THESE lines instead of legacy text.
+//
+// Accepts EITHER `{ doc, variantKey }` (member / logger — reads
+// wods.movement_prescriptions) OR `{ instances }` (the builder — holds the
+// instance array directly). Returns null when there is no structured
+// prescription (caller keeps its legacy text rendering).
+// ============================================================================
+export function composeStructuredWorkoutDisplay({ doc, variantKey, instances, mode = 'member', gender = null } = {}) {
+  const effectiveGender = mode === 'coach' ? null : (gender ?? null)
+  const resolved = Array.isArray(instances)
+    ? (instances.length ? resolveInstancesForDisplay(instances, effectiveGender) : null)
+    : resolveVariantForMember(doc, variantKey, effectiveGender)
+  if (!resolved || resolved.length === 0) return null
+  return { lines: resolved.map((r) => r.line), movements: resolved }
 }
 
 /** P9 - normalise a display-side scaling level ('rx'|'intermediate'|'beginner'|

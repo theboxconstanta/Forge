@@ -276,13 +276,20 @@ function composeChained(section, fmt, config, identity) {
  *   scoreNote: string|null,   // cod inchis, fraza reala decisa la randare
  * }
  */
-export function composeSection(section, variantKey) {
+export function composeSection(section, variantKey, structuredLines = null) {
   const format = section?.format
   if (!format) return { identity: { name: null }, primary: { text: '' }, blocks: [], scoreNote: null }
 
   const fmt = getFormat(format)
   const config = section?.formatConfig || {}
-  const movements = section?.variants?.[variantKey]?.movements || []
+  // P9.4 - when the caller has resolved the variant's STRUCTURED prescription
+  // (composeStructuredWorkoutDisplay), those lines are the movement source, so
+  // the Coach Preview reads exactly what the member / logger / snapshot will
+  // (same renderInstanceLine engine). Falls back to the legacy text array for
+  // legacy-only sections. Heading/scheme/block composition below is unchanged.
+  const movements = Array.isArray(structuredLines)
+    ? structuredLines
+    : (section?.variants?.[variantKey]?.movements || [])
   const identity = { name: (section?.name || '').trim() || null }
 
   if (fmt.family === 'mixed') return composeMixed(section, fmt, config, movements, identity)

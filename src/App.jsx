@@ -64,12 +64,12 @@ import { ComposedWorkoutView } from './ComposedWorkoutView'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
-  newMovementInstance, parseWorkoutPaste, resolveVariantDisplayLines, variantKeyFromLevel,
+  newMovementInstance, parseWorkoutPaste, variantKeyFromLevel,
   buildMovementIndex, resolveCatalogMovementByName, resolveCatalogMovementForInstance,
   resolveInstanceCapability, backfillInstanceIdentity, assertCapabilityIntegrity,
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
-  resolveNumericInput,
+  resolveNumericInput, composeStructuredWorkoutDisplay,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
@@ -934,7 +934,14 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
 // Jurnal/Clasament) - validare pe WOD-uri reale, din toate familiile, inainte
 // sa devina noua fundatie de randare (decizia userului).
 function ComposedWorkoutPreview({ section, t }) {
-  const composed = composeSection(section, 'rx')
+  // P9.4 - ONE shared structured-workout projection. When the RX variant carries
+  // structured instances, the preview's movement lines come from the SAME
+  // resolveMovementInstance engine the member screen / logger / snapshot use
+  // (gender-neutral = coach mode: "20 Power Snatch @ 45/30 kg"). A legacy-only
+  // section keeps its regenerated text lines. composeSection still owns the
+  // TITLE / SCHEME / block layout.
+  const structured = composeStructuredWorkoutDisplay({ instances: section?.variants?.rx?.instances, mode: 'coach' })
+  const composed = composeSection(section, 'rx', structured ? structured.lines : null)
   if (!composed || composed.blocks.length === 0) return null
   return (
     <div style={{ background: '#F7F7F5', border: '1px solid #eee', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
@@ -942,6 +949,16 @@ function ComposedWorkoutPreview({ section, t }) {
       <ComposedWorkoutView composed={composed} t={t} />
     </div>
   )
+}
+
+// P9.4 - one movement line for the Member workout screen. A STRUCTURED line
+// (from composeStructuredWorkoutDisplay - the same engine as the Coach Preview /
+// logger / snapshot) is already gender-resolved and clean: render it verbatim.
+// The rxEngine text munging (resolveMovementDisplayText collapses a "45/30kg"
+// pair; cleanMovementDisplayText strips AI-parser asides) is ONLY for the
+// legacy free-text movements_rx path.
+function memberMovementLine(line, structured, genderKey) {
+  return structured ? line : cleanMovementDisplayText(resolveMovementDisplayText(line, genderKey))
 }
 
 // ===========================================================================
@@ -9119,9 +9136,11 @@ function App() {
   const metconVariantsForDisplay = (section, doc = activePrescriptionDoc, genderKey = memberGenderKey) =>
     metconScalingVariantsForDisplay(section).map((v, i) => {
       const vk = variantKeyFromLevel(v.level)
-      const structuredLines = vk ? resolveVariantDisplayLines(doc, vk, genderKey) : null
-      if (structuredLines && structuredLines.length) {
-        return { ...VARIANTE_CONFIG[i], ...v, movements: structuredLines, weightMale: null, weightFemale: null, structured: true }
+      // P9.4 - the ONE shared structured-workout projection (also feeds the
+      // logger + Coach Preview). member mode + the athlete's gender.
+      const structured = vk ? composeStructuredWorkoutDisplay({ doc, variantKey: vk, mode: 'member', gender: genderKey }) : null
+      if (structured && structured.lines.length) {
+        return { ...VARIANTE_CONFIG[i], ...v, movements: structured.lines, weightMale: null, weightFemale: null, structured: true }
       }
       return { ...VARIANTE_CONFIG[i], ...v }
     })
@@ -9150,12 +9169,14 @@ function App() {
     ? editLogFormatConfig
     : logTargetSection ? logTargetSection.formatConfig
     : (variantaAleasa !== null ? logWodZiData?.format_config : wodFormatConfig)
-  // P9 - the member-resolved structured lines for the frozen variant, or null
-  // (legacy fallback). Read from activePrescriptionDoc which, in a frozen flow,
-  // is logCtx.prescriptionDoc (frozen at click) - never re-resolved from live wods.
+  // P9 / P9.4 - the member-resolved structured lines for the frozen variant, via
+  // the ONE shared projection (identical to what the member saw on the Home
+  // card and to the prescription snapshot). Read from activePrescriptionDoc
+  // which, in a frozen flow, is logCtx.prescriptionDoc (frozen at click) -
+  // never re-resolved from live wods. null -> legacy text fallback.
   const frozenVariantKey = variantaAleasa !== null ? variantKeyFromLevel(VARIANTE_CONFIG[variantaAleasa]?.nivel) : null
   const structuredLogLines = (variantaAleasa !== null && frozenVariantKey)
-    ? resolveVariantDisplayLines(activePrescriptionDoc, frozenVariantKey, memberGenderKey)
+    ? (composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })?.lines ?? null)
     : null
   const miscariPentruLog = editLogId
     ? editLogMiscari
@@ -10174,7 +10195,7 @@ function App() {
                           <div style={{ marginTop: '16px' }}>
                             {miscari.map((m, mi) => (
                               <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                {cleanMovementDisplayText(resolveMovementDisplayText(m, activeAthleteGenderKey))}
+                                {memberMovementLine(m, v.structured, activeAthleteGenderKey)}
                               </div>
                             ))}
                           </div>
@@ -10237,7 +10258,7 @@ function App() {
                                 <div style={{ marginTop: '16px' }}>
                                   {miscari.map((m, mi) => (
                                     <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                      {cleanMovementDisplayText(resolveMovementDisplayText(m, activeAthleteGenderKey))}
+                                      {memberMovementLine(m, v.structured, activeAthleteGenderKey)}
                                     </div>
                                   ))}
                                 </div>

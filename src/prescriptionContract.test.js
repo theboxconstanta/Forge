@@ -601,3 +601,79 @@ describe('P9.2 — decimals survive the structured round-trip', () => {
     expect(art.weightFemale).toBe('15')
   })
 })
+
+// ============================================================================
+// P9.4 - the ONE shared structured-workout presentation projection
+// ============================================================================
+import { composeStructuredWorkoutDisplay, resolveInstancesForDisplay } from './prescriptionContract.js'
+
+describe('P9.4 - composeStructuredWorkoutDisplay (one model, coach == member-unknown)', () => {
+  const instances = [
+    { instanceId: 'mi_a', name: 'Power Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
+    { instanceId: 'mi_b', name: 'Run', distance: { mode: 'universal', value: 200, unit: 'm' } },
+    { instanceId: 'mi_c', name: 'DB Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 22.5, female: 15, unit: 'kg' } },
+    { instanceId: 'mi_d', name: 'Wallball', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 9, female: 6, unit: 'kg' } },
+  ]
+  const doc = { version: 1, variants: { rx: { movements: instances } } }
+
+  it('coach mode -> gender-neutral (both values), from an instance list', () => {
+    expect(composeStructuredWorkoutDisplay({ instances, mode: 'coach' }).lines).toEqual([
+      '20 Power Snatch @ 45/30 kg', '200 m Run', '20 DB Snatch @ 22.5/15 kg', '20 Wallball @ 9/6 kg',
+    ])
+  })
+
+  it('member male / female / unknown, from a variant doc', () => {
+    expect(composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'member', gender: 'male' }).lines).toEqual([
+      '20 Power Snatch @ 45 kg', '200 m Run', '20 DB Snatch @ 22.5 kg', '20 Wallball @ 9 kg',
+    ])
+    expect(composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'member', gender: 'female' }).lines).toEqual([
+      '20 Power Snatch @ 30 kg', '200 m Run', '20 DB Snatch @ 15 kg', '20 Wallball @ 6 kg',
+    ])
+    expect(composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'member', gender: null }).lines).toEqual(
+      composeStructuredWorkoutDisplay({ instances, mode: 'coach' }).lines,
+    )
+  })
+
+  it('coach mode == member-unknown-gender (identical lines)', () => {
+    expect(composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'coach' }).lines)
+      .toEqual(composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'member', gender: null }).lines)
+  })
+
+  it('null when there is no structured prescription (caller keeps legacy text)', () => {
+    expect(composeStructuredWorkoutDisplay({ doc: { version: 1, variants: {} }, variantKey: 'rx', mode: 'coach' })).toBe(null)
+    expect(composeStructuredWorkoutDisplay({ instances: [], mode: 'coach' })).toBe(null)
+    expect(composeStructuredWorkoutDisplay({ instances: null, mode: 'coach' })).toBe(null)
+    expect(composeStructuredWorkoutDisplay({})).toBe(null)
+  })
+
+  it('repeated movement instances stay distinct + ordered', () => {
+    const rep = [
+      { instanceId: '1', name: 'Power Clean', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 60, female: 40, unit: 'kg' } },
+      { instanceId: '2', name: 'Power Clean', reps: { mode: 'universal', value: 10 }, load: { mode: 'sex_specific', male: 70, female: 47.5, unit: 'kg' } },
+    ]
+    expect(composeStructuredWorkoutDisplay({ instances: rep, mode: 'member', gender: 'female' }).lines)
+      .toEqual(['10 Power Clean @ 40 kg', '10 Power Clean @ 47.5 kg'])
+  })
+
+  it('decimals + calories + distance carried through without rounding', () => {
+    const mixed = [
+      { instanceId: 'r', name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
+      { instanceId: 'd', name: 'Run', distance: { mode: 'universal', value: 1.5, unit: 'km' } },
+      { instanceId: 'l', name: 'Snatch', reps: { mode: 'universal', value: 5 }, load: { mode: 'universal', value: 22.25, unit: 'kg' } },
+    ]
+    expect(composeStructuredWorkoutDisplay({ instances: mixed, mode: 'coach' }).lines)
+      .toEqual(['15/12 Cal Row', '1.5 km Run', '5 Snatch @ 22.25 kg'])
+  })
+
+  it('member display == logger display == snapshot line (same engine)', () => {
+    const memberLines = composeStructuredWorkoutDisplay({ doc, variantKey: 'rx', mode: 'member', gender: 'female' }).lines
+    const snap = buildPrescriptionSnapshot({ doc, variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    expect(snap.movements.map((m) => m.displayLine)).toEqual(memberLines)
+  })
+
+  it('resolveInstancesForDisplay is the shared engine (resolveVariantForMember delegates to it)', () => {
+    const a = resolveInstancesForDisplay(instances, 'male').map((r) => r.line)
+    const b = resolveVariantForMember(doc, 'rx', 'male').map((r) => r.line)
+    expect(a).toEqual(b)
+  })
+})
