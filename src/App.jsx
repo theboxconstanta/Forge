@@ -72,6 +72,19 @@ import {
   resolveNumericInput, composeStructuredWorkoutDisplay,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
+import { MovementIcon } from './movementIcons.jsx'
+import { resolveMovementIconKey } from './movementIcons.js'
+import { scoreDefinitionFor } from './scoreDefinition'
+import UniversalScoreInput from './UniversalScoreInput'
+
+// P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
+// name part and the trailing "@ x" prescription part, for the right-aligned
+// read-only Log WOD movement row. A line with no " @ " is all name.
+function splitPrescriptionLine(line) {
+  const s = String(line || '')
+  const i = s.lastIndexOf(' @ ')
+  return i === -1 ? { namePart: s, rxPart: null } : { namePart: s.slice(0, i), rxPart: s.slice(i + 3) }
+}
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
@@ -9156,6 +9169,10 @@ function App() {
   // (logCtx) during a fresh logging session, so it always belongs to the
   // clicked workout even if the live workout state drifts afterward.
   const logTargetSection = logTargetSectionId ? logAdditionalScoredSectionsV.find(s => s.id === logTargetSectionId) : null
+  // P9.5 - the primary-metcon Log WOD flow (a programmed workout, not an edit,
+  // not a section-scored log, not a free log). This path renders the new
+  // single-screen Universal Log WOD; every other path keeps its existing UI.
+  const logWodPrimaryPath = screen === 'logWOD' && !editLogId && !logTargetSectionId && variantaAleasa !== null && !!logWodZiData
   // Formatul activ pentru ecranul logWOD (oficial daca exista wodZiData, altfel
   // ales liber de membru) - inlocuieste vechiul isAmrapLog/miscariPentruAmrapLog,
   // acum generalizat prin catalogul din workoutFormats.js (FormatLogger).
@@ -10688,7 +10705,81 @@ function App() {
                 placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
                 weightUnit={userProfile?.weight_unit} t={t} />
             </div>
-          ) : logWodStep === 'compose' ? (
+          ) : logWodPrimaryPath ? (() => {
+            // P9.5 - Universal Log WOD (structured or legacy programmed workout).
+            // ONE clean screen: variant badge -> read-only workout (P9.4
+            // projection + icons) -> YOUR SCORE (adaptive) -> SAVE. No "Chosen
+            // variant" card, no "TODAY'S WORKOUT", no SortableList/drag, no
+            // Quick Add, no salmon. Frozen identity (logCtx) untouched.
+            const cheie = VARIANTE_CONFIG[variantaAleasa].key
+            const structuredDisplay = composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })
+            const rows = structuredDisplay
+              ? structuredDisplay.movements.map(m => ({ line: m.line, iconKey: resolveMovementIconKey(m) }))
+              : (logWodZiData[cheie] || []).map(line => ({ line, iconKey: 'OTHER' }))
+            const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig)
+            const scheduleLines = formatMemberScheduleLines(activeLogFormatId, activeLogFormatConfig, t)
+            const dispatchScorePatch = (patch) => {
+              if ('result' in patch) setWodResult(patch.result)
+              if ('time' in patch) setWodTime(patch.time)
+              if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
+              if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
+              if ('sets' in patch) setWodSets(patch.sets)
+              if ('stages' in patch) setWodChainedStages(patch.stages)
+              if ('completed' in patch) setWodCompleted(patch.completed)
+              if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
+            }
+            return (
+              <>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #ECECEC', background: '#fff', marginBottom: '20px' }}>
+                  <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} size={6} />
+                  <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
+                </div>
+
+                <div style={{ marginBottom: '26px' }}>
+                  <WorkoutFormatHeader formatId={activeLogFormatId} formatConfig={activeLogFormatConfig} legacyDuration={formatWodDurata(logWodZiData?.duration)} t={t} />
+                  {scheduleLines.prescriptionLines.map((l, i) => (
+                    <div key={i} style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: i === 0 ? '6px' : '2px' }}>{l}</div>
+                  ))}
+                  {rows.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      {rows.map((r, i) => {
+                        const { namePart, rxPart } = splitPrescriptionLine(r.line)
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '10px 0', borderTop: i > 0 ? '1px solid #F3F4F6' : 'none' }}>
+                            <MovementIcon iconKey={r.iconKey} size={22} style={{ color: '#0E0E0E', flexShrink: 0 }} />
+                            <span style={{ flex: 1, fontSize: '14px', color: '#0E0E0E', lineHeight: 1.4, minWidth: 0, wordBreak: 'break-word' }}>{namePart}</span>
+                            {rxPart && <span style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', flexShrink: 0, whiteSpace: 'nowrap' }}>@ {rxPart}</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {scheduleLines.metadataLines.map((l, i) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#9A9A9A', marginTop: i === 0 ? '14px' : '2px' }}>{l}</div>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.07em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
+                <UniversalScoreInput
+                  def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
+                  movements={miscariPentruLog} prescribedWeight={prescribedWeightPentruLog} rxStatus={liveRxStatus}
+                  value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
+                  onChange={dispatchScorePatch}
+                  weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
+                  <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+                </div>
+
+                <button onClick={saveWodLog} disabled={wodSaving}
+                  style={{ width: '100%', padding: '15px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '700', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>
+                  {wodSaving ? t.logWodSaving : (editLogId ? t.logWodSaveEdit : t.logWodSaveNew)}
+                </button>
+              </>
+            )
+          })() : logWodStep === 'compose' ? (
             <>
               {variantaAleasa !== null && (
                 <div style={{ background: VARIANTE_CONFIG[variantaAleasa].bg, borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
@@ -10781,7 +10872,7 @@ function App() {
             </>
           ) : null}
 
-          {(editLogId || logWodStep === 'score') && (
+          {!logWodPrimaryPath && (editLogId || logWodStep === 'score') && (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             {!editLogId && !logTargetSectionId && (
               <div onClick={() => setLogWodStep('compose')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#888', cursor: 'pointer', marginBottom: '14px' }}>

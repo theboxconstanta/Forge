@@ -1,10 +1,12 @@
 # Per-Movement Prescription Engine — P9.5 Universal Log WOD + Scoring UX + Movement Icons
 
 Date: 2026-08-30
-Status: **PHASE A/B/C complete (read-only audit + universal score contract +
-schema determination). Awaiting owner confirmation of the contract + icon
-approach before PHASE D–F (the Log WOD UI rebuild + icon subsystem).**
-**P10 NOT STARTED.**
+Status: **PHASE A–K complete. Owner-approved 2026-08-30. Universal Log WOD +
+adaptive score input + movement-icon system SHIPPED. NO migration, zero
+production data. Owner manual acceptance pending.** **P10 NOT STARTED.**
+
+> §A–T below = the pre-implementation audit/architecture (PHASE A–C).
+> The **P9.5 IMPLEMENTATION REPORT (PHASE D–K)** is appended at the end.
 
 ---
 
@@ -473,3 +475,231 @@ performance readers / snapshot-first reads — untouched and out of scope.
 
 **Awaiting owner confirmation of §D (score contract) and §C.2/§G (client-side
 icon map, no migration) before PHASE D–F.**
+
+---
+---
+
+# P9.5 IMPLEMENTATION REPORT (PHASE D–K) — owner-approved 2026-08-30
+
+## A2. EXECUTIVE SUMMARY (implementation)
+
+Universal Log WOD shipped for the **primary programmed-metcon** flow: one clean
+single screen (variant badge -> read-only workout with movement icons -> YOUR
+SCORE -> SAVE), the explicit **[Finished] [Time Capped]** toggle, and a
+21-family movement-icon system resolved identity-first. **No migration, no
+production data touched.** Every P9-P9.4 invariant preserved; the score
+*computation* (`composeWodLogFields` and the `workoutFormats.js` helpers) is
+byte-unchanged - only the input UI feeding it changed. `FormatLogger` stays the
+engine for SETS / STAGES / free-log / section / skill / edit flows.
+
+## D2. UNIVERSAL LOG WOD — what shipped
+
+`App.jsx` `screen === 'logWOD'`, new guard `logWodPrimaryPath` =
+`!editLogId && !logTargetSectionId && variantaAleasa !== null && !!logWodZiData`.
+When true, one screen renders (the old two-step compose->score is collapsed);
+every other logWOD sub-flow (edit / section-scored / free log) is byte-identical.
+
+**Removed** (structured/programmed path only): "Chosen variant" colored card;
+"TODAY'S WORKOUT" label; `describeFormatConfig` duplicate line; `<SortableList>`
++ drag handles; "Continue -> Log Score" step; Quick-Add; salmon `#791F1F`
+section headers; nested card-in-card.
+
+**Kept**: back arrow "Log WOD"; small `RX` badge pill; `<WorkoutFormatHeader>`
+heading (same widget as the member Home card) + `formatMemberScheduleLines`
+prescription/metadata lines; read-only movement rows `[icon] name ... @ rx`;
+`YOUR SCORE`; adaptive score input; notes; one `SAVE` CTA; RX badge on the
+weight field.
+
+Movement rows: `composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc,
+variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })` — the
+**P9.4 projection, unchanged**, `.movements[]` carrying `canonicalMovementId` for
+the icon. Legacy-only workout -> `logWodZiData[variantKey]` text lines +
+`OTHER` icon. `splitPrescriptionLine()` splits `"12 Wall Ball @ 9 kg"` into
+name + `@ 9 kg` for the right-aligned layout; long names wrap (`wordBreak`), no
+horizontal overflow.
+
+## E2. UNIVERSAL SCORE INPUT — `src/UniversalScoreInput.jsx`
+
+Driven by `scoreDefinitionFor(formatId, formatConfig)` -> one `kind`:
+
+| kind | UI |
+|---|---|
+| `TIME` | `mm:ss`, no toggle |
+| `TIME_CAPPED` | **[Finished] [Time Capped]** segmented control (state by fill+weight, not colour alone — §35); Finished -> `mm:ss`; Time Capped -> Rounds + per-movement partial-reps rows (`sequential` -> partials only) + "Time cap: 20:00" |
+| `ROUNDS_REPS` | Rounds + per-movement partial reps |
+| `REPS` / `LOAD` / `DISTANCE` / `CALORIES` | one numeric field (P9.2 `resolveNumericInput` — comma/dot, `102,5`->`102.5`, integer-only for reps/calories) + unit suffix |
+| `NONE` | completion checkbox |
+| `SETS` / `STAGES` / `FREE` | **delegates to `<FormatLogger>` unchanged** |
+
+`value` / `onChange` contract is byte-identical to `FormatLogger`'s
+(`{ result, time, roundsCompleted, partialReps, sets, completed, weightLogged,
+stages }`), so `composeWodLogFields` reads it with **zero change**.
+
+**TOGGLE PAYLOAD CORRECTNESS (§3)** — enforced in `TimeScoreBlock.pick()`:
+- -> Finished: `onChange({ roundsCompleted: '', partialReps: [] })` — stale capped
+  work can never reach the payload.
+- -> Time Capped: `onChange({ time: '' })` — a stale finish time can never reach
+  the payload. `composeFortimeOrAmrapFields` then produces
+  `time_result: null, completion_state: 'capped'`.
+Verified by `universalScoreInput.test.jsx` (accumulated-value assertions).
+
+## F2. MOVEMENT ICON SYSTEM
+
+- `src/movementIconMap.json` — `{ [canonicalMovementId]: iconKey }` for all 465
+  platform movements. Seeded **offline once** from `category` /
+  `movement_pattern` / `allowed_prescription_metrics` / name-family analysis
+  (§17 — name matching only at seed time). Checked into the repo.
+- `src/movementIcons.js` — `resolveMovementIconKey(instanceOrId)` — **id-first**
+  (`instance.canonicalMovementId` -> map -> key), `'OTHER'` for id-less / unknown /
+  not-in-map. Always a valid key, never `undefined`.
+- `src/movementIcons.jsx` — `<MovementIcon iconKey size>` — `switch` over 21
+  inline line-icon SVGs (24x24, `stroke="currentColor"`, one family);
+  `lucide-react` supplies `Dumbbell` + `Bike`. `aria-hidden` (the name is the
+  label). **Presentation only** — never consulted by capability / identity /
+  scoring / snapshot / RX / leaderboard.
+
+### ICON COVERAGE TABLE (465 movements, 21 keys)
+
+| iconKey | count |
+|---|---|
+| BARBELL | 90 |
+| GYMNASTICS | 56 |
+| BODYWEIGHT | 55 |
+| DUMBBELL | 55 |
+| KETTLEBELL | 40 |
+| OTHER | 40 |
+| SANDBAG | 27 |
+| CARRY | 24 |
+| BOX | 17 |
+| BENCH | 10 |
+| RINGS | 8 |
+| GHD | 7 |
+| BIKE | 6 |
+| RUN | 6 |
+| JUMP_ROPE | 5 |
+| CARDIO_OTHER | 5 |
+| SLED | 5 |
+| ROPE | 4 |
+| WALL_BALL | 3 |
+| ROWER | 1 |
+| SKIERG | 1 |
+
+`OTHER` = 40 / 465 = **8.6 %** (< 12 %, asserted by the integrity test).
+
+### OTHER MOVEMENTS — all 40, classified (§11)
+
+Every `OTHER` entry is a **named benchmark / hero / girl WOD** living in the
+`movements` catalog — a *workout name*, not a movement (a known catalog-pollution
+issue noted in the P9.3 audit). A specific icon family would be **misleading**
+for these. None is an ordinary classifiable exercise.
+
+| name | type |
+|---|---|
+| Adam, Danny, Desforges, DT, Forrest, Glen, Griff, J.T., Josh, Kalsu, Michael, Murph, Nate, Nutts, Ryan, Scott, Ship, Badger, Randy | hero WOD (benchmark, non-movement) |
+| Amanda, Angie, Annie, Barbara, Chelsea, Cindy, Diane, Elizabeth, Eva, Fran, Grace, Helen, Isabel, Jackie, Karen, Kelly, Linda, Lynne, Mary, Nancy, Nicole | girl benchmark WOD (non-movement) |
+
+`movementIconIntegrity.test.js` asserts every `OTHER` id matches the named-WOD
+allow-list — a new ordinary exercise slipping into `OTHER` fails the build.
+
+## G2. ICON RESOLUTION / IDENTITY (§16/§17)
+
+`Power Snatch` and `Power Snatches` resolve (upstream, P9.3) to the **same**
+`canonicalMovementId`, so they share the `BARBELL` icon by construction — the
+icon layer never sees the display text. Verified by
+`movementIconIntegrity.test.js` ("alias -> same icon").
+
+## I2. P9.4 INTEGRATION (§21)
+
+The Log WOD movement lines are `composeStructuredWorkoutDisplay(...).movements`
+verbatim — the **same** call the member Home card makes. No `loggerFormatter` /
+`iconFormatter`. Icons decorate; the line text is the shared projection.
+
+## J2. FROZEN IDENTITY / K2. HISTORICAL / L2. VARIANTS / M2. GENDER
+
+Unchanged. The new screen reads `logCtx`-derived state only
+(`activePrescriptionDoc`, `frozenVariantKey`, `logWodZiData`, `logBusinessDate`,
+`memberGenderKey`, `miscariPentruLog`, `prescribedWeightPentruLog`) — exactly
+what the old screen read. `saveWodLog` is called unchanged. No re-resolution
+from today / current selection / display text / a fresh V2 fetch.
+`p95ScoreMatrix.test.js` + existing INC-04 / P9 / P9.4 suites cover D+N,
+variant isolation, gender, repeated movement, snapshot alignment.
+
+## N2. LEGACY FALLBACK (§28)
+
+`logWodPrimaryPath` also handles a legacy programmed workout (no structured
+prescription): `composeStructuredWorkoutDisplay` returns `null` ->
+`logWodZiData[variantKey]` legacy text lines rendered as-is (not reparsed) with
+the `OTHER` icon. No aggressive parsing, no invented prescriptions/icons.
+
+## O2. SNAPSHOT (§27)
+
+`prescription_snapshot` write path (`buildPrescriptionSnapshot` from frozen
+`logCtx.prescriptionDoc`) is untouched. P9.4's
+`member displayLine == snapshot displayLine` test still passes — the Log WOD now
+renders that same `displayLine`.
+
+## P2. TEST MATRIX
+
+| file | tests | covers |
+|---|---|---|
+| `scoreDefinition.test.js` | 17 | every family -> kind, time-cap detection, `single_value` context, edit-flow kind |
+| `movementIconIntegrity.test.js` | 49 | catalog-wide: 465 -> valid key or OTHER; OTHER = named-WOD-only; distribution; representative families; alias -> same icon |
+| `universalScoreInput.test.jsx` | 13 | TIME; TIME_CAPPED toggle **payload correctness**; ROUNDS_REPS; REPS (integer); LOAD (`102,5`->`102.5`); CALORIES; NONE; SETS delegation; weight field |
+| `p95ScoreMatrix.test.js` | 9 | §38 A-H persistence outcomes; §7 leaderboard order (finishers -> capped-by-work, no artificial time); §39 cap edges |
+| **new total** | **88** | |
+
+Regression: `prescriptionContract` / P9.2 / P9.3 (`movementCapabilityIntegrity`) /
+P9.4 (`composeStructuredWorkoutDisplay`) / `workoutFormats` / `workoutComposer` /
+logging-identity — **all green**. WOD-SIMPLE `vitest run`: **1271 passed**, the
+**9 pre-existing Deno-only `supabase/functions/*` `@std/assert` failures**
+unchanged and unrelated. `vite build` + `eslint` (P9.5 files) clean.
+
+## Q2. PRODUCTION DATA
+
+| | |
+|---|---|
+| Migrations applied | **NONE** |
+| `wods` / `wod_logs` / `skill_logs` / `movements` rows modified | **0** |
+| Historical rewrite | **none** |
+
+`movementIconMap.json` is a checked-in repo artifact.
+
+## R2. DEPLOYMENT
+
+See the commit line at the bottom. `app_version` -> `p9-5-universal-logwod-20260830`.
+forge-admin-web: **no change** (P9.5 is WOD-SIMPLE only).
+
+## S2. KNOWN ISSUES
+
+- INC-04 Aug 27 production case — untouched, not reproduced, not P9.5.
+  Production Readiness **not** claimed GREEN.
+- `single_value` unit-context inference is not yet wired to a live per-section
+  metric source — `Max Effort` currently opens as `FREE` (one labelled field);
+  a structured section could pass `singleValueUnit` later without a data change.
+- 40 benchmark-WOD names still pollute the `movements` catalog (P9.3 finding) —
+  they render the `OTHER` icon, which is correct. Catalog cleanup is out of scope.
+
+## T2. MANUAL OWNER ACCEPTANCE (short — representative, not 465)
+
+1. **For Time finished** — open a capped RFT, tap `Finished`, enter `17:42`, save.
+2. **For Time capped** — same workout, tap `Time Capped`, `2` rounds + `43` reps,
+   save. Check the leaderboard: finishers rank above you; you show `CAP - 2+43`,
+   no fabricated time.
+3. **AMRAP** — `7` rounds + `12` reps.
+4. **Load workout** — a decimal `102,5` saves as `102.5`.
+5. **Gender** — open the same workout as a male vs a female profile: prescriptions
+   differ (`61 kg` / `43 kg`); a no-gender profile shows `61/43 kg`.
+6. **Historical D+N** — a workout from a past date, logged today, saves to that
+   date's workout.
+7. **Legacy workout** — a non-structured programmed workout: clean rows, generic
+   `OTHER` icons, no crash.
+8. **Repeated movement** — a workout with the same movement twice at different
+   loads: both rows + icons correct and independent.
+9. **Custom / unknown movement** — renders the generic `OTHER` icon; screen intact.
+10. Log WOD movement lines **==** the member Home card for the same variant/gender.
+
+## HARD STOP
+
+**P10 NOT STARTED.** Journal / leaderboard / `isNotRxd` historical semantics /
+performance readers / snapshot-first reads — untouched. Owner manual acceptance
+required before P9.5 is declared closed.

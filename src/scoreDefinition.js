@@ -1,0 +1,98 @@
+// P9.5 — ScoreDefinition: a thin UI-facing adapter over Forge's EXISTING scoring
+// contract (workoutFormats.js `family` / `scoreMode`, `effectiveScoreMode`,
+// `isSequentialFormat`, `timeCapSec`). It is PRESENTATION / INPUT metadata only —
+// it does NOT replace persistence. `saveWodLog` / `composeWodLogFields` /
+// `completion_state` / `result` / `time_result` / `sets` are all unchanged.
+//
+// Owner-approved kinds (P9.5 §1): TIME · TIME_CAPPED · ROUNDS_REPS · REPS ·
+// LOAD · DISTANCE · CALORIES · SETS · STAGES · NONE · FREE.
+// No new scoring engine. No MULTI_SCORE abstraction — SETS / STAGES / multiple
+// scored sections already cover Forge's real multi-score cases.
+
+import { getFormat, effectiveScoreMode, isSequentialFormat } from './workoutFormats'
+
+export const SCORE_KINDS = [
+  'TIME', 'TIME_CAPPED', 'ROUNDS_REPS', 'REPS', 'LOAD', 'DISTANCE', 'CALORIES',
+  'SETS', 'STAGES', 'NONE', 'FREE',
+]
+
+// The dedicated optional time-cap field on Duration-primary formats (see the
+// FORMATS catalog: `timeCapSec: { type: 'duration', required: false }`).
+function timeCapOf(config) {
+  const c = config || {}
+  const v = parseInt(c.timeCapSec, 10)
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+
+/**
+ * scoreDefinitionFor(formatId, formatConfig[, opts]) -> ScoreDefinition
+ *
+ * ScoreDefinition = {
+ *   kind,                    one of SCORE_KINDS
+ *   timeCapSec?: number,     TIME_CAPPED only
+ *   roundsKnown?: number,    config.rounds — capped rounds default + "N rounds complete"
+ *   sequential?: boolean,    For Time / Ladder — per-movement partials, no "rounds"
+ *   unit?: string,           LOAD 'kg'|'lb' · DISTANCE 'm'|'km' · CALORIES 'cal'
+ *   integer?: boolean,       reps / rounds / calories → integer-only input
+ * }
+ *
+ * `opts.singleValueUnit` — for a `single_value` (Max Effort) section, the caller
+ * MAY pass a deterministic unit derived from the section's structured metrics
+ * ('reps' | 'load' | 'calories' | 'distance'). Absent → FREE (one labelled
+ * field). Historical `single_value` rows are never reinterpreted — this only
+ * shapes the INPUT affordance for a NEW log.
+ */
+export function scoreDefinitionFor(formatId, formatConfig, opts = {}) {
+  const format = formatId ? getFormat(formatId) : null
+  const config = formatConfig || {}
+
+  if (!format) return { kind: 'FREE' }
+
+  if (format.family === 'sets') return { kind: 'SETS' }
+  if (format.family === 'chained') return { kind: 'STAGES' }
+  if (format.family === 'nft') return { kind: 'NONE' }
+
+  const mode = effectiveScoreMode(formatId, config) || format.scoreMode
+
+  if (mode === 'amrap') {
+    return { kind: 'ROUNDS_REPS', roundsKnown: null, integer: true }
+  }
+
+  if (mode === 'fortime_or_amrap') {
+    const cap = timeCapOf(config)
+    const sequential = isSequentialFormat(formatId, config)
+    const roundsKnown = parseInt(config.rounds, 10) || null
+    if (cap) return { kind: 'TIME_CAPPED', timeCapSec: cap, sequential, roundsKnown, integer: true }
+    return { kind: 'TIME', sequential, roundsKnown }
+  }
+
+  if (mode === 'single_value') {
+    switch (opts.singleValueUnit) {
+      case 'reps': return { kind: 'REPS', integer: true }
+      case 'load': return { kind: 'LOAD', unit: opts.unit || 'kg' }
+      case 'calories': return { kind: 'CALORIES', unit: 'cal', integer: true }
+      case 'distance': return { kind: 'DISTANCE', unit: opts.unit || 'm' }
+      default: return { kind: 'FREE' }
+    }
+  }
+
+  // Any other / mixed format whose main work resolves elsewhere — a plain time
+  // field is the safe universal default (matches FormatLogger's own fallthrough).
+  return { kind: 'TIME' }
+}
+
+/** Map an already-persisted log back to the ScoreDefinition kind that produced
+ * it — used only for the EDIT flow so an old result opens with the right input.
+ * Never changes the stored meaning. */
+export function scoreKindForExistingLog(log, formatId, formatConfig) {
+  const def = scoreDefinitionFor(formatId, formatConfig, {})
+  // A capped duration log (completion_state 'capped' or legacy: no time, has a
+  // rounds-style result) always edits as the capped branch even if the format
+  // now shows no cap.
+  if ((def.kind === 'TIME' || def.kind === 'TIME_CAPPED')) {
+    const capped = log?.completion_state === 'capped'
+      || (log?.completion_state == null && !log?.time_result && !!(log?.result || '').trim())
+    if (capped) return { ...def, kind: 'TIME_CAPPED', timeCapSec: def.timeCapSec || null }
+  }
+  return def
+}
