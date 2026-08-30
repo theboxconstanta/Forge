@@ -309,6 +309,60 @@ export function variantKeyFromLevel(level) {
   return null
 }
 
+// P9.1 - sentinel: this variant has >1 movement with distinct member-resolved
+// loads, so there is NO single valid "prescribed weight" for it. Same string
+// value as rxEngine.js's MULTI_MOVEMENT_STANDARD so isMultiMovementStandard()
+// there recognises it and classifyRxStatus() returns null (no RX badge).
+export const MULTI_LOAD_STANDARD = 'multi'
+
+/** P9.1 - the single member-resolved load standard (kg) for a variant, or:
+ *  - null  : no movement carries a load (bodyweight variant) -> no RX standard
+ *  - 'multi': >1 movement with DISTINCT resolved loads -> no single standard,
+ *            classification must stay neutral until per-movement (P10+)
+ *  - number: exactly one distinct resolved load across all loaded movements
+ * Built ONLY from the (frozen) structured doc - never from the legacy single
+ * global weight column, which cannot represent a multi-load workout. */
+export function structuredVariantLoadStandard(doc, variantKey, gender) {
+  const resolved = resolveVariantForMember(doc, variantKey, gender)
+  if (!resolved) return null
+  const values = []
+  for (const r of resolved) {
+    const l = r.load
+    if (!l) continue
+    let v = l.value
+    if (v == null && Array.isArray(l.bothValues)) v = gender === 'female' ? l.bothValues[1] : gender === 'male' ? l.bothValues[0] : null
+    if (v != null) values.push(v)
+  }
+  if (values.length === 0) return null
+  const distinct = new Set(values)
+  if (distinct.size > 1) return MULTI_LOAD_STANDARD
+  return values[0]
+}
+
+/** P9.1 - does this variant carry ANY load prescription? (drives whether the
+ * logger shows a weight-logging field for a structured workout, independent of
+ * whether a single RX standard exists). */
+export function structuredVariantHasLoad(doc, variantKey, gender) {
+  const resolved = resolveVariantForMember(doc, variantKey, gender)
+  if (!resolved) return false
+  return resolved.some((r) => !!r.load)
+}
+
+// P9.1 - VALUE snapshot (deep, structurally independent) of the structured
+// prescription document, taken at "Log Score" click. The contract holds only
+// plain objects / arrays / finite numbers / strings / null (no Date, Map, Set,
+// functions, undefined, NaN, Infinity - verified against §C.5), so a deep clone
+// is lossless. structuredClone where available (browsers + Node >=17, and the
+// test env), JSON round-trip as a universal fallback. After this returns,
+// NO in-place / nested / array mutation of the source can alter the result.
+export function snapshotPrescriptionDoc(doc) {
+  if (doc == null) return null
+  try {
+    if (typeof structuredClone === 'function') return structuredClone(doc)
+  } catch { /* fall through */ }
+  return JSON.parse(JSON.stringify(doc))
+}
+
 // ============================================================================
 // Legacy artifacts — regenerated from structure on every save (never read as
 // truth). Keeps `wods.movements_{variant}` text[] and the 8 global weight

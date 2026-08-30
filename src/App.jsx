@@ -66,6 +66,7 @@ import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
   newMovementInstance, parseWorkoutPaste, resolveVariantDisplayLines, variantKeyFromLevel,
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
+  snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
@@ -8634,7 +8635,10 @@ function App() {
     // (no variant) or a workout with no structured prescription for this
     // variant - downstream (P10) then keeps the existing legacy fallback.
     // Determinism: identical (frozen doc, variant, gender) -> identical snapshot.
-    const frozenDocForSnapshot = logCtx?.prescriptionDoc ?? logWodZiData?.movement_prescriptions ?? null
+    // P9.1 - ONLY the deep value-clone captured at "Log Score" click. No live
+    // wodZiData fallback: if the frozen context is somehow absent, write no
+    // snapshot (fail closed) rather than snapshot from mutable current state.
+    const frozenDocForSnapshot = logCtx?.prescriptionDoc ?? null
     const snapshotVariantKey = varianta ? variantKeyFromLevel(varianta.nivel) : null
     let prescriptionSnapshot = null
     if (variantaAleasa !== null && snapshotVariantKey && variantHasStructuredPrescription(frozenDocForSnapshot, snapshotVariantKey)) {
@@ -8672,7 +8676,17 @@ function App() {
       // WOD-ului zilei - "GET UP" - la o logare libera de tip "Complex"
       // care n-avea nicio legatura cu acel WOD).
       if (variantaAleasa !== null) {
-        const prescribedWeight = varianta ? (logWodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null
+        // P9.1 - for a structured workout the "prescribed weight" for the
+        // share-popup Not-Rx flag is the FROZEN structured standard resolved
+        // for this member: a single number when the workout has exactly one
+        // load, '' (no forced classification) when it is multi-load or
+        // bodyweight - NEVER the legacy first-load global column.
+        const structuredStd = snapshotVariantKey && variantHasStructuredPrescription(frozenDocForSnapshot, snapshotVariantKey)
+          ? structuredVariantLoadStandard(frozenDocForSnapshot, snapshotVariantKey, memberGenderKey)
+          : undefined
+        const prescribedWeight = structuredStd !== undefined
+          ? (typeof structuredStd === 'number' ? String(structuredStd) : '')
+          : (varianta ? (logWodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null)
         const prescribedMovements = varianta ? (logWodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
         setWorkoutSharePopup({
           wodName: logWodZiData?.name || null,
@@ -8987,7 +9001,13 @@ function App() {
   const displayedWorkoutDate = wodZiWorkoutV2?.date ?? wodZiData?.date ?? null
   const homeDisplayIsCurrent = displayedWorkoutDate != null && displayedWorkoutDate === dataAcasa
   // Freeze the exact displayed workout identity at click time (utils.js).
-  const captureLogCtx = () => freezeLoggingContext(workoutForDisplay, wodZiData, wodZiWorkoutV2, dataAcasa)
+  // P9.1 - the structured prescription doc is passed as a DEEP VALUE CLONE
+  // (snapshotPrescriptionDoc), so later in-place / nested / array mutation of
+  // the live wods row cannot alter logCtx.prescriptionDoc.
+  const captureLogCtx = () => freezeLoggingContext(
+    workoutForDisplay, wodZiData, wodZiWorkoutV2, dataAcasa,
+    snapshotPrescriptionDoc(wodZiData?.movement_prescriptions ?? null),
+  )
   // Whether the current screen is a FRESH (non-edit) logging session with a
   // frozen context. Every logger/save read below switches to logCtx when true.
   const inFrozenLogFlow = (screen === 'logWOD' || screen === 'logSkill') && !editLogId && logCtx != null
@@ -9078,23 +9098,40 @@ function App() {
   // (miscariPentruLog), exact ca la Skill Work dinainte, fara sa mai
   // depinda de o coloana separata de greutate pe gen (care nu exista pt
   // sectiuni suplimentare, doar pt sectiunea primara).
+  const activeAthleteGenderKey = memberGenderKey
+  // P9.1 - the STRUCTURED per-variant load standard (from the FROZEN doc,
+  // resolved for the member): null (bodyweight), MULTI_LOAD_STANDARD (>1
+  // distinct load), or a number (one distinct load). Only for a structured
+  // frozen variant; null otherwise so the legacy path below runs unchanged.
+  const structuredLoadStandard = (structuredLogLines && frozenVariantKey)
+    ? structuredVariantLoadStandard(activePrescriptionDoc, frozenVariantKey, activeAthleteGenderKey)
+    : null
+  const structuredHasLoad = (structuredLogLines && frozenVariantKey)
+    ? structuredVariantHasLoad(activePrescriptionDoc, frozenVariantKey, activeAthleteGenderKey)
+    : false
+  // The FormatLogger's `prescribedWeight` prop is a pure GATE ("does this
+  // workout prescribe a load? -> show the weight-logging field") - it is never
+  // displayed as text. For a structured workout the gate is
+  // structuredHasLoad; the legacy single global column is NEVER surfaced as a
+  // single "Prescribed Weight" authority for a multi-load structured workout.
   const prescribedWeightPentruLog = editLogId
     ? editLogPrescribedWeight
     : logTargetSection ? ''
-    : (variantaAleasa !== null ? (logWodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
-  // Faza 3 (rxEngine.js) - clasificare RX/Not Rx in timp real, derivata la
-  // citire din acelasi text folosit mai sus pt prescribedWeightPentruLog,
-  // niciodata dintr-un selector manual de gen. standardKg poate fi null
-  // (nicio greutate prescrisa - niciodata Not Rx fortat) sau semnalul
-  // "multi" (mai multe miscari cu greutati distincte - fara clasificare,
-  // vezi isMixedCategory mai jos in fisier pt tratamentul existent al
-  // acestui caz).
-  const activeAthleteGenderKey = memberGenderKey
-  const activeRxStandardKg = resolveSectionStandardKg({
-    movements: miscariPentruLog,
-    legacyWeightText: prescribedWeightPentruLog,
-    genderKey: activeAthleteGenderKey,
-  })
+    : (structuredLogLines && frozenVariantKey)
+      ? (structuredHasLoad ? 'structured' : '')
+      : (variantaAleasa !== null ? (logWodZiData?.[weightKeyForVariant(VARIANTE_CONFIG[variantaAleasa]?.nivel, userProfile?.gender)] || '') : '')
+  // Faza 3 (rxEngine.js) - clasificare RX/Not Rx in timp real. standardKg:
+  // null (fara greutate prescrisa - niciodata Not Rx fortat), 'multi' (mai
+  // multe miscari cu greutati distincte - fara clasificare), sau un numar.
+  // P9.1 - pt un antrenament structurat, standardul vine din datele
+  // structurate inghetate, NU din comparatia cu prima greutate legacy.
+  const activeRxStandardKg = (structuredLogLines && frozenVariantKey)
+    ? structuredLoadStandard // null | MULTI_LOAD_STANDARD ('multi') | number - classifyRxStatus handles all three
+    : resolveSectionStandardKg({
+        movements: miscariPentruLog,
+        legacyWeightText: prescribedWeightPentruLog,
+        genderKey: activeAthleteGenderKey,
+      })
   const liveRxStatus = classifyRxStatus({
     enteredWeightText: wodWeightLogged,
     standardKg: activeRxStandardKg,

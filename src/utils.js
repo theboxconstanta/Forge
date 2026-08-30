@@ -107,19 +107,23 @@ export function isWorkoutFetchCurrent(fetchedForDate, currentSelectedDate) {
 // The snapshot deep-freezes nothing (React state is treated as immutable by
 // convention) but it captures the object REFERENCES at click time, so a later
 // setWodZiData/setWodZiWorkoutV2 cannot change what the logger sees.
-export function freezeLoggingContext(displayedWorkout, wodZiData, wodZiWorkoutV2, businessDate) {
+export function freezeLoggingContext(displayedWorkout, wodZiData, wodZiWorkoutV2, businessDate, snapshotDoc) {
   const sections = displayedWorkout?.sections || []
   return {
     businessDate: businessDate ?? null,
     wodZiData: wodZiData ?? null,
     wodZiWorkoutV2: wodZiWorkoutV2 ?? null,
     workout: displayedWorkout ?? null,
-    // P9 - the structured per-movement prescription document (canonical typed
-    // contract v1), captured BY REFERENCE from the wods row at click time. The
-    // log snapshot is built from THIS, never re-read from live wodZiData at
-    // submit. null when the workout has no structured prescription (legacy
-    // fallback path).
-    prescriptionDoc: wodZiData?.movement_prescriptions ?? null,
+    // P9.1 - a deep VALUE SNAPSHOT of the structured per-movement prescription
+    // document (canonical typed contract v1), taken at "Log Score" click.
+    // Structurally independent from mutable workout/editor/member state: after
+    // this returns, no in-place / nested / array mutation of the source wods
+    // row can alter logCtx.prescriptionDoc. The caller passes the deep clone
+    // (prescriptionContract.snapshotPrescriptionDoc) - a plain reference is
+    // deliberately NOT accepted here. The log snapshot is built from THIS,
+    // never re-read from live wodZiData at submit. null when the workout has no
+    // structured prescription (legacy fallback path).
+    prescriptionDoc: snapshotDoc ?? null,
     // wall-clock instant the logging target was frozen (recorded on the
     // snapshot so a later reader knows when this member's prescription was
     // resolved).

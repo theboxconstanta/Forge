@@ -4,6 +4,7 @@ import {
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
+import { snapshotPrescriptionDoc } from './prescriptionContract.js'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -414,31 +415,48 @@ describe('freezeLoggingContext / resolveLoggedWorkoutIdentity - INC-04 GLOBAL (f
     expect(resolveLoggedWorkoutIdentity(ctx, 'RX').wodId).toBe('wod-A') // A.v2.legacyWodId
   })
 
-  // P9 - the frozen context captures the structured prescription doc BY
-  // REFERENCE at click; a later mutation of the source wods row cannot change
-  // what the logger/snapshot sees.
-  it('P9: freezeLoggingContext captures movement_prescriptions by reference (immutable vs a later live edit)', () => {
-    const wodRow = {
-      id: 'wod-A', date: '2026-08-20', type: 'For Time',
-      movement_prescriptions: { version: 1, variants: { rx: { movements: [
-        { instanceId: 'mi_1', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
-      ] } } },
-    }
-    const ctx = freezeLoggingContext(dispA, wodRow, A.v2, '2026-08-20')
-    expect(ctx.prescriptionDoc).toBe(wodRow.movement_prescriptions)
+  // P9.1 - freezeLoggingContext must hold a VALUE snapshot of the structured
+  // prescription, not a reference. No in-place / nested / array mutation of
+  // the source can alter logCtx.prescriptionDoc after the freeze.
+  const mkP1 = () => ({ version: 1, variants: { rx: { movements: [
+    { instanceId: 'mi_1', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
+    { instanceId: 'mi_2', name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
+  ] } } })
+
+  it('P9.1: deep-clone freeze - mutating the ORIGINAL top-level object cannot alter the frozen doc', () => {
+    const source = mkP1()
+    const ctx = freezeLoggingContext(dispA, { id: 'wod-A', date: '2026-08-20' }, A.v2, '2026-08-20', snapshotPrescriptionDoc(source))
+    expect(ctx.prescriptionDoc).not.toBe(source)
     expect(typeof ctx.frozenAt).toBe('string')
-    // coach edits the LIVE row after the logger opened
-    const p2 = { version: 1, variants: { rx: { movements: [
-      { instanceId: 'mi_1', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 60, female: 45, unit: 'kg' } },
-    ] } } }
-    // simulate a fresh fetch replacing wodZiData; the frozen ctx is unaffected
-    const freshRow = { ...wodRow, movement_prescriptions: p2 }
-    expect(ctx.prescriptionDoc).not.toBe(freshRow.movement_prescriptions)
-    expect(ctx.prescriptionDoc.variants.rx.movements[0].load.female).toBe(30) // still P1
+    source.variants.rx = { movements: [] }
+    source.version = 99
+    expect(ctx.prescriptionDoc.version).toBe(1)
+    expect(ctx.prescriptionDoc.variants.rx.movements).toHaveLength(2)
   })
 
-  it('P9: freezeLoggingContext prescriptionDoc is null when the workout has no structured prescription', () => {
-    const ctx = freezeLoggingContext(dispA, { id: 'wod-A', date: '2026-08-20' }, A.v2, '2026-08-20')
+  it('P9.1: nested mutation - mutating the source load/calorie object in place cannot alter the frozen doc', () => {
+    const source = mkP1()
+    const ctx = freezeLoggingContext(dispA, null, A.v2, '2026-08-20', snapshotPrescriptionDoc(source))
+    source.variants.rx.movements[0].load.female = 999
+    source.variants.rx.movements[0].load.male = 999
+    source.variants.rx.movements[1].calories.female = 999
+    expect(ctx.prescriptionDoc.variants.rx.movements[0].load.female).toBe(30)
+    expect(ctx.prescriptionDoc.variants.rx.movements[0].load.male).toBe(45)
+    expect(ctx.prescriptionDoc.variants.rx.movements[1].calories.female).toBe(12)
+  })
+
+  it('P9.1: array mutation - push/splice/reorder on the source movements array cannot alter the frozen doc', () => {
+    const source = mkP1()
+    const ctx = freezeLoggingContext(dispA, null, A.v2, '2026-08-20', snapshotPrescriptionDoc(source))
+    source.variants.rx.movements.push({ instanceId: 'mi_9', name: 'Burpee' })
+    source.variants.rx.movements.splice(0, 1)
+    source.variants.rx.movements.reverse()
+    expect(ctx.prescriptionDoc.variants.rx.movements.map((m) => m.instanceId)).toEqual(['mi_1', 'mi_2'])
+  })
+
+  it('P9.1: snapshotPrescriptionDoc(null) -> null; freeze with no structured prescription -> prescriptionDoc null', () => {
+    expect(snapshotPrescriptionDoc(null)).toBe(null)
+    const ctx = freezeLoggingContext(dispA, { id: 'wod-A', date: '2026-08-20' }, A.v2, '2026-08-20', snapshotPrescriptionDoc(null))
     expect(ctx.prescriptionDoc).toBe(null)
   })
 })

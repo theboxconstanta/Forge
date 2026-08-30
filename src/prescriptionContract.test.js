@@ -357,3 +357,82 @@ describe('P9 — member resolution + snapshot from frozen doc', () => {
     doc.variants.rx.movements[0].load = { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' }
   })
 })
+
+import {
+  snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad, MULTI_LOAD_STANDARD,
+} from './prescriptionContract.js'
+
+describe('P9.1 — deep snapshot, load standard, snapshot purity & retry', () => {
+  const mk = () => ({ version: 1, variants: { rx: { movements: [
+    { instanceId: 'a', name: 'Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 45, female: 30, unit: 'kg' } },
+    { instanceId: 'b', name: 'Wall Ball', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 9, female: 6, unit: 'kg' } },
+    { instanceId: 'c', name: 'Row', calories: { mode: 'sex_specific', male: 15, female: 12 } },
+    { instanceId: 'd', name: 'Run', distance: { mode: 'universal', value: 500, unit: 'm' } },
+  ] } } })
+
+  it('snapshotPrescriptionDoc is a structurally independent deep clone', () => {
+    const src = mk()
+    const clone = snapshotPrescriptionDoc(src)
+    expect(clone).toEqual(src)
+    expect(clone).not.toBe(src)
+    src.variants.rx.movements[0].load.female = 999
+    src.variants.rx.movements.push({ instanceId: 'x', name: 'Y' })
+    expect(clone.variants.rx.movements[0].load.female).toBe(30)
+    expect(clone.variants.rx.movements).toHaveLength(4)
+    expect(snapshotPrescriptionDoc(null)).toBe(null)
+  })
+
+  it('structuredVariantLoadStandard: null (bodyweight) | multi (>1 distinct) | number (one)', () => {
+    // multi (45/9 for male)
+    expect(structuredVariantLoadStandard(mk(), 'rx', 'male')).toBe(MULTI_LOAD_STANDARD)
+    expect(structuredVariantLoadStandard(mk(), 'rx', 'female')).toBe(MULTI_LOAD_STANDARD)
+    // one load
+    const one = { version: 1, variants: { rx: { movements: [
+      { instanceId: 'a', name: 'Thruster', load: { mode: 'sex_specific', male: 43, female: 30, unit: 'kg' } },
+      { instanceId: 'b', name: 'Pull-up', reps: { mode: 'universal', value: 10 } },
+    ] } } }
+    expect(structuredVariantLoadStandard(one, 'rx', 'male')).toBe(43)
+    expect(structuredVariantLoadStandard(one, 'rx', 'female')).toBe(30)
+    // unknown gender -> no single resolved standard (member sees "43/30");
+    // RX classification stays neutral, consistent with weightKeyForVariant(null)
+    expect(structuredVariantLoadStandard(one, 'rx', null)).toBe(null)
+    // bodyweight
+    const bw = { version: 1, variants: { rx: { movements: [{ instanceId: 'a', name: 'Burpee', reps: { mode: 'universal', value: 20 } }] } } }
+    expect(structuredVariantLoadStandard(bw, 'rx', 'male')).toBe(null)
+    // repeated same load -> single
+    const same = { version: 1, variants: { rx: { movements: [
+      { instanceId: 'a', name: 'Clean', load: { mode: 'sex_specific', male: 60, female: 40, unit: 'kg' } },
+      { instanceId: 'b', name: 'Clean', load: { mode: 'sex_specific', male: 60, female: 40, unit: 'kg' } },
+    ] } } }
+    expect(structuredVariantLoadStandard(same, 'rx', 'female')).toBe(40)
+  })
+
+  it('structuredVariantHasLoad', () => {
+    expect(structuredVariantHasLoad(mk(), 'rx', 'male')).toBe(true)
+    expect(structuredVariantHasLoad({ version: 1, variants: { rx: { movements: [{ instanceId: 'a', name: 'Burpee', reps: { mode: 'universal', value: 20 } }] } } }, 'rx', 'male')).toBe(false)
+  })
+
+  it('buildPrescriptionSnapshot does NOT mutate the frozen doc', () => {
+    const frozen = mk()
+    const before = JSON.stringify(frozen)
+    buildPrescriptionSnapshot({ doc: frozen, variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    expect(JSON.stringify(frozen)).toBe(before)
+  })
+
+  it('retry idempotency: same frozen inputs -> deep-equal snapshot', () => {
+    const frozen = mk()
+    const s1 = buildPrescriptionSnapshot({ doc: frozen, variantKey: 'rx', gender: 'female', resolvedAt: 't0', source: 'structured' })
+    const s2 = buildPrescriptionSnapshot({ doc: frozen, variantKey: 'rx', gender: 'female', resolvedAt: 't0', source: 'structured' })
+    expect(s2).toEqual(s1)
+  })
+
+  it('snapshot is not load-centric: distance + calories carry mode + value + bothValues', () => {
+    const snap = buildPrescriptionSnapshot({ doc: mk(), variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    // Row calories 15/12 -> female resolved 12, programmed both preserved
+    const row = snap.movements.find((m) => m.name === 'Row')
+    expect(row.calories).toEqual({ value: 12, mode: 'sex_specific', bothValues: [15, 12] })
+    // Run 500m universal -> not {male:500, female:null}
+    const run = snap.movements.find((m) => m.name === 'Run')
+    expect(run.distance).toEqual({ value: 500, unit: 'm', mode: 'universal', bothValues: null })
+  })
+})
