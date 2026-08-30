@@ -775,7 +775,16 @@ export function isNotRxd(log, prescribedWeight, formatId, config, loggedMovement
   const greutateDiferita = greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
   const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
   const miscariSchimbate = movementsChanged(loggedMovements, prescribedMovements)
-  return greutateDiferita || neterminatInTimp || miscariSchimbate
+  // P9.5.2 - a non-null performed_prescription is the athlete's own explicit
+  // record that they performed a MODIFIED / scaled version (per-movement load /
+  // distance / calories, or a movement substitution). The save path only writes
+  // it when the performed overlay materially differs from the programmed
+  // prescription (performedIsModified), so its mere presence is authoritative:
+  // the result is Modified / Not RX regardless of the legacy single-weight
+  // comparison above. The variant itself is unchanged (RX stays RX) - only the
+  // RX/Modified classification flips.
+  const performedModificat = log?.performed_prescription != null
+  return greutateDiferita || neterminatInTimp || miscariSchimbate || performedModificat
 }
 
 // Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,

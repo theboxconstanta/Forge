@@ -612,6 +612,173 @@ export function resolveNumericInput(raw, opts = {}) {
 }
 
 // ============================================================================
+// P9.5.2 — PERFORMED PRESCRIPTION overlay.
+//
+// A `wod_logs.performed_prescription` doc records WHAT THE ATHLETE ACTUALLY DID,
+// as an overlay on the frozen PROGRAMMED prescription. NULL = performed exactly
+// as programmed. A non-null doc is ONE variant's structured MovementInstance
+// list (the SAME per-instance shape as a `wods.movement_prescriptions` variant),
+// plus an optional per-instance `substitutedFrom`. V1 permits edits to
+// load / distance / calorie specs and whole-movement substitution (by
+// canonicalMovementId). Round / rep STRUCTURE is never editable in V1 — the
+// capped-leaderboard rep-structure policy is deferred.
+//
+// Mirrors the DB trigger `validate_wod_log_performed_prescription()`
+// (migration 20260831090000) for structure / enum / type.
+// ============================================================================
+
+export const PERFORMED_PRESCRIPTION_VERSION = 1
+// The metrics the athlete-side Edit flow may change. `reps` is workout
+// STRUCTURE (locked in V1); it only ever carries over unchanged.
+export const PERFORMED_EDITABLE_METRICS = ['load', 'distance', 'calories']
+
+/** The initial performed draft for a variant = a deep VALUE clone of the frozen
+ * programmed instances, tagged. Returns null when the variant has no structured
+ * programmed prescription (caller then hides Edit — §42 legacy). Pure — the
+ * caller is responsible for having frozen `doc`. */
+export function buildPerformedPrescriptionDraft({ doc, variantKey, sectionId = null }) {
+  const vObj = doc?.variants?.[variantKey]
+  if (!vObj || !Array.isArray(vObj.movements) || vObj.movements.length === 0) return null
+  return {
+    version: PERFORMED_PRESCRIPTION_VERSION,
+    variantKey: variantKey ?? null,
+    sectionId: sectionId ?? null,
+    source: 'performed',
+    movements: snapshotPrescriptionDoc(vObj.movements),
+  }
+}
+
+/** Structure / enum / type validation for a performed doc — mirrors the DB
+ * trigger validate_wod_log_performed_prescription(). NULL is valid (= as
+ * programmed). Returns { valid, errors }. */
+export function validatePerformedPrescription(doc) {
+  if (doc === null || doc === undefined) return { valid: true, errors: [] }
+  const errors = []
+  const push = (m) => errors.push(m)
+  if (typeof doc !== 'object' || Array.isArray(doc)) return { valid: false, errors: ['must be an object'] }
+  if (doc.version !== PERFORMED_PRESCRIPTION_VERSION) push(`version must be ${PERFORMED_PRESCRIPTION_VERSION}`)
+  if (doc.variantKey != null && !VARIANT_KEYS.includes(doc.variantKey)) push(`variantKey invalid: "${doc.variantKey}"`)
+  if (!Array.isArray(doc.movements)) return { valid: false, errors: [...errors, 'movements must be an array'] }
+  const seen = new Set()
+  for (const mv of doc.movements) {
+    if (!mv || typeof mv !== 'object') { push('movement must be an object'); continue }
+    const id = mv.instanceId
+    if (typeof id !== 'string' || id.length === 0) { push('movement needs a non-empty instanceId'); continue }
+    if (seen.has(id)) push(`duplicate instanceId "${id}"`)
+    seen.add(id)
+    if (typeof mv.name !== 'string' || mv.name.length === 0) push(`(${id}): needs a non-empty name`)
+    if ('canonicalMovementId' in mv && mv.canonicalMovementId !== null && typeof mv.canonicalMovementId !== 'string') {
+      push(`(${id}): canonicalMovementId must be a string or null`)
+    }
+    for (const mk of METRIC_KEYS) {
+      if (!(mk in mv)) continue
+      const spec = mv[mk]
+      if (!spec || typeof spec !== 'object') { push(`(${id}).${mk}: must be an object`); continue }
+      if (mk === 'reps' && spec.mode === 'text') {
+        if (typeof spec.text !== 'string') push(`(${id}).reps(text): text must be a string`)
+        continue
+      }
+      if (spec.mode !== 'universal' && spec.mode !== 'sex_specific') {
+        push(`(${id}).${mk}: mode must be universal or sex_specific`)
+        continue
+      }
+      if (spec.mode === 'universal') {
+        if (!isNumOrNull(spec.value)) push(`(${id}).${mk}.value must be a number or null`)
+      } else {
+        if (!isNumOrNull(spec.male)) push(`(${id}).${mk}.male must be a number or null`)
+        if (!isNumOrNull(spec.female)) push(`(${id}).${mk}.female must be a number or null`)
+      }
+      if (mk === 'load' && !LOAD_UNITS.includes(spec.unit)) push(`(${id}).load.unit must be one of ${LOAD_UNITS.join('/')}`)
+      if (mk === 'distance' && !DISTANCE_UNITS.includes(spec.unit)) push(`(${id}).distance.unit must be one of ${DISTANCE_UNITS.join('/')}`)
+    }
+  }
+  return { valid: errors.length === 0, errors }
+}
+
+/** The athlete-resolved COMPARISON view of an instance list — each metric
+ * reduced to { value, unit } (or { text }) for the given gender. Equality only,
+ * never display. */
+function performedComparableInstances(instances, gender) {
+  return (instances || []).map((mv) => {
+    const r = resolveMovementInstance(mv, gender)
+    const red = (m) => {
+      if (!m) return null
+      if (m.mode === 'text') return { text: m.text ?? '' }
+      return { value: m.value ?? null, unit: m.unit ?? null }
+    }
+    return {
+      instanceId: mv.instanceId ?? null,
+      canonicalMovementId: mv.canonicalMovementId ?? null,
+      name: normalizeMovementName(mv.name),
+      reps: red(r.reps), load: red(r.load), distance: red(r.distance), calories: red(r.calories),
+    }
+  })
+}
+
+/** True when the performed doc resolves — for THIS athlete — to exactly the
+ * programmed variant (same movements, order, identity, and resolved
+ * load / distance / calorie / reps values). The caller stores NULL then
+ * (§22 dirty state: identical ⇒ performed_prescription stays NULL).
+ * `gender`: 'male' | 'female' | null. */
+export function performedMatchesProgrammed(performedDoc, programmedDoc, variantKey, gender) {
+  if (performedDoc == null) return true
+  const prog = programmedDoc?.variants?.[variantKey]?.movements
+  if (!Array.isArray(prog)) return false
+  const a = performedComparableInstances(performedDoc.movements, gender)
+  const b = performedComparableInstances(prog, gender)
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+/** Did the athlete perform a materially different workout than programmed?
+ * (drives the Modified / Not-RX classification — §27). Same as
+ * !performedMatchesProgrammed but tolerates a missing programmed doc (a
+ * non-null performed doc alone already means "modified"). */
+export function performedIsModified(performedDoc, programmedDoc, variantKey, gender) {
+  if (performedDoc == null) return false
+  if (!programmedDoc?.variants?.[variantKey]) return true
+  return !performedMatchesProgrammed(performedDoc, programmedDoc, variantKey, gender)
+}
+
+/** Apply a whole-movement substitution to ONE performed instance. Keeps the
+ * stable instanceId; adopts the target's canonical identity; records
+ * `substitutedFrom` (the ORIGINAL identity, only on the FIRST substitution);
+ * retains a load / distance / calorie spec only when the target movement's
+ * capability still allows it (§16 / §17); never invents a metric the athlete
+ * did not already have. `reps` (structure) always carries over unchanged.
+ * `capability` = resolveMovementCapability(targetRow). Pure. */
+export function applyPerformedSubstitution(instance, targetRow, capability) {
+  const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
+  const next = {
+    instanceId: instance.instanceId,
+    name: targetRow?.name ?? instance.name,
+    canonicalMovementId: targetRow?.id ?? null,
+  }
+  if (instance.reps) next.reps = instance.reps
+  for (const mk of PERFORMED_EDITABLE_METRICS) {
+    if (instance[mk] && (allowed.length === 0 || allowed.includes(mk))) next[mk] = instance[mk]
+  }
+  next.substitutedFrom = instance.substitutedFrom ?? {
+    canonicalMovementId: instance.canonicalMovementId ?? null,
+    name: instance.name,
+  }
+  return next
+}
+
+/** Set one editable metric's universal value on a performed instance (the
+ * athlete-side Edit control writes a single value — their own performed load,
+ * not a sex-split). Keeps the spec's unit; drops the spec entirely when the
+ * value is cleared to null AND the programmed instance had no such spec... but
+ * we keep it as {value:null} so equality can still detect "cleared vs
+ * programmed". `metric` ∈ PERFORMED_EDITABLE_METRICS. Pure. */
+export function setPerformedMetricValue(instance, metric, value, unit) {
+  const prev = instance[metric] || {}
+  const nextSpec = { mode: 'universal', value: value ?? null }
+  if (metric === 'load') nextSpec.unit = unit || prev.unit || 'kg'
+  if (metric === 'distance') nextSpec.unit = unit || prev.unit || 'm'
+  return { ...instance, [metric]: nextSpec }
+}
+
+// ============================================================================
 // Legacy artifacts — regenerated from structure on every save (never read as
 // truth). Keeps `wods.movements_{variant}` text[] and the 8 global weight
 // columns populated for legacy readers.
