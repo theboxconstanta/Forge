@@ -67,6 +67,7 @@ import {
   newMovementInstance, parseWorkoutPaste, resolveVariantDisplayLines, variantKeyFromLevel,
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
+  resolveNumericInput,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 
@@ -952,8 +953,40 @@ const pmpeLink = { background: 'none', border: 'none', color: '#888', fontSize: 
 const pmpeIconBtn = { width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', color: '#666', cursor: 'pointer', flexShrink: 0 }
 const PMPE_QTY = ['reps', 'distance', 'calories']
 
-function pmpeToNum(s) { const t = String(s).trim().replace(',', '.'); if (t === '') return null; const n = parseFloat(t); return Number.isFinite(n) ? n : null }
 const pmpeNumStr = (v) => (v === null || v === undefined ? '' : String(v))
+const pmpeAsNum = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+// P9.2 - structured numeric field with a draft->commit lifecycle. Semantic
+// twin of forge-admin-web's NumField (MovementRow.tsx); all parse/normalize
+// rules live in the shared contract's resolveNumericInput. While focused the
+// coach types freely (comma OR dot decimal, partial "22," held intact); a valid
+// value commits per keystroke, empty commits null, garbage reverts on blur
+// (never a silent 0). Unfocused shows the canonical value so mode toggles /
+// movement replacement / reload always reflect.
+function PmpeNumField({ value, onCommit, ariaLabel, integer, style }) {
+  const [focused, setFocused] = useState(false)
+  const [draft, setDraft] = useState('')
+  const shown = focused ? draft : pmpeNumStr(value)
+  return (
+    <input
+      style={style}
+      inputMode={integer ? 'numeric' : 'decimal'}
+      value={shown}
+      aria-label={ariaLabel}
+      onFocus={() => { setDraft(pmpeNumStr(value)); setFocused(true) }}
+      onChange={e => {
+        setDraft(e.target.value)
+        const r = resolveNumericInput(e.target.value, { integer, previous: value, final: false })
+        if (r.commit) onCommit(r.value)
+      }}
+      onBlur={e => {
+        const r = resolveNumericInput(e.target.value, { integer, previous: value, final: true })
+        onCommit(r.value)
+        setFocused(false)
+      }}
+    />
+  )
+}
 
 function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove }) {
   const mode = spec?.mode ?? defaultMode
@@ -961,6 +994,8 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
   const showUnit = metric === 'load' || metric === 'distance'
   const isText = metric === 'reps' && mode === 'text'
   const carry = showUnit ? { unit } : {}
+  // reps and calories are whole counts - the field rejects a decimal for them.
+  const isInt = metric === 'reps' || metric === 'calories'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
       <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: '#999' }}>{label}</span>
@@ -969,12 +1004,12 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
       ) : mode === 'sex_specific' ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
           <span style={{ color: '#bbb', fontSize: '11px' }}>M</span>
-          <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.male)} aria-label={`${label} men`} onChange={e => onChange({ ...spec, mode: 'sex_specific', male: pmpeToNum(e.target.value), ...carry })} />
+          <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.male)} ariaLabel={`${label} men`} onCommit={n => onChange({ ...spec, mode: 'sex_specific', male: n, ...carry })} />
           <span style={{ color: '#bbb', fontSize: '11px' }}>F</span>
-          <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.female)} aria-label={`${label} women`} onChange={e => onChange({ ...spec, mode: 'sex_specific', female: pmpeToNum(e.target.value), ...carry })} />
+          <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.female)} ariaLabel={`${label} women`} onCommit={n => onChange({ ...spec, mode: 'sex_specific', female: n, ...carry })} />
         </span>
       ) : (
-        <input style={pmpeNumInput} inputMode="decimal" value={pmpeNumStr(spec?.value)} aria-label={label} onChange={e => onChange({ ...spec, mode: 'universal', value: pmpeToNum(e.target.value), ...carry })} />
+        <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.value)} ariaLabel={label} onCommit={n => onChange({ ...spec, mode: 'universal', value: n, ...carry })} />
       )}
       {showUnit && (
         <select style={{ fontSize: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', padding: '3px' }} value={unit} aria-label={`${label} unit`} onChange={e => onChange({ ...spec, mode: spec?.mode ?? defaultMode, unit: e.target.value })}>

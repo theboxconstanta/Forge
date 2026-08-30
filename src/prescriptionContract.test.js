@@ -16,6 +16,9 @@ import {
   movementObjectsForV2,
   parsePastedMovementLine,
   parseWorkoutPaste,
+  parsePrescriptionNumber,
+  formatPrescriptionNumber,
+  resolveNumericInput,
   PRESCRIPTION_CONTRACT_VERSION,
 } from './prescriptionContract.js'
 import fixtures from './prescriptionFixtures.json'
@@ -434,5 +437,167 @@ describe('P9.1 — deep snapshot, load standard, snapshot purity & retry', () =>
     // Run 500m universal -> not {male:500, female:null}
     const run = snap.movements.find((m) => m.name === 'Run')
     expect(run.distance).toEqual({ value: 500, unit: 'm', mode: 'universal', bothValues: null })
+  })
+})
+
+// ============================================================================
+// P9.2 — generic decimal numeric input (comma OR dot), canonical stays numeric
+// ============================================================================
+
+describe('P9.2 — parsePrescriptionNumber (generic, no whitelist)', () => {
+  // table-driven: prove the parser is GENERIC, not built around gym weights
+  const VALID = [
+    ['45', 45], ['0', 0], ['0,5', 0.5], ['0.5', 0.5],
+    ['7,5', 7.5], ['7.5', 7.5], ['12,5', 12.5], ['17,5', 17.5], ['22,5', 22.5], ['22.5', 22.5],
+    ['27,5', 27.5], ['32,5', 32.5], ['42,5', 42.5], ['47,5', 47.5], ['52,5', 52.5], ['62,5', 62.5],
+    ['100,5', 100.5], ['22,25', 22.25], ['22.25', 22.25], ['17,75', 17.75], ['17.75', 17.75],
+    ['7,125', 7.125], ['7.125', 7.125], ['100,125', 100.125],
+    ['1,25', 1.25], ['2,75', 2.75], ['11,25', 11.25], ['37,25', 37.25], ['62,75', 62.75],
+  ]
+  for (const [raw, expected] of VALID) {
+    it(`"${raw}" -> ${expected}`, () => {
+      expect(parsePrescriptionNumber(raw)).toEqual({ value: expected, ok: true })
+    })
+  }
+
+  it('number passthrough (finite) / rejects non-finite', () => {
+    expect(parsePrescriptionNumber(45)).toEqual({ value: 45, ok: true })
+    expect(parsePrescriptionNumber(22.5)).toEqual({ value: 22.5, ok: true })
+    expect(parsePrescriptionNumber(NaN)).toEqual({ value: null, ok: false })
+    expect(parsePrescriptionNumber(Infinity)).toEqual({ value: null, ok: false })
+  })
+
+  it('empty / null / whitespace -> no value (never 0)', () => {
+    expect(parsePrescriptionNumber('')).toEqual({ value: null, ok: true })
+    expect(parsePrescriptionNumber('   ')).toEqual({ value: null, ok: true })
+    expect(parsePrescriptionNumber(null)).toEqual({ value: null, ok: true })
+    expect(parsePrescriptionNumber(undefined)).toEqual({ value: null, ok: true })
+  })
+
+  const INVALID = ['22,5,5', '22..5', '22,,5', '2.2.5', '12abc', 'abc12', '22abc', '--5', '5-', ',,', '..', 'NaN', 'Infinity', '-5', '.5', '5.', ' 5 5 ', '1e3', '1 000']
+  for (const raw of INVALID) {
+    it(`rejects "${raw}" (not silently coerced)`, () => {
+      expect(parsePrescriptionNumber(raw)).toEqual({ value: null, ok: false })
+    })
+  }
+
+  it('formatPrescriptionNumber is the canonical dot string', () => {
+    expect(formatPrescriptionNumber(22.5)).toBe('22.5')
+    expect(formatPrescriptionNumber(45)).toBe('45')
+    expect(formatPrescriptionNumber(null)).toBe('')
+    expect(formatPrescriptionNumber(undefined)).toBe('')
+  })
+})
+
+describe('P9.2 — resolveNumericInput (draft->commit lifecycle)', () => {
+  it('a fully valid value commits (comma or dot)', () => {
+    expect(resolveNumericInput('22,5', { previous: null })).toEqual({ value: 22.5, commit: true })
+    expect(resolveNumericInput('22.5', { previous: null })).toEqual({ value: 22.5, commit: true })
+  })
+
+  it('empty commits null (not zero, not previous)', () => {
+    expect(resolveNumericInput('', { previous: 45 })).toEqual({ value: null, commit: true })
+  })
+
+  it('a partial "22," / "22." is HELD while typing (no commit, canonical untouched)', () => {
+    expect(resolveNumericInput('22,', { previous: 22, final: false })).toEqual({ value: 22, commit: false })
+    expect(resolveNumericInput('22.', { previous: null, final: false })).toEqual({ value: null, commit: false })
+  })
+
+  it('typing "2" -> "22" -> "22," -> "22,5" ends at 22.5 without losing the comma', () => {
+    let canonical = null
+    for (const [raw, expectCommit] of [['2', true], ['22', true], ['22,', false], ['22,5', true]]) {
+      const r = resolveNumericInput(raw, { previous: canonical, final: false })
+      expect(r.commit).toBe(expectCommit)
+      if (r.commit) canonical = r.value
+    }
+    expect(canonical).toBe(22.5)
+  })
+
+  it('on blur (final): invalid reverts to previous, never a silent 0', () => {
+    expect(resolveNumericInput('22abc', { previous: 45, final: true })).toEqual({ value: 45, commit: true })
+    expect(resolveNumericInput('22,,5', { previous: null, final: true })).toEqual({ value: null, commit: true })
+    expect(resolveNumericInput('22,', { previous: 22, final: true })).toEqual({ value: 22, commit: true })
+  })
+
+  it('integer mode (reps / calories): rejects a decimal, keeps integers', () => {
+    expect(resolveNumericInput('20', { integer: true, previous: null })).toEqual({ value: 20, commit: true })
+    expect(resolveNumericInput('20,5', { integer: true, previous: 20, final: false })).toEqual({ value: 20, commit: false })
+    expect(resolveNumericInput('20.5', { integer: true, previous: 20, final: true })).toEqual({ value: 20, commit: true })
+  })
+
+  it('decimal mode (load / distance): accepts arbitrary precision', () => {
+    expect(resolveNumericInput('22,25', { previous: null })).toEqual({ value: 22.25, commit: true })
+    expect(resolveNumericInput('1,5', { previous: null })).toEqual({ value: 1.5, commit: true })
+  })
+})
+
+describe('P9.2 — Quick Paste comma/dot decimal equivalence', () => {
+  it('"@ 22,5/15kg" and "@ 22.5/15kg" produce the identical numeric load', () => {
+    const comma = parsePastedMovementLine('20 Dumbbell Snatches @ 22,5/15kg')
+    const dot = parsePastedMovementLine('20 Dumbbell Snatches @ 22.5/15kg')
+    expect(comma.instance.load).toEqual({ mode: 'sex_specific', male: 22.5, female: 15, unit: 'kg' })
+    expect(dot.instance.load).toEqual(comma.instance.load)
+  })
+
+  it('arbitrary precision "@ 22,25/17,75kg"', () => {
+    const parsed = parsePastedMovementLine('20 Dumbbell Snatches @ 22,25/17,75kg')
+    expect(parsed.instance.load).toEqual({ mode: 'sex_specific', male: 22.25, female: 17.75, unit: 'kg' })
+  })
+
+  it('universal comma load "@ 22,5kg"', () => {
+    const parsed = parsePastedMovementLine('20 Thrusters @ 22,5kg')
+    expect(parsed.instance.load).toEqual({ mode: 'universal', value: 22.5, unit: 'kg' })
+  })
+
+  it('comma distance "1,5 km Run"', () => {
+    const parsed = parsePastedMovementLine('1,5 km Run')
+    expect(parsed.instance.distance).toEqual({ mode: 'universal', value: 1.5, unit: 'km' })
+  })
+
+  it('a doubled-separator token is NOT coerced — the line stays unparsed for that metric', () => {
+    const parsed = parsePastedMovementLine('20 Thrusters @ 22,,5kg')
+    // "22,,5kg" doesn't match the load grammar -> no load extracted, not "22"
+    expect(parsed?.instance.load).toBeUndefined()
+  })
+})
+
+describe('P9.2 — decimals survive the structured round-trip', () => {
+  const doc = {
+    version: 1,
+    variants: {
+      rx: { movements: [
+        { instanceId: 'mi_a', name: 'DB Snatch', reps: { mode: 'universal', value: 20 }, load: { mode: 'sex_specific', male: 22.5, female: 15, unit: 'kg' } },
+        { instanceId: 'mi_b', name: 'Row', distance: { mode: 'universal', value: 1.5, unit: 'km' } },
+      ] },
+    },
+  }
+
+  it('member display keeps the decimal (male / female / unknown), no rounding', () => {
+    expect(resolveVariantForMember(doc, 'rx', 'male').map((r) => r.line))
+      .toEqual(['20 DB Snatch @ 22.5 kg', '1.5 km Row'])
+    expect(resolveVariantForMember(doc, 'rx', 'female').map((r) => r.line))
+      .toEqual(['20 DB Snatch @ 15 kg', '1.5 km Row'])
+    expect(resolveVariantForMember(doc, 'rx', null).map((r) => r.line))
+      .toEqual(['20 DB Snatch @ 22.5/15 kg', '1.5 km Row'])
+  })
+
+  it('prescription snapshot keeps decimals as numbers (never localized strings)', () => {
+    const snap = buildPrescriptionSnapshot({ doc, variantKey: 'rx', gender: 'female', resolvedAt: 't0' })
+    const dbs = snap.movements.find((m) => m.name === 'DB Snatch')
+    expect(dbs.load).toEqual({ value: 15, unit: 'kg', mode: 'sex_specific', bothValues: [22.5, 15] })
+    expect(typeof dbs.load.value).toBe('number')
+    expect(typeof dbs.load.bothValues[0]).toBe('number')
+  })
+
+  it('V2 mirror carries the numeric decimal in prescription (not "22,5")', () => {
+    const [m] = movementObjectsForV2(doc.variants.rx.movements)
+    expect(m.prescription.load).toEqual({ mode: 'sex_specific', male: 22.5, female: 15, unit: 'kg' })
+  })
+
+  it('legacy weight mirror renders the decimal with a dot', () => {
+    const art = buildLegacyArtifactsForVariant(doc.variants.rx.movements)
+    expect(art.weightMale).toBe('22.5')
+    expect(art.weightFemale).toBe('15')
   })
 })

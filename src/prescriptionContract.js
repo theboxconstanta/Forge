@@ -364,6 +364,75 @@ export function snapshotPrescriptionDoc(doc) {
 }
 
 // ============================================================================
+// P9.2 — canonical numeric input parsing.
+//
+// Localized decimal syntax (comma vs dot) is an INPUT concern only. Canonical
+// structured prescription values stay NUMERIC (§C.5 / DB trigger: number|null).
+// A coach on a comma-locale mobile keyboard types "22,5"; that means the number
+// 22.5, never the string "22,5" and never "22.5".
+// ============================================================================
+
+// STRICT grammar for a COMMITTED structured prescription value: 1+ digits, then
+// optionally ONE decimal group introduced by a single '.' or ','. No sign
+// (negative prescriptions are not a domain value), no thousands separators, no
+// trailing text, no doubled separators, no bare ".5"/"5.". Comma and dot are
+// equivalent notation for the SAME number. Partial editing states ("22,",
+// "22.") are handled by the UI draft layer, never committed as-is.
+const PRESCRIPTION_NUMBER_RE = /^\d+(?:[.,]\d+)?$/
+
+/** The one canonical parser for structured prescription numeric entry — shared
+ * by both builders and the paste parser so comma/dot handling is identical.
+ *
+ *   number in           -> { value: n, ok: true }   (finite) | { ok: false }
+ *   '' | null | undef    -> { value: null, ok: true }  (semantically "no value")
+ *   '45' '22,5' '22.5'   -> { value: 45|22.5, ok: true }
+ *   '0,5' '22,25' '7.125'-> exact decimal, ok
+ *   '22,' '22..5' '2.2.5'
+ *   '22abc' '--5' 'NaN'
+ *   'Infinity' ',,' '..'  -> { value: null, ok: false }   (rejected, not coerced)
+ *
+ * Field-specific domain rules (integer-only reps/calories, > 0, …) are layered
+ * on top by the caller — this function is pure syntax. */
+export function parsePrescriptionNumber(raw) {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? { value: raw, ok: true } : { value: null, ok: false }
+  if (raw === null || raw === undefined) return { value: null, ok: true }
+  const t = String(raw).trim()
+  if (t === '') return { value: null, ok: true }
+  if (!PRESCRIPTION_NUMBER_RE.test(t)) return { value: null, ok: false }
+  const n = Number(t.replace(',', '.'))
+  return Number.isFinite(n) ? { value: n, ok: true } : { value: null, ok: false }
+}
+
+/** Canonical string form of a committed value, for display in an input that is
+ * NOT currently being edited. Dot notation (JS canonical). */
+export function formatPrescriptionNumber(v) {
+  return v === null || v === undefined ? '' : String(v)
+}
+
+/** P9.2 — the draft→commit decision for one structured numeric field, shared by
+ * both builders so comma / dot / partial / invalid / empty handling is
+ * byte-identical. The UI component owns only a focus flag + a draft string.
+ *
+ *   opts.integer   reject a non-integer result (reps & calories are counts)
+ *   opts.previous  last committed canonical value; returned on a rejected commit
+ *                  (never a silent 0)
+ *   opts.final     true on blur / row-commit: always resolves to a value
+ *                  (empty -> null, invalid -> previous). false while typing: a
+ *                  partial like "22," is kept in the draft, canonical untouched.
+ *
+ * Returns { value, commit }. commit:false => keep the draft, do not call
+ * onCommit (canonical state stays as it was). */
+export function resolveNumericInput(raw, opts = {}) {
+  const { integer = false, previous = null, final = false } = opts
+  const t = String(raw ?? '').trim()
+  if (t === '') return { value: null, commit: true }
+  const { value, ok } = parsePrescriptionNumber(t)
+  const good = ok && value !== null && (!integer || Number.isInteger(value))
+  if (good) return { value, commit: true }
+  return final ? { value: previous ?? null, commit: true } : { value: previous ?? null, commit: false }
+}
+
+// ============================================================================
 // Legacy artifacts — regenerated from structure on every save (never read as
 // truth). Keeps `wods.movements_{variant}` text[] and the 8 global weight
 // columns populated for legacy readers.
@@ -580,9 +649,10 @@ export function parseWorkoutPaste(text, opts = {}) {
 }
 
 function num(s) {
-  if (s === null || s === undefined) return null
-  const n = parseFloat(String(s).replace(',', '.'))
-  return Number.isFinite(n) ? n : null
+  // The paste regexes only ever hand this a bare numeric token
+  // (\d+(?:[.,]\d+)?), so the strict canonical parser accepts every real match
+  // and both builders + paste share ONE decimal-normalization path (P9.2).
+  return parsePrescriptionNumber(s).value
 }
 
 function titleWord(s) {
