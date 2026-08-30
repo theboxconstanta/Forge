@@ -1250,19 +1250,33 @@ file-resolution failures, unrelated).
 
 ## K. PRODUCTION VALIDATION
 
-(filled after promote + smoke test)
+`fix/inc-p9-5-2-01` merged to `main` (`cf8e94e`); Vercel status `success`;
+prod bundle `index-CId6cNID.js` (commit `cf8e94e`, contains `performedEditTitle`).
+Smoke test in a real browser (hard reload → SW bypass onto the fixed bundle):
+
+| Check | Result |
+|---|---|
+| Cold load + hard refresh | Home renders, no error boundary |
+| Home (authenticated) | ✅ "Hey Lucian", calendar, WOD card |
+| Log / Journal | ✅ |
+| **Log WOD screen** (the crashed route — mounts the `memberGymMovements` fetch effect) | ✅ renders; effect fires with no throw |
+| Log WOD → Continue → score step | ✅ |
+| Navigate back out of Log WOD (runs the P9.5.2 overlay-reset in the leave effect) | ✅ back to Home |
+| Leaderboard (real Fri Aug 28 data — `sortSectionLogs` + `isNotRxd` over rows with the new column) | ✅ (verified on the reverted build; identical reader code) |
+| PRs (`fetchWodLogs` `select('*')` incl. `performed_prescription`) | ✅ (same) |
 
 ## L. FINAL COMMIT
 
-`b08d6f5` (fixed reapply), merged to `main`.
+`cf8e94e` on `main` (fast-forward of `b08d6f5` fix + `1543d44` reapply + report).
 
 ## M. BUNDLE
 
-(filled after deploy)
+`index-CId6cNID.js` (was `index-CLh-9WPx.js` crashing; rollback interim was
+`index-DzeYhQet.js`).
 
 ## N. APP_VERSION
 
-`prescription-engine-p9-5-2-inc01-fixed-20260830`
+`prescription-engine-p9-5-2-inc01-fixed-20260830` (set live).
 
 ## HARD STOP
 
