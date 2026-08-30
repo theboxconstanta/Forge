@@ -215,6 +215,99 @@ No P9 defect is deferred as "P10 work."
 
 ---
 
+## K. ACCEPTANCE BLOCKER — LIVE CAPABILITY LOOKUP BROKEN (fixed)
+
+Date: 2026-08-30. Owner manual acceptance failed on the first step:
+
+> "In the live builder I cannot enter per-movement load at all. For Dumbbell
+> Snatch, Power Clean and Wallballs the UI only exposes REPS / Different M/F /
+> Scheme. There is no LOAD Male/Female control."
+
+### End-to-end diagnosis (capability lookup / seed / UI binding)
+
+| Layer | Verified | Result |
+|---|---|---|
+| DB seed | live `select allowed_prescription_metrics, default_prescription_metric, pg_typeof(...)` for `Power Clean` / `Dumbbell Snatch` / `Wall Ball` | **correct** — `{reps,load}` / `load`, type `text[]`, all platform (`gym_id IS NULL`), no gym-local shadow rows |
+| RLS | `movements_select` policy | **correct** — `((gym_id IS NULL) OR (gym_id = my_gym_id()))`, role `authenticated` |
+| PostgREST schema cache | anon REST `?select=...,allowed_prescription_metrics,...` | **correct** — returns `[]` (RLS-filtered), **not** a `400` → columns are in the cache |
+| Prod bundle (client) | grep deployed JS | **correct** — `MOVEMENT_COLUMNS` includes the capability columns; `resolveMovementCapability` minified logic intact (`Array.isArray(row.allowed_prescription_metrics)`) |
+| **App.jsx prop wiring** | `<SectionCard …>` at the metcon render site | **BROKEN** — `movementCatalog` **was never passed** |
+
+**Root cause.** `App()` builds `movementCatalog` (a `useMemo` exposing
+`capabilityFor` / `lookupForParse` / `suggestions` / `createMovement`), but the
+`<SectionCard>` element for the workout sections did not forward it. The prop is
+threaded `SectionCard → PrimarySectionBody → VariantEditorBody →
+MovementRowListPWA` — every hop forwards a value that started out `undefined`.
+`MovementRowListPWA`'s guard then returned the fallback
+`{ allowed: [], default: null, unknown: true }` for **every** movement, so:
+
+- no Load M/F control ever rendered (an "unknown" movement shows only "+ Add
+  prescription"),
+- a Quick-Paste-seeded `reps` instance rendered the bare reps editor — value +
+  the (now-removed) "Different M/F" + "Scheme" — with no "+ Load" affordance.
+
+This was a **pre-existing latent gap**: the old `MiscareQuickAdd` autocomplete
+degraded silently to a static movement list when it got no catalog, so nothing
+looked broken until P5′ made the capability lookup load-bearing.
+
+### Fixes (commit `4cb2c07` WOD-SIMPLE, `13bab28` forge-admin-web)
+
+1. **Pass the catalog.** `<SectionCard movementCatalog={movementCatalog} …>` —
+   one line. This alone restores Load M/F for every capable movement.
+2. **`seed()` stale-closure.** `MovementRowPWA.seed(next, metric, capForSeed)`
+   now takes the target capability explicitly instead of closing over the
+   render-scope `cap` (which is keyed on the *old* `instance.name` mid-rename).
+   Renaming a bare row to a load-default movement now seeds **both** `load` and
+   `reps`.
+3. **Canonical identity on rename.** `changeName` sets
+   `canonicalMovementId = catalogRowFor(name)?.id ?? null` (was hard-coded
+   `null`), so the frozen log snapshot carries canonical movement identity.
+4. **reps has no "Different M/F".** Per the owner ruling that **reps = workout
+   structure, not a prescription characteristic**, the M/F toggle is removed
+   from the reps editor in both repos (`PmpeMetricEditor` in App.jsx,
+   `MetricEditor` in admin `MovementRow.tsx`). reps keeps its single value input
+   + "Scheme" (21-15-9 free text); a legacy/paste `sex_specific` reps spec can
+   be collapsed with "Single value". `load` / `distance` / `calories` keep the
+   full "Different M/F" ↔ "Same for all" pair.
+
+### Verification
+
+- Deployed bundle on `forge-delta-ivory.vercel.app` (`index-U2wwuT2N.js`)
+  embeds `VERCEL_GIT_COMMIT_SHA = 4cb2c07…` — **the fix is live in production.**
+- `app_version.current` bumped to
+  `prescription-engine-p9-1-catalogfix-20260830`.
+- Tests: forge-admin-web **1171** (+4 new `MovementRow.test.tsx` — reps has no
+  M/F toggle; paste-seeded reps-only row shows "+ Load"; rename seeds load+reps),
+  WOD-SIMPLE **1032** (+9 pre-existing unrelated Deno file-load failures).
+  `vite build` + `tsc -b` + ESLint clean both repos. No migration, zero
+  production data touched.
+
+### Re-confirmed owner manual acceptance checklist
+
+Open the **WOD-SIMPLE PWA builder** (hard-refresh / dismiss the update toast so
+you are on `…catalogfix-20260830`), create/edit a WOD, add a metcon section:
+
+1. Add movement **"Power Clean"** → a **Load — Men / Women (kg)** pair appears
+   automatically (sex-specific by default). Enter `60` / `42`.
+2. Click **"Same for all"** on Load → collapses to one **Load (kg)** field
+   keeping `60`; **"Different M/F"** restores `60 / 42`.
+3. The **Reps** field shows only a value input + **"Scheme"** — **no**
+   "Different M/F" on reps.
+4. Add **"Dumbbell Snatch"** and **"Wallballs"** → same Load M/F control on each.
+5. Add a bodyweight movement (e.g. **"Burpees"**) → **no** Load control, reps
+   only.
+6. Quick-Paste a block that contains `Power Clean 60/42kg` → the review chip
+   resolves to a movement with Load M/F populated (`60 / 42`), not a reps-only row.
+7. Generate Variants → Intermediate / Beginner inherit the structured Load and
+   remain independently editable.
+8. Save. Open the same WOD in the **member PWA** as a male and as a female
+   profile → each sees their own load; a profile with no gender sees `60/42 kg`
+   (no male fallback).
+
+If every step passes, P9/P9.1 manual acceptance is clear and P10 may begin.
+
+---
+
 ## HARD STOP
 
 **P10 NOT STARTED.** `isNotRxd` / Journal / leaderboard historical
