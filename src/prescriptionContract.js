@@ -83,6 +83,145 @@ export function resolveMovementCapability(catalogRow) {
 }
 
 // ============================================================================
+// P9.3 — deterministic canonical movement identity resolution.
+//
+// A movement instance must resolve to the SAME catalog row (and therefore the
+// same capabilities) regardless of harmless spelling — "Wall Ball" / "Wallballs"
+// / "wall-ball" / "WB" are one movement. Display-name equality is NOT identity;
+// the catalog row id is. Once resolved, the id is persisted on the instance and
+// every later lookup goes id-first, never re-derived from display text.
+//
+// The catalog has ~29 deliberate duplicate rows (DB/Dumbbell, KB/Kettlebell,
+// &/And). This module NEVER merges or deletes them — when a name maps to
+// several rows that agree on capability it resolves deterministically to one;
+// only rows that DISAGREE on capability produce an ambiguous (Review) result.
+// ============================================================================
+
+/** Fold a coach-typed or catalog movement name to a comparison key: lowercase,
+ * "&" → " and ", `- _ / .` → space, strip quotes/parens/commas, collapse. */
+export function normalizeMovementName(s) {
+  return String(s ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[._/\\-]+/g, ' ')
+    .replace(/['"()[\],]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** The ordered set of lookup keys a name yields (most-specific first). Aliases
+ * are treated as exact (no depluralisation) since they are deliberate. */
+export function movementNameKeys(name, opts = {}) {
+  const isAlias = opts.isAlias === true
+  const base = normalizeMovementName(name)
+  if (!base) return []
+  const keys = []
+  const seen = new Set()
+  const add = (v) => {
+    const t = String(v).replace(/\s+/g, ' ').trim()
+    for (const k of [t, t.replace(/ /g, '')]) {
+      if (k && !seen.has(k)) { seen.add(k); keys.push(k) }
+    }
+  }
+  add(base)
+  add(base.replace(/\bdb\b/g, 'dumbbell'))
+  add(base.replace(/\bdumbbell\b/g, 'db'))
+  add(base.replace(/\bkb\b/g, 'kettlebell'))
+  add(base.replace(/\bkettlebell\b/g, 'kb'))
+  if (!isAlias) {
+    add(base.replace(/(\w)s\b/g, '$1'))
+    add(base.replace(/\bpush ?ups?\b/g, 'push up').replace(/\bpull ?ups?\b/g, 'pull up').replace(/\bsit ?ups?\b/g, 'sit up'))
+  }
+  return keys
+}
+
+function capSignature(row) {
+  return (row.allowed_prescription_metrics || []).slice().sort().join('+') + '|' + (row.default_prescription_metric || '')
+}
+
+/** Build the resolver index over a set of `movements` rows. Rows keep their own
+ * identity — nothing is merged. */
+export function buildMovementIndex(rows) {
+  const byId = new Map()
+  const byKey = new Map()
+  const put = (k, row) => {
+    let a = byKey.get(k)
+    if (!a) { a = []; byKey.set(k, a) }
+    if (!a.includes(row)) a.push(row)
+  }
+  for (const row of rows || []) {
+    if (row && row.id) byId.set(row.id, row)
+    if (!row || !row.name) continue
+    for (const k of movementNameKeys(row.name)) put(k, row)
+    for (const a of row.aliases || []) for (const k of movementNameKeys(a, { isAlias: true })) put(k, row)
+  }
+  return { byId, byKey, rows: rows || [] }
+}
+
+/** Resolve a coach-visible name to ONE catalog row.
+ *  - a key with a single row → that row
+ *  - a key with several rows that AGREE on capability → deterministic pick
+ *    (shortest canonical name, then id) — the deliberate DB dupes land here
+ *  - a key whose rows DISAGREE on capability → { ambiguous: true, candidates }
+ *  - nothing → null */
+export function resolveCatalogMovementByName(index, name) {
+  if (!index || !index.byKey) return null
+  for (const k of movementNameKeys(name)) {
+    const rows = index.byKey.get(k)
+    if (!rows || rows.length === 0) continue
+    if (rows.length === 1) return rows[0]
+    const sigs = new Set(rows.map(capSignature))
+    if (sigs.size === 1) {
+      return [...rows].sort((a, b) => a.name.length - b.name.length || String(a.id).localeCompare(String(b.id)))[0]
+    }
+    return { ambiguous: true, candidates: rows.map((r) => r.name) }
+  }
+  return null
+}
+
+/** Identity-first resolution for a movement INSTANCE: a persisted
+ * canonicalMovementId wins outright; the display name is only the fallback for
+ * an instance that has never been resolved. Identity is never re-derived from
+ * text once an id is known. Returns a catalog row or null. */
+export function resolveCatalogMovementForInstance(index, instance) {
+  if (!index || !instance) return null
+  const id = instance.canonicalMovementId
+  if (id && index.byId && index.byId.has(id)) return index.byId.get(id)
+  const hit = resolveCatalogMovementByName(index, instance.name)
+  return hit && !hit.ambiguous ? hit : null
+}
+
+/** Capability for an instance, id-first. */
+export function resolveInstanceCapability(index, instance) {
+  return resolveMovementCapability(resolveCatalogMovementForInstance(index, instance))
+}
+
+/** Return `instances` with `canonicalMovementId` filled in wherever a row is
+ * missing one but its name resolves deterministically. Pure — used at save time
+ * so a movement confirmed once is never again resolved by fuzzy text. */
+export function backfillInstanceIdentity(instances, index) {
+  if (!index) return instances || []
+  return (instances || []).map((inst) => {
+    if (inst.canonicalMovementId) return inst
+    const row = resolveCatalogMovementByName(index, inst.name)
+    return row && !row.ambiguous ? { ...inst, canonicalMovementId: row.id } : inst
+  })
+}
+
+/** DEV/TEST invariant — a known canonical id whose catalog row DOES carry
+ * capabilities must never resolve to `unknown`. Throws in dev/test; callers
+ * gate this to non-production. */
+export function assertCapabilityIntegrity(index, instance) {
+  const id = instance && instance.canonicalMovementId
+  if (!id || !index || !index.byId || !index.byId.has(id)) return
+  const row = index.byId.get(id)
+  const rowHasCaps = Array.isArray(row.allowed_prescription_metrics) && row.allowed_prescription_metrics.length > 0
+  if (rowHasCaps && resolveMovementCapability(row).unknown) {
+    throw new Error(`[capability-integrity] movement ${id} "${row.name}" carries ${JSON.stringify(row.allowed_prescription_metrics)} but resolved to unknown`)
+  }
+}
+
+// ============================================================================
 // Structural validation (mirrors the DB trigger)
 // ============================================================================
 

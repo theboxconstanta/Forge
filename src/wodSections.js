@@ -22,6 +22,8 @@ import {
   parsePastedMovementLine,
   validatePrescriptionsForPublish,
   emptyPrescriptions,
+  backfillInstanceIdentity,
+  resolveCatalogMovementByName,
 } from './prescriptionContract.js'
 
 // Extrage greutatea dintr-o linie de miscare deja normalizata (ex. "21
@@ -63,11 +65,18 @@ export const emptySectionVariants = () => Object.fromEntries(
 // forge-admin-web's sectionEditing.ts (hydrateInstancesFromLegacy). Pure,
 // best-effort, never persisted until the coach saves (architecture doc C.9.1).
 const LOADED_NAME_RE_PWA = /\b(snatch|clean|jerk|deadlift|thruster|squat|press|swing|lunge|carry|wall ?ball|barbell|dumbbell|kettlebell|db|kb|complex|shrug|curl|good morning|high pull|overhead)\b/i
-export const hydrateInstancesFromLegacy = (lines, globalWeight) => {
+export const hydrateInstancesFromLegacy = (lines, globalWeight, movementIndex = null) => {
   const instances = []
   for (const line of lines || []) {
     const parsed = parsePastedMovementLine(line)
-    if (parsed) instances.push(parsed.instance)
+    if (!parsed) continue
+    // P9.3 - deterministic identity on reload: assign the canonical id when the
+    // name resolves unambiguously. Ambiguous names stay id-less (never guessed).
+    if (movementIndex && !parsed.instance.canonicalMovementId) {
+      const row = resolveCatalogMovementByName(movementIndex, parsed.instance.name)
+      if (row && !row.ambiguous) parsed.instance.canonicalMovementId = row.id
+    }
+    instances.push(parsed.instance)
   }
   const gm = parseWeightTextPwa(globalWeight?.male)
   const gf = parseWeightTextPwa(globalWeight?.female)
@@ -201,7 +210,7 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
       const structuredMovements = w.movement_prescriptions?.variants?.[v.key]?.movements
       const instances = Array.isArray(structuredMovements) && structuredMovements.length > 0
         ? structuredMovements.map(m => ({ ...m }))
-        : hydrateInstancesFromLegacy(legacyLines, weight)
+        : hydrateInstancesFromLegacy(legacyLines, weight, opts.movementIndex || null)
       return [v.key, { instances, movements: legacyLines, quickAdd: '', paste: '', weight, note: w[`notes_${v.key}`] || '' }]
     })),
   })
@@ -308,7 +317,12 @@ export const legacySlotAssignmentAfterSave = (sections) => {
   return map
 }
 
-export const legacyPayloadFromSections = (sections) => {
+export const legacyPayloadFromSections = (sections, opts = {}) => {
+  // P9.3 - at save time, fill in canonicalMovementId for any structured
+  // instance that resolved deterministically but was never persisted (e.g. a
+  // legacy-hydrated row the coach never re-touched). A movement confirmed once
+  // is thereafter identified by id, not fuzzy text.
+  const movementIndex = opts.movementIndex || null
   const primary = sections.find(s => s.isPrimary) || sections[0] || createSection('metcon', true)
   const { warmup: warmupS, skill: skillS, skill2: skill2S } = assignNonPrimarySlots(sections)
 
@@ -342,7 +356,7 @@ export const legacyPayloadFromSections = (sections) => {
   const prescriptions = emptyPrescriptions()
   for (const v of VARIANTE_WEIGHT_BASE) {
     const sv = primary.variants?.[v.key] || { instances: [], movements: [], weight: { male: '', female: '' }, note: '' }
-    const instances = sv.instances || []
+    const instances = movementIndex ? backfillInstanceIdentity(sv.instances || [], movementIndex) : (sv.instances || [])
     if (instances.length > 0) {
       prescriptions.variants[v.key] = { movements: instances }
       const art = buildLegacyArtifactsForVariant(instances)

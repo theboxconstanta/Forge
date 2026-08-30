@@ -65,6 +65,8 @@ import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOve
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
   newMovementInstance, parseWorkoutPaste, resolveVariantDisplayLines, variantKeyFromLevel,
+  buildMovementIndex, resolveCatalogMovementByName, resolveCatalogMovementForInstance,
+  resolveInstanceCapability, backfillInstanceIdentity, assertCapabilityIntegrity,
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
   resolveNumericInput,
@@ -1031,11 +1033,16 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
   )
 }
 
-function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, capabilityFor, catalogRowFor, suggestions, needsReview }) {
+function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, capabilityFor, capabilityForInstance, catalogRowFor, suggestions, needsReview }) {
   const [nameFocused, setNameFocused] = useState(false)
   const [justPicked, setJustPicked] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const cap = useMemo(() => capabilityFor(instance.name), [capabilityFor, instance.name])
+  // P9.3 - id-first: once this instance carries a canonicalMovementId its
+  // capability comes from that row, never re-derived from the display text.
+  const cap = useMemo(
+    () => (capabilityForInstance ? capabilityForInstance(instance) : capabilityFor(instance.name)),
+    [capabilityForInstance, capabilityFor, instance],
+  )
   const present = PMPE_QTY.concat('load').filter(k => instance[k])
   const active = new Set(present.length ? present : (cap.default ? (cap.default === 'load' && cap.allowed.includes('reps') ? ['load', 'reps'] : [cap.default]) : []))
   const nameSug = justPicked || !nameFocused ? [] : suggestions(instance.name)
@@ -1060,7 +1067,7 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
     if (bare && nc.default) seed(next, nc.default, nc)
     onChange(next)
   }
-  const setQuantity = (metric) => { const next = { ...instance }; for (const k of PMPE_QTY) delete next[k]; seed(next, metric); onChange(next) }
+  const setQuantity = (metric) => { const next = { ...instance }; for (const k of PMPE_QTY) delete next[k]; seed(next, metric, cap); onChange(next) }
   const patch = (p) => onChange({ ...instance, ...p })
 
   return (
@@ -1116,6 +1123,14 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
 
 function MovementRowListPWA({ instances, onChange, catalog }) {
   const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
+  // P9.3 - id-first capability: a movement keeps its controls across name edits.
+  const capabilityForInstance = (inst) => catalog?.capabilityForInstance?.(inst) ?? capabilityFor(inst?.name)
+  // P9.3 dev invariant - a known canonical id whose catalog row DOES carry
+  // capabilities must never render as a reduced (e.g. reps-only) row. Throws in
+  // dev/test only; production is unaffected. See assertCapabilityIntegrity.
+  if (import.meta.env?.DEV && catalog?.index) {
+    for (const inst of instances) assertCapabilityIntegrity(catalog.index, inst)
+  }
   const catalogRowFor = (name) => catalog?.lookupForParse?.(name) ?? null
   const suggestions = (text) => catalog?.suggestions?.(text) ?? []
   const [pasteOpen, setPasteOpen] = useState(false)
@@ -1156,7 +1171,7 @@ function MovementRowListPWA({ instances, onChange, catalog }) {
       {instances.map((inst, i) => (
         <MovementRowPWA key={inst.instanceId} instance={inst} needsReview={reviewIds.has(inst.instanceId)} onChange={(n) => replaceAt(i, n)} onRemove={() => removeAt(i)} onDuplicate={() => dupAt(i)}
           onMoveUp={() => move(i, -1)} onMoveDown={() => move(i, 1)} isFirst={i === 0} isLast={i === instances.length - 1}
-          capabilityFor={capabilityFor} catalogRowFor={catalogRowFor} suggestions={suggestions} />
+          capabilityFor={capabilityFor} capabilityForInstance={capabilityForInstance} catalogRowFor={catalogRowFor} suggestions={suggestions} />
       ))}
       {instances.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movements yet — add one, or paste a workout.</div>}
       <button onClick={() => onChange([...instances, newMovementInstance()])} style={{ marginTop: '4px', padding: '8px 12px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '12px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add movement</button>
@@ -2923,18 +2938,15 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // for a single call site (PrimarySectionBody's MiscareQuickAdd).
   const movementCatalog = useMemo(() => {
     const names = Array.from(new Set([...MISCARI, ...gymMovements.map(m => m.name)]))
-    // Per-Movement Prescription Engine (P5') - case-insensitive, alias-aware
-    // match with DB<->Dumbbell / KB<->Kettlebell expansions, mirroring
-    // forge-admin-web's MovementCatalogProvider.matchMovementRow exactly.
+    // Per-Movement Prescription Engine (P9.3) - deterministic canonical identity:
+    // an alias-aware normalized index over the catalog rows (hyphen / "&" /
+    // whitespace / plural tolerant), byte-for-byte with forge-admin-web's
+    // MovementCatalogProvider. Duplicate rows (DB/Dumbbell, &/And) that agree on
+    // capability resolve to one; rows that disagree return ambiguous -> unknown.
+    const index = buildMovementIndex(gymMovements)
     const matchRow = (rawName) => {
-      const n = (rawName || '').trim().toLowerCase()
-      if (!n) return null
-      const cands = [n, n.replace(/\bdb\b/g, 'dumbbell'), n.replace(/\bkb\b/g, 'kettlebell'), n.replace(/\bdumbbell\b/g, 'db'), n.replace(/\bkettlebell\b/g, 'kb'), n.replace(/s$/, '')]
-      for (const c of cands) {
-        const hit = gymMovements.find(r => r.name.toLowerCase() === c || (r.aliases || []).some(a => a.toLowerCase() === c))
-        if (hit) return hit
-      }
-      return null
+      const hit = resolveCatalogMovementByName(index, rawName)
+      return hit && !hit.ambiguous ? hit : null
     }
     return {
       suggestions: (text) => {
@@ -2944,6 +2956,12 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         return names.filter(m => m.toLowerCase().includes(lower)).slice(0, 5)
       },
       capabilityFor: (name) => resolveMovementCapability(matchRow(name)),
+      // P9.3 - id-first: a movement confirmed once keeps its capability through
+      // every later edit/render regardless of display-name drift.
+      capabilityForInstance: (instance) => resolveInstanceCapability(index, instance),
+      resolveId: (instance) => resolveCatalogMovementForInstance(index, instance)?.id ?? null,
+      backfillIdentity: (instances) => backfillInstanceIdentity(instances, index),
+      index,
       lookupForParse: (name) => {
         const row = matchRow(name)
         return row ? { id: row.id, name: row.name, capability: resolveMovementCapability(row) } : null
@@ -3725,7 +3743,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // scriem, silentios, fara toast dublu.
     if (!validateSectionsForLegacy(flushed, t).valid) return
     setSavingWod(true)
-    const payload = { gym_id: gymId, date: dataWod, ...legacyPayloadFromSections(flushed) }
+    const payload = { gym_id: gymId, date: dataWod, ...legacyPayloadFromSections(flushed, { movementIndex: movementCatalog.index }) }
     // upsert pe conflict de data (nu doar insert) - data implicita e azi, care
     // poate coincide cu un WOD deja existent chiar daca formularul n-a fost
     // deschis explicit prin "editeaza" (editWodId ramane null in cazul asta);
@@ -3771,7 +3789,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // silentioasa de mai jos (cand data aleasa coincide cu un WOD deja
   // existent, fara sa fi apasat explicit "editeaza").
   const syncWodFormFromRow = (w, opts) => {
-    const sections = sectionsFromLegacyWod(w, opts)
+    const sections = sectionsFromLegacyWod(w, { ...opts, movementIndex: movementCatalog.index })
     setEditWodId(w.id)
     setDataWod(w.date)
     setWodSections(sections)
@@ -3893,7 +3911,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     primary.formatConfig = { rounds: 5, timeCapSec: 18 * 60 }
     primary.open = true
     const movements = ['10 pull-ups', '15 push-ups', '20 air squats'].map(parseMiscareLinePasta)
-    const mkVar = () => ({ instances: hydrateInstancesFromLegacy(movements, { male: null, female: null }), movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' })
+    const mkVar = () => ({ instances: hydrateInstancesFromLegacy(movements, { male: null, female: null }, movementCatalog.index), movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' })
     primary.variants = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, mkVar()]))
     setWodSections([primary])
     if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
@@ -3972,8 +3990,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const selected = duplicateRows.filter(r => r.selected)
     if (!duplicateSourceWod || selected.length === 0) return
     setDuplicateSaving(true)
-    const sections = sectionsFromLegacyWod(duplicateSourceWod)
-    const payloadBase = legacyPayloadFromSections(sections)
+    const sections = sectionsFromLegacyWod(duplicateSourceWod, { movementIndex: movementCatalog.index })
+    const payloadBase = legacyPayloadFromSections(sections, { movementIndex: movementCatalog.index })
     let anyError = false
     for (const row of selected) {
       const payload = { gym_id: gymId, date: row.targetDate, ...payloadBase }
