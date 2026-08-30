@@ -9,7 +9,7 @@
 // No new scoring engine. No MULTI_SCORE abstraction — SETS / STAGES / multiple
 // scored sections already cover Forge's real multi-score cases.
 
-import { getFormat, effectiveScoreMode, isSequentialFormat } from './workoutFormats'
+import { getFormat, effectiveScoreMode, isSequentialFormat, TIME_CAP_LABEL_FORMAT_IDS } from './workoutFormats'
 
 export const SCORE_KINDS = [
   'TIME', 'TIME_CAPPED', 'ROUNDS_REPS', 'REPS', 'LOAD', 'DISTANCE', 'CALORIES',
@@ -41,6 +41,16 @@ function timeCapOf(config) {
  * ('reps' | 'load' | 'calories' | 'distance'). Absent → FREE (one labelled
  * field). Historical `single_value` rows are never reinterpreted — this only
  * shapes the INPUT affordance for a NEW log.
+ *
+ * `opts.legacyDurationSec` — P9.5.3: the WOD's canonical stated time in seconds
+ * (`timeToSec(wods.duration)`). For the cap-family For-Time formats
+ * (TIME_CAP_LABEL_FORMAT_IDS) this IS the time cap when `format_config` carries
+ * no `timeCapSec` / `durationSec` — which is how every RFT and almost every
+ * For Time in production actually stores its cap. Without it the adaptive input
+ * never offers the Finished / Did-not-finish choice for those workouts. Same
+ * canonical fallback chain as `estimateTotalDurationSec`
+ * (`timeCapSec || durationSec || <stated duration>`); NEVER parsed from
+ * rendered text.
  */
 export function scoreDefinitionFor(formatId, formatConfig, opts = {}) {
   const format = formatId ? getFormat(formatId) : null
@@ -59,7 +69,9 @@ export function scoreDefinitionFor(formatId, formatConfig, opts = {}) {
   }
 
   if (mode === 'fortime_or_amrap') {
+    const legacyCap = Number(opts.legacyDurationSec)
     const cap = timeCapOf(config)
+      || (TIME_CAP_LABEL_FORMAT_IDS.includes(formatId) && Number.isFinite(legacyCap) && legacyCap > 0 ? legacyCap : null)
     const sequential = isSequentialFormat(formatId, config)
     const roundsKnown = parseInt(config.rounds, 10) || null
     if (cap) return { kind: 'TIME_CAPPED', timeCapSec: cap, sequential, roundsKnown, integer: true }

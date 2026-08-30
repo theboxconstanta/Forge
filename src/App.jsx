@@ -10948,7 +10948,21 @@ function App() {
                   onDone={commitPerformedEdit} t={t} />
               )
             }
-            const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig)
+            // P9.5.3 - RFT / For Time / Chipper / Ladder / Partner WOD store
+            // their time cap in `wods.duration` ("20:00"), NOT
+            // format_config.timeCapSec (verified: every prod RFT). Feed the
+            // canonical stated time so scoreDefinition can offer the explicit
+            // Finished / Did-not-finish choice for capped For-Time workouts.
+            const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig, {
+              legacyDurationSec: timeToSec(logWodZiData?.duration),
+            })
+            // P9.5.3 - a STRUCTURED per-movement metcon shows every load in the
+            // workout body and offers the P9.5.2 Edit flow for performed loads;
+            // the global "Weight" field inside YOUR SCORE is redundant here (the
+            // athlete records a scaled load via Edit -> movement -> value, not an
+            // ambiguous single box). Legacy / non-structured keeps its Weight
+            // field (`prescribedWeightPentruLog`). `weight_logged` is untouched.
+            const primaryPrescribedWeight = structuredDisplay ? '' : prescribedWeightPentruLog
             const scheduleLines = formatMemberScheduleLines(activeLogFormatId, activeLogFormatConfig, t)
             const dispatchScorePatch = (patch) => {
               if ('result' in patch) setWodResult(patch.result)
@@ -11007,7 +11021,7 @@ function App() {
                 <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.07em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
-                  movements={miscariPentruLog} prescribedWeight={prescribedWeightPentruLog} rxStatus={liveRxStatus}
+                  movements={miscariPentruLog} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
                   value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
                   onChange={dispatchScorePatch}
                   weightUnit={userProfile?.weight_unit || 'kg'} t={t} />

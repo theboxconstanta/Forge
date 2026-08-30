@@ -24,6 +24,39 @@ describe('P9.5 — scoreDefinitionFor', () => {
     expect(scoreDefinitionFor('RFT', { rounds: 5 }).kind).toBe('TIME')
   })
 
+  // P9.5.3 — every prod RFT stores its cap in wods.duration ("20:00"), NOT
+  // format_config. scoreDefinition must accept the canonical stated time.
+  it('P9.5.3 — RFT with cap only in wods.duration -> TIME_CAPPED via opts.legacyDurationSec', () => {
+    const d = scoreDefinitionFor('RFT', { rounds: 3 }, { legacyDurationSec: 1200 })
+    expect(d.kind).toBe('TIME_CAPPED')
+    expect(d.timeCapSec).toBe(1200)
+    expect(d.roundsKnown).toBe(3)
+    expect(d.sequential).toBe(false)
+  })
+
+  it('P9.5.3 — For Time / Chipper / Ladder / Partner WOD(For Time) also take legacyDurationSec', () => {
+    expect(scoreDefinitionFor('For Time', {}, { legacyDurationSec: 720 }).kind).toBe('TIME_CAPPED')
+    expect(scoreDefinitionFor('Chipper', {}, { legacyDurationSec: 1800 }).kind).toBe('TIME_CAPPED')
+    expect(scoreDefinitionFor('Ladder', {}, { legacyDurationSec: 1800 }).kind).toBe('TIME_CAPPED')
+    expect(scoreDefinitionFor('Partner WOD', { baseFormat: 'For Time' }, { legacyDurationSec: 1200 }).kind).toBe('TIME_CAPPED')
+  })
+
+  it('P9.5.3 — legacyDurationSec does NOT cap an AMRAP (time is the prescribed duration, not a cap)', () => {
+    expect(scoreDefinitionFor('AMRAP', { durationSec: 900 }, { legacyDurationSec: 900 }).kind).toBe('ROUNDS_REPS')
+    expect(scoreDefinitionFor('Partner WOD', { baseFormat: 'AMRAP' }, { legacyDurationSec: 1200 }).kind).toBe('ROUNDS_REPS')
+  })
+
+  it('P9.5.3 — RFT with neither a config cap NOR a stated duration stays TIME (owner §14)', () => {
+    expect(scoreDefinitionFor('RFT', { rounds: 3 }, {}).kind).toBe('TIME')
+    expect(scoreDefinitionFor('RFT', { rounds: 3 }, { legacyDurationSec: 0 }).kind).toBe('TIME')
+    expect(scoreDefinitionFor('RFT', { rounds: 3 }, { legacyDurationSec: NaN }).kind).toBe('TIME')
+  })
+
+  it('P9.5.3 — an explicit format_config.timeCapSec still wins over legacyDurationSec', () => {
+    const d = scoreDefinitionFor('RFT', { rounds: 3, timeCapSec: 600 }, { legacyDurationSec: 1200 })
+    expect(d.timeCapSec).toBe(600)
+  })
+
   it('For Time (sequence) with a cap -> TIME_CAPPED + sequential', () => {
     const d = scoreDefinitionFor('For Time', { timeCapSec: 900 })
     expect(d.kind).toBe('TIME_CAPPED')

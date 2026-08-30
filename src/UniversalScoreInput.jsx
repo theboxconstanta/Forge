@@ -111,8 +111,10 @@ function RoundsAndAdditionalReps({ v, patch, t, roundsPlaceholder, repsPlacehold
   )
 }
 
-// [Finished] [Time Capped] — selected state communicated by fill AND weight
-// (not colour alone), owner §35.
+// [Finished] [Did not finish] — selected state communicated by fill AND weight
+// (not colour alone), owner §35. Copy is presentation only (owner P9.5.3 §5);
+// the internal mode stays 'finished' / 'capped' and the persisted
+// completion_state stays completed / capped.
 function FinishedCappedToggle({ mode, onPick, t }) {
   const btn = (active) => ({
     flex: 1, padding: '12px 8px', borderRadius: '12px', border: `1px solid ${active ? '#0E0E0E' : '#E4E4E4'}`,
@@ -120,12 +122,12 @@ function FinishedCappedToggle({ mode, onPick, t }) {
     fontSize: '13px', fontWeight: active ? '700' : '500', cursor: 'pointer',
   })
   return (
-    <div role="radiogroup" aria-label="Finished or time capped" style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+    <div role="radiogroup" aria-label="Finished or did not finish" style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
       <button type="button" role="radio" aria-checked={mode === 'finished'} style={btn(mode === 'finished')} onClick={() => onPick('finished')}>
         {t?.logWodFinishedLabel || 'Finished'}
       </button>
       <button type="button" role="radio" aria-checked={mode === 'capped'} style={btn(mode === 'capped')} onClick={() => onPick('capped')}>
-        {t?.logWodTimeCappedLabel || 'Time Capped'}
+        {t?.logWodDidNotFinishLabel || 'Did not finish'}
       </button>
     </div>
   )

@@ -884,7 +884,12 @@ export function describeFormatConfig(formatId, config, t) {
 // EMOM/Tabata/Intervals timpul e chiar durata prescrisa a antrenamentului,
 // nu un "cap", asa ca acolo se arata doar valoarea goala (cerinta explicita -
 // vezi exemplele "AMRAP / 15:00" vs "For Time / Time cap 20:00").
-const TIME_CAP_LABEL_FORMAT_IDS = ['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD']
+// The `fortime_or_amrap` formats where a stated time is a CAP over an attempt
+// that could finish earlier (not a fixed prescribed duration like AMRAP). For
+// these, `wods.duration` / `format_config.timeCapSec` / `durationSec` all mean
+// "the cap". P9.5.3: scoreDefinition.js reads this to decide whether the
+// Finished / Did-not-finish choice applies.
+export const TIME_CAP_LABEL_FORMAT_IDS = ['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD']
 
 // Universal Member Workout Format Header - singura sursa de adevar pt
 // perechea "format + metadata de timp/structura relevanta", derivata

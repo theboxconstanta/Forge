@@ -47,7 +47,7 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
     render(<Harness def={def} movements={['12 Wall Ball']} />)
     expect(screen.getByLabelText('Finish time minutes')).toBeInTheDocument()
     expect(screen.queryByLabelText('Rounds completed')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /did not finish/i }))
     expect(screen.queryByLabelText('Finish time minutes')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Rounds completed')).toBeInTheDocument()
     expect(screen.getByLabelText('Additional reps')).toBeInTheDocument()
@@ -58,7 +58,7 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
     fireEvent.change(screen.getByLabelText('Finish time minutes'), { target: { value: '17' } })
     fireEvent.change(screen.getByLabelText('Finish time seconds'), { target: { value: '42' } })
     expect(val().time).toBe('17:42')
-    fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /did not finish/i }))
     expect(val().time).toBe('')
     const rounds = screen.getByLabelText('Rounds completed')
     fireEvent.focus(rounds); fireEvent.change(rounds, { target: { value: '2' } }); fireEvent.blur(rounds)
@@ -71,7 +71,7 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
 
   it('§14 — Time Capped -> Finished CLEARS rounds + additional reps (no stale capped work)', () => {
     render(<Harness def={def} movements={['12 Wall Ball']} />)
-    fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /did not finish/i }))
     const rounds = screen.getByLabelText('Rounds completed')
     fireEvent.focus(rounds); fireEvent.change(rounds, { target: { value: '2' } }); fireEvent.blur(rounds)
     const add = screen.getByLabelText('Additional reps')
@@ -86,7 +86,7 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
 
   it('shows the time-cap value, no calculation/formula/leaderboard text (§4)', () => {
     render(<Harness def={{ ...def }} movements={['12 Wall Ball', '32 Cal Row']} />)
-    fireEvent.click(screen.getByRole('radio', { name: /time capped/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /did not finish/i }))
     expect(screen.getByText(/time cap: 20:00/i)).toBeInTheDocument()
     expect(screen.queryByText(/calculated automatically/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/total work/i)).not.toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('P9.5 — UniversalScoreInput · TIME_CAPPED · toggle payload correctn
 
   it('a capped-shaped edit draft opens on Time Capped', () => {
     render(<Harness def={def} movements={['12 Wall Ball']} initial={{ roundsCompleted: '2', additionalReps: '43' }} />)
-    expect(screen.getByRole('radio', { name: /time capped/i })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: /did not finish/i })).toHaveAttribute('aria-checked', 'true')
   })
 })
 
