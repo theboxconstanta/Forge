@@ -1835,3 +1835,33 @@ Only `app_version` (`current` row) updated.
 
 **P10 NOT STARTED.** Owner manual acceptance remains the final gate. No "View
 programmed" comparison view was built (S40).
+
+## P9.5.5 FOLLOW-UP — full athlete-result surface completeness (`d0cbc19`)
+
+**Invariant (owner, non-negotiable):** every persisted programmed-vs-performed
+difference is reflected on EVERY athlete-result presentation surface; no
+supported modification stays hidden behind the programmed workout.
+
+Complete surface audit:
+
+| surface | movement rows? | performed projection | modified indicator |
+|---|---|---|---|
+| Leaderboard expanded card | yes | `cardMovementLines = resultPerformedLines(log) ?? miscariAfisate` | "Not RX'd" on header (visible collapsed) |
+| Leaderboard collapsed card | no (score) | — | "Not RX'd" on header |
+| Journal card | yes | `cardMovementLines` | "Not RX'd" on header |
+| Share card | yes | `composePerformedResultLines(performedToSave, memberGenderKey)` | "Not RX'd" |
+| Benchmark detail history | no (score) | — | **NEW**: `resultIsCompositionModified(log, gender, t)` → `<NotRxdBadge>` (was `capped`-only) |
+| Movement detail history | n/a | metcon logs never appear (`extractMovementEntriesFromWodLogs` is sets-family only) | n/a |
+| Aggregate (multi-section) leaderboard | no (name + score) | — | not a per-result card |
+| PR progression note | no (score-delta text) | — | on the same Journal card whose header carries "Not RX'd" |
+| Home "WORKOUT DONE" / section cards | programmed workout (a PROGRAMMING surface, S5 — deliberately unchanged) | — | — |
+| Feed | no (free text) | — | — |
+
+`resultIsCompositionModified` reuses the canonical `resultCompositionModified`
+(P9.5.4): weight-below-standard OR movements-changed OR `performed_prescription`
+overlay — the composition rule, distinct from the `capped` performance badge
+already shown. No DB change. Tests: +2 static surface-completeness assertions
+(`p955ResultPerformedProjection.test.js`, 20). Suite **1392 pass**.
+
+Net result: **every athlete-result surface either renders the performed movement
+content, or carries a "Not RX'd" indicator when the result was modified.**
