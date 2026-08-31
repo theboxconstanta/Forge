@@ -46,7 +46,7 @@ import {
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
-  isMixedCategory, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
+  isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
@@ -5718,6 +5718,22 @@ function resultPerformedLines(log) {
     console.warn('[P9.5.5] malformed performed_prescription on wod_log', log?.id)
   }
   return lines
+}
+
+// P9.5.5 - did this persisted RESULT differ in COMPOSITION from its programmed
+// variant? (weight below standard / movements changed / a performed_prescription
+// overlay). Same canonical rule as the leaderboard bucket (P9.5.4
+// resultCompositionModified). Used by score-only result surfaces that render NO
+// movement rows (benchmark history), so a modified attempt is never shown
+// unmarked. `t` only feeds parseWodLogDetails' set-label path (metcon logs skip
+// it). `gender` = the member's own gender for these own-history surfaces.
+function resultIsCompositionModified(log, gender, t) {
+  if (!log) return false
+  const linked = !!log.workout_section_id
+  const prescribedWeight = linked ? null : (log.wods?.[weightKeyForVariant(log.variant_level, gender)] || null)
+  const prescribedMovements = linked ? null : (log.wods?.[`movements_${(log.variant_level || '').toLowerCase()}`] || null)
+  const loggedMovements = parseWodLogDetails(log, t).miscariAfisate
+  return resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements)
 }
 
 // Results Phase 2 Slice 5 - Analytics Foundation. O singura sursa
@@ -11864,6 +11880,10 @@ function App() {
                           {log.completion_state === 'capped' && (
                             <span style={{ fontSize: '9px', fontWeight: '600', color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
                           )}
+                          {/* P9.5.5 - a modified attempt (scaled load / substitution /
+                              performed overlay) is never shown here unmarked, even
+                              though this score-only surface renders no movement rows. */}
+                          {resultIsCompositionModified(log, userProfile?.gender, t) && <NotRxdBadge t={t} compact />}
                         </span>
                       </div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>

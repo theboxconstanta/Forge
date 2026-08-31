@@ -175,4 +175,21 @@ describe('P9.5.5 §52 — result-card surfaces route through the shared projecti
   it('§35 the projection resolves against the FROZEN gender, not current state', () => {
     expect(app).toMatch(/log\?\.prescription_snapshot\?\.gender/)
   })
+
+  it('NON-NEGOTIABLE: score-only result surfaces mark a modified attempt (benchmark history)', () => {
+    // benchmark detail renders NO movement rows - a modified attempt must still
+    // be visibly flagged so no modification is hidden.
+    expect(app).toMatch(/function resultIsCompositionModified\(log, gender, t\)/)
+    expect(app).toMatch(/resultIsCompositionModified\(log, userProfile\?\.gender, t\) && <NotRxdBadge/)
+    // it uses the canonical composition rule, not an ad-hoc check
+    expect(app).toMatch(/return resultCompositionModified\(log, prescribedWeight, loggedMovements, prescribedMovements\)/)
+  })
+
+  it('the movement-content result surfaces AND the modified-badge cover the full set', () => {
+    // 3 surfaces render performed movement content:
+    expect((app.match(/resultPerformedLines\(\w+\) \?\? miscariAfisate/g) || []).length).toBe(2) // leaderboard + Journal
+    expect(app).toMatch(/composePerformedResultLines\(performedToSave, memberGenderKey\)/)         // share
+    // "Not RX'd" badge is present on every result-card header + the score-only history:
+    expect((app.match(/<NotRxdBadge t=\{t\}/g) || []).length).toBeGreaterThanOrEqual(4) // lb card, journal card, share, benchmark history
+  })
 })
