@@ -1339,6 +1339,36 @@ export function isWeightScoredSetsFormat(config, formatId) {
   return !scoringMode || scoringMode === 'Total Weight' || scoringMode === 'Max Weight'
 }
 
+// INC-06 - the ONE canonical display string for a family:'sets' log's derived
+// score, so every athlete-result surface (Clasament card, Jurnal card, Skill
+// Jurnal card, share card) shows the SAME value with the SAME unit. Wraps the
+// existing setsDisplayScore (value) + isWeightScoredSetsFormat (unit gate):
+//   rep-scored  (Tabata/Intervals 'Total Reps'|'Lowest Reps', Death By)  -> "203 reps"
+//   weight-scored (Complex 'Total/Max Weight'; Weightlifting/Strength/Build-to-
+//                  Heavy/Superset fallback = maxWeightFromSets)          -> "142 kg"
+// null when there is no derivable score (family:'sets' with neither a resolvable
+// scoringMode nor any logged weight - e.g. an empty Complex). `repsWord` keeps
+// i18n at the call site (t.clasamentRepsUnit); this module stays pure.
+export function setsScoreText(formatId, config, rowsByKey, weightUnit, repsWord = 'reps') {
+  const score = setsDisplayScore(formatId, config, rowsByKey)
+  if (score == null) return null
+  const unit = isWeightScoredSetsFormat(config, formatId)
+    ? (weightUnit === 'lbs' ? 'lbs' : 'kg')
+    : repsWord
+  return `${score} ${unit}`
+}
+
+// INC-06 - the label for the derived family:'sets' total (logger's "score" box),
+// keyed off the CANONICAL scoringMode (resolveSetsScoringMode) not raw config.
+// Rep modes -> the existing rep labels; weight modes (Complex Total/Max Weight)
+// -> the Weight label, not a misleading "Total reps" / "Lowest round". `t`
+// optional so the module stays testable without the translation bundle.
+export function setsScoreLabel(mode, t) {
+  if (mode === 'Lowest Reps') return t?.fmtLowestRepsScoreLabel || 'Cea mai slabă rundă'
+  if (mode === 'Total Weight' || mode === 'Max Weight') return t?.logWodWeightLabel || 'Weight'
+  return t?.fmtTotalRepsScoreLabel || 'Total reps'
+}
+
 // Conversie NEROTUNJITA kg<->lbs, doar pt COMPARATIE/sortare interna -
 // convertWeight() din utils.js rotunjeste la 0.5 (corect pt afisare pe
 // disc de bara, gresit pt clasament: 220lbs rotunjit ar cadea exact pe

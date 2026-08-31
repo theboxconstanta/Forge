@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound } from './workoutFormats'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 import { secToTime } from './utils'
 
@@ -276,7 +276,11 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
       ))}
       {score != null && (
         <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
-          {config?.scoringMode === 'Total Reps' ? (t?.fmtTotalRepsScoreLabel || 'Total reps') : (t?.fmtLowestRepsScoreLabel || 'Cea mai slabă rundă')}: {score}
+          {/* INC-06 - key the label off the CANONICAL resolver, not the raw
+              config: a coach-programmed Intervals/Tabata that never picked a
+              scoringMode still scores by the schema default ('Total Reps'), and
+              computeSetsScore already returns that SUM - the label must agree. */}
+          {setsScoreLabel(resolveSetsScoringMode(formatId, config), t)}: {score}
         </div>
       )}
     </>

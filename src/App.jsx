@@ -44,7 +44,7 @@ import {
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
-  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, isSequentialFormat,
+  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
   isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
@@ -2226,7 +2226,11 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
           </div>
           {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>{t.clasamentNoWod}</div>}
         </div>
-        <button onClick={() => goDay(+1)} disabled={isToday} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: isToday ? '#e0e0e0' : '#0E0E0E', color: isToday ? '#bbb' : '#fff', fontSize: '16px', cursor: isToday ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+        {/* INC-06 - forward navigation is NOT capped at today. A workout can be
+            programmed for a future business date and logged from Home before that
+            date (the Home calendar has no future cap either); its leaderboard
+            must be reachable to see those results. Generic - no date is special. */}
+        <button onClick={() => goDay(+1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
@@ -5996,7 +6000,6 @@ function RecentBenchmarkProgressSection({ progress, onSelectBenchmark, t, lang }
 }
 
 function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
-  const unitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg'
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6097,7 +6100,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // altceva in afara de "X seturi", deci inlocuim complet (nu doar
               // adaugam), altfel "65kg" si "10 seturi" ar aparea impreuna, unul
               // util, celalalt fara sens langa greutatea reala.
-              const wSetsScore = wHasSets ? setsDisplayScore(formatTipResolvat, formatConfigResolvat, w.sets) : null
+              // INC-06 - the derived family:'sets' score as ONE canonical string
+              // (value + correct unit). Was `${score}${unitLabel}` which appended
+              // kg/lbs even to a rep-scored Intervals/Tabata total ("203kg"); the
+              // leaderboard already gates the unit on isWeightScoredSetsFormat and
+              // now Jurnal goes through the same shared helper.
+              const wSetsText = wHasSets ? setsScoreText(formatTipResolvat, formatConfigResolvat, w.sets, weightUnit, t.clasamentRepsUnit) : null
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -6116,7 +6124,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // stie de ele - construim direct din log_meta (totalReps +
               // textul deja compus per etapa, fara niciun re-parse).
               const chainedTotalReps = formatAfisat?.family === 'chained' ? (w.log_meta?.totalReps ?? null) : null
-              const rezultatBucati = wSetsScore != null ? [`${wSetsScore}${unitLabel}`]
+              const rezultatBucati = wSetsText != null ? [wSetsText]
                 : chainedTotalReps != null ? [t.jurnalTotalRepsLabel(chainedTotalReps), ...(w.log_meta?.stages || []).map(s => s.text).filter(Boolean)]
                 : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                 : rezultatBucatiRaw
@@ -6226,7 +6234,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // greutate cu care a terminat, in loc s-o vada dintr-o privire.
               const skillFormatId = esteSlot2 ? sl.wods?.skill2_type : sl.wods?.skill_type
               const skillFormatConfigActual = esteSlot2 ? sl.wods?.skill2_format_config : sl.wods?.skill_format_config
-              const skillScor = hasSets ? setsDisplayScore(skillFormatId, skillFormatConfigActual, sl.sets) : null
+              // INC-06 - same canonical score string as the Jurnal WOD card / leaderboard
+              const skillScorText = hasSets ? setsScoreText(skillFormatId, skillFormatConfigActual, sl.sets, weightUnit, t.clasamentRepsUnit) : null
               const parti = []
               if (hasSets) {
                 Object.entries(sl.sets).forEach(([miscare, seturi]) => {
@@ -6274,10 +6283,10 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   </div>
                   {skillOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                      {skillScor != null && (
+                      {skillScorText != null && (
                         <div style={{ marginBottom: '12px' }}>
                           <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{skillScor}{unitLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{skillScorText}</div>
                         </div>
                       )}
                       {hasSets ? (
@@ -7147,7 +7156,9 @@ function App() {
     if (Math.abs(delta) < 50) return
     // Swipe stanga (delta negativ, degetul merge spre stanga) = ziua urmatoare,
     // ca la o pagina care se "intoarce" - swipe dreapta = ziua anterioara.
-    if (delta < 0) { if (jurnalDate < jurnalTodayISO) goJurnalDay(1) } else { goJurnalDay(-1) }
+    // INC-06 - no future cap: a workout logged from Home for a future business
+    // date must be reopenable from its own Jurnal day (matches the leaderboard).
+    if (delta < 0) { goJurnalDay(1) } else { goJurnalDay(-1) }
   }
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -9055,13 +9066,25 @@ function App() {
         const performedShareLines = performedToSave
           ? composePerformedResultLines(performedToSave, memberGenderKey)
           : null
+        // INC-06 - for family:'sets' (Intervals/Tabata/Complex/Weightlifting/...)
+        // and family:'chained', composeWodLogFields ALWAYS writes result/
+        // time_result = null; the score lives in logFields.sets / log_meta.
+        // The share card only read result/timeResult -> it showed "—" for every
+        // such workout. Feed it the SAME canonical derived score the leaderboard
+        // and the Jurnal card already show.
+        const activeShareFmt = getFormat(activeLogFormatId)
+        const derivedShareScore = activeShareFmt?.family === 'sets'
+          ? setsScoreText(activeLogFormatId, activeLogFormatConfig, logFields.sets, userProfile?.weight_unit, t.clasamentRepsUnit)
+          : (activeShareFmt?.family === 'chained' && logFields.log_meta?.totalReps != null)
+            ? t.jurnalTotalRepsLabel(logFields.log_meta.totalReps)
+            : null
         setWorkoutSharePopup({
           wodName: logWodZiData?.name || null,
           movements: performedShareLines ?? miscariFinale,
           variantLevel: varianta?.nivel || null,
           variantColor: varianta?.culoare || null,
           variantBg: varianta?.bg || null,
-          result: logFields.result, timeResult: logFields.time_result,
+          result: derivedShareScore ?? logFields.result, timeResult: logFields.time_result,
           loggedAt: new Date().toISOString(),
           // P9.5.2 - carry the just-saved performed overlay so isNotRxd sees it
           // (a Modified performed workout is Not RX regardless of weight match).
@@ -10824,13 +10847,14 @@ function App() {
               <div style={{ flex: 1, textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>
                 {jurnalDate === jurnalTodayISO ? t.clasamentToday : new Date(jurnalDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
-              <button onClick={() => goJurnalDay(1)} disabled={jurnalDate >= jurnalTodayISO} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: jurnalDate >= jurnalTodayISO ? '#e0e0e0' : '#0E0E0E', color: jurnalDate >= jurnalTodayISO ? '#bbb' : '#fff', fontSize: '16px', cursor: jurnalDate >= jurnalTodayISO ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
+              {/* INC-06 - see the leaderboard: no future cap on Jurnal navigation. */}
+              <button onClick={() => goJurnalDay(1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <button onClick={() => jurnalDateInputRef.current?.showPicker?.() || jurnalDateInputRef.current?.click()}
                   style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', color: '#0E0E0E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Calendar size={15} strokeWidth={2} />
                 </button>
-                <input ref={jurnalDateInputRef} type="date" value={jurnalDate} max={jurnalTodayISO}
+                <input ref={jurnalDateInputRef} type="date" value={jurnalDate}
                   onChange={e => e.target.value && setJurnalDate(e.target.value)}
                   style={{ position: 'absolute', inset: 0, width: '32px', height: '32px', opacity: 0, cursor: 'pointer' }} />
               </div>
