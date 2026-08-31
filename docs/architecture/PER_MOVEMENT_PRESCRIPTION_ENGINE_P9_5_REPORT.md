@@ -1668,3 +1668,170 @@ Only `app_version` (`current` row) updated, to signal clients.
 **P10 NOT STARTED.** The P9 series is not declared closed - owner manual
 acceptance remains the final gate. The composition-RX **capped** badge/bucket
 question (G) is flagged for a separate owner decision.
+
+---
+
+# P9.5.5 — RESULT CARD PERFORMED-PRESCRIPTION PROJECTION
+
+AUDIT -> one shared result-presentation rule -> test all modification types ->
+deploy. **Read/presentation only. 0 migrations, 0 backfill, 0 row mutations.**
+Deployed `4ae2010`, bundle `index-vTgYi4ZE.js`, `app_version`
+`prescription-engine-p9-5-5-result-performed-projection-20260831`.
+
+## A. OWNER FINDING
+
+After P9.5.4 the leaderboard correctly buckets a modified result under **Mixed
+Categories** with **Not RX'd**, but the result CARD still shows the PROGRAMMED
+movement content (`@ 35 kg`) instead of what the athlete performed (`@ 25 kg`).
+
+## B. ROOT CAUSE
+
+Every athlete-result card renders `parseWodLogDetails(log).miscariAfisate` — the
+frozen PROGRAMMED movement text parsed from `wod_logs.notes`. P9.5.2 never
+rewrites `notes` (or `movements_snapshot`), so a per-movement performed Edit
+(load / distance / calorie / substitution) is invisible on the card. Three
+surfaces, all reading the same programmed source:
+
+| surface | file | reads |
+|---|---|---|
+| Leaderboard expanded card | `App.jsx` ~2395 | `parseWodLogDetails(log).miscariAfisate` |
+| Journal card | `App.jsx` ~6128 | `parseWodLogDetails(w).miscariAfisate` |
+| Share card | `App.jsx` `WorkoutSharePopup` | `data.movements` = `miscariFinale` (programmed, at save) |
+| Aggregate (multi-section) leaderboard | `aggregateLeaderboard.js` | renders name + score only, **no movement rows** — n/a |
+| Additional-section leaderboard | `App.jsx` `buildBlocksForAdditionalSection` | same expanded-card render; section logs never carry `performed_prescription` (Edit is `logWodPrimaryPath`-only) — safe via the shared fallback |
+
+## C. RESULT-SURFACE SOURCE OF TRUTH
+
+For an ATHLETE RESULT: movement rows = **performed_prescription** when present
+and valid, else the programmed rendering. Score, variant label, and RX/Mixed
+classification are unchanged.
+
+## D. PROGRAMMED VS PERFORMED
+
+`prescription_snapshot` stays the coach/provenance record. `performed_prescription`
+is what the athlete did. The card keeps `VARIANT: RX` (provenance, never
+"Mixed") and the `Not RX'd` badge; only the movement rows switch source.
+
+## E. SHARED PROJECTION
+
+New pure function `composePerformedResultLines(performedDoc, gender)` in
+`prescriptionContract.js` (⇄ `.ts` for parity):
+
+```
+performedDoc == null            -> null   (caller keeps programmed rendering)
+!validatePerformedPrescription  -> null   (fail closed, owner S33)
+movements empty                 -> null
+else -> composeStructuredWorkoutDisplay({ instances: performedDoc.movements, mode:'member', gender }).lines
+```
+
+The performed doc is a **full clone** of the programmed variant's instances:
+athlete-edited metrics are stored `universal` (single value -> shown verbatim);
+untouched metrics keep their `sex_specific` spec -> resolved against `gender`.
+`gender` MUST be the **FROZEN** gender (`prescription_snapshot.gender` at log
+time), fallback `resolveAthleteGenderKey(log.profile.gender)`, else null (both
+values). Never the athlete's current gender, never the current workout / variant
+(owner S13 / S35 / S49). Same rendering engine as the member workout screen /
+logger / snapshot (P9.4). No new formatter, no icons (S38), no diff/summary
+(S39).
+
+`App.jsx`: shared `resultPerformedLines(log)` wrapper -> extracts the frozen
+gender + calls `composePerformedResultLines`. The leaderboard card and the
+Journal card both render
+`const cardMovementLines = resultPerformedLines(log) ?? miscariAfisate`; the
+share card uses `composePerformedResultLines(performedToSave, memberGenderKey)`.
+
+## F. LOAD CHANGE
+
+Programmed `15 Sumo deadlift high-pull @ 35 kg`, performed `25 kg` ->
+card shows **`15 Sumo deadlift high-pull … @ 25 kg`** (not 35, not 35/25).
+Verified live (Aug-31 "Test" RFT: `@ 25 kg` and `@ 24 kg` for the two edited
+movements, `@ 9 kg` for the untouched sex-specific Wallballs resolved to male,
+`Box jumps` plain).
+
+## G. MOVEMENT SUBSTITUTION
+
+Performed instance `name` = the athlete's chosen movement, `substitutedFrom`
+recorded but not shown. `21 Power Clean @ 61` -> `21 Dumbbell Clean @ 22.5 kg`.
+The programmed workout is untouched everywhere else.
+
+## H. MULTIPLE / REPEATED INSTANCES
+
+Full-clone doc + `instanceId` keying: all edited rows render their performed
+values, unchanged rows render identically to programmed, order preserved (no
+re-sort). Repeated movement (`Power Clean` ×2, only the 2nd edited) -> `61 kg` /
+`35 kg` respectively.
+
+## I. HISTORICAL BEHAVIOR
+
+Reader-time. Historical logs with `performed_prescription = NULL` are
+byte-identical to before. The 3 existing production rows with a non-null overlay
+(all `variant_level = 'RX'`, member 97a4e88a) render performed content on the
+next card view. No backfill. `parseWodLogDetails` and every classifier
+(`isNotRxd` / `isMixedCategory` / `_loggedMovements`) still read the PROGRAMMED
+`miscariAfisate` (P9.5.4 already routes the performed signal into
+classification).
+
+## J. JOURNAL / SHARE BEHAVIOR
+
+Both are athlete-result surfaces -> same rule via the same shared projection.
+Minimal read fix, no redesign. Ascending-AMRAP reps parsing keeps the frozen
+programmed movement structure (`miscariAfisate`) — P9.5.2 locks reps (S22).
+
+## K. LEGACY FALLBACK
+
+Legacy free-text logs (no `performed_prescription`) -> `resultPerformedLines`
+returns null -> the existing text rendering, unchanged. Verified live (Aug-29
+"For Time", "Adrian Ionascu" legacy log with a typed "Banded Ring Dip"
+substitution -> programmed text shown, no regression). No note-text parsing to
+invent performed structure.
+
+## L. TESTS
+
+`src/p955ResultPerformedProjection.test.js` (18): owner's exact case
+(male / female / null frozen gender); load / distance / calorie change;
+substitution; multiple + repeated edits; order preservation; null / malformed ->
+null (fail closed); LOAD-scored independence; + static checks that all three
+result-card surfaces route through the shared projection and that classification
+still reads `miscariAfisate` (`_loggedMovements` / `isMixedCategory` untouched).
+Suite **1390 pass** (+ 9 pre-existing Deno `@std/assert` file failures,
+unrelated). `eslint` + `vite build` clean. `appHookOrderIntegrity.test.js`
+green. `forge-admin-web`: `tsc -p tsconfig.app.json` clean, `src/features/programming`
+483 pass.
+
+## M. PRODUCTION IMPACT
+
+| | |
+|---|---|
+| migrations | **0** |
+| rows modified | **0** |
+| `wods` / `workouts` / `wod_logs` / `movements` / `members` | untouched |
+
+Only `app_version` (`current` row) updated.
+
+## N. DEPLOYMENT
+
+- commit `4ae2010` (branch `fix/p9-5-5-result-performed-projection` -> fast-forward `main`); forge-admin-web `632bcee` (contract parity)
+- prod bundle `index-vTgYi4ZE.js` (commit `4ae2010`)
+- `app_version` `prescription-engine-p9-5-5-result-performed-projection-20260831`
+- **Production smoke test** (real logged-in session, hard reload): Aug-31 "Test"
+  RFT expanded card -> `VARIANT RX`, `Not RX'd`, `Mixed Categories`, movement
+  rows **`15 Wallballs @ 9 kg` / `15 Sumo deadlift high-pull … @ 25 kg` /
+  `15 Box jumps` / `15 Push Press @ 24 kg`**, `RESULT 3 runde complete · 12:00`;
+  Aug-29 legacy "Adrian Ionascu" card -> programmed text, no regression; no
+  global error boundary.
+
+## OWNER MANUAL ACCEPTANCE
+
+1. Log an RX workout, **Edit** one load `35 kg -> 25 kg`, Save.
+2. Open the leaderboard, expand your card. Expect: `Mixed Categories`, `Not RX'd`,
+   `VARIANT RX`, and the movement row shows **`@ 25 kg`**.
+3. Substitute one movement, Save, reopen -> the substituted movement is shown.
+4. A true-RX result (no Edit) -> the original programmed prescription is shown,
+   no visual change.
+5. A modified + `Did not finish` result -> performed movements + the capped
+   score (`N runde + M`), no fabricated time.
+
+## HARD STOP
+
+**P10 NOT STARTED.** Owner manual acceptance remains the final gate. No "View
+programmed" comparison view was built (S40).
