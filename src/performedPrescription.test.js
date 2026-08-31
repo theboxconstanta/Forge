@@ -9,7 +9,7 @@ import {
   resolveMovementCapability,
   PERFORMED_PRESCRIPTION_VERSION,
 } from './prescriptionContract.js'
-import { isNotRxd } from './workoutFormats.js'
+import { resultCompositionModified } from './workoutFormats.js'
 
 // A programmed doc: RX variant, two movements — a loaded Thruster (sex-specific
 // 43/30 kg) and a bodyweight Pull-up (reps only).
@@ -174,13 +174,13 @@ describe('P9.5.2 — repeated movements: no cross-contamination (§32)', () => {
   })
 })
 
-describe('P9.5.2 — isNotRxd reads performed_prescription', () => {
-  it('a log with a non-null performed_prescription is Not RX regardless of weight', () => {
+describe('P9.5.2 / P9.5.6 — resultCompositionModified reads performed_prescription', () => {
+  it('a log with a non-null performed_prescription is Modified regardless of weight', () => {
     const log = { weight_logged: '43', time_result: '10:00', performed_prescription: { version: 1, movements: [] } }
-    expect(isNotRxd(log, '43', 'For Time', {}, ['Thruster'], ['Thruster'])).toBe(true)
+    expect(resultCompositionModified(log, '43', ['Thruster'], ['Thruster'])).toBe(true)
   })
-  it('a log with NULL performed_prescription is unaffected (still RX when weight matches)', () => {
+  it('a log with NULL performed_prescription is unaffected (As Prescribed when weight matches)', () => {
     const log = { weight_logged: '43', time_result: '10:00', performed_prescription: null }
-    expect(isNotRxd(log, '43', 'For Time', {}, ['Thruster'], ['Thruster'])).toBe(false)
+    expect(resultCompositionModified(log, '43', ['Thruster'], ['Thruster'])).toBe(false)
   })
 })

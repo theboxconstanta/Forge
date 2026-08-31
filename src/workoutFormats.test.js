@@ -6,7 +6,7 @@ import {
   normalizeSetsRows, addSetRow, updateSetRow, removeSetRow,
   defaultRowsForFormat, computeSetsPrCandidates, computeSetsScore, resolveSetsScoringMode,
   REP_SCHEME_QUICK_OPTIONS, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, formatMemberHeaderTiming, resolveMemberHeaderTiming, getWorkoutFormatDisplay, formatTypeLabel, AUTO_DURATION_FORMAT_IDS,
-  isNotRxd, weightKeyForVariant, effectiveScoreMode,
+  resultCompositionModified, weightKeyForVariant, effectiveScoreMode,
   maxWeightFromSets, setsDisplayScore, isSequentialFormat,
   movementsChanged, isMixedCategory, composeFinishedRoundsText,
   composeStageResult, totalRepsChained, totalRepsAmrapStage,
@@ -181,64 +181,68 @@ describe('effectiveScoreMode', () => {
   })
 })
 
-describe('isNotRxd', () => {
-  it('greutate identica cu prescrisul (trim + case-insensitive) -> RXd', () => {
-    expect(isNotRxd({ weight_logged: ' 61KG ', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+// P9.5.6 - AXIS B: "did the athlete materially change the SELECTED variant's
+// prescription?" This is the SINGLE rule behind both the leaderboard bucket and
+// the result badge. It reads weight_logged vs the selected variant's standard,
+// the logged vs prescribed movement list, and performed_prescription - and
+// NOTHING about completion (time_result / capped / rounds / score). The former
+// helper isNotRxd ORed in a "did not finish in the time cap" term; that
+// conflated completion into prescription status and was removed in P9.5.6.
+describe('resultCompositionModified — AXIS B (prescription vs SELECTED variant)', () => {
+  it('greutate identica cu prescrisul (trim + case-insensitive) -> As Prescribed', () => {
+    expect(resultCompositionModified({ weight_logged: ' 61KG ', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('greutate diferita de prescris -> Not RXd', () => {
-    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(true)
+  it('greutate SUB standardul variantei alese -> Modified', () => {
+    expect(resultCompositionModified({ weight_logged: '40kg', time_result: '10:00' }, '61kg')).toBe(true)
   })
-  it('spatiu intern intre numar si unitate -> tot RXd ("61 kg" vs "61kg")', () => {
-    expect(isNotRxd({ weight_logged: '61 kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('spatiu intern intre numar si unitate -> As Prescribed ("61 kg" vs "61kg")', () => {
+    expect(resultCompositionModified({ weight_logged: '61 kg', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('unitate omisa de membru -> tot RXd cand numarul coincide ("61" vs "61kg")', () => {
-    expect(isNotRxd({ weight_logged: '61', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('unitate omisa de membru -> As Prescribed cand numarul coincide ("61" vs "61kg")', () => {
+    expect(resultCompositionModified({ weight_logged: '61', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('zecimala redundanta -> tot RXd ("61.0kg" vs "61kg")', () => {
-    expect(isNotRxd({ weight_logged: '61.0kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('zecimala redundanta -> As Prescribed ("61.0kg" vs "61kg")', () => {
+    expect(resultCompositionModified({ weight_logged: '61.0kg', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('fara greutate logata (camp gol) -> presupus RXd la greutate', () => {
-    expect(isNotRxd({ weight_logged: '', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('fara greutate logata (camp gol) -> presupus As Prescribed la greutate', () => {
+    expect(resultCompositionModified({ weight_logged: '', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('For Time neterminat (fara time_result) -> Not RXd, chiar cu greutate corecta', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'For Time')).toBe(true)
+  it('P9.5.6 - For Time NETERMINAT (fara time_result), prescriptie neschimbata -> As Prescribed (completion, nu prescriptie)', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: null }, '61kg')).toBe(false)
   })
-  it('AMRAP fara time_result -> tot RXd (nu exista concept de neterminat la AMRAP)', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'AMRAP')).toBe(false)
+  it('P9.5.6 - RFT capped 2/3 runde, prescriptie neschimbata -> As Prescribed (fixtura owner Adrian)', () => {
+    expect(resultCompositionModified({ weight_logged: '9', time_result: null, result: '2 runde complete', completion_state: 'capped' }, '9', ['15 Wallballs'], ['15 Wallballs'])).toBe(false)
   })
-  it('fara greutate prescrisa configurata -> nu poate fi Not RXd pe greutate', () => {
-    expect(isNotRxd({ weight_logged: '40kg', time_result: '10:00' }, null, 'For Time')).toBe(false)
+  it('AMRAP fara time_result -> As Prescribed', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: null }, '61kg')).toBe(false)
   })
-  it('formatId absent (log fara wods/format_type/header recunoscut) -> nu presupune "For Time", sare peste verificarea de time cap', () => {
-    expect(isNotRxd({ weight_logged: '', time_result: null }, null, undefined)).toBe(false)
+  it('fara greutate prescrisa configurata (legacy) -> nu poate fi Modified pe greutate', () => {
+    expect(resultCompositionModified({ weight_logged: '40kg', time_result: '10:00' }, null)).toBe(false)
   })
-  it('Partner WOD cu baseFormat AMRAP, fara time_result -> tot RXd (UI-ul de logare nu a cerut niciodata timp)', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'AMRAP' })).toBe(false)
+  it('P9.5.6 - Partner WOD For Time, fara time_result, prescriptie neschimbata -> As Prescribed', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: null }, '61kg')).toBe(false)
   })
-  it('Partner WOD cu baseFormat For Time, fara time_result -> Not RXd', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: null }, '61kg', 'Partner WOD', { baseFormat: 'For Time' })).toBe(true)
+  it('miscari schimbate (substitutie), greutate identica -> Modified', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: '10:00' }, '61kg', ['21 Thrusters', '15 Wall Balls'], ['21 Thrusters', '15 Pull-ups'])).toBe(true)
   })
-  it('miscari schimbate, greutate identica si terminat in timp -> Not RXd', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time', {}, ['21 Thrusters', '15 Wall Balls'], ['21 Thrusters', '15 Pull-ups'])).toBe(true)
+  it('miscari identice, greutate identica -> As Prescribed', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: '10:00' }, '61kg', ['21 Thrusters', '15 Pull-ups'], ['21 Thrusters', '15 Pull-ups'])).toBe(false)
   })
-  it('miscari identice, greutate identica, terminat in timp -> RXd', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time', {}, ['21 Thrusters', '15 Pull-ups'], ['21 Thrusters', '15 Pull-ups'])).toBe(false)
+  it('loggedMovements/prescribedMovements omise -> nu afecteaza rezultatul', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('loggedMovements/prescribedMovements omise (apelanti vechi) -> nu afecteaza rezultatul', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('Faza 3 - greutate LOGATA MAI MARE decat prescrisa -> As Prescribed (enteredWeight >= standard)', () => {
+    expect(resultCompositionModified({ weight_logged: '70kg', time_result: '10:00' }, '61kg')).toBe(false)
   })
-  it('Faza 3 (rxEngine.js) - greutate LOGATA MAI MARE decat prescrisa -> tot RXd (bug-ul real reparat, nu mai egalitate exacta)', () => {
-    expect(isNotRxd({ weight_logged: '70kg', time_result: '10:00' }, '61kg', 'For Time')).toBe(false)
+  it('Faza 3 - greutate nenumerica pastreaza fallback-ul (egalitate exacta de text)', () => {
+    expect(resultCompositionModified({ weight_logged: 'bodyweight', time_result: '10:00' }, 'bodyweight')).toBe(false)
+    expect(resultCompositionModified({ weight_logged: 'bodyweight', time_result: '10:00' }, 'vest')).toBe(true)
   })
-  it('Faza 3 - greutate nenumerica pastreaza fallback-ul vechi (egalitate exacta de text)', () => {
-    expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'bodyweight', 'For Time')).toBe(false)
-    expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'vest', 'For Time')).toBe(true)
+  it('P9.5.2 - performed_prescription non-null -> Modified chiar cu greutate/miscari identice', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: '10:00', performed_prescription: { version: 1, movements: [] } }, '61kg', ['21 Thrusters'], ['21 Thrusters'])).toBe(true)
   })
-  it('P9.5.2 - performed_prescription non-null -> Not RXd chiar cu greutate/miscari identice si terminat', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00', performed_prescription: { version: 1, movements: [] } }, '61kg', 'For Time', {}, ['21 Thrusters'], ['21 Thrusters'])).toBe(true)
-  })
-  it('P9.5.4 - performed_prescription null -> neafectat (RXd cand restul coincide)', () => {
-    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00', performed_prescription: null }, '61kg', 'For Time', {}, ['21 Thrusters'], ['21 Thrusters'])).toBe(false)
+  it('P9.5.4 - performed_prescription null -> neafectat (As Prescribed cand restul coincide)', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: '10:00', performed_prescription: null }, '61kg', ['21 Thrusters'], ['21 Thrusters'])).toBe(false)
   })
 })
 
@@ -290,9 +294,10 @@ describe('isMixedCategory', () => {
     expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'], null)).toBe(false)
     expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(false)
   })
-  it('P9.5.4 - "neterminat in time cap" NU e Mixed (ramane in bucket-ul RX) - dimensiune de performanta, nu compozitie', () => {
+  it('P9.5.4/P9.5.6 - "neterminat in time cap" NU e Mixed (ramane in bucket-ul variantei) - dimensiune de completare, nu prescriptie', () => {
     // isMixedCategory nu primeste formatId/time_result -> nu are cum sa vada
-    // performanta; e exact intentia (spre deosebire de isNotRxd).
+    // completarea; e exact intentia - si acum badge-ul (resultCompositionModified)
+    // foloseste EXACT aceeasi regula.
     expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'], null)).toBe(false)
   })
 })

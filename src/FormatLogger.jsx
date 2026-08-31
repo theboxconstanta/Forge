@@ -117,8 +117,9 @@ function TimeResultFields({ result, time, onChange, t, hideResult }) {
 
 // Un singur camp de greutate (nu per miscare) - aparut doar cand adminul a
 // prescris o greutate pentru varianta aleasa (wods.<varianta>_weight).
-// Folosit sa detectam "Not RXd" (vezi isNotRxd in workoutFormats.js) daca
-// greutatea logata difera de cea prescrisa. Pre-completat cu prescrisul de
+// Folosit sa detectam o modificare de prescriptie (vezi resultCompositionModified
+// in workoutFormats.js) daca greutatea logata e sub cea prescrisa a variantei
+// alese. Pre-completat cu prescrisul de
 // catre App.jsx la alegerea variantei (seed in state-ul real, nu fallback la
 // render) - acelasi motiv ca la bug-ul de reps: fallback-ul la render
 // impiedica editarea libera a campului.
@@ -392,8 +393,8 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   // antrenorului trebuie sa schimbe UI-ul de logare, altfel un Partner WOD
   // configurat ca AMRAP tot arata campurile de Timp si hint-ul "daca nu ai
   // terminat", care n-au sens pentru AMRAP (nu exista time cap/finish acolo).
-  // effectiveScoreMode e aceeasi functie folosita de isNotRxd - un singur loc
-  // care decide scoreMode-ul real, nu 2 implementari care pot desincroniza.
+  // effectiveScoreMode - un singur loc care decide scoreMode-ul real
+  // (folosit si de scoreDefinition.js), nu 2 implementari care pot desincroniza.
   const scoreMode = effectiveScoreMode(formatId, config) || format.scoreMode
   // Ascending AMRAP: "movements" primite sunt nume de baza (fara numere,
   // vezi catalogul) - reconstruim lista cu reps-ul corect prescris pt runda

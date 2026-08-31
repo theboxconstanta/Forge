@@ -755,60 +755,48 @@ function greutateEsteSubStandard(weightLogged, prescribedWeight) {
   return !weightMatches(weightLogged, prescribedWeight)
 }
 
-// "Not RXd" = greutatea logata e SUB standardul prescris al variantei (vezi
-// greutateEsteSubStandard - Faza 3, regula enteredWeight >= standard, nu mai
-// egalitate exacta), SAU miscarile logate difera de cele prescrise (vezi
-// movementsChanged), SAU (la formatele cu time cap real - For Time/RFT/
-// Ladder, scoreMode 'fortime_or_amrap') nu s-a terminat in time cap (fara
-// time_result). AMRAP nu are concept de "neterminat" (scorul e mereu cat ai
-// facut in timp), deci nu intra la a treia conditie. loggedMovements/
-// prescribedMovements sunt optionale - apelantii care nu le au inca (ex.
-// inainte de refactorul Mixed Categories) primesc acelasi rezultat ca
-// inainte, fara sa strice apelurile existente. Derivat la citire, nu stocat -
-// daca adminul corecteaza greutatea/miscarile prescrise ulterior, eticheta
-// ramane consistenta cu valoarea curenta, fara o a doua sursa de adevar care
-// poate desincroniza. Acelasi semnal e folosit peste tot (Jurnal, Clasament,
-// pop-up-ul de felicitare) - un membru care a schimbat doar o miscare (nu
-// greutatea) trebuie sa apara la fel de "Not RXd" oriunde, nu doar in
-// gruparea Mixed Categories de pe Clasament.
-// P9.5.4 - THE ONE canonical "the athlete's RESULT COMPOSITION differs from the
-// programmed variant" rule. Composition = which movements and at what
-// prescribed load / distance / calories - NOT performance. It is:
-//   - the LEADERBOARD BUCKET authority (isMixedCategory below), and
-//   - one of the two inputs to the "Not RXd" badge (isNotRxd below).
-// so the badge and the bucket can never disagree about a COMPOSITION change.
+// P9.5.6 - THE ONE canonical "did the athlete materially change the SELECTED
+// variant's prescription?" rule. This is AXIS B (prescription / composition
+// status) and it is COMPLETELY INDEPENDENT of AXIS A (which variant the athlete
+// selected) and AXIS C (how much of the workout they completed / their score).
 //
-// Three signals, all read-time, none persisted:
-//   1. weight_logged is below the variant's prescribed standard
+// It is the SINGLE authority for BOTH:
+//   - the leaderboard bucket (isMixedCategory below), and
+//   - the result badge ("Not RX'd" for an RX variant, "Modified" for a non-RX
+//     variant - the wording is display only, the classification is one rule),
+//     rendered on the leaderboard card, the Jurnal card, the share card and the
+//     benchmark-history row (via App.jsx resultIsCompositionModified).
+// The badge and the bucket therefore can never disagree.
+//
+// Three signals, all read-time, none persisted, ALL evaluated RELATIVE TO THE
+// SELECTED VARIANT (never automatically relative to RX - the prescribed weight /
+// movements passed in come from the SELECTED variant's frozen prescription_snapshot,
+// see resolveResultProvenance):
+//   1. weight_logged is below the SELECTED variant's prescribed standard
 //      (greutateEsteSubStandard - Faza 3, `entered >= standard` rule).
-//   2. the logged movement list differs from the prescribed one
+//   2. the logged movement list differs from the SELECTED variant's prescribed one
 //      (movementsChanged - substituted / added / removed / rewritten).
-//   3. a non-null performed_prescription (P9.5.2). saveWodLog only ever writes
-//      it when the athlete's performed overlay MATERIALLY differs from the
-//      programmed variant (performedIsModified gate) - a per-movement load /
-//      distance / calorie change, or a canonical movement substitution. That
-//      is a composition modification by construction, so `!= null` is a
-//      classification signal here, not mere provenance.
-// The programmed variant is NEVER mutated - RX stays RX; only the RX/Modified
-// classification (badge) and the leaderboard bucket move.
+//   3. a non-null performed_prescription (P9.5.2). saveWodLog only ever writes it
+//      when the athlete's performed overlay MATERIALLY differs from the SELECTED
+//      variant - a per-movement load / distance / calorie change, or a canonical
+//      movement substitution. `!= null` is a composition modification by
+//      construction.
+//
+// It DELIBERATELY does NOT look at completion_state / time_result / rounds
+// completed / partial reps / score magnitude. "Did not finish", "capped",
+// "2 of 3 rounds", a slow time, a low rep count, DNF - these are COMPLETION /
+// PERFORMANCE status (a separate axis), shown separately, and NEVER make an
+// otherwise-as-prescribed result "modified". (Pre-P9.5.6 the badge helper
+// isNotRxd ORed in a `did not finish inside the time cap` term - that conflated
+// AXIS C into AXIS B and is the INC / P9.5.6 regression that was removed.)
+//
+// The SELECTED variant is NEVER mutated - RX stays RX, Intermediate stays
+// Intermediate; only this Modified/As-Prescribed classification and the
+// leaderboard bucket move.
 export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements) {
   return greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
     || movementsChanged(loggedMovements, prescribedMovements)
     || (log?.performed_prescription != null)
-}
-
-// "Not RXd" badge = composition modified (resultCompositionModified) OR the
-// PERFORMANCE dimension "did not finish inside a real time cap" (For Time / RFT
-// / Ladder / Partner-WOD-ForTime, scoreMode 'fortime_or_amrap', no time_result).
-// AMRAP has no concept of "unfinished" (the score is always what you did in the
-// time), so it never triggers the performance term. The performance term is
-// DELIBERATELY NOT part of the leaderboard bucket (see isMixedCategory): a
-// capped result whose composition is exactly RX stays in its RX bucket, ranked
-// after the finishers, carrying only the badge.
-export function isNotRxd(log, prescribedWeight, formatId, config, loggedMovements, prescribedMovements) {
-  const compozitieModificata = resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements)
-  const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
-  return compozitieModificata || neterminatInTimp
 }
 
 // Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,
@@ -826,15 +814,15 @@ export function movementsChanged(loggedMovements, prescribedMovements) {
 }
 
 // "Mixed Categories" (Clasament) leaderboard bucket = the RESULT COMPOSITION
-// differs from the programmed variant (resultCompositionModified). Kept as a
-// thin, back-compatible wrapper: the first arg stays `weight_logged` (string),
-// with the new optional `performedPrescription` 5th arg carrying the P9.5.2
-// signal. DELIBERATELY does NOT include isNotRxd's "did not finish in the time
-// cap" performance term - a capped result whose composition is exactly RX stays
-// in its RX bucket (ranked after the finishers by sortSectionLogs), never moved
-// to Mixed. Every leaderboard surface that buckets by variant MUST route through
-// here so the bucket, the badge, the filter and the participant count never
-// disagree about RX status.
+// differs from the SELECTED variant's prescription (resultCompositionModified).
+// Thin, back-compatible wrapper: the first arg stays `weight_logged` (string),
+// with the optional `performedPrescription` 5th arg carrying the P9.5.2 signal.
+// P9.5.6 - identical to the result badge now (both are just
+// resultCompositionModified): a capped / incomplete result whose composition is
+// exactly the selected variant stays in that variant's bucket (ranked after the
+// finishers by sortSectionLogs), never moved to Mixed, and carries NO badge.
+// Every leaderboard surface that buckets by variant routes through here so the
+// bucket, the badge, the filter and the participant count never disagree.
 export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null) {
   return resultCompositionModified(
     { weight_logged: weightLogged, performed_prescription: performedPrescription },

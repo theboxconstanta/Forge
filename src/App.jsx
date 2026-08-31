@@ -43,7 +43,7 @@ import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, isNotRxd, weightKeyForVariant, weightMatches, greutateNumerica,
+  formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
   isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
@@ -2113,9 +2113,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
         const prescribedMovements = prov.prescribedMovements
         const { miscariAfisate } = parseWodLogDetails(log, t)
         const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements, _supportsRx: true, _prov: prov }
-        // P9.5.4 - the bucket rule must see the same performed-prescription
-        // signal the "Not RXd" badge (isNotRxd, line ~2300) already uses, so a
-        // materially modified performed result lands in Mixed Categories, not RX.
+        // P9.5.4 / P9.5.6 - the bucket rule and the result badge are ONE rule
+        // (resultCompositionModified): a materially modified result (weight below
+        // the SELECTED variant's standard, movement change, or performed overlay)
+        // lands in Mixed Categories; a merely incomplete/capped one does NOT.
         const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription)
         if (isMixed) mixedLogs.push(logCuDetalii)
         else rxLogs.push(logCuDetalii)
@@ -2329,11 +2330,14 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
-                      // Sectiunile suplimentare (_supportsRx:false) n-au variante
-                      // de scalare fata de care sa fie clasificate Not-Rx (vezi
-                      // buildBlocksForAdditionalSection) - badge-ul nu se aplica.
-                      const notRxdLog = log._supportsRx
-                        ? isNotRxd(log, log._prescribedWeight, effFormatId, effFormatConfig, log._loggedMovements, log._prescribedMovements)
+                      // P9.5.6 - AXIS B only: did the athlete materially change
+                      // the SELECTED variant's prescription? Identical rule to
+                      // the leaderboard bucket (isMixedCategory). Completion /
+                      // "did not finish" is a separate axis and never sets this.
+                      // Additional sections (_supportsRx:false) have no scaling
+                      // variant to be modified against - no badge.
+                      const resultModifiedLog = log._supportsRx
+                        ? resultCompositionModified(log, log._prescribedWeight, log._loggedMovements, log._prescribedMovements)
                         : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
@@ -2341,7 +2345,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // P9.5.5 - a RESULT card shows what the athlete PERFORMED:
                       // performed_prescription lines when present, else the
                       // programmed text. Display only - classification
-                      // (_loggedMovements / isNotRxd / isMixedCategory) is
+                      // (_loggedMovements / resultCompositionModified) is
                       // unchanged (P9.5.4 already routes the performed signal).
                       const cardMovementLines = resultPerformedLines(log) ?? miscariAfisate
                       // Family 'sets' CU scor calculat (scoringMode rezolvat,
@@ -2393,7 +2397,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                             <div style={{ flex: 1 }}>
                               <div style={{ ...TYPO.primary, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {name}
-                                {notRxdLog && <NotRxdBadge t={t} compact />}
+                                {resultModifiedLog && <NotRxdBadge t={t} compact variant={log.variant_level} />}
                               </div>
                               <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
                                 <Clock size={10} strokeWidth={2} />
@@ -5709,7 +5713,7 @@ function parseWodLogDetails(w, t, simpleReps) {
   // Formatul detectat din prima linie a header-ului text vechi (ex. "AMRAP
   // 20:00") - null daca nu exista/nu se recunoaste. Folosit atat ca sa stim
   // cate linii sa taiem de la inceputul listei de miscari, cat si ca ultim
-  // fallback pt tipul real al logului (vezi isNotRxd la ambele ecrane).
+  // fallback pt tipul real al logului (afisarea scorului).
   const headerFormatId = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
   const miscariAfisate = linii.slice(headerFormatId ? 1 : 0)
   const wHasSets = w.sets && Object.keys(w.sets).length > 0
@@ -6063,9 +6067,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // Layer 2a - o sectiune suplimentara n-are variante de scalare
               // (RX/Intermediate/Beginner/OnRamp) fata de care sa compari "a
               // scazut greutatea/miscarile" - null explicit (nu w.wods, care
-              // ar fi comparatia GRESITA - a sectiunii primare), isNotRxd
-              // ramane corect (doar semnalul "neterminat in time cap"
-              // conteaza atunci, vezi isNotRxd/movementsChanged).
+              // ar fi comparatia GRESITA - a sectiunii primare).
               // P10 - a historical Journal result is classified against the
               // prescription FROZEN on its own log (resolveResultProvenance),
               // not the current wods row: a later coach edit to today's RX load /
@@ -6081,15 +6083,18 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // fara sa dea eroare.
               const prescribedMovementsLog = esteSectiuneLegata ? null : wProv.prescribedMovements
               // Incercam toate semnalele posibile pt tipul real (wods legat,
-              // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
-              // trateaza deja corect cazul cand niciunul nu exista (formatId absent
-              // -> nu presupune "For Time", sare peste verificarea de time cap).
+              // format_type, sau header-ul text vechi) - folosit doar la
+              // afisarea scorului (setsDisplayScore/ascending), nu la clasificare.
               const formatTipResolvat = esteSectiuneLegata ? (w.format_snapshot || w.format_type || headerFormatId) : wProv.formatId
               const formatConfigResolvat = esteSectiuneLegata ? w.format_config_snapshot : wProv.formatConfig
-              const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, formatConfigResolvat, miscariAfisate, prescribedMovementsLog)
+              // P9.5.6 - AXIS B: did the athlete change the SELECTED variant's
+              // prescription? Same canonical rule as the leaderboard bucket.
+              // Completion status ("2 rounds complete", capped, DNF) is a
+              // SEPARATE axis and never sets this.
+              const resultModifiedLog = resultCompositionModified(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog)
               // P9.5.5 - the Journal is an ATHLETE RESULT surface: show what was
               // PERFORMED (performed_prescription lines) when present, else the
-              // programmed text. Display only - notRxdLog above is unchanged.
+              // programmed text. Display only - resultModifiedLog above is unchanged.
               const cardMovementLines = resultPerformedLines(w) ?? miscariAfisate
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
@@ -6136,7 +6141,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
-                      {notRxdLog && <NotRxdBadge t={t} compact />}
+                      {resultModifiedLog && <NotRxdBadge t={t} compact variant={w.variant_level} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteWod && (
@@ -6490,14 +6495,21 @@ function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }
   )
 }
 
-// Eticheta "Not RX'd" - randata identic in Clasament, JurnalList si
-// WorkoutSharePopup (inainte, 3 stiluri inline usor diferite intre ele, fara
-// niciun motiv functional). `compact` = varianta mica de pe cardurile de
-// Clasament (langa numele participantului).
-function NotRxdBadge({ t, compact }) {
+// Eticheta pt un rezultat MODIFICAT fata de prescriptia variantei ALESE
+// (AXA B - vezi resultCompositionModified). Randata identic in Clasament,
+// JurnalList, WorkoutSharePopup si istoricul de benchmark. `compact` = varianta
+// mica de pe cardurile de Clasament.
+// P9.5.6 - wording e DOAR display si depinde de varianta aleasa: pt RX raman
+// "Not RX'd" (termenul CrossFit consacrat pt "nu am facut RX"); pt orice alta
+// varianta programata (Intermediate/Beginner/OnRamp/custom viitor) e "Modified"
+// - un Intermediate care si-a modificat prescriptia NU a "picat RX", pur si
+// simplu nu a facut Intermediate cum era prescris. Clasificarea in sine e o
+// singura regula, agnostica de numele variantei (§74).
+function NotRxdBadge({ t, compact, variant }) {
+  const isRxVariant = String(variant ?? 'rx').toLowerCase().replace(/[_\s-]/g, '') === 'rx'
   return (
     <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '600', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
-      {t.notRxdBadge}
+      {isRxVariant ? t.notRxdBadge : t.modifiedBadge}
     </span>
   )
 }
@@ -6508,7 +6520,7 @@ function NotRxdBadge({ t, compact }) {
 // social media direct, fara integrare separata per platforma).
 function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, notRxd } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const dataObj = new Date(loggedAt)
   const shareText = [
@@ -6548,7 +6560,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
               <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
                 {variantLevel}
               </div>
-              {notRxd && <NotRxdBadge t={t} />}
+              {resultModified && <NotRxdBadge t={t} variant={variantLevel} />}
             </div>
           )}
           {movements && movements.length > 0 && (
@@ -6868,8 +6880,9 @@ function App() {
   const [memberGymMovements, setMemberGymMovements] = useState([])
   const memberMovementIndex = useMemo(() => buildMovementIndex(memberGymMovements), [memberGymMovements])
   // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
-  // cu greutatea prescrisa a variantei alese pentru a detecta "Not RXd" (vezi
-  // isNotRxd in workoutFormats.js). Semanata direct cu prescrisul la alegerea
+  // cu greutatea prescrisa a VARIANTEI ALESE pentru a detecta o modificare de
+  // prescriptie (vezi resultCompositionModified in workoutFormats.js). Semanata
+  // direct cu prescrisul la alegerea
   // variantei (nu fallback la render) - acelasi motiv ca la bug-ul de reps
   // reparat la SequentialPartialFields: fallback-ul la render impiedica
   // editarea libera a campului.
@@ -6935,7 +6948,7 @@ function App() {
   const [editLogMiscari, setEditLogMiscari] = useState([])
   // Greutatea prescrisa a variantei logului editat (din wods.<varianta>_weight,
   // via join-ul wods(...) din fetchWodLogs) - folosita ca sa aratam corect
-  // "Not RXd" si sa recalculam la editare (vezi isNotRxd in workoutFormats.js).
+  // starea de prescriptie (vezi resultCompositionModified in workoutFormats.js).
   const [editLogPrescribedWeight, setEditLogPrescribedWeight] = useState('')
   const [editLogMiscareCurenta, setEditLogMiscareCurenta] = useState('')
   const [wodMiscariCustom, setWodMiscariCustom] = useState(null)
@@ -9086,9 +9099,12 @@ function App() {
           variantBg: varianta?.bg || null,
           result: derivedShareScore ?? logFields.result, timeResult: logFields.time_result,
           loggedAt: new Date().toISOString(),
-          // P9.5.2 - carry the just-saved performed overlay so isNotRxd sees it
-          // (a Modified performed workout is Not RX regardless of weight match).
-          notRxd: isNotRxd({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, activeLogFormatId, activeLogFormatConfig, miscariFinale, prescribedMovements),
+          // P9.5.6 - AXIS B only: did the athlete change the SELECTED variant's
+          // prescription? (weight below the selected variant's standard, movement
+          // change, or a material performed_prescription overlay). Completion /
+          // "did not finish" NEVER sets this. Same canonical rule as the
+          // leaderboard bucket and the Jurnal badge.
+          resultModified: resultCompositionModified({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements),
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
@@ -9492,7 +9508,7 @@ function App() {
         ? (wodMiscariCustom ?? (structuredLogLines && structuredLogLines.length ? structuredLogLines : (logWodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? [])))
         : wodMiscari)
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
-  // (logare noua sau editare) - vezi isNotRxd in workoutFormats.js. Pt o
+  // (logare noua sau editare) - vezi resultCompositionModified in workoutFormats.js. Pt o
   // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
   // (mai jos) extrage greutatea direct din textul fiecarei miscari
   // (miscariPentruLog), exact ca la Skill Work dinainte, fara sa mai
@@ -11938,7 +11954,7 @@ function App() {
                           {/* P9.5.5 - a modified attempt (scaled load / substitution /
                               performed overlay) is never shown here unmarked, even
                               though this score-only surface renders no movement rows. */}
-                          {resultIsCompositionModified(log, userProfile?.gender, t) && <NotRxdBadge t={t} compact />}
+                          {resultIsCompositionModified(log, userProfile?.gender, t) && <NotRxdBadge t={t} compact variant={log.variant_level} />}
                         </span>
                       </div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>

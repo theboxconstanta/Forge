@@ -2,18 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { isNotRxd, isMixedCategory, resultCompositionModified } from './workoutFormats.js'
+import { isMixedCategory, resultCompositionModified } from './workoutFormats.js'
 
-// P9.5.4 — GLOBAL LEADERBOARD RESULT CLASSIFICATION
+// P9.5.4 / P9.5.6 — GLOBAL LEADERBOARD RESULT CLASSIFICATION
 //
-// Owner finding: a modified result showed the "Not RX'd" badge but stayed in
-// the RX leaderboard bucket. Root cause: the badge (isNotRxd) gained the P9.5.2
-// performed_prescription signal but the bucket (isMixedCategory) did not.
-//
-// The fix centralises the COMPOSITION rule in resultCompositionModified() and
-// routes both through it. This matrix asserts the fix is GLOBAL — independent of
-// scoring family — and that the badge and the bucket AGREE about every
-// composition modification, while true-RX results (any family) stay RX.
+// P9.5.4 owner finding: a modified result showed the badge but stayed in the RX
+// bucket. Fix: centralise the COMPOSITION rule in resultCompositionModified().
+// P9.5.6 owner finding: an RX athlete who followed RX but did NOT finish (2/3
+// rounds) showed "Not RX'd". Fix: the badge is now EXACTLY
+// resultCompositionModified — the former isNotRxd helper's "did not finish in
+// the time cap" term (a COMPLETION signal) was removed. Badge === bucket for
+// every case; completion never sets either.
 //
 // `perf` = a non-null performed_prescription overlay (P9.5.2 only ever persists
 // it when the athlete's performed version MATERIALLY differs from programmed).
@@ -72,28 +71,37 @@ describe('P9.5.4 — global bucket classification matrix (all score families)', 
   }
 })
 
-describe('P9.5.4 §38 — badge and bucket agree on every COMPOSITION modification', () => {
-  for (const [label, log, pw, fmt, cfg, lm, pm, expectMixed] of MATRIX) {
-    it(`${label}: resultCompositionModified === bucket verdict`, () => {
-      const composition = resultCompositionModified(log, pw, lm, pm)
-      expect(composition).toBe(expectMixed)
-      // isNotRxd (badge) = composition OR "did not finish in cap" -> it is
-      // therefore true wherever the bucket says Mixed (never disagrees downward).
-      const badge = isNotRxd(log, pw, fmt, cfg, lm, pm)
-      if (expectMixed) expect(badge).toBe(true)
+describe('P9.5.6 §40/§72 — badge and bucket are ONE rule (resultCompositionModified)', () => {
+  for (const [label, log, pw, , , lm, pm, expectMixed] of MATRIX) {
+    it(`${label}: badge === bucket === ${expectMixed ? 'Modified' : 'As Prescribed'}`, () => {
+      const badge = resultCompositionModified(log, pw, lm, pm)
+      const bucket = isMixedCategory(log.weight_logged, pw, lm, pm, log.performed_prescription)
+      expect(badge).toBe(expectMixed)
+      expect(bucket).toBe(expectMixed)
+      expect(badge).toBe(bucket)
     })
   }
 })
 
-describe('P9.5.4 §11/§16 — the performance dimension is bucket-orthogonal', () => {
-  it('a composition-RX capped RFT: badge shows Not RXd (performance) but bucket stays RX', () => {
-    const log = { weight_logged: '61kg', time_result: null, result: '2 runde + 43', completion_state: 'capped' }
-    expect(isNotRxd(log, '61kg', 'RFT', { rounds: 3, timeCapSec: 1200 }, M, M)).toBe(true)   // badge: yes (unfinished)
-    expect(isMixedCategory(log.weight_logged, '61kg', M, M, log.performed_prescription)).toBe(false) // bucket: RX
+describe('P9.5.6 §3/§28 — completion is orthogonal to BOTH bucket and badge', () => {
+  it('Adrian: 3 RFT, RX, followed RX, 2/3 rounds capped -> NOT modified, RX bucket, no badge', () => {
+    const log = { weight_logged: '9', time_result: null, result: '2 runde complete', completion_state: 'capped' }
+    expect(resultCompositionModified(log, '9', ['15 Wallballs'], ['15 Wallballs'])).toBe(false) // badge: NO
+    expect(isMixedCategory(log.weight_logged, '9', ['15 Wallballs'], ['15 Wallballs'], null)).toBe(false) // bucket: RX
   })
-  it('AMRAP never triggers the performance term', () => {
-    const log = { weight_logged: '43kg', result: '7 + 12', time_result: null }
-    expect(isNotRxd(log, '43kg', 'AMRAP', {}, M, M)).toBe(false)
+  it('capped RFT, composition exactly RX -> badge NO, bucket RX (was badge YES pre-P9.5.6)', () => {
+    const log = { weight_logged: '61kg', time_result: null, result: '2 runde + 43', completion_state: 'capped' }
+    expect(resultCompositionModified(log, '61kg', M, M)).toBe(false)
+    expect(isMixedCategory(log.weight_logged, '61kg', M, M, log.performed_prescription)).toBe(false)
+  })
+  it('For Time (no cap) unfinished, composition exactly RX -> badge NO', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: null }, '61kg', M, M)).toBe(false)
+  })
+  it('Partner WOD (For Time base) unfinished, composition RX -> badge NO', () => {
+    expect(resultCompositionModified({ weight_logged: '61kg', time_result: null }, '61kg', M, M)).toBe(false)
+  })
+  it('AMRAP partial round, composition RX -> badge NO', () => {
+    expect(resultCompositionModified({ weight_logged: '43kg', result: '7 + 12', time_result: null }, '43kg', M, M)).toBe(false)
   })
 })
 
@@ -109,10 +117,10 @@ describe('P9.5.4 §25 — score magnitude never determines RX', () => {
 })
 
 describe('P9.5.4 §30 — no overcorrection: true RX stays RX', () => {
-  it('performed_prescription null + everything matching -> RX across families', () => {
-    for (const fmt of ['For Time', 'RFT', 'AMRAP', 'Weightlifting']) {
+  it('performed_prescription null + everything matching -> RX (badge + bucket) across families', () => {
+    for (const _fmt of ['For Time', 'RFT', 'AMRAP', 'Weightlifting']) {
       expect(isMixedCategory('61kg', '61kg', M, M, null)).toBe(false)
-      expect(isNotRxd({ weight_logged: '61kg', time_result: '9:00', performed_prescription: null }, '61kg', fmt, { timeCapSec: 1200 }, M, M)).toBe(false)
+      expect(resultCompositionModified({ weight_logged: '61kg', time_result: '9:00', performed_prescription: null }, '61kg', M, M)).toBe(false)
     }
   })
 })

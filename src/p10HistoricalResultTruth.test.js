@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { resolveResultProvenance } from './resultProvenance.js'
 import { snapshotLoadStandard, MULTI_LOAD_STANDARD } from './prescriptionContract.js'
-import { resultCompositionModified, isNotRxd, isMixedCategory } from './workoutFormats.js'
+import { resultCompositionModified, isMixedCategory } from './workoutFormats.js'
 
 // P10 — HISTORICAL RESULT TRUTH / SNAPSHOT-FIRST READ MODEL
 //
@@ -122,7 +122,6 @@ describe('P10 · A — coach raises the RX load 35 → 45 after the athlete logg
     const logged = ['20 Wall Ball', '15 Pull-up']
     expect(resultCompositionModified(base, prov.prescribedWeight, logged, prov.prescribedMovements)).toBe(false)
     expect(isMixedCategory(base.weight_logged, prov.prescribedWeight, logged, prov.prescribedMovements, base.performed_prescription)).toBe(false)
-    expect(isNotRxd(base, prov.prescribedWeight, prov.formatId, prov.formatConfig, logged, prov.prescribedMovements)).toBe(false)
   })
 })
 
@@ -151,12 +150,12 @@ describe('P10 · C — coach changes the format after the athlete logged', () =>
     time_result: null,
     notes: 'AMRAP 20:00\n20 Wall Ball\n15 Pull-up\n---\n',
   })
-  it('frozen format wins: an AMRAP result is not re-read as an unfinished For Time', () => {
+  it('frozen format wins for score INTERPRETATION (P9.5.6: completion never affects the badge anyway)', () => {
     const flipped = { ...base, wods: { type: 'For Time' } }
     const prov = resolveResultProvenance(flipped)
     expect(prov.formatId).toBe('AMRAP')
-    // AMRAP has no "unfinished" concept — no time_result must NOT flag Not-RX'd
-    expect(isNotRxd(base, prov.prescribedWeight, prov.formatId, prov.formatConfig, ['20 Wall Ball', '15 Pull-up'], prov.prescribedMovements)).toBe(false)
+    // P9.5.6 - the badge is composition-only; no time_result is COMPLETION, never modification.
+    expect(resultCompositionModified(base, prov.prescribedWeight, ['20 Wall Ball', '15 Pull-up'], prov.prescribedMovements)).toBe(false)
   })
 })
 
@@ -263,10 +262,10 @@ describe('P10 · I — no score-family regression across formats', () => {
       })
       const prov = resolveResultProvenance(log)
       expect(prov.formatId).toBe(fmt)
-      expect(isNotRxd(log, prov.prescribedWeight, prov.formatId, prov.formatConfig, ['20 Wall Ball'], prov.prescribedMovements)).toBe(false)
+      expect(resultCompositionModified(log, prov.prescribedWeight, ['20 Wall Ball'], prov.prescribedMovements)).toBe(false)
     })
   }
-  it('RFT with no time_result still flags "did not finish" (performance term is format-driven, frozen)', () => {
+  it('P9.5.6 - RFT with no time_result, composition exactly RX -> NOT modified (completion is a separate axis)', () => {
     const log = makeLog({
       variant_level: 'rx', weight_logged: '43',
       prescription_snapshot: snap('male', [{ value: 43, unit: 'kg' }]),
@@ -274,7 +273,7 @@ describe('P10 · I — no score-family regression across formats', () => {
       movements_snapshot: ['20 Wall Ball'], time_result: null,
     })
     const prov = resolveResultProvenance(log)
-    expect(isNotRxd(log, prov.prescribedWeight, prov.formatId, prov.formatConfig, ['20 Wall Ball'], prov.prescribedMovements)).toBe(true)
+    expect(resultCompositionModified(log, prov.prescribedWeight, ['20 Wall Ball'], prov.prescribedMovements)).toBe(false)
   })
 })
 
@@ -302,7 +301,7 @@ describe('P10 · call-site wiring in App.jsx', () => {
   })
   it('leaderboard cards resolve format identity from the log, not the render group, for the primary part', () => {
     expect(app).toMatch(/const logProv = log\._prov \|\| null/)
-    expect(app).toMatch(/isNotRxd\(log, log\._prescribedWeight, effFormatId, effFormatConfig, log\._loggedMovements, log\._prescribedMovements\)/)
+    expect(app).toMatch(/resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements\)/)
   })
   it('the Journal card classifies against resolveResultProvenance(w)', () => {
     expect(app).toMatch(/const wProv = resolveResultProvenance\(w\)/)
