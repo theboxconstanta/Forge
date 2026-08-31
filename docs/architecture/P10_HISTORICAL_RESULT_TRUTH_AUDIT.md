@@ -603,3 +603,218 @@ No schema change either way.
 
 Audit complete. **No implementation. No deployment. Awaiting owner approval of
 the P10.1–P10.5 proposal (and the §R legacy-weight product decision).**
+
+---
+
+# P10 — IMPLEMENTATION
+
+**Status: SHIPPED LIVE (WOD-SIMPLE `13beb71`, forge-admin-web `72b62d5`) 2026-08-31.**
+`app_version = historical-result-truth-p10-20260831`. Owner approved P10.1–P10.5
+and Option (A) for the legacy-weight decision.
+
+## §A — What changed, in one sentence
+
+Every historical-result reader in WOD-SIMPLE (leaderboard classification / sort /
+score interpretation, Journal `isNotRxd`, `onEditWod` reopen, benchmark-history
+badge) now resolves the **prescribed side** of a result from the provenance
+**frozen on that log's own row** — `format_snapshot` / `format_config_snapshot` /
+`movements_snapshot` / `prescription_snapshot` / `notes` header / `profile`
+gender — instead of the live `wods` row. A coach editing a workout after an
+athlete logged it can no longer re-bucket, re-badge, re-rank or re-interpret that
+past result. Score value, `variant_level`, `completion_state` and the performed
+movement rows were already frozen (P9.1–P9.5.5b) and are untouched.
+
+## §B — New shared resolver (P10.1)
+
+`src/resultProvenance.js` — **new pure module**, `export function
+resolveResultProvenance(log)`. Reads only the log's own persisted columns; never
+React state, never the live workout except as the last-resort fallback for a
+pre-Scoring-Phase-0 legacy log that froze no snapshot at all.
+
+Returns `{ formatId, formatConfig, prescribedMovements, prescribedWeight, gender,
+source }`.
+
+| field | source hierarchy |
+|---|---|
+| `formatId` | `format_snapshot` → `wods.type` → `format_type` → notes-header → null |
+| `formatConfig` | `format_config_snapshot` (when `format_snapshot` present) → `wods.format_config` → null |
+| `prescribedMovements` | `movements_snapshot` **only for `variant_level === 'rx'`** (the trigger freezes the RX `text[]` regardless of variant) → null (⇒ no `movementsChanged` term) |
+| `prescribedWeight` | `snapshotLoadStandard(prescription_snapshot)` → **null for a legacy log with no structured snapshot** (Option A) · `'multi'` → null · returned as a **string** for `isNotRxd`/`isMixedCategory` |
+| `gender` | `prescription_snapshot.gender` (frozen) → `resolveAthleteGenderKey(profile.gender)` only when no structured snapshot exists |
+| `source` | `'snapshot'` / `'legacy-format-only'` / `'legacy-none'` |
+
+`src/prescriptionContract.js` + `.../prescriptionContract.ts` (parity):
+`snapshotLoadStandard(prescriptionSnapshot)` — reads the flat P9.1 snapshot shape
+(`{ gender, movements:[{ load:{ value, bothValues } }] }`) directly; returns
+`number | 'multi' | null`; never touches `wods`. The `.ts` copy is contract-only
+for parity — the readers live in WOD-SIMPLE.
+
+## §C — Leaderboard (P10.2, `App.jsx` `Clasament`)
+
+- `getSectionLogsForTier` / `buildBlocksForAdditionalSection`: the `sortSectionLogs`
+  format identity now comes from the **most-recent representative log's frozen
+  `format_snapshot`**, `wodZiData` / `section.format` only as fallback. Sorting
+  **algorithms unchanged** — only their inputs.
+- `splitRxSiMixed`: `prescribedWeight` / `prescribedMovements` per log from
+  `resolveResultProvenance(log)`; the resolved provenance is stashed on
+  `logCuDetalii._prov` for the card renderer. The single `isMixedCategory(...)`
+  call site is unchanged in shape (still feeds `log.performed_prescription`).
+- Card render: per-card `logProv = log._prov` drives `effFormatId` /
+  `effFormatConfig` / `effFormat = getFormat(effFormatId)`, which feed
+  `isNotRxd`, `isWeightScoredSetsFormat`, `resolveSetsScoringMode`,
+  `parseWodLogDetails(simpleReps)`, the ascending-AMRAP reconstruction and the
+  `sets` / `chained` family checks. Additional-section cards (no `_prov`) keep
+  the render-group format (already section-frozen via `workout_sections`).
+- `wodZiData` is retained **only** for the page header (`{wodZiData.type}
+  {formatWodDurata(wodZiData.duration)}`) and the sort-format fallback.
+
+## §D — Journal (P10.3, `App.jsx` `JurnalList`)
+
+`prescribedWeightLog` / `prescribedMovementsLog` / `formatTipResolvat` /
+`formatConfigResolvat` for a **primary** (non-section-linked) log now come from
+`resolveResultProvenance(w)` — feeding `isNotRxd`, `setsDisplayScore`,
+`getFormat(...)` and the ascending-AMRAP total. Section-linked logs keep their
+existing `format_snapshot` / `null` branches. The P9.5.5b benchmark-history badge
+(`resultIsCompositionModified`) was migrated to the resolver in the same edit.
+No UI redesign; P9.5.5 performed rendering untouched.
+
+## §E — Reopen / edit (P10.4, `App.jsx` `onEditWod`)
+
+`formatId` / `formatConfigForEdit` now come from `resolveResultProvenance(log)`
+for **any** log (the old `log.workout_section_id ? log.format_snapshot : null`
+gate is gone — the frozen snapshot is identical to `wods` at log time for a
+primary log, so this is safe, not just a section-linked fix).
+`setEditLogPrescribedWeight(editProv.prescribedWeight || '')` — a legacy log with
+no frozen load shows **no** prescribed-weight hint rather than borrowing today's
+`wods.<v>_weight_<sex>` (Option A).
+
+## §F — Gender (P10.5)
+
+Folded into P10.1: `resolveResultProvenance` returns `prescription_snapshot.gender`
+first, and `snapshotLoadStandard` resolves `bothValues` against that frozen
+gender, so the prescribed-weight standard a historical result is judged against
+no longer flips when the member's `members.gender` is later corrected.
+
+## §G — Legacy-weight product decision (Option A, as approved)
+
+A legacy `wod_log` with **no frozen prescribed load** in `prescription_snapshot`
+resolves `prescribedWeight = null`; `greutateEsteSubStandard` short-circuits on a
+null standard, so the **weight-below-standard term is skipped** for that log. We
+do **not** read `wods.rx_weight_male/female` to retro-classify, and we do **not**
+backfill. No overcorrection: `movements_snapshot` (RX) and `performed_prescription`
+still classify a legacy log as modified when that frozen evidence exists.
+
+DB reality (unchanged): 422 `wod_logs` · 10 `prescription_snapshot` · 6
+`performed_prescription` · 412 both-null legacy · 344 `format_snapshot` · 119
+`movements_snapshot`.
+
+## §H — What was explicitly NOT changed
+
+- No migration, no backfill, no production row mutation, no new column / table /
+  trigger / function / view. (`app_version` bump is the only DB write — a
+  pre-existing deploy ritual.)
+- `App()` not split; the resolver is its own module.
+- P9.1 frozen `logCtx` / P9.4 display projection / P9.5.2 `performed_prescription`
+  contract / P9.5.4 canonical composition classification / P9.5.5 performed-first
+  movement rendering / P9.5.5b surface completeness — all untouched. P10 changed
+  historical **source inputs**, not those product semantics.
+- Sorting algorithms in `sortSectionLogs` — inputs only.
+- `resultCompositionModified` / `isNotRxd` / `isMixedCategory` signatures.
+- forge-admin-web behaviour — only the parity `snapshotLoadStandard` helper was
+  added (unused there; keeps the shared contract module parallel).
+
+## §I — Tests
+
+`src/p10HistoricalResultTruth.test.js` — **32 new, all green:**
+
+- `snapshotLoadStandard` unit (single load / `bothValues` by frozen gender /
+  MULTI / null / no `wods` argument exists).
+- **§12 anti-regression:** editing `wods` type + `format_config` + `movements_rx`
+  + `rx_weight_male/female` after a historical log leaves
+  `resolveResultProvenance(log)` **byte-identical** (deep-equal before/after).
+- **A** coach raises RX load 35→45 → frozen load stays 35, badge/bucket/`isNotRxd`
+  unchanged.
+- **B** coach swaps a movement → `prescribedMovements` stays the frozen list;
+  a result that matched the original is still not modified.
+- **C** coach changes format AMRAP→For Time → frozen `AMRAP` wins; an AMRAP
+  result with no `time_result` is **not** re-read as an unfinished For Time.
+- **D** member gender flipped after the log → frozen `prescription_snapshot.gender`
+  keeps the standard at 30 (female), classification stays RX.
+- **E** `performed_prescription != null` → still Mixed / Not-RX (P9.5.4).
+- **G** legacy log, no frozen load → `prescribedWeight = null`,
+  `source = 'legacy-none'`; changing today's `wods` RX weight does not
+  retro-classify; a frozen substitution overlay still marks it modified
+  (no overcorrection).
+- **H** `legacy-format-only` (frozen movements, no `prescription_snapshot`) →
+  movement change detected against the frozen list, not today's `wods`.
+- **I** score-family sweep (AMRAP / RFT / For Time / EMOM) — an exactly-RX result
+  reads RX under frozen provenance; RFT with no `time_result` still flags
+  "did not finish" (the performance term is format-driven and frozen).
+- **J** the resolver has no `wod_id` / `workout_id` / date / `logged_at` logic;
+  the returned shape carries only prescribed-side provenance.
+- Call-site wiring assertions on `App.jsx` (resolver import; leaderboard split;
+  card `logProv` / `effFormatId`; Journal `wProv`; `onEditWod` `editProv`;
+  `wodZiData` still used for the header).
+
+Full WOD-SIMPLE suite: **1424 pass** (1392 + 32), 9 pre-existing Deno
+`@std/assert` file-load failures unchanged. `eslint src/App.jsx
+src/resultProvenance.js src/prescriptionContract.js` — 0 errors. `vite build` OK.
+forge-admin-web `tsc -p tsconfig.app.json` — 0 errors; `prescriptionContract.parity`
++ `scalingEngine` suites 122 pass.
+
+## §J — Deploy
+
+Branch `p10-historical-result-truth` → Vercel preview `success` → local
+`vite preview` boot check (login screen renders = `App()` full hook phase OK,
+0 console errors) → `git merge --ff-only` to `main` → push → `app_version` row
+updated to `historical-result-truth-p10-20260831` → prod deploy `success`.
+Prod bundle `assets/index-BPgupzod.js` contains the resolver
+(`legacy-format-only` / `legacy-none` source strings). forge-admin-web parity
+commit merged to `main` the same way.
+
+## §K — Production smoke (hard reload, SW bypassed)
+
+1. App boots to Home dashboard — no error boundary. ✓
+2. Leaderboard (today = "RFT 15:00"): one result, "Not RX'd" badge **and**
+   "Mixed Categories" bucket agree. ✓
+3. Leaderboard card expands — VARIANT RX, 4 movement rows, RESULT "3 runde
+   complete · 23:00". ✓
+4. Journal: same log card, "RX" + "Not RX'd", "3 RFT" header, movement rows,
+   RESULT, Edit button. ✓
+5. `onEditWod`: reopens as "RFT · 15:00" with the log's own 4 movements and
+   TIME 23:00 — frozen format identity reconstructed, no crash. ✓
+6. 0 console errors across Home / Leaderboard / Journal / Edit. ✓
+
+(The card shows performed content "Box Step-up" while the editor shows the
+programmed "Box jumps" — that is the existing P9.5.5 / P9.5.2 performed-overlay
+behaviour on this log, not a P10 change.)
+
+## §L — Schema limitation carried forward (report-only)
+
+There is still no frozen `prescribed_weight_snapshot` column. For the 412
+pre-P9.1 legacy rows the prescribed-load comparison basis cannot be recovered
+from result-owned data — Option A (skip the term) is the approved behaviour, not
+a gap to fix. No column was added (§13).
+
+## §M — §19 HARD-STOP check
+
+No required historical value had to be inferred from mutable current workout
+state. Where result-owned provenance exists it is used; where it does not
+(legacy load) the explicitly approved Option-A behaviour applies and is
+disclosed above. Nothing was silently derived from `wods`.
+
+## §N — Files touched
+
+- `src/resultProvenance.js` **(new)**
+- `src/prescriptionContract.js` — `snapshotLoadStandard`
+- `src/App.jsx` — import; `Clasament` (`buildBlocksForPrimary`,
+  `buildBlocksForAdditionalSection`, card render); `JurnalList`;
+  `resultIsCompositionModified`; `onEditWod`
+- `src/p10HistoricalResultTruth.test.js` **(new)**
+- `forge-admin-web/src/features/programming/prescriptionContract.ts` —
+  `snapshotLoadStandard` (parity)
+
+## §O — HARD STOP
+
+P10 implemented, tested, deployed, verified and reported. **Stopping here. The
+next phase does not begin without a new owner request.**
