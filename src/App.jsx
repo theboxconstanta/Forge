@@ -2100,7 +2100,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
         const prescribedWeight = prescribedWeightFor(nivelId, log)
         const { miscariAfisate } = parseWodLogDetails(log, t)
         const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements, _supportsRx: true }
-        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements)
+        // P9.5.4 - the bucket rule must see the same performed-prescription
+        // signal the "Not RXd" badge (isNotRxd, line ~2300) already uses, so a
+        // materially modified performed result lands in Mixed Categories, not RX.
+        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription)
         if (isMixed) mixedLogs.push(logCuDetalii)
         else rxLogs.push(logCuDetalii)
       })

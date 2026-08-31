@@ -234,6 +234,12 @@ describe('isNotRxd', () => {
     expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'bodyweight', 'For Time')).toBe(false)
     expect(isNotRxd({ weight_logged: 'bodyweight', time_result: '10:00' }, 'vest', 'For Time')).toBe(true)
   })
+  it('P9.5.2 - performed_prescription non-null -> Not RXd chiar cu greutate/miscari identice si terminat', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00', performed_prescription: { version: 1, movements: [] } }, '61kg', 'For Time', {}, ['21 Thrusters'], ['21 Thrusters'])).toBe(true)
+  })
+  it('P9.5.4 - performed_prescription null -> neafectat (RXd cand restul coincide)', () => {
+    expect(isNotRxd({ weight_logged: '61kg', time_result: '10:00', performed_prescription: null }, '61kg', 'For Time', {}, ['21 Thrusters'], ['21 Thrusters'])).toBe(false)
+  })
 })
 
 describe('movementsChanged', () => {
@@ -276,6 +282,18 @@ describe('isMixedCategory', () => {
   })
   it('Faza 3 - greutate LOGATA MAI MARE decat prescrisa -> tot in categoria normala, nu Mixed', () => {
     expect(isMixedCategory('70kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(false)
+  })
+  it('P9.5.4 - performed_prescription non-null (arg 5) -> Mixed, chiar cu greutate/miscari identice', () => {
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'], { version: 1, movements: [] })).toBe(true)
+  })
+  it('P9.5.4 - performed_prescription null/absent (arg 5) -> comportament neschimbat', () => {
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'], null)).toBe(false)
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'])).toBe(false)
+  })
+  it('P9.5.4 - "neterminat in time cap" NU e Mixed (ramane in bucket-ul RX) - dimensiune de performanta, nu compozitie', () => {
+    // isMixedCategory nu primeste formatId/time_result -> nu are cum sa vada
+    // performanta; e exact intentia (spre deosebire de isNotRxd).
+    expect(isMixedCategory('61kg', '61kg', ['21 Thrusters @ 61kg'], ['21 Thrusters @ 61kg'], null)).toBe(false)
   })
 })
 

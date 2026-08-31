@@ -771,20 +771,44 @@ function greutateEsteSubStandard(weightLogged, prescribedWeight) {
 // pop-up-ul de felicitare) - un membru care a schimbat doar o miscare (nu
 // greutatea) trebuie sa apara la fel de "Not RXd" oriunde, nu doar in
 // gruparea Mixed Categories de pe Clasament.
+// P9.5.4 - THE ONE canonical "the athlete's RESULT COMPOSITION differs from the
+// programmed variant" rule. Composition = which movements and at what
+// prescribed load / distance / calories - NOT performance. It is:
+//   - the LEADERBOARD BUCKET authority (isMixedCategory below), and
+//   - one of the two inputs to the "Not RXd" badge (isNotRxd below).
+// so the badge and the bucket can never disagree about a COMPOSITION change.
+//
+// Three signals, all read-time, none persisted:
+//   1. weight_logged is below the variant's prescribed standard
+//      (greutateEsteSubStandard - Faza 3, `entered >= standard` rule).
+//   2. the logged movement list differs from the prescribed one
+//      (movementsChanged - substituted / added / removed / rewritten).
+//   3. a non-null performed_prescription (P9.5.2). saveWodLog only ever writes
+//      it when the athlete's performed overlay MATERIALLY differs from the
+//      programmed variant (performedIsModified gate) - a per-movement load /
+//      distance / calorie change, or a canonical movement substitution. That
+//      is a composition modification by construction, so `!= null` is a
+//      classification signal here, not mere provenance.
+// The programmed variant is NEVER mutated - RX stays RX; only the RX/Modified
+// classification (badge) and the leaderboard bucket move.
+export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements) {
+  return greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
+    || movementsChanged(loggedMovements, prescribedMovements)
+    || (log?.performed_prescription != null)
+}
+
+// "Not RXd" badge = composition modified (resultCompositionModified) OR the
+// PERFORMANCE dimension "did not finish inside a real time cap" (For Time / RFT
+// / Ladder / Partner-WOD-ForTime, scoreMode 'fortime_or_amrap', no time_result).
+// AMRAP has no concept of "unfinished" (the score is always what you did in the
+// time), so it never triggers the performance term. The performance term is
+// DELIBERATELY NOT part of the leaderboard bucket (see isMixedCategory): a
+// capped result whose composition is exactly RX stays in its RX bucket, ranked
+// after the finishers, carrying only the badge.
 export function isNotRxd(log, prescribedWeight, formatId, config, loggedMovements, prescribedMovements) {
-  const greutateDiferita = greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
+  const compozitieModificata = resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements)
   const neterminatInTimp = effectiveScoreMode(formatId, config) === 'fortime_or_amrap' && !log?.time_result
-  const miscariSchimbate = movementsChanged(loggedMovements, prescribedMovements)
-  // P9.5.2 - a non-null performed_prescription is the athlete's own explicit
-  // record that they performed a MODIFIED / scaled version (per-movement load /
-  // distance / calories, or a movement substitution). The save path only writes
-  // it when the performed overlay materially differs from the programmed
-  // prescription (performedIsModified), so its mere presence is authoritative:
-  // the result is Modified / Not RX regardless of the legacy single-weight
-  // comparison above. The variant itself is unchanged (RX stays RX) - only the
-  // RX/Modified classification flips.
-  const performedModificat = log?.performed_prescription != null
-  return greutateDiferita || neterminatInTimp || miscariSchimbate || performedModificat
+  return compozitieModificata || neterminatInTimp
 }
 
 // Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,
@@ -801,16 +825,21 @@ export function movementsChanged(loggedMovements, prescribedMovements) {
   return loggedMovements.some((m, i) => (m || '').trim().toLowerCase() !== (prescribedMovements[i] || '').trim().toLowerCase())
 }
 
-// "Mixed Categories" (Clasament) = compozitia antrenamentului difera de cea
-// prescrisa variantei - greutate sub standard (vezi greutateEsteSubStandard)
-// SAU miscari schimbate. Diferit de
-// isNotRxd (care include si "neterminat in time cap" - o chestiune de
-// performanta, nu de compozitie): cineva care a facut EXACT miscarile si
-// greutatea prescrisa dar n-a terminat in time cap ramane in categoria lui
-// normala (doar cu badge-ul "Not RXd"), nu e mutat la Mixed Categories.
-export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements) {
-  const greutateDiferita = greutateEsteSubStandard(weightLogged, prescribedWeight)
-  return greutateDiferita || movementsChanged(loggedMovements, prescribedMovements)
+// "Mixed Categories" (Clasament) leaderboard bucket = the RESULT COMPOSITION
+// differs from the programmed variant (resultCompositionModified). Kept as a
+// thin, back-compatible wrapper: the first arg stays `weight_logged` (string),
+// with the new optional `performedPrescription` 5th arg carrying the P9.5.2
+// signal. DELIBERATELY does NOT include isNotRxd's "did not finish in the time
+// cap" performance term - a capped result whose composition is exactly RX stays
+// in its RX bucket (ranked after the finishers by sortSectionLogs), never moved
+// to Mixed. Every leaderboard surface that buckets by variant MUST route through
+// here so the bucket, the badge, the filter and the participant count never
+// disagree about RX status.
+export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null) {
+  return resultCompositionModified(
+    { weight_logged: weightLogged, performed_prescription: performedPrescription },
+    prescribedWeight, loggedMovements, prescribedMovements,
+  )
 }
 
 // Compune/parseaza header-ul text "TIP mm:ss" folosit de Hero WOD-uri
