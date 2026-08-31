@@ -778,6 +778,25 @@ export function setPerformedMetricValue(instance, metric, value, unit) {
   return { ...instance, [metric]: nextSpec }
 }
 
+/** P9.5.5 - the movement DISPLAY LINES for an ATHLETE RESULT card, projected
+ * from a persisted `wod_logs.performed_prescription` overlay. Athlete-edited
+ * metrics are stored `universal` (a single performed value); untouched metrics
+ * keep their `sex_specific` spec and are resolved against `gender` - which MUST
+ * be the FROZEN gender (`prescription_snapshot.gender` at log time), never the
+ * athlete's current gender. Returns lines, or null when the doc is null /
+ * structurally invalid / empty (caller then keeps its programmed rendering -
+ * fail closed). Pure. Same rendering engine as the member workout screen / logger
+ * / snapshot (P9.4 `composeStructuredWorkoutDisplay`). */
+export function composePerformedResultLines(performedDoc, gender) {
+  if (performedDoc == null) return null
+  if (!validatePerformedPrescription(performedDoc).valid) return null
+  if (!Array.isArray(performedDoc.movements) || performedDoc.movements.length === 0) return null
+  const display = composeStructuredWorkoutDisplay({
+    instances: performedDoc.movements, mode: 'member', gender: gender ?? null,
+  })
+  return (display && Array.isArray(display.lines) && display.lines.length) ? display.lines : null
+}
+
 // ============================================================================
 // Legacy artifacts — regenerated from structure on every save (never read as
 // truth). Keeps `wods.movements_{variant}` text[] and the 8 global weight

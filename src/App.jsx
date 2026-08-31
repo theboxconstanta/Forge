@@ -72,6 +72,7 @@ import {
   resolveNumericInput, composeStructuredWorkoutDisplay,
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
+  composePerformedResultLines,
 } from './prescriptionContract'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
@@ -2305,6 +2306,12 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, renderGroup.sectionFormat?.simpleReps)
+                      // P9.5.5 - a RESULT card shows what the athlete PERFORMED:
+                      // performed_prescription lines when present, else the
+                      // programmed text. Display only - classification
+                      // (_loggedMovements / isNotRxd / isMixedCategory) is
+                      // unchanged (P9.5.4 already routes the performed signal).
+                      const cardMovementLines = resultPerformedLines(log) ?? miscariAfisate
                       // Family 'sets' CU scor calculat (scoringMode rezolvat,
                       // configurat explicit sau din default-ul schemei - vezi
                       // resolveSetsScoringMode) - scorul nu mai apare in blocul
@@ -2392,15 +2399,15 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                   )}
                                 </div>
                               )}
-                              {miscariAfisate.length > 0 && (
+                              {cardMovementLines.length > 0 && (
                                 <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
-                                  {miscariAfisate.map((m, j) => (
+                                  {cardMovementLines.map((m, j) => (
                                     <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                                   ))}
                                 </div>
                               )}
                               {areRezultatFinal && (
-                                <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: miscariAfisate.length > 0 ? '10px' : '0', borderTop: miscariAfisate.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: cardMovementLines.length > 0 ? '10px' : '0', borderTop: cardMovementLines.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
                                   <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                                   <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{rezultatBucati.join(' · ')}</div>
                                 </div>
@@ -5693,6 +5700,26 @@ function parseWodLogDetails(w, t, simpleReps) {
   return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
 }
 
+// P9.5.5 - the ONE shared "what workout content does an ATHLETE RESULT card
+// show" rule (leaderboard card, Journal card, share card). A result is WHAT THE
+// ATHLETE PERFORMED: `wod_logs.performed_prescription` lines (via the shared
+// pure `composePerformedResultLines`) when the overlay is present + valid,
+// resolved against the FROZEN gender (`prescription_snapshot.gender` at log
+// time) - NEVER the current workout / variant / member state. Returns null when
+// there is no performed override or it is malformed; the caller then keeps its
+// existing programmed rendering (`parseWodLogDetails` / snapshot fallback).
+function resultPerformedLines(log) {
+  if (log?.performed_prescription == null) return null
+  const frozenGender = log?.prescription_snapshot?.gender
+    || resolveAthleteGenderKey(log?.profile?.gender)
+    || null
+  const lines = composePerformedResultLines(log.performed_prescription, frozenGender)
+  if (lines == null && import.meta.env?.DEV && !validatePerformedPrescription(log.performed_prescription).valid) {
+    console.warn('[P9.5.5] malformed performed_prescription on wod_log', log?.id)
+  }
+  return lines
+}
+
 // Results Phase 2 Slice 5 - Analytics Foundation. O singura sursa
 // (athlete_performance_summary) - orice numar de aici e identic cu ce
 // arata Admin's own AthletePerformanceOverview.tsx pentru acelasi membru,
@@ -6010,6 +6037,10 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const formatTipResolvat = esteSectiuneLegata ? (w.format_snapshot || w.format_type || headerFormatId) : (w.wods?.type || w.format_type || headerFormatId)
               const formatConfigResolvat = esteSectiuneLegata ? w.format_config_snapshot : w.wods?.format_config
               const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, formatConfigResolvat, miscariAfisate, prescribedMovementsLog)
+              // P9.5.5 - the Journal is an ATHLETE RESULT surface: show what was
+              // PERFORMED (performed_prescription lines) when present, else the
+              // programmed text. Display only - notRxdLog above is unchanged.
+              const cardMovementLines = resultPerformedLines(w) ?? miscariAfisate
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
               // fara nicio greutate (bug raportat: un Complex cu greutate maxima
@@ -6090,9 +6121,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   )}
                   {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
-                      {miscariAfisate.length > 0 && (
+                      {cardMovementLines.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
-                          {miscariAfisate.map((m, j) => (
+                          {cardMovementLines.map((m, j) => (
                             <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
@@ -8972,9 +9003,14 @@ function App() {
           ? (typeof structuredStd === 'number' ? String(structuredStd) : '')
           : (varianta ? (logWodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null)
         const prescribedMovements = varianta ? (logWodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
+        // P9.5.5 - the share card is an ATHLETE RESULT: show the PERFORMED
+        // movement lines when the athlete saved a performed overlay.
+        const performedShareLines = performedToSave
+          ? composePerformedResultLines(performedToSave, memberGenderKey)
+          : null
         setWorkoutSharePopup({
           wodName: logWodZiData?.name || null,
-          movements: miscariFinale,
+          movements: performedShareLines ?? miscariFinale,
           variantLevel: varianta?.nivel || null,
           variantColor: varianta?.culoare || null,
           variantBg: varianta?.bg || null,
