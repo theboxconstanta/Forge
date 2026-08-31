@@ -74,6 +74,7 @@ import {
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
   composePerformedResultLines,
 } from './prescriptionContract'
+import { resolveResultProvenance } from './resultProvenance'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
 import UniversalScoreInput from './UniversalScoreInput'
@@ -2085,22 +2086,33 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
       return Object.values(byMember)
     }
     const logsUnicePerMembru = dedupLogsGlobal(sectionLogs)
+    // P10 - each historical result is classified / sorted / score-interpreted
+    // against the prescription FROZEN onto its own log at save time
+    // (resolveResultProvenance), never against the workout as it stands now.
+    // wodZiData stays the source only for the page header + the sort-format
+    // fallback when no log ever froze a format.
+    const sortFormatFor = (arr) => {
+      const rep = arr.reduce((a, b) => (!a || new Date(b.logged_at) > new Date(a.logged_at)) ? b : a, null)
+      const p = rep ? resolveResultProvenance(rep) : null
+      return { id: p?.formatId || wodZiData?.type || null, config: p?.formatConfig ?? wodZiData?.format_config ?? null }
+    }
     const getSectionLogsForTier = (nivelId) => {
-      const sorted = sortSectionLogs(logsUnicePerMembru.filter(l => l.variant_level === nivelId), wodZiData?.type, wodZiData?.format_config)
+      const tierLogs = logsUnicePerMembru.filter(l => l.variant_level === nivelId)
+      const sf = sortFormatFor(tierLogs)
+      const sorted = sortSectionLogs(tierLogs, sf.id, sf.config)
       if (genderTab === 'masculin') return sorted.filter(l => l.profile?.gender === 'masculin')
       if (genderTab === 'feminin') return sorted.filter(l => l.profile?.gender === 'feminin')
       return sorted
     }
-    const prescribedWeightFor = (nivelId, log) => wodZiData?.[weightKeyForVariant(nivelId, log.profile?.gender)] || null
-    const prescribedMovementsFor = (nivelId) => wodZiData?.[`movements_${nivelId.toLowerCase()}`] || null
     const splitRxSiMixed = (nivelId, sectionLogsForTier) => {
       const rxLogs = []
       const mixedLogs = []
-      const prescribedMovements = prescribedMovementsFor(nivelId)
       sectionLogsForTier.forEach(log => {
-        const prescribedWeight = prescribedWeightFor(nivelId, log)
+        const prov = resolveResultProvenance(log)
+        const prescribedWeight = prov.prescribedWeight
+        const prescribedMovements = prov.prescribedMovements
         const { miscariAfisate } = parseWodLogDetails(log, t)
-        const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements, _supportsRx: true }
+        const logCuDetalii = { ...log, _prescribedWeight: prescribedWeight, _nivelOriginal: nivelId, _loggedMovements: miscariAfisate, _prescribedMovements: prescribedMovements, _supportsRx: true, _prov: prov }
         // P9.5.4 - the bucket rule must see the same performed-prescription
         // signal the "Not RXd" badge (isNotRxd, line ~2300) already uses, so a
         // materially modified performed result lands in Mixed Categories, not RX.
@@ -2135,7 +2147,12 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
   // clasament plat, fara nivele si fara Mixed Categories (nu exista o a doua
   // varianta fata de care cineva sa fie "mixt").
   const buildBlocksForAdditionalSection = (sectionLogs, section) => {
-    const sorted = sortSectionLogs(sectionLogs, section.format, section.format_config)
+    // P10 - sort a section-linked historical result against the format frozen
+    // on the log (format_snapshot), not the section as it stands now; fall back
+    // to the current section format only when no log froze one.
+    const repAdd = sectionLogs.reduce((a, b) => (!a || new Date(b.logged_at) > new Date(a.logged_at)) ? b : a, null)
+    const repProv = repAdd ? resolveResultProvenance(repAdd) : null
+    const sorted = sortSectionLogs(sectionLogs, repProv?.formatId || section.format, repProv?.formatConfig ?? section.format_config)
     const filtered = genderTab === 'masculin' ? sorted.filter(l => l.profile?.gender === 'masculin')
       : genderTab === 'feminin' ? sorted.filter(l => l.profile?.gender === 'feminin')
       : sorted
@@ -2277,6 +2294,17 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                     {group.logs.map((log, i) => {
                       const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
                       const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
+                      // P10 - primary-part cards carry the provenance frozen on
+                      // their own log (_prov, set in splitRxSiMixed); format
+                      // identity for classification / score interpretation comes
+                      // from there, so a later coach edit to the current workout
+                      // cannot re-interpret this historical result. Additional
+                      // sections keep the render-group format (already frozen
+                      // from workout_sections for section-linked logs).
+                      const logProv = log._prov || null
+                      const effFormatId = logProv ? logProv.formatId : renderGroup.sectionFormatId
+                      const effFormatConfig = logProv ? logProv.formatConfig : renderGroup.sectionFormatConfig
+                      const effFormat = logProv ? (effFormatId ? getFormat(effFormatId) : null) : renderGroup.sectionFormat
                       // Family 'sets' nu are niciodata time_result/result (vezi
                       // setsScoreOf/sortSectionLogs mai sus) - scorul calculat
                       // acolo (_setsScore) e singura sursa de afisat, cu unitatea
@@ -2290,10 +2318,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // (deja folosit in sortSectionLogs pt clasare), dar nu
                       // era aplicat aici, la afisare (Clasament arata gresit
                       // "606kg" in loc de "606 reps").
-                      const setsWeightScored = renderGroup.sectionFormat?.family === 'sets' ? isWeightScoredSetsFormat(renderGroup.sectionFormatConfig, renderGroup.sectionFormatId) : false
-                      const result = renderGroup.sectionFormat?.family === 'sets'
+                      const setsWeightScored = effFormat?.family === 'sets' ? isWeightScoredSetsFormat(effFormatConfig, effFormatId) : false
+                      const result = effFormat?.family === 'sets'
                         ? (log._setsScore != null ? `${log._setsScore}${setsWeightScored ? ((log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg') : ` ${t.clasamentRepsUnit}`}` : '—')
-                        : renderGroup.sectionFormat?.family === 'chained'
+                        : effFormat?.family === 'chained'
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
@@ -2301,11 +2329,11 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // de scalare fata de care sa fie clasificate Not-Rx (vezi
                       // buildBlocksForAdditionalSection) - badge-ul nu se aplica.
                       const notRxdLog = log._supportsRx
-                        ? isNotRxd(log, log._prescribedWeight, renderGroup.sectionFormatId, renderGroup.sectionFormatConfig, log._loggedMovements, log._prescribedMovements)
+                        ? isNotRxd(log, log._prescribedWeight, effFormatId, effFormatConfig, log._loggedMovements, log._prescribedMovements)
                         : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
-                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, renderGroup.sectionFormat?.simpleReps)
+                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, effFormat?.simpleReps)
                       // P9.5.5 - a RESULT card shows what the athlete PERFORMED:
                       // performed_prescription lines when present, else the
                       // programmed text. Display only - classification
@@ -2321,15 +2349,15 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // invers. Family 'sets' FARA scor (Complex/Weightlifting
                       // fara scoringMode configurat) ramane neschimbata - "X
                       // seturi" descriptiv, fara total de aratat.
-                      const showSetsScoreAtEnd = renderGroup.sectionFormat?.family === 'sets' && result !== '—'
+                      const showSetsScoreAtEnd = effFormat?.family === 'sets' && result !== '—'
                       // Ascending AMRAP: aceeasi cifra de "reps totale" ca in Jurnal
-                      // (vezi parseWodLogDetails/JurnalList) - randGroup.sectionFormat/
-                      // sectionData sunt deja cele ale Sectiunii afisate in acest
-                      // bloc, nu trebuie rezolvate per-log ca acolo.
-                      const ascendingTotalReps = (renderGroup.sectionFormat?.ascending && log.result && miscariAfisate.length > 0)
+                      // (vezi parseWodLogDetails/JurnalList). P10 - format + config
+                      // vin din provenance-ul frozen pe log (effFormat/effFormatConfig),
+                      // nu din WOD-ul curent.
+                      const ascendingTotalReps = (effFormat?.ascending && log.result && miscariAfisate.length > 0)
                         ? (() => {
-                            const { rounds, partialArr } = parseAscendingAmrapResult(log.result, miscariAfisate, renderGroup.sectionFormatConfig?.startReps, renderGroup.sectionFormatConfig?.incrementReps)
-                            return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, renderGroup.sectionFormatConfig?.startReps, renderGroup.sectionFormatConfig?.incrementReps)
+                            const { rounds, partialArr } = parseAscendingAmrapResult(log.result, miscariAfisate, effFormatConfig?.startReps, effFormatConfig?.incrementReps)
+                            return totalRepsAscendingAmrap(rounds, partialArr, miscariAfisate.length, effFormatConfig?.startReps, effFormatConfig?.incrementReps)
                           })()
                         : null
                       // WOD-uri inlantuite - detaliu = textul deja compus per
@@ -2339,7 +2367,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // apare in blocul TOTAL/MINIM/MAXIM dupa detaliere (mai
                       // jos), nu langa "X seturi" ca inainte.
                       const rezultatBucati = showSetsScoreAtEnd ? []
-                        : renderGroup.sectionFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
+                        : effFormat?.family === 'chained' ? (log.log_meta?.stages || []).map(s => s.text).filter(Boolean)
                         : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                         : rezultatBucatiRaw
                       // Reflecta direct continutul afisat (rezultatBucati),
@@ -2429,7 +2457,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               {showSetsScoreAtEnd && (
                                 <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                                   <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    {t.clasamentSetsScoreLabel[resolveSetsScoringMode(renderGroup.sectionFormatId, renderGroup.sectionFormatConfig)] || t.jurnalResultLabel}
+                                    {t.clasamentSetsScoreLabel[resolveSetsScoringMode(effFormatId, effFormatConfig)] || t.jurnalResultLabel}
                                   </div>
                                   <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '700' }}>{result}</div>
                                 </div>
@@ -5720,18 +5748,14 @@ function resultPerformedLines(log) {
   return lines
 }
 
-// P9.5.5 - did this persisted RESULT differ in COMPOSITION from its programmed
-// variant? (weight below standard / movements changed / a performed_prescription
-// overlay). Same canonical rule as the leaderboard bucket (P9.5.4
-// resultCompositionModified). Used by score-only result surfaces that render NO
-// movement rows (benchmark history), so a modified attempt is never shown
-// unmarked. `t` only feeds parseWodLogDetails' set-label path (metcon logs skip
-// it). `gender` = the member's own gender for these own-history surfaces.
+// P9.5.5 / P10 - did this persisted RESULT differ in COMPOSITION from its
+// programmed variant? Same canonical rule as the leaderboard bucket
+// (`resultCompositionModified`). Now reads FROZEN provenance
+// (`resolveResultProvenance`), so a later coach edit never flips it. Used by
+// score-only result surfaces that render NO movement rows (benchmark history).
 function resultIsCompositionModified(log, gender, t) {
   if (!log) return false
-  const linked = !!log.workout_section_id
-  const prescribedWeight = linked ? null : (log.wods?.[weightKeyForVariant(log.variant_level, gender)] || null)
-  const prescribedMovements = linked ? null : (log.wods?.[`movements_${(log.variant_level || '').toLowerCase()}`] || null)
+  const { prescribedWeight, prescribedMovements } = resolveResultProvenance(log)
   const loggedMovements = parseWodLogDetails(log, t).miscariAfisate
   return resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements)
 }
@@ -6039,19 +6063,26 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // ar fi comparatia GRESITA - a sectiunii primare), isNotRxd
               // ramane corect (doar semnalul "neterminat in time cap"
               // conteaza atunci, vezi isNotRxd/movementsChanged).
-              const prescribedWeightLog = esteSectiuneLegata ? null : (w.wods?.[weightKeyForVariant(w.variant_level, gender)] || null)
+              // P10 - a historical Journal result is classified against the
+              // prescription FROZEN on its own log (resolveResultProvenance),
+              // not the current wods row: a later coach edit to today's RX load /
+              // movements / format must not re-badge this past entry. Legacy logs
+              // with no structured snapshot keep no weight-below-standard term
+              // (Option A) - we do NOT fall back to today's wods.<v>_weight_<sex>.
+              const wProv = resolveResultProvenance(w)
+              const prescribedWeightLog = esteSectiuneLegata ? null : wProv.prescribedWeight
               // Ca la weightKeyForVariant: doar variantele reale (RX/Intermediate/
               // Beginner/OnRamp) au o coloana movements_* prescrisa pe wods - la o
               // logare libera (fara wod_id) sau cu variant_level = numele unui
               // format (nu al unei variante), accesul intoarce undefined -> null,
               // fara sa dea eroare.
-              const prescribedMovementsLog = esteSectiuneLegata ? null : (w.wods?.[`movements_${(w.variant_level || '').toLowerCase()}`] || null)
+              const prescribedMovementsLog = esteSectiuneLegata ? null : wProv.prescribedMovements
               // Incercam toate semnalele posibile pt tipul real (wods legat,
               // format_type, sau header-ul text vechi) - isNotRxd/effectiveScoreMode
               // trateaza deja corect cazul cand niciunul nu exista (formatId absent
               // -> nu presupune "For Time", sare peste verificarea de time cap).
-              const formatTipResolvat = esteSectiuneLegata ? (w.format_snapshot || w.format_type || headerFormatId) : (w.wods?.type || w.format_type || headerFormatId)
-              const formatConfigResolvat = esteSectiuneLegata ? w.format_config_snapshot : w.wods?.format_config
+              const formatTipResolvat = esteSectiuneLegata ? (w.format_snapshot || w.format_type || headerFormatId) : wProv.formatId
+              const formatConfigResolvat = esteSectiuneLegata ? w.format_config_snapshot : wProv.formatConfig
               const notRxdLog = isNotRxd(w, prescribedWeightLog, formatTipResolvat, formatConfigResolvat, miscariAfisate, prescribedMovementsLog)
               // P9.5.5 - the Journal is an ATHLETE RESULT surface: show what was
               // PERFORMED (performed_prescription lines) when present, else the
@@ -10812,21 +10843,17 @@ function App() {
                 const linii = prefix.split('\n').filter(Boolean)
                 const headerTip = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
                 const movimenteLog = linii.slice(headerTip ? 1 : 0)
-                // Layer 2a - un log legat de o sectiune suplimentara
-                // (workout_section_id, non-primara) NU poate fi editat corect
-                // citind log.wods?.type/format_config - acelea sunt formatul
-                // sectiunii PRIMARE a WOD-ului, nicio legatura cu sectiunea
-                // reala logata (ex. Sectiunea B "1RM Clean", Weightlifting,
-                // pe un WOD a carui sectiune primara e RFT). format_snapshot/
-                // format_config_snapshot (Scoring Snapshot, deja populate
-                // corect per-sectiune de trigger-ul snapshot_wod_log_context)
-                // sunt sursa corecta oricand workout_section_id e setat -
-                // pentru loguri legate de sectiunea PRIMARA, snapshot-ul e
-                // oricum identic cu log.wods (aceeasi sursa la momentul
-                // logarii), deci schimbarea e sigura si acolo, nu doar o
-                // corectie ingusta pt sectiuni suplimentare.
-                const formatId = (log.workout_section_id ? log.format_snapshot : null) || log.wods?.type || log.format_type || headerTip || 'For Time'
-                const formatConfigForEdit = (log.workout_section_id ? log.format_config_snapshot : null) || log.wods?.format_config
+                // P10 - reopening a historical log rebuilds its PRESCRIBED
+                // context from the provenance frozen on the log itself
+                // (resolveResultProvenance: format_snapshot / format_config_snapshot
+                // first, for ANY log - primary or section-linked), never from the
+                // workout as it stands today. A coach editing today's WOD after
+                // an athlete logged it must not change how that past entry
+                // reopens. Live `log.wods` is only the fallback for pre-Scoring-
+                // Phase-0 legacy logs that froze no format snapshot.
+                const editProv = resolveResultProvenance(log)
+                const formatId = editProv.formatId || headerTip || 'For Time'
+                const formatConfigForEdit = editProv.formatConfig
                 const format = getFormat(formatId)
                 setEditLogId(log.id)
                 setEditLogHeader(headerTip ? linii[0] : '')
@@ -10875,7 +10902,11 @@ function App() {
                 setWodCompleted(!!log.log_meta?.completed)
                 setWodNote(parts.length > 1 ? parts[1] : '')
                 setWodWeightLogged(log.weight_logged || '')
-                setEditLogPrescribedWeight(log.wods?.[weightKeyForVariant(log.variant_level, userProfile?.gender)] || '')
+                // P10 / Option A - the prescribed-weight reference for a reopened
+                // historical log comes from its frozen prescription_snapshot only.
+                // A legacy log that froze none shows no prescribed-weight hint
+                // rather than borrowing today's wods.<v>_weight_<sex>.
+                setEditLogPrescribedWeight(editProv.prescribedWeight || '')
                 // P9.5.2 - carry the log's performed overlay through the edit so
                 // it survives an .update (which never writes the column) and the
                 // Not-RX badge stays consistent. V1 has no structured re-edit UI

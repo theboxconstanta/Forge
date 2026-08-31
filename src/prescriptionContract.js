@@ -518,6 +518,34 @@ export function structuredVariantLoadStandard(doc, variantKey, gender) {
   return values[0]
 }
 
+/** P10 - the single frozen load standard (kg) from an already-persisted
+ * `wod_logs.prescription_snapshot` (the P9.1 snapshot shape:
+ * `{ variant, gender, movements: [{ load: { value, unit, mode, bothValues } }] }`).
+ * The snapshot's `load.value` is already resolved to the snapshot's frozen
+ * gender; `bothValues` is the fallback. Returns:
+ *   - null   : no snapshot / no loaded movement / value not recoverable
+ *   - 'multi': >1 distinct frozen load  -> no single standard
+ *   - number : exactly one distinct frozen load
+ * NEVER reads the current `wods` row - this is HISTORICAL truth only. */
+export function snapshotLoadStandard(prescriptionSnapshot) {
+  const movements = prescriptionSnapshot?.movements
+  if (!Array.isArray(movements)) return null
+  const g = prescriptionSnapshot.gender ?? null
+  const values = []
+  for (const m of movements) {
+    const l = m?.load
+    if (!l) continue
+    let v = (typeof l.value === 'number' && Number.isFinite(l.value)) ? l.value : null
+    if (v == null && Array.isArray(l.bothValues)) {
+      const cand = g === 'female' ? l.bothValues[1] : g === 'male' ? l.bothValues[0] : null
+      v = (typeof cand === 'number' && Number.isFinite(cand)) ? cand : null
+    }
+    if (v != null) values.push(v)
+  }
+  if (values.length === 0) return null
+  return new Set(values).size > 1 ? MULTI_LOAD_STANDARD : values[0]
+}
+
 /** P9.1 - does this variant carry ANY load prescription? (drives whether the
  * logger shows a weight-logging field for a structured workout, independent of
  * whether a single RX standard exists). */
