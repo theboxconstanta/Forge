@@ -72,9 +72,10 @@ import {
   resolveNumericInput, composeStructuredWorkoutDisplay,
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
-  composePerformedResultLines,
+  composePerformedResultLines, snapshotDisplayLines,
 } from './prescriptionContract'
 import { resolveResultProvenance } from './resultProvenance'
+import { resolveResultMovementLines } from './resultWorkoutLines'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
 import UniversalScoreInput from './UniversalScoreInput'
@@ -2342,12 +2343,12 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, effFormat?.simpleReps)
-                      // P9.5.5 - a RESULT card shows what the athlete PERFORMED:
-                      // performed_prescription lines when present, else the
-                      // programmed text. Display only - classification
-                      // (_loggedMovements / resultCompositionModified) is
-                      // unchanged (P9.5.4 already routes the performed signal).
-                      const cardMovementLines = resultPerformedLines(log) ?? miscariAfisate
+                      // P9.5.7 - a RESULT card shows WHAT THE ATHLETE ACTUALLY DID
+                      // (performed overlay -> frozen resolved selected-variant
+                      // snapshot -> frozen notes text -> frozen movement names).
+                      // The movement section is never hidden for an unmodified
+                      // result. Display only - classification unchanged.
+                      const cardMovementLines = resolveResultMovementLines(log)
                       // Family 'sets' CU scor calculat (scoringMode rezolvat,
                       // configurat explicit sau din default-ul schemei - vezi
                       // resolveSetsScoringMode) - scorul nu mai apare in blocul
@@ -5736,25 +5737,10 @@ function parseWodLogDetails(w, t, simpleReps) {
   return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
 }
 
-// P9.5.5 - the ONE shared "what workout content does an ATHLETE RESULT card
-// show" rule (leaderboard card, Journal card, share card). A result is WHAT THE
-// ATHLETE PERFORMED: `wod_logs.performed_prescription` lines (via the shared
-// pure `composePerformedResultLines`) when the overlay is present + valid,
-// resolved against the FROZEN gender (`prescription_snapshot.gender` at log
-// time) - NEVER the current workout / variant / member state. Returns null when
-// there is no performed override or it is malformed; the caller then keeps its
-// existing programmed rendering (`parseWodLogDetails` / snapshot fallback).
-function resultPerformedLines(log) {
-  if (log?.performed_prescription == null) return null
-  const frozenGender = log?.prescription_snapshot?.gender
-    || resolveAthleteGenderKey(log?.profile?.gender)
-    || null
-  const lines = composePerformedResultLines(log.performed_prescription, frozenGender)
-  if (lines == null && import.meta.env?.DEV && !validatePerformedPrescription(log.performed_prescription).valid) {
-    console.warn('[P9.5.5] malformed performed_prescription on wod_log', log?.id)
-  }
-  return lines
-}
+// P9.5.7 - resolveResultMovementLines(log) lives in src/resultWorkoutLines.js
+// (pure, independently testable, can never reach the live workout). It is THE
+// shared "what workout did this athlete ACTUALLY DO?" projection for the
+// leaderboard expanded card, the Journal card and the share card.
 
 // P9.5.5 / P10 - did this persisted RESULT differ in COMPOSITION from its
 // programmed variant? Same canonical rule as the leaderboard bucket
@@ -6092,10 +6078,12 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // Completion status ("2 rounds complete", capped, DNF) is a
               // SEPARATE axis and never sets this.
               const resultModifiedLog = resultCompositionModified(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog)
-              // P9.5.5 - the Journal is an ATHLETE RESULT surface: show what was
-              // PERFORMED (performed_prescription lines) when present, else the
-              // programmed text. Display only - resultModifiedLog above is unchanged.
-              const cardMovementLines = resultPerformedLines(w) ?? miscariAfisate
+              // P9.5.7 - the Journal is an ATHLETE RESULT surface: it shows WHAT
+              // THE ATHLETE ACTUALLY DID, via the ONE shared projection (performed
+              // overlay -> frozen resolved selected-variant snapshot -> frozen
+              // notes text -> frozen movement names). Never hidden for an
+              // unmodified result. Display only - resultModifiedLog unchanged.
+              const cardMovementLines = resolveResultMovementLines(w)
               // Family 'sets' fara scoringMode configurat (Complex, Weightlifting,
               // Build to Heavy/1RM etc.) - rezultatBucati brut arata doar "X seturi",
               // fara nicio greutate (bug raportat: un Complex cu greutate maxima
@@ -9074,11 +9062,18 @@ function App() {
           ? (typeof structuredStd === 'number' ? String(structuredStd) : '')
           : (varianta ? (logWodZiData?.[weightKeyForVariant(varianta.nivel, userProfile?.gender)] || null) : null)
         const prescribedMovements = varianta ? (logWodZiData?.[`movements_${varianta.nivel.toLowerCase()}`] || null) : null
-        // P9.5.5 - the share card is an ATHLETE RESULT: show the PERFORMED
-        // movement lines when the athlete saved a performed overlay.
+        // P9.5.7 - the share card is an ATHLETE RESULT: it shows WHAT THE ATHLETE
+        // ACTUALLY DID via the same source precedence as the leaderboard / Jurnal
+        // (performed overlay -> frozen resolved selected-variant snapshot ->
+        // frozen movement text). `movements_snapshot` is not available yet at
+        // save time (the trigger writes it after the insert) - the leaderboard /
+        // Jurnal pick that last tier up once the row is refetched.
         const performedShareLines = performedToSave
           ? composePerformedResultLines(performedToSave, memberGenderKey)
           : null
+        const shareMovementLines = (performedShareLines && performedShareLines.length ? performedShareLines : null)
+          ?? snapshotDisplayLines(prescriptionSnapshot)
+          ?? (miscariFinale.length ? miscariFinale : (miscariPentruLog.length ? miscariPentruLog : []))
         // INC-06 - for family:'sets' (Intervals/Tabata/Complex/Weightlifting/...)
         // and family:'chained', composeWodLogFields ALWAYS writes result/
         // time_result = null; the score lives in logFields.sets / log_meta.
@@ -9093,7 +9088,7 @@ function App() {
             : null
         setWorkoutSharePopup({
           wodName: logWodZiData?.name || null,
-          movements: performedShareLines ?? miscariFinale,
+          movements: shareMovementLines,
           variantLevel: varianta?.nivel || null,
           variantColor: varianta?.culoare || null,
           variantBg: varianta?.bg || null,

@@ -144,24 +144,30 @@ describe('P9.5.5 — fallback / defensive', () => {
   })
 })
 
-describe('P9.5.5 §52 — result-card surfaces route through the shared projection', () => {
+describe('P9.5.5 / P9.5.7 §52 — result-card surfaces route through the shared projection', () => {
   const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'App.jsx'), 'utf8')
+  const proj = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'resultWorkoutLines.js'), 'utf8')
 
   it('one shared helper `resultPerformedLines`, delegating to composePerformedResultLines', () => {
-    expect((app.match(/function resultPerformedLines\(/g) || []).length).toBe(1)
-    expect(app).toMatch(/composePerformedResultLines\(log\.performed_prescription, frozenGender\)/)
+    expect((proj.match(/export function resultPerformedLines\(/g) || []).length).toBe(1)
+    expect(proj).toMatch(/composePerformedResultLines\(log\.performed_prescription, frozenGender\)/)
+    // App.jsx no longer defines its own copy
+    expect(app).not.toMatch(/function resultPerformedLines\(/)
   })
 
-  it('the leaderboard card + Journal card both render `cardMovementLines = resultPerformedLines(...) ?? miscariAfisate`', () => {
-    const decls = app.match(/const cardMovementLines = resultPerformedLines\(\w+\) \?\? miscariAfisate/g) || []
+  it('P9.5.7 - leaderboard card + Journal card both route through resolveResultMovementLines', () => {
+    const decls = app.match(/const cardMovementLines = resolveResultMovementLines\(\w+\)/g) || []
     expect(decls.length).toBe(2) // leaderboard render + Journal render
     // and both render cardMovementLines, not the raw miscariAfisate
     expect(app).toMatch(/\{cardMovementLines\.map\(\(m, j\) =>/)
+    // imported from its own pure module (never reaches the live workout)
+    expect(app).toMatch(/import \{ resolveResultMovementLines \} from '\.\/resultWorkoutLines'/)
   })
 
-  it('the share card uses composePerformedResultLines for its movement list', () => {
+  it('P9.5.7 - the share card routes through the same source precedence', () => {
     expect(app).toMatch(/performedShareLines = performedToSave\s*\n\s*\?\s*composePerformedResultLines\(performedToSave, memberGenderKey\)/)
-    expect(app).toMatch(/movements: performedShareLines \?\? miscariFinale/)
+    expect(app).toMatch(/movements: shareMovementLines/)
+    expect(app).toMatch(/\?\? snapshotDisplayLines\(prescriptionSnapshot\)/)
   })
 
   it('§9 classification still reads the programmed `miscariAfisate` (NOT cardMovementLines)', () => {
@@ -173,7 +179,7 @@ describe('P9.5.5 §52 — result-card surfaces route through the shared projecti
   })
 
   it('§35 the projection resolves against the FROZEN gender, not current state', () => {
-    expect(app).toMatch(/log\?\.prescription_snapshot\?\.gender/)
+    expect(proj).toMatch(/log\?\.prescription_snapshot\?\.gender/)
   })
 
   it('NON-NEGOTIABLE: score-only result surfaces mark a modified attempt (benchmark history)', () => {
@@ -186,8 +192,8 @@ describe('P9.5.5 §52 — result-card surfaces route through the shared projecti
   })
 
   it('the movement-content result surfaces AND the modified-badge cover the full set', () => {
-    // 3 surfaces render performed movement content:
-    expect((app.match(/resultPerformedLines\(\w+\) \?\? miscariAfisate/g) || []).length).toBe(2) // leaderboard + Journal
+    // 3 surfaces render movement content via the ONE shared P9.5.7 resolver:
+    expect((app.match(/const cardMovementLines = resolveResultMovementLines\(\w+\)/g) || []).length).toBe(2) // leaderboard + Journal
     expect(app).toMatch(/composePerformedResultLines\(performedToSave, memberGenderKey\)/)         // share
     // "Not RX'd" badge is present on every result-card header + the score-only history:
     expect((app.match(/<NotRxdBadge t=\{t\}/g) || []).length).toBeGreaterThanOrEqual(4) // lb card, journal card, share, benchmark history

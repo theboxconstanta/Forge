@@ -546,6 +546,24 @@ export function snapshotLoadStandard(prescriptionSnapshot) {
   return new Set(values).size > 1 ? MULTI_LOAD_STANDARD : values[0]
 }
 
+/** P9.5.7 - the frozen RESOLVED display lines from an already-persisted
+ * `wod_logs.prescription_snapshot` (P9.1 flat shape). Each movement's
+ * `displayLine` was resolved at log time for the SELECTED variant + the athlete's
+ * frozen gender ("15 Wallballs @ 9 kg"). Order is preserved and repeated
+ * instances stay distinct (each carries its own instanceId + displayLine).
+ * Historical truth only - NEVER reads the current `wods` row. null when the
+ * snapshot is absent / empty / carries no usable line. */
+export function snapshotDisplayLines(prescriptionSnapshot) {
+  const movements = prescriptionSnapshot?.movements
+  if (!Array.isArray(movements) || movements.length === 0) return null
+  const lines = movements
+    .map((m) => (typeof m?.displayLine === 'string' && m.displayLine.trim()) ? m.displayLine
+      : (typeof m?.name === 'string' && m.name.trim()) ? m.name
+      : null)
+    .filter(Boolean)
+  return lines.length ? lines : null
+}
+
 /** P9.1 - does this variant carry ANY load prescription? (drives whether the
  * logger shows a weight-logging field for a structured workout, independent of
  * whether a single RX standard exists). */
