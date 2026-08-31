@@ -1468,3 +1468,203 @@ Only `app_version` (`current` row) was updated, and only to signal clients.
 **P10 NOT STARTED.** The entire P9 series is **not** declared closed — owner
 manual acceptance (§N above, plus the P9.5.2 §K checklist) remains the final
 gate.
+
+---
+
+# P9.5.4 — GLOBAL RESULT CLASSIFICATION FOR LEADERBOARD
+
+AUDIT -> centralize the composition rule -> test all score families -> deploy.
+**No DB change. No scoring-engine change. No sort change. No new App.jsx
+effect/hook.** Deployed `98c9987`, bundle `index-gu4gYKIj.js`, `app_version`
+`prescription-engine-p9-5-4-leaderboard-classification-20260831`.
+
+## A. OWNER FINDING
+
+A modified result correctly shows the **Not RX'd** badge but is still grouped
+under **RX** in the leaderboard. Observed on one For Time workout; the fix must
+be global.
+
+## B. SCOPE
+
+**GLOBAL** - every workout / scoring family. The single RX/Mixed bucketing
+surface (`splitRxSiMixed` in `Clasament`) is format-agnostic: it runs for
+TIME / TIME_CAPPED / AMRAP / REPS / LOAD / DISTANCE / CALORIES / SETS / STAGES
+primary-section logs alike.
+
+## C. ROOT CAUSE
+
+P9.5.2 added the `performed_prescription != null` signal to **`isNotRxd`** (the
+"Not RX'd" badge) but **not** to **`isMixedCategory`** (the leaderboard bucket).
+The two predicates had diverged on the *composition* dimension. A P9.5.2
+per-movement Edit (scaled load / distance / calories, or a canonical movement
+substitution) leaves `wod_logs.weight_logged` NULL and the `notes` movement
+text unchanged, so `isMixedCategory` saw no modification -> RX bucket, while
+`isNotRxd` -> "Not RX'd" badge.
+
+## D. OLD CLASSIFICATION PATH
+
+- **badge** `isNotRxd(log, prescribedWeight, formatId, config, loggedMovements, prescribedMovements)`
+  = `greutateEsteSubStandard(weight_logged, prescribedWeight)` OR
+    `movementsChanged(loggedMovements, prescribedMovements)` OR
+    `effectiveScoreMode === 'fortime_or_amrap' && !time_result` OR
+    `performed_prescription != null`.
+- **bucket** `isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements)`
+  = `greutateEsteSubStandard(...)` OR `movementsChanged(...)`.  **← no performed_prescription**
+
+Audit of every bucket / group / filter / count surface:
+
+| surface | file | grouping | affected? |
+|---|---|---|---|
+| primary-section RX/Mixed split | `App.jsx` `splitRxSiMixed` (one `isMixedCategory` call) | `isMixedCategory` | **yes - the bug** |
+| card "Not RX'd" badge | `App.jsx` line ~2300 | `isNotRxd` | already correct |
+| participant count | `App.jsx` `sectionLogs.length` per rendered block | derived from the buckets | follows the fix |
+| gender filter | `App.jsx` `getSectionLogsForTier` | `l.profile?.gender`, applied BEFORE the split | orthogonal, unaffected |
+| additional-section leaderboard | `App.jsx` `buildBlocksForAdditionalSection` | `_supportsRx: false`, flat list, no RX/Mixed | n/a |
+| aggregate (multi-section) leaderboard | `aggregateLeaderboard.js` | ranked flat across sections, `classifiedTier = variant_level` display only, no RX/Mixed bucket | n/a |
+| Journal badge / share popup | `App.jsx` lines ~6009 / ~8982 | `isNotRxd` | already correct |
+
+## E. NEW CANONICAL CLASSIFICATION PATH
+
+One shared pure function in `workoutFormats.js`:
+
+```js
+// the RESULT COMPOSITION differs from the programmed variant
+export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements) {
+  return greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
+    || movementsChanged(loggedMovements, prescribedMovements)
+    || (log?.performed_prescription != null)
+}
+```
+
+- `isNotRxd` = `resultCompositionModified(...) || <did-not-finish-in-cap>` -
+  **byte-identical behaviour** (the three composition OR-terms it already had,
+  now sourced from the shared helper).
+- `isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null)`
+  now **delegates to `resultCompositionModified`** - existing 4-arg call sites
+  and tests keep working; the new optional 5th arg carries the P9.5.2 signal.
+- `App.jsx:2103` passes `log.performed_prescription` as that 5th arg.
+
+`performed_prescription != null` is a legitimate *classification* signal here,
+not mere provenance (owner S8): `saveWodLog` only ever persists it when the
+athlete's overlay **materially differs** from programmed
+(`performedIsModified` gate), i.e. it is a composition modification by
+construction.
+
+## F. PROGRAMMED VARIANT VS RESULT CLASSIFICATION
+
+The saved `variant_level` (RX / Intermediate / Beginner / OnRamp) is **never
+mutated** - it stays historical provenance. In the Mixed Categories block the
+entry is shown under an `RX` sub-label (its programmed target) while the block
+header reads *Mixed Categories* (its result classification). Verified live:
+Aug-30 leaderboard, "Test" 21:00 modified -> **Mixed Categories** block,
+**RX** sub-group, **Not RX'd** badge.
+
+## G. MIXED CATEGORIES POLICY
+
+`isMixedCategory` = `resultCompositionModified` only. It DELIBERATELY does NOT
+include `isNotRxd`'s **performance** term ("did not finish inside the time
+cap"). This is Forge's long-standing, documented split
+(`workoutFormats.js` header): a result whose **composition** is exactly RX but
+that was capped stays in its RX bucket (ranked after the finishers by
+`sortSectionLogs`), carrying only the badge - it is not "scaled", it is
+"unfinished". Owner S11 endorses this ("True RX capped: 2+43 -> RX or existing
+capped RX category semantics").
+
+**Reconciling owner S7 ("isNotRxd = true => not pure RX bucket") with S11:**
+`isNotRxd` conflates *composition* and *performance*. The bucket authority is
+**composition** (`resultCompositionModified`); S7 holds for every composition
+modification (verified). The residual case - a composition-RX **capped** result
+- shows "Not RX'd" (performance) but stays RX (S11). That is a deliberate,
+pre-P9.5.4 behaviour, **not** the reported bug, and changing it would move
+capped RX athletes out of the RX competition (S11 forbids). If the owner wants
+the badge and bucket to agree for the capped case too, the smallest change is a
+distinct **"Capped"** label for the pure-performance case (leaving the bucket
+alone) - flagged as a separate product decision, not done here.
+
+## H. ALL SCORE FAMILIES
+
+`src/p954LeaderboardClassification.test.js` - a table-driven matrix, verdict =
+the leaderboard bucket:
+
+| | family | scenario | bucket |
+|---|---|---|---|
+| A | TIME | true RX | RX |
+| B / B2 / B3 | TIME | modified load / substitution / performed overlay | Mixed |
+| C | TIME_CAPPED | completed, true RX | RX |
+| D | TIME_CAPPED | completed, modified load | Mixed |
+| E | TIME_CAPPED | capped, composition RX | **RX** (S11) |
+| F | TIME_CAPPED | capped, performed overlay | Mixed |
+| G / H / H2 | AMRAP | true RX / modified / performed overlay | RX / Mixed / Mixed |
+| I / J | REPS (Max Reps) | true RX (big #) / substitution | RX / Mixed |
+| K / L | LOAD (Max Load) | true RX **120 kg** / modified prescription | **RX** / Mixed |
+| M / N (+mods) | DISTANCE / CALORIES | true RX / modified | RX / Mixed |
+| P | historical | RX row, weight below standard | Mixed |
+| Q | legacy | no prescribed data at all | RX (cannot classify) |
+
+## I. GENDER FILTERS
+
+Orthogonal. `getSectionLogsForTier` filters by `profile.gender` **before**
+`splitRxSiMixed` buckets. Verified live: Male -> Mixed Categories + Male shows
+the modified "Test"; Female -> "No results yet" (no cross-contamination). Static
+test asserts the ordering in `App.jsx`.
+
+## J. PARTICIPANT COUNTS
+
+`sectionLogs.length` is computed per rendered block (`weightGroups.flatMap`),
+so it follows the bucket. Verified live: Aug-30 **Mixed Categories - 1
+participant** (RX block now empty, not rendered); Aug-28 **RX - 2 participants**
+(true-RX Lavinia 18:16 / Cosmin 19:50, unchanged).
+
+## K. HISTORICAL BEHAVIOR
+
+Reader-time. The 3 existing production `wod_logs` with `performed_prescription`
+(all `variant_level = 'RX'`, member 97a4e88a, Aug 30/31 RFT) move to Mixed
+Categories automatically on the next leaderboard render. **No backfill, no row
+mutation.**
+
+## L. LEGACY BEHAVIOR
+
+Unchanged. `resultCompositionModified` with no prescribed data
+(`greutateEsteSubStandard` guards on empty, `movementsChanged` returns false for
+an empty/`null` prescribed list) -> not Mixed. Free text is never used to invent
+Modified status. `weight_logged` / `prescribedWeight` semantics are pre-existing
+and untouched - score magnitude alone never sets Mixed (matrix K/L, S25).
+
+## M. TEST MATRIX
+
+`src/p954LeaderboardClassification.test.js` (50): the A-Q family matrix; S38
+badge-vs-bucket agreement on every composition modification; S11 performance
+dimension is bucket-orthogonal; S25 score magnitude never determines RX; S30
+no overcorrection; single-`isMixedCategory`-call-site + gender-orthogonality
+static checks on `App.jsx`.
+`src/workoutFormats.test.js`: +4 (`isNotRxd` / `isMixedCategory` performed_prescription).
+Full suite **1372 pass** (+ 9 pre-existing Deno `@std/assert` file failures,
+unrelated). `eslint` + `vite build` clean. `appHookOrderIntegrity.test.js`
+(INC-P9.5.2-01 regression) green. forge-admin-web untouched.
+
+## N. PRODUCTION IMPACT
+
+| | |
+|---|---|
+| migrations | **0** |
+| rows modified | **0** |
+| `wods` / `workouts` / `wod_logs` / `movements` / `members` | untouched |
+
+Only `app_version` (`current` row) updated, to signal clients.
+
+## O. DEPLOYMENT
+
+- commit `98c9987` (branch `fix/p9-5-4-leaderboard-classification` -> fast-forward `main`)
+- prod bundle `index-gu4gYKIj.js` (commit `98c9987`)
+- `app_version` `prescription-engine-p9-5-4-leaderboard-classification-20260831`
+- **Production smoke test** (real logged-in session, hard reload): Aug-30
+  leaderboard - modified "Test" result now in **Mixed Categories** (RX
+  sub-group, Not RX'd badge, 1 participant); Male filter -> Mixed + Male;
+  Female -> empty; Aug-28 - true-RX Lavinia / Cosmin still in **RX** (2
+  participants), time sort intact; no global error boundary.
+
+## HARD STOP
+
+**P10 NOT STARTED.** The P9 series is not declared closed - owner manual
+acceptance remains the final gate. The composition-RX **capped** badge/bucket
+question (G) is flagged for a separate owner decision.
