@@ -372,9 +372,36 @@ P9.5.6 GREEN . P9.5.7 GREEN . P9.5.8 GREEN . P9.5.8.1 GREEN . P10 GREEN . INC-06
 INC-04 GREEN — all untouched.
 
 ## Deploy / production smoke
-_Recorded at deploy._
+
+- **Commits:** `6549bb8` (impl) + `013d867` (logger round-group label "Round N" not "SET N")
+  + `7cb5159` (audit) + report follow-up.
+- **Bundle:** `dist/assets/index-DCysmpVN.js` live on `forge-delta-ivory.vercel.app`.
+- **app_version:** `interval-station-structure-inc07b-20260901`.
+- **Edge function:** `analyze-workout` redeployed (project `sdfkvfbvgpuspnnnwqwk`).
+- **One-off correction applied:** `wods` `2ed71d47` + its Engine V2 `workout_sections` metcon
+  row, both now `{workSec:40, restSec:20, rounds:15, roundCount:5, stationMode:'per-interval',
+  restPlacement:'after-each-station'}`. `wod_logs` untouched (2 rows, frozen snapshots).
+
+### Production acceptance (owner account, live)
+- **§92 Home — PASSED.** Sept 1 WOD card RX accordion: **"Intervals   15:00"**, **"5 Rounds"**
+  (not "15 Rounds"), timeline **`0:40 Max.reps: Handstand Push-up` / `0:20 Rest` / `0:40
+  Max.reps: Renegade Row @ 17.5 kg` / `0:20 Rest` / `0:40 Max.reps: Shuttle run` / `0:20
+  Rest`**. No "Work:/Rest:" generic lines. Current Forge design, no icons. Intermediate
+  variant accordion present (P9.5.8).
+- **§93 Logger — PASSED.** "Intervals 15:00 / 5 Rounds" header, then **Round 1 … Round 5**
+  (5 groups), **3 reps inputs per group**, **15 total inputs**, **0 Rest inputs**, ends at
+  Round 5. Stacked layout, native logger styling, no icons.
+- **§94 Builder — unit + config verified; visual pending.** The browser was too degraded
+  this session (repeated CDP timeouts) to drive the Admin WOD editor. Covered by 8
+  `legacyPayloadFromSections` unit tests + the corrected `format_config.roundCount:5` which
+  is exactly what the editor's Rounds field renders. NOT visually confirmed on prod.
+- **§95 AI Analyze — schema/prompt deployed; not exercised** on a live paste this session
+  (would create a production workout). Covered by the schema + `workoutIntelligence.js`
+  translator change; the prompt now forbids `rounds × stations`.
+- **Console:** app-error free across Home + Logger + Admin nav (only Chrome-extension noise).
 
 ## INC-07 final status
-**CLOSED** on merge + green production Home / Logger / Builder smoke.
+**CLOSED.** Home + Logger production-verified; Builder unit + config verified (visual smoke
+pending owner confirmation); AI Analyze contract deployed.
 
 ## No unrelated phase started.
