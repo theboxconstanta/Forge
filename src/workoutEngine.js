@@ -336,14 +336,18 @@ export function getProgrammedVariantLevels(section, doc = null) {
 }
 
 /** Whether `levelOrKey` (any display-side spelling) is among `section`'s
- * explicitly programmed variants. An empty programmed set (unclassifiable
- * workout) returns true for every key - the caller's pre-P9.5.8 fallback. */
+ * explicitly programmed variants.
+ *
+ * P9.5.8.1: an EMPTY programmed set is NOT a licence to allow everything. A
+ * workout with zero detectable programmed variants is incomplete - consumption
+ * surfaces fail safe (nothing selectable / not loggable), they do not
+ * fabricate all four. `[]` therefore rejects every key. In production 0/54
+ * workouts resolve empty, so this only ever guards a malformed/half-authored
+ * row. This is ROLE-INDEPENDENT: a user's role never creates a variant. */
 export function isProgrammedVariant(section, doc, levelOrKey) {
   const key = variantKeyFromLevel(levelOrKey)
   if (!key) return false
-  const programmed = getProgrammedVariantLevels(section, doc)
-  if (programmed.length === 0) return true
-  return programmed.includes(key)
+  return getProgrammedVariantLevels(section, doc).includes(key)
 }
 
 /** The variant a member logging screen should DEFAULT to: the member's usual

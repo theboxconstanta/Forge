@@ -10,6 +10,10 @@ import {
 // Invariant: the variant levels a member may select == the variant levels the
 // coach EXPLICITLY programmed. Never fill gaps; never assume RX exists; an
 // empty placeholder variant does not count; a load/distance-only variant does.
+//
+// P9.5.8.1 - the resolver takes NO role argument: a user's role never creates a
+// variant on a consumption surface. An EMPTY programmed set fails safe
+// (nothing selectable), it is NOT "show all four".
 
 const baseWod = {
   id: 'w1', gym_id: 'g1', date: '2026-09-01', name: 'TEST', type: 'For Time',
@@ -145,20 +149,17 @@ describe('P9.5.8 · isProgrammedVariant', () => {
     expect(isProgrammedVariant(s, null, 'onramp')).toBe(true)
   })
 
-  it('unclassifiable workout (no programming signal) → every key allowed (fallback)', () => {
+  it('P9.5.8.1 · incomplete workout (empty programmed set) → EVERY key rejected (fail safe, not "show all four")', () => {
     const w = { ...baseWod, movements_rx: [], notes_rx: null }
     const s = metconOf(w)
     expect(getProgrammedVariantLevels(s, null)).toEqual([])
     for (const k of ['RX', 'Intermediate', 'Beginner', 'OnRamp']) {
-      expect(isProgrammedVariant(s, null, k)).toBe(true)
+      expect(isProgrammedVariant(s, null, k)).toBe(false)
     }
   })
 
-  it('null section → allowed (unclassifiable, same conservative fallback as an empty set)', () => {
-    // The guard restricts ONLY when it can positively identify the programmed
-    // set. A missing section (some unrelated load quirk) must not block a
-    // legitimate save.
-    expect(isProgrammedVariant(null, null, 'RX')).toBe(true)
+  it('P9.5.8.1 · null section → rejected (nothing programmed = nothing selectable)', () => {
+    expect(isProgrammedVariant(null, null, 'RX')).toBe(false)
   })
 
   it('unknown level string → false', () => {

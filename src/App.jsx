@@ -7421,31 +7421,35 @@ function App() {
     if (user && userProfile?.gym_id) fetchWodZiWorkoutV2(dataAcasa)
   }, [dataAcasa, userProfile?.gym_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Coach Quick Create Phase 1 - Usual Level e un DEFAULT moale (preferinta),
-  // niciodata o restrictie: cand WOD-ul zilei se incarca si membrul inca n-a
-  // ales manual o varianta in aceasta sesiune (variantaAleasa === null),
-  // pre-selecteaza automat varianta din userProfile.usual_level. Membrul tot
-  // poate schimba varianta oricand inainte de logare (click pe alt card mai
-  // jos, exact ca inainte) - variantaAleasa ramane sursa de adevar pt ce se
-  // logheaza (Mixed Categories neatins), acest efect doar seteaza starea
-  // initiala. Nu ruleaza deloc daca membrul a ales deja ceva (variantaAleasa
-  // !== null) - nu suprascrie o alegere manuala facuta intre timp.
+  // Coach Quick Create Phase 1 + P9.5.8 + P9.5.8.1 - the selected variant on
+  // the Home card. Two jobs, one effect:
+  //   1. SOFT DEFAULT - when nothing is selected yet and the member has a
+  //      usual_level preference, pre-select it (a preference, never a
+  //      restriction, Mixed Categories untouched).
+  //   2. SANITIZE - when a selection exists but is NOT among the variants the
+  //      coach programmed for the workout NOW displayed (member navigated to
+  //      another day, or a coach edit removed that variant), deterministically
+  //      re-resolve rather than leave an unselectable variant "selected".
+  // Both jobs resolve through the SAME contract: usual_level if programmed ->
+  // RX if programmed -> first programmed -> no selection. Role never enters
+  // here - a user's role does not create a variant.
   useEffect(() => {
-    if (variantaAleasa !== null) return
-    if (!wodZiData || !userProfile?.usual_level) return
-    // P9.5.8 - the pre-selection is a SOFT default, never a bypass of the
-    // programmed-variant contract: only auto-select `usual_level` when the
-    // coach actually programmed that variant for today's metcon. Otherwise
-    // fall back to RX (if programmed) or the first programmed level; if the
-    // workout carries no programming signal at all, leave the choice unmade
-    // (the accordion below then offers all four, unchanged).
+    if (!wodZiData) return
     const wf = wodZiWorkoutV2 || mapLegacyWodToWorkout(wodZiData)
     const metcon = (wf?.sections || []).find(s => s.slotKey === 'metcon') || null
     const doc = wodZiData?.movement_prescriptions ?? null
-    const defaultKey = resolveDefaultProgrammedVariantKey(metcon, doc, userProfile.usual_level)
-    if (!defaultKey) return
-    const idx = VARIANTE_WEIGHT_BASE.findIndex(v => v.key === defaultKey)
-    if (idx !== -1) setVariantaAleasa(idx)
+    const programmed = getProgrammedVariantLevels(metcon, doc)
+    if (variantaAleasa !== null) {
+      const currentKey = VARIANTE_WEIGHT_BASE[variantaAleasa]?.key
+      if (currentKey && programmed.includes(currentKey)) return // still valid - keep it
+      // stale / no-longer-programmed selection -> fall through and re-resolve
+    } else if (!userProfile?.usual_level) {
+      return // nothing selected, no preference -> leave the choice to the member
+    }
+    const defaultKey = resolveDefaultProgrammedVariantKey(metcon, doc, userProfile?.usual_level ?? null)
+    const nextIdx = defaultKey ? VARIANTE_WEIGHT_BASE.findIndex(v => v.key === defaultKey) : -1
+    const next = nextIdx !== -1 ? nextIdx : null
+    if (next !== variantaAleasa) setVariantaAleasa(next)
   }, [wodZiData, wodZiWorkoutV2, userProfile?.usual_level])
 
   // INC-02 (SENTRY-CYAN-HARBOR-4T) - efectul de mai sus doar SELECTEAZA o
@@ -8944,14 +8948,17 @@ function App() {
       || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
-    // P9.5.8 - DEFENSIVE SAVE GUARD. A member's selected variant must be one
-    // the coach actually programmed for the FROZEN logging target
-    // (logPrimarySectionV / activePrescriptionDoc, captured at "Log Score" -
-    // never a re-fetched mutable workout). Fail closed: no silent coercion (an
-    // Intermediate selection is NEVER rewritten to RX). admin/coach are exempt
-    // (same rationale as the Home picker); an unclassifiable workout (empty
-    // programmed set) passes through unchanged (isProgrammedVariant -> true).
-    if (variantaAleasa !== null && logWodZiData && !isAdmin && !isCoach
+    // P9.5.8 / P9.5.8.1 - DEFENSIVE SAVE GUARD, ROLE-INDEPENDENT. A logged
+    // official-variant result must name a variant the coach actually
+    // programmed for the FROZEN logging target (logPrimarySectionV /
+    // activePrescriptionDoc, captured at "Log Score" - never a re-fetched
+    // mutable workout). This holds for EVERY role: admin/coach status does not
+    // create a variant, and there is no separate admin manual-result-entry
+    // workflow (forge-admin-web only reads wod_logs). Fail closed - no silent
+    // coercion (an Intermediate selection is NEVER rewritten to RX). An
+    // incomplete workout (empty programmed set) also fails closed here
+    // (isProgrammedVariant returns false for []).
+    if (variantaAleasa !== null && logWodZiData
         && !isProgrammedVariant(logPrimarySectionV, activePrescriptionDoc, VARIANTE_CONFIG[variantaAleasa]?.nivel)) {
       showToast(t.toastVariantNotProgrammed)
       setWodSaving(false)
@@ -9459,17 +9466,21 @@ function App() {
     ? (logCtx.prescriptionDoc ?? null)
     : (wodZiData?.movement_prescriptions ?? null)
 
-  // P9.5.8 - the variant levels the coach ACTUALLY programmed for the metcon
-  // being shown on the Home card (canonical keys, data-driven - see
-  // getProgrammedVariantLevels). A member may select only these; admin/coach
-  // are never restricted (they need every variant visible for programming and
-  // coaching). An empty result = no programming signal the persisted model can
-  // classify -> `memberVariantAllowed` returns true for all four, keeping the
-  // pre-P9.5.8 behaviour rather than rendering an empty selector.
+  // P9.5.8 / P9.5.8.1 - the variant levels the coach ACTUALLY programmed for the
+  // metcon shown on the Home card (canonical keys, data-driven - see
+  // getProgrammedVariantLevels). The Home WOD card is a CONSUMPTION surface:
+  // what variants exist is defined by the PROGRAMMING, never by the viewer's
+  // role. admin/coach/owner see exactly the same set here as a plain member -
+  // they create variants in the WOD editor (an authoring surface), not from
+  // this card. A user's role never fabricates a variant.
+  //
+  // P9.5.8.1 - an EMPTY set is NOT "show all four": a workout with no
+  // detectable programmed variant is incomplete, so nothing is selectable and
+  // the Log button stays disabled (fail safe). 0/54 production workouts resolve
+  // empty; this only guards a malformed row.
   const homeProgrammedVariantKeys = getProgrammedVariantLevels(primarySectionV, activePrescriptionDoc)
-  const memberVariantAllowed = (levelOrKey) =>
-    isAdmin || isCoach || homeProgrammedVariantKeys.length === 0
-    || homeProgrammedVariantKeys.includes(variantKeyFromLevel(levelOrKey))
+  const homeVariantSelectable = (levelOrKey) =>
+    homeProgrammedVariantKeys.includes(variantKeyFromLevel(levelOrKey))
 
   // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
   // sectiunea primara a modelului de domeniu - logica pura (RX = baza
@@ -10505,20 +10516,19 @@ function App() {
                       previous pass, just retargeted to 52px exactly instead
                       of a 60-64px range. Selection state and the click
                       handler are unchanged. */}
-                  {/* Redesign the Member Workout View - un membru cu usual_level
-                      setat (isAdmin/isCoach exclusi - ei tot au nevoie sa vada
-                      toate cele 4 variante, pt programare/coaching) vede DOAR
-                      propriul nivel, curatat de artefacte de parsare AI
-                      (cleanMovementDisplayText) si cu time cap/runde pe randuri
-                      separate (formatMemberScheduleLines) - nu mai atinge
-                      accordion-ul cu toate cele 4 variante de mai jos, pastrat
-                      neschimbat ca fallback pt admin/coach si pt membrii care
-                      n-au ales inca un nivel (nu putem alege unul in locul lor).
-                      variantaAleasa e deja indexul corect (pre-selectat din
-                      usual_level, vezi efectul de sincronizare de mai sus) -
-                      refolosit direct, nicio logica noua de potrivire. */}
+                  {/* Redesign the Member Workout View - a plain member (isAdmin/
+                      isCoach excluded HERE ONLY as a display-density choice:
+                      they keep the full accordion, not the streamlined single-
+                      variant card) with usual_level set sees ONLY their own
+                      level, cleaned of AI parse artefacts and with time cap /
+                      rounds on separate lines. P9.5.8.1 - the branch also
+                      requires the selected variant to be one the coach actually
+                      programmed (homeVariantSelectable); a stale cross-day
+                      selection falls through to the accordion so the member
+                      re-picks. variantaAleasa is already the right index
+                      (resolved by the sync effect above). */}
                   {!isAdmin && !isCoach && userProfile?.usual_level && variantaAleasa !== null
-                    && memberVariantAllowed(VARIANTE_CONFIG[variantaAleasa]?.nivel) ? (() => {
+                    && homeVariantSelectable(VARIANTE_CONFIG[variantaAleasa]?.nivel) ? (() => {
                     const v = metconVariantsForDisplay(primarySectionV)[variantaAleasa]
                     if (!v) return null
                     const miscari = v.movements
@@ -10570,11 +10580,12 @@ function App() {
                   })() : (
                   <div style={{ marginTop: '24px' }}>
                     {(() => { const accordionScheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []; return metconVariantsForDisplay(primarySectionV).map((v, i) => {
-                      // P9.5.8 - a member may select only the variants the coach
-                      // programmed for this metcon. admin/coach still see all
-                      // four; an unclassifiable workout also keeps all four
-                      // (memberVariantAllowed handles both fallbacks).
-                      if (!memberVariantAllowed(v.level)) return null
+                      // P9.5.8 / P9.5.8.1 - CONSUMPTION surface: only variants
+                      // the coach actually programmed are selectable, for
+                      // EVERY role (admin/coach/owner included - they author
+                      // variants in the WOD editor, not here). An incomplete
+                      // workout (empty set) shows no accordion.
+                      if (!homeVariantSelectable(v.level)) return null
                       const miscari = v.movements
                       const notaVarianta = v.notes
                       const isSelected = variantaAleasa === i
@@ -10647,12 +10658,11 @@ function App() {
                       clicking freezes that exact workout identity for the
                       whole logging session. Never falls back to today. */}
                   {(() => {
-                    // P9.5.8 - a stale selection pointing at a variant the coach
-                    // did NOT program for the CURRENTLY displayed metcon (e.g. the
-                    // member picked Intermediate on another day, then navigated
-                    // here) must not be loggable. memberVariantAllowed is
-                    // true for admin/coach and for an unclassifiable workout.
-                    const variantReadyToLog = variantaAleasa !== null && memberVariantAllowed(VARIANTE_CONFIG[variantaAleasa]?.nivel)
+                    // P9.5.8 / P9.5.8.1 - the CTA variant must always be one the
+                    // coach programmed for the CURRENTLY displayed metcon, for
+                    // every role. A stale cross-day selection, or an incomplete
+                    // workout, leaves the button disabled ("choose a variant").
+                    const variantReadyToLog = variantaAleasa !== null && homeVariantSelectable(VARIANTE_CONFIG[variantaAleasa]?.nivel)
                     const canLog = variantReadyToLog && homeDisplayIsCurrent
                     return (
                   <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={!canLog}
