@@ -285,7 +285,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           return (
             <div key={r} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: r < iv.roundCount ? '1px solid #f0f0f0' : 'none' }}>
               <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
-                {(t?.skillLogSetLabel ? t.skillLogSetLabel(r) : `Rundă ${r}`).toUpperCase()}
+                {(t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `Rundă ${r}`).toUpperCase()}
               </div>
               {iv.stations.map((st, si) => {
                 const key = intervalStationKey(r, si + 1, st.name)
