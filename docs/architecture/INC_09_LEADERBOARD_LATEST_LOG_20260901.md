@@ -170,12 +170,24 @@ data edits.** The owner's own deletion of their test logs (§5) is not part of t
   INC-04 (`homeWorkoutResponseIsCurrent` + `inc04HomeDateSelectionRace`) · P10 · P9.5.7 (41)
   · P9.5.6 · P9.5.8 · P9.5.8.1 — all pass, untouched.
 
-## §12. Production smoke
-_Recorded at deploy._ The original incident data was deleted by the owner mid-audit (§5);
-the exact "new log not surfacing" flow cannot be re-reproduced without re-creating a
-future-dated `logged_at` (which the fix now prevents). Post-deploy smoke = boot + the
-current single log renders correctly (structured, `Round 1…5`) + a legacy result still
-renders flat.
+## §12. Production smoke — 2026-09-01, bundle `index-B21xqqCo.js`
+
+Deploy: `main` `6ab917a`; `app_version` → `leaderboard-latest-log-inc09-20260901`.
+Bundle carries all three fix sites (minified): `return(a.getTime()>i.getTime()?i:a).toISOString()`
+· `new Date(e?.logged_at||0).getTime()` · `String(e?.id||"")>String(...)`.
+
+| check | result |
+|---|---|
+| App() boots (prod, real session) | ✅ Home renders, React root mounted, 0 app console errors |
+| Leaderboard → Sept 1 "Intervals 15:00" | ✅ **1 participant, `Test`, 150 reps** — the single remaining log `2d6a279d`, chosen by the new `logIsMoreRecent` dedup |
+| expand that row (structured) | ✅ INC-08 projection intact — `Round 1…5`, 3 stations each, `TOTAL 150`. No `Rundă 1…15`. No crash |
+| Leaderboard → Aug 30 "RFT 20:00" (different format, legacy) | ✅ flat render — `VARIANT RX`, movement list, `RESULT 3 runde complete · 21:00`. No round breakdown injected. No crash |
+| console after navigation + expand | ✅ only 2 pre-existing browser-extension "message channel closed" noise lines; 0 app errors |
+
+The original incident data was deleted by the owner mid-audit (§5); the exact "new log
+not surfacing" flow cannot be re-reproduced without re-creating a future-dated `logged_at`
+(which the fix now prevents). The smoke above confirms: the leaderboard's latest-log
+selection is deterministic and correct, and INC-08 / INC-08A rendering are both preserved.
 
 ## §13. Remaining limitations / observations
 1. **Additional scored sections have no per-member dedup** (`buildBlocksForAdditionalSection`
@@ -195,6 +207,8 @@ INC-08 GREEN · INC-08A GREEN · INC-07 GREEN · INC-06 GREEN · INC-04 GREEN ·
 P9.5.6 GREEN · P9.5.7 GREEN · P9.5.8 GREEN · P9.5.8.1 GREEN — all untouched.
 
 ## §15. INC-09 final status
-**CLOSED** on merge + green boot/legacy/structured production smoke.
+**CLOSED** — 2026-09-01. Merged `main` `6ab917a`; `app_version` bumped; production smoke
+GREEN (§12): boot ✅, latest-log dedup ✅, INC-08 structured projection ✅, legacy flat
+render ✅, console clean ✅.
 
 ## §16. No workout-id / date / movement-name hardcode. No unrelated phase started.
