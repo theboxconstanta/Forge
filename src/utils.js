@@ -29,7 +29,31 @@ export function todayLocalStr() {
 export function dateWithCurrentTime(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const now = new Date()
-  return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString()
+  const at = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds())
+  // INC-09 - never return a timestamp in the FUTURE. The intent here is to
+  // attribute a log to the workout's business date when that date is today or
+  // PAST (member forgot to log yesterday, logs today - `at` is already <= now,
+  // unchanged). But logging a FUTURE-dated workout early would otherwise stamp
+  // `logged_at` ahead of real time, and the leaderboard's "latest submission"
+  // dedup (logIsMoreRecent) would then let that future-dated log outrank every
+  // genuinely later re-log. Cap at now: an early future-workout log gets its
+  // real submission time; leaderboard membership uses wod_id, not logged_at.
+  return (at.getTime() > now.getTime() ? now : at).toISOString()
+}
+
+// INC-09 - deterministic "is `candidate` a more recent submission than
+// `current`?" for the leaderboard's per-member / representative-log selection.
+// `logged_at` is the recency key (never in the future - see dateWithCurrentTime).
+// A millisecond tie breaks on `id` so the selection is STABLE across refetches
+// regardless of the order the DB returns rows in (the leaderboard query has no
+// ORDER BY). Score is NOT a factor - the contract is latest submission, not
+// best result.
+export function logIsMoreRecent(candidate, current) {
+  if (!current) return true
+  const tc = new Date(candidate?.logged_at || 0).getTime()
+  const tk = new Date(current?.logged_at || 0).getTime()
+  if (tc !== tk) return tc > tk
+  return String(candidate?.id || '') > String(current?.id || '')
 }
 
 // Limitele unei zile LOCALE (00:00:00.000 -> 23:59:59.999), convertite in

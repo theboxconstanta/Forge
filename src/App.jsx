@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -2083,9 +2083,11 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
   const buildBlocksForPrimary = (sectionLogs) => {
     const dedupLogsGlobal = (arr) => {
       const byMember = {}
+      // INC-09 - one canonical row per member = the LATEST submission
+      // (logIsMoreRecent: logged_at, id tie-break; never score). Deterministic
+      // regardless of the order the query returned rows in.
       arr.forEach(log => {
-        const curr = byMember[log.member_id]
-        if (!curr || new Date(log.logged_at) > new Date(curr.logged_at)) byMember[log.member_id] = log
+        if (logIsMoreRecent(log, byMember[log.member_id])) byMember[log.member_id] = log
       })
       return Object.values(byMember)
     }
@@ -2096,7 +2098,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
     // wodZiData stays the source only for the page header + the sort-format
     // fallback when no log ever froze a format.
     const sortFormatFor = (arr) => {
-      const rep = arr.reduce((a, b) => (!a || new Date(b.logged_at) > new Date(a.logged_at)) ? b : a, null)
+      const rep = arr.reduce((a, b) => (logIsMoreRecent(b, a) ? b : a), null)
       const p = rep ? resolveResultProvenance(rep) : null
       return { id: p?.formatId || wodZiData?.type || null, config: p?.formatConfig ?? wodZiData?.format_config ?? null }
     }
@@ -2155,7 +2157,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
     // P10 - sort a section-linked historical result against the format frozen
     // on the log (format_snapshot), not the section as it stands now; fall back
     // to the current section format only when no log froze one.
-    const repAdd = sectionLogs.reduce((a, b) => (!a || new Date(b.logged_at) > new Date(a.logged_at)) ? b : a, null)
+    const repAdd = sectionLogs.reduce((a, b) => (logIsMoreRecent(b, a) ? b : a), null)
     const repProv = repAdd ? resolveResultProvenance(repAdd) : null
     const sorted = sortSectionLogs(sectionLogs, repProv?.formatId || section.format, repProv?.formatConfig ?? section.format_config)
     const filtered = genderTab === 'masculin' ? sorted.filter(l => l.profile?.gender === 'masculin')

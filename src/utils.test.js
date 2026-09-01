@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -556,6 +556,8 @@ describe('computeWodHeaderLine - INC-02 (SENTRY-CYAN-HARBOR-4T) regression', () 
 })
 
 describe('dateWithCurrentTime', () => {
+  afterEach(() => vi.useRealTimers())
+
   it('pastreaza ora curenta, dar pe data ceruta (loguri pt un WOD dintr-o zi trecuta)', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 6, 15, 14, 22, 30))
@@ -565,6 +567,75 @@ describe('dateWithCurrentTime', () => {
     expect(rezultat.getDate()).toBe(13)
     expect(rezultat.getHours()).toBe(14)
     expect(rezultat.getMinutes()).toBe(22)
+  })
+
+  it('INC-09: today\'s workout - returns ~now, unchanged', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 1, 11, 53, 0))
+    const r = new Date(dateWithCurrentTime('2026-09-01'))
+    expect(r.getDate()).toBe(1)
+    expect(r.getHours()).toBe(11)
+    expect(r.getMinutes()).toBe(53)
+    expect(r.getTime()).toBeLessThanOrEqual(Date.now())
+  })
+
+  it('INC-09: FUTURE workout logged early - NEVER returns a future timestamp (capped at now)', () => {
+    vi.useFakeTimers()
+    // logging on Aug 31 18:29 a workout dated Sep 1
+    vi.setSystemTime(new Date(2026, 7, 31, 18, 29, 0))
+    const r = new Date(dateWithCurrentTime('2026-09-01'))
+    expect(r.getTime()).toBeLessThanOrEqual(Date.now())
+    // it is the real submission moment, not Sep-1-evening
+    expect(r.getMonth()).toBe(7)
+    expect(r.getDate()).toBe(31)
+  })
+})
+
+describe('logIsMoreRecent - INC-09 (leaderboard latest-submission selection)', () => {
+  const L = (id, iso) => ({ id, logged_at: iso })
+
+  it('null current -> candidate wins', () => {
+    expect(logIsMoreRecent(L('a', '2026-09-01T08:00:00Z'), null)).toBe(true)
+  })
+
+  it('later logged_at wins', () => {
+    expect(logIsMoreRecent(L('a', '2026-09-01T09:00:00Z'), L('b', '2026-09-01T08:00:00Z'))).toBe(true)
+    expect(logIsMoreRecent(L('a', '2026-09-01T07:00:00Z'), L('b', '2026-09-01T08:00:00Z'))).toBe(false)
+  })
+
+  it('score is NOT a factor - a lower-score newer log still wins', () => {
+    const older = { id: 'x', logged_at: '2026-09-01T08:00:00Z', sets: { a: [{ reps: '1000' }] } }
+    const newer = { id: 'y', logged_at: '2026-09-01T09:00:00Z', sets: { a: [{ reps: '1' }] } }
+    expect(logIsMoreRecent(newer, older)).toBe(true)
+  })
+
+  it('millisecond tie -> deterministic id tie-break, stable regardless of arg order', () => {
+    const a = L('aaa', '2026-09-01T08:00:00.500Z')
+    const b = L('bbb', '2026-09-01T08:00:00.500Z')
+    expect(logIsMoreRecent(b, a)).toBe(true)   // 'bbb' > 'aaa'
+    expect(logIsMoreRecent(a, b)).toBe(false)
+  })
+
+  it('reduce over an unordered array converges to the same winner', () => {
+    const rows = [
+      L('m', '2026-09-01T08:32:00Z'),
+      L('z', '2026-09-01T08:53:00Z'),   // latest
+      L('a', '2026-09-01T08:00:00Z'),
+      L('q', '2026-09-01T08:50:00Z'),
+    ]
+    const winner = rows.reduce((acc, r) => (logIsMoreRecent(r, acc) ? r : acc), null)
+    expect(winner.id).toBe('z')
+    // shuffle -> same winner
+    const winner2 = [...rows].reverse().reduce((acc, r) => (logIsMoreRecent(r, acc) ? r : acc), null)
+    expect(winner2.id).toBe('z')
+  })
+
+  it('INC-09 incident shape: a future-dated legacy log no longer outranks a real recent log (once logged_at is capped at save)', () => {
+    // pre-INC-09 the legacy log had logged_at in the future; post-fix a new
+    // save is stamped <= now, so among logs saved after the fix the newest wins.
+    const newStructured = L('3ffcbb04', '2026-09-01T08:53:45Z')
+    const olderStructured = L('2d6a279d', '2026-09-01T08:00:11Z')
+    expect(logIsMoreRecent(newStructured, olderStructured)).toBe(true)
   })
 })
 
