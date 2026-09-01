@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
 } from './utils'
@@ -312,15 +312,53 @@ describe('isWorkoutFetchCurrent - INC-04 (Log Score opens today for a selected h
     expect(isWorkoutFetchCurrent('2026-09-03', '2026-08-01')).toBe(false) // late "today" response, D still selected
   })
 
-  it('rapid date switching (27 -> 26 -> 27): the first 27 response still applies (same date selected again)', () => {
+  it('the intermediate date (26) response is dropped on 27 -> 26 -> 27', () => {
+    expect(isWorkoutFetchCurrent('2026-08-26', '2026-08-27')).toBe(false)
+  })
+
+  it('date equality ALONE is not enough for A -> B -> A (see homeWorkoutResponseIsCurrent)', () => {
+    // isWorkoutFetchCurrent would wrongly pass an old 27 response once 27 is
+    // re-selected. The monotonic-sequence guard in homeWorkoutResponseIsCurrent
+    // is what actually rejects it - covered in that describe block below.
     expect(isWorkoutFetchCurrent('2026-08-27', '2026-08-27')).toBe(true)
-    expect(isWorkoutFetchCurrent('2026-08-26', '2026-08-27')).toBe(false) // the intermediate 26 response is dropped
   })
 
   it('null / undefined fetch date never counts as current (fails safe, no today fallback)', () => {
     expect(isWorkoutFetchCurrent(null, '2026-08-27')).toBe(false)
     expect(isWorkoutFetchCurrent(undefined, '2026-08-27')).toBe(false)
     expect(isWorkoutFetchCurrent(null, null)).toBe(false)
+  })
+})
+
+describe('homeWorkoutResponseIsCurrent - INC-04 FINAL (monotonic request currency)', () => {
+  // The same date can be requested repeatedly (the [dataAcasa] effect, the
+  // realtime `wods` handler, a focus refresh, rapid A->B->A chip taps). Date
+  // equality alone lets an OLDER response for the currently-selected date
+  // commit over a NEWER in-flight one. Each fetch captures a monotonically
+  // increasing seq; only seq === latest AND date === selected may commit.
+
+  it('latest request for the selected date commits', () => {
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 5, latestSeq: 5, requestDate: '2026-09-03', selectedDate: '2026-09-03' })).toBe(true)
+  })
+
+  it('A -> B -> A: the FIRST A response (seq 1) is rejected once a newer A request (seq 3) exists', () => {
+    // taps: A(seq1) -> B(seq2) -> A(seq3); A#1 resolves last
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 1, latestSeq: 3, requestDate: '2026-09-01', selectedDate: '2026-09-01' })).toBe(false)
+    // A#3 (the real current one) commits
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 3, latestSeq: 3, requestDate: '2026-09-01', selectedDate: '2026-09-01' })).toBe(true)
+  })
+
+  it('same-date refetch (realtime `wods` change while the [dataAcasa] fetch is still in flight): #1 loses to #2', () => {
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 1, latestSeq: 2, requestDate: '2026-09-03', selectedDate: '2026-09-03' })).toBe(false)
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 2, latestSeq: 2, requestDate: '2026-09-03', selectedDate: '2026-09-03' })).toBe(true)
+  })
+
+  it('a stale response whose date is no longer selected is rejected even if it is the latest seq', () => {
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 4, latestSeq: 4, requestDate: '2026-09-03', selectedDate: '2026-09-07' })).toBe(false)
+  })
+
+  it('null request date fails safe', () => {
+    expect(homeWorkoutResponseIsCurrent({ requestSeq: 2, latestSeq: 2, requestDate: null, selectedDate: '2026-09-03' })).toBe(false)
   })
 })
 

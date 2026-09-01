@@ -91,6 +91,18 @@ export function isWorkoutFetchCurrent(fetchedForDate, currentSelectedDate) {
   return fetchedForDate != null && fetchedForDate === currentSelectedDate
 }
 
+// INC-04 FINAL - request-currency for the Home workout fetches, strengthened
+// beyond date equality. The same date can be requested several times over
+// (the [dataAcasa] effect on selection, the realtime `wods` handler, a
+// visibility/focus refresh, and rapid A -> B -> A chip taps), so an OLDER
+// response whose date happens to match the current selection must still lose
+// to the newest in-flight request. Each fetch captures a monotonically
+// increasing sequence number at issue time; a response commits only if its
+// sequence is still the latest AND its date is still the selected one.
+export function homeWorkoutResponseIsCurrent({ requestSeq, latestSeq, requestDate, selectedDate }) {
+  return requestSeq === latestSeq && isWorkoutFetchCurrent(requestDate, selectedDate)
+}
+
 // INC-04 GLOBAL - freeze the identity of the workout currently displayed, at
 // the exact moment the member presses "Log Score" / Skill "Log". The whole
 // logging session (display + save) then derives EVERY identity-bearing value

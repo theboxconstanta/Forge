@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial,
@@ -7009,6 +7009,13 @@ function App() {
   const clasamentDateRef = useRef(clasamentDate)
   useEffect(() => { dataAcasaRef.current = dataAcasa }, [dataAcasa])
   useEffect(() => { clasamentDateRef.current = clasamentDate }, [clasamentDate])
+  // INC-04 - monotonic request tokens for the two independent Home workout
+  // fetches. The same date can be requested repeatedly (the [dataAcasa]
+  // effect, the realtime `wods` handler, a focus refresh, A->B->A chip
+  // taps), so date equality alone cannot tell a stale response from the
+  // current one - only the newest request issued may commit its result.
+  const wodZiReqSeqRef = useRef(0)
+  const wodZiV2ReqSeqRef = useRef(0)
   const jurnalDateInputRef = useRef(null)
   const [userProfile, setUserProfile] = useState(null)
   const [myGym, setMyGym] = useState(CURRENT_GYM)
@@ -7215,7 +7222,16 @@ function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') { setResetLinkError(''); setResetMode(true); return }
-      setUser(session?.user ?? null)
+      const nextUser = session?.user ?? null
+      // INC-04 - TOKEN_REFRESHED (hourly, and on every tab focus via the
+      // visibilitychange getSession() call) delivers a BRAND-NEW user object
+      // with an unchanged id. Re-setting it re-runs every [user]-keyed effect -
+      // including the one that resets `dataAcasa` to today - snapping an
+      // explicitly selected Home date back to today whenever the phone unlocks.
+      // Keep the existing reference when only the session/token changed; adopt
+      // the new object only on a genuine identity change (sign-in, sign-out,
+      // account switch).
+      setUser(prev => (prev && nextUser && prev.id === nextUser.id ? prev : nextUser))
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -7266,6 +7282,11 @@ function App() {
     if (user) {
       const d = new Date()
       const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      // INC-04 - this effect now runs ONLY on a genuine identity change: the
+      // onAuthStateChange handler keeps the same `user` reference across
+      // TOKEN_REFRESHED / focus re-auth, so this no longer fires (and no
+      // longer resets the selected date) on every tab wake. Resetting to
+      // today on a real sign-in / account switch is correct.
       setDataAcasa(todayStr)
       saveProfile()
       fetchUserProfile()
@@ -7395,13 +7416,13 @@ function App() {
       setPerformedCommitted(null); setPerformedDraft(null); setLogWodEditMode(false)
     }
     if (screen === 'home') {
-      const d = new Date()
-      setDataAcasa(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
-      setTimeout(() => {
-        const container = homeCalScrollRef.current
-        const chip = homeCalTodayRef.current
-        if (container && chip) container.scrollLeft = Math.max(0, chip.offsetLeft - container.offsetWidth / 2 + chip.offsetWidth / 2)
-      }, 50)
+      // INC-04 - returning to Home must NOT reset the selected date. The Home
+      // date is user intent: it survives every screen round-trip (logger
+      // cancel/save, Leaderboard, Journal, Feed, Admin, PRs). `dataAcasa`
+      // self-initialises to today via useState; a real account switch resets
+      // it in the [user] effect. Here we only re-centre the chip strip on
+      // whatever date is currently selected.
+      scrollChipToDate(dataAcasaRef.current)
     }
     if (screen === 'feed' && user) {
       setFeedUnread(0)
@@ -7413,6 +7434,15 @@ function App() {
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // INC-04 - the instant the selection changes, drop a workout still loaded
+    // for a DIFFERENT day so the transient state is "loading <selected date>",
+    // never "<previous day's workout> shown under the <new date> chip" with a
+    // (disabled) Log button. A refetch for the SAME date (realtime `wods`
+    // change, focus refresh) keeps the current content - no flash. The
+    // functional updater form is safe against the concurrent fetch commits
+    // below (which are themselves request-currency guarded).
+    setWodZiData(prev => (prev && prev.date !== dataAcasa ? null : prev))
+    setWodZiWorkoutV2(prev => (prev && prev.date !== dataAcasa ? null : prev))
     if (user) fetchWodZi(dataAcasa)
     // userProfile.gym_id in dependinte (nu doar dataAcasa) - profilul se
     // incarca async, dupa acest efect; fara re-declansare cand devine
@@ -8506,11 +8536,14 @@ function App() {
   const fetchWodZi = async (data_param) => {
     const _fwd = new Date()
     const data_str = data_param || dataAcasaRef.current || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
+    const mySeq = ++wodZiReqSeqRef.current
     const { data } = await supabase.from('wods').select('*').eq('date', data_str).maybeSingle()
-    // INC-04 - discard a response whose date is no longer the selected one
-    // (member switched dates while this request was in flight). Never let a
-    // stale today response overwrite an explicitly-selected historical day.
-    if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
+    // INC-04 - commit only if this is still the newest wods request AND its
+    // date is still selected. A stale response (member switched dates, a
+    // realtime refetch superseded this one, an A->B->A tap) is discarded -
+    // never falls back to today (null handling in the [dataAcasa] effect /
+    // workoutForDisplay covers the empty case).
+    if (!homeWorkoutResponseIsCurrent({ requestSeq: mySeq, latestSeq: wodZiReqSeqRef.current, requestDate: data_str, selectedDate: dataAcasaRef.current })) return
     setWodZiData(data || null)
   }
 
@@ -8523,16 +8556,18 @@ function App() {
     if (!userProfile?.gym_id) return
     const _fwd = new Date()
     const data_str = data_param || dataAcasaRef.current || `${_fwd.getFullYear()}-${String(_fwd.getMonth()+1).padStart(2,'0')}-${String(_fwd.getDate()).padStart(2,'0')}`
+    const mySeq = ++wodZiV2ReqSeqRef.current
     try {
       const v2 = await loadFromWorkoutEngineV2(userProfile.gym_id, data_str)
-      // INC-04 - same request-currency guard as fetchWodZi. workoutForDisplay
-      // and resolveWodIdForLog both PREFER wodZiWorkoutV2, so a stale V2
-      // response is what actually bound the logger to the wrong day.
-      if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
+      // INC-04 - same request-currency guard as fetchWodZi (its own sequence -
+      // the two fetches resolve independently). workoutForDisplay and
+      // resolveWodIdForLog both PREFER wodZiWorkoutV2, so a stale V2 response
+      // is what actually bound the logger to the wrong day.
+      if (!homeWorkoutResponseIsCurrent({ requestSeq: mySeq, latestSeq: wodZiV2ReqSeqRef.current, requestDate: data_str, selectedDate: dataAcasaRef.current })) return
       setWodZiWorkoutV2(v2)
     } catch (err) {
       console.error('fetchWodZiWorkoutV2 failed (cade pe fallback legacy, vezi workoutForDisplay):', err)
-      if (!isWorkoutFetchCurrent(data_str, dataAcasaRef.current)) return
+      if (!homeWorkoutResponseIsCurrent({ requestSeq: mySeq, latestSeq: wodZiV2ReqSeqRef.current, requestDate: data_str, selectedDate: dataAcasaRef.current })) return
       setWodZiWorkoutV2(null)
     }
   }
