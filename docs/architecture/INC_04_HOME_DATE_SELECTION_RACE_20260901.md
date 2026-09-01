@@ -225,15 +225,26 @@ timezone redesign.
 - `vite build` — clean (`index-*.js` ~1219 kB).
 - P9.5.8 / P9.5.8.1 / P9.5.7 / P9.5.6 / P10 / INC-06 suites — all pass, untouched.
 
-## §AE. Production throttle acceptance
-_Recorded post-deploy — see the checklist at the end._
+## §AE. Production acceptance (verified LIVE 2026-09-01, owner account, `forge-delta-ivory.vercel.app`)
+- **Select Aug 31 (D-1) → Leaderboard → Home** ⇒ Home **stays on Aug 31** (green chip,
+  "August 2026", "← Back to today", Monday's classes). Pre-fix: snapped to Sept 1.
+- **Select Aug 31 → open logger (correct "3 RFT" workout frozen) → cancel** ⇒ Home **stays
+  on Aug 31**.
+- **Rapid chip taps 29 Aug → 2 Sep** ⇒ settles on **2 Sep**; its WOD card shows Sept 2's
+  "AMRAP 10:00" (coherent, not a stale earlier day), Log button correctly enabled.
+- **"← Back to today"** ⇒ Sept 1, "TODAY", link gone.
+- **Console:** no new app errors across all of the above (only the known Chrome-extension
+  "message channel closed" noise, pre-dating the test).
+- Not verified this session (no artificial lag tooling / no member login): the exact
+  hostile-async-order commit race — covered by the 12 deterministic deferred-promise
+  scenarios — and token-refresh-on-focus, covered by the `setUser` id-gate.
 
 ## §AF. Console status
 Preview build boots clean (login screen, no error boundary); no app-code console errors.
 Known Chrome-extension "message channel closed" noise is unrelated.
 
-## §AG. Commit — _filled at deploy_
-## §AH. Bundle — _filled at deploy_
+## §AG. Commit — `76eaafe` (WOD-SIMPLE, `theboxconstanta/Forge` main); report follow-up commit for §AE
+## §AH. Bundle — `dist/assets/index-Cc9FQn_9.js` live on the prod alias
 ## §AI. app_version — `home-date-selection-race-inc04-20260901`
 
 ## §AJ. Remaining limitations
