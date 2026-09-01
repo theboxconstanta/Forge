@@ -142,8 +142,25 @@ variant (Intermediate stations); no-hardcode source scan.
   P10 (`p10HistoricalResultTruth`) · P9.5.7 (`p957ResultDetailProjection` 41) · P9.5.6 ·
   P9.5.8 · P9.5.8.1 · INC-04 — all pass, untouched.
 
-## §L. Production smoke
-_Recorded at deploy._
+## §L. Production smoke (verified LIVE 2026-09-01, owner account, `forge-delta-ivory.vercel.app`)
+
+- **Commit** `60dc2c9` · **bundle** `dist/assets/index-*.js` (station-key regex present) ·
+  **app_version** `structured-interval-result-projection-inc08-20260901`.
+- **STRUCTURED (§63) — PASSED.** Journal → the structured Intervals log (frozen
+  `roundCount:5` + `stationMode:'per-interval'`, 15 `intervalStationKey` `sets`) renders:
+  **Round 1 … Round 5** (5 semantic groups), each with **3 station rows**
+  (`Max.reps: Handstand Push-up` / `Max.reps: Renegade Row @ 17.5 kg` / `Max.reps: Shuttle
+  run`, in order, `10 reps` each), **15 score values, 0 Rest rows, no Round 6–15**.
+  Prescription (`@ 17.5 kg`) shown. Native Forge styling, no icons.
+- **LEGACY (§64) — PASSED.** The two legacy Intervals logs on the same workout
+  (`format_config_snapshot` without `stationMode`, flat `"Rundă 1".."Rundă 15"` keys) still
+  render **15 flat `Rundă N` rows** — in the Journal AND in the Leaderboard expanded card.
+  **Not reinterpreted as 5×3** (§8 / §37).
+- **Leaderboard ranking** unchanged (single RX participant, `203 reps` — the aggregate is
+  computed the same key-agnostic way).
+- **Console:** app-error free across Leaderboard expand + Journal (structured + 2 legacy).
+- The Leaderboard's own row currently dedupes to the latest (legacy) log; the structured
+  branch there shares the exact `parseWodLogDetails` path proven live in the Journal.
 
 ## §M. Remaining limitations
 1. The `"Max.reps:"` prefix on the incident's frozen station labels (a pre-INC-06 AI-parse
