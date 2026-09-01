@@ -78,6 +78,7 @@ import {
 } from './prescriptionContract'
 import { resolveResultProvenance } from './resultProvenance'
 import { resolveResultMovementLines } from './resultWorkoutLines'
+import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
 import UniversalScoreInput from './UniversalScoreInput'
@@ -2344,7 +2345,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
-                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, effFormat?.simpleReps)
+                      const { miscariAfisate, noteLog, wHasSets, wSetsParti, intervalResult, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, effFormat?.simpleReps)
                       // P9.5.7 - a RESULT card shows WHAT THE ATHLETE ACTUALLY DID
                       // (performed overlay -> frozen resolved selected-variant
                       // snapshot -> frozen notes text -> frozen movement names).
@@ -2453,7 +2454,9 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               )}
                               {wHasSets && (
                                 <div style={{ marginBottom: (showSetsScoreAtEnd || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
-                                  {wSetsParti.map((p, j) => (
+                                  {intervalResult ? (
+                                    <IntervalResultRounds intervalResult={intervalResult} t={t} />
+                                  ) : wSetsParti.map((p, j) => (
                                     <div key={j} style={{ marginBottom: '6px' }}>
                                       <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
                                       <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
@@ -5733,10 +5736,43 @@ function parseWodLogDetails(w, t, simpleReps) {
       return omitLabel ? bucati.join(' @ ') : `${t.skillLogSetLabel(si + 1)}: ${bucati.join(' @ ')}`
     }).join(' · '),
   })) : []
-  const rezultatBucati = [w.result, w.time_result, wHasSets ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
+  // INC-08 - structured per-interval Interval result: the R×S score entries in
+  // `sets` are grouped into R SEMANTIC rounds × S stations, from the log's OWN
+  // FROZEN snapshot (never the live workout). null for legacy / non-interval -
+  // the caller then renders `wSetsParti` flat, unchanged.
+  const intervalResult = resolveStructuredIntervalResult(w)
+  // INC-08 - a structured interval shows R round groups below; "15 sets" (the
+  // raw score-entry count) would just be a confusing number next to it.
+  const rezultatBucati = [w.result, w.time_result, (wHasSets && !intervalResult) ? t.jurnalSetsCountLabel(wSetsParti.length) : null, w.log_meta?.completed ? t.jurnalCompletedLabel : null].filter(Boolean)
   const areRezultat = rezultatBucati.length > 0
   const areDetalii = miscariAfisate.length > 0 || (noteLog && noteLog.trim()) || wHasSets || areRezultat
-  return { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati, areRezultat, areDetalii, headerFormatId }
+  return { miscariAfisate, noteLog, wHasSets, wSetsParti, intervalResult, rezultatBucati, areRezultat, areDetalii, headerFormatId }
+}
+
+// INC-08 - THE shared structured-interval result breakdown: R semantic round
+// groups, each with S station rows, from `resolveStructuredIntervalResult`
+// (frozen log evidence only). Replaces the flat `wSetsParti` list on the
+// leaderboard expanded card + the Journal card. Same Forge text hierarchy as
+// the flat version (bold round label, muted station line), no icons.
+function IntervalResultRounds({ intervalResult, t }) {
+  const repsWord = t?.clasamentRepsUnit || 'reps'
+  return (
+    <>
+      {intervalResult.rounds.map((rd) => (
+        <div key={rd.roundIndex} style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', marginBottom: '2px' }}>
+            {t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(rd.roundIndex) : `Rundă ${rd.roundIndex}`}
+          </div>
+          {rd.stations.map((st) => (
+            <div key={st.stationIndex} style={{ fontSize: '11px', color: '#888', display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '1px 0' }}>
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{st.label}</span>
+              <span style={{ flexShrink: 0 }}>{st.reps != null ? `${st.reps} ${repsWord}` : '—'}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
+  )
 }
 
 // P9.5.7 - resolveResultMovementLines(log) lives in src/resultWorkoutLines.js
@@ -6015,7 +6051,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
             {w && (() => {
               const logKey = w.id
               const isOpen = !closedKeys.has(logKey)
-              const { miscariAfisate, noteLog, wHasSets, wSetsParti, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
+              const { miscariAfisate, noteLog, wHasSets, wSetsParti, intervalResult, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii, headerFormatId } = parseWodLogDetails(w, t)
               // Titlu: "Nume WOD" | Varianta (daca WOD-ul are nume) - altfel doar
               // varianta, ca inainte. Subtitlu: formatul + durata reale ale WOD-ului
               // legat (ex. "AMRAP 20:00") - la logare libera (fara wod_id) nu exista
@@ -6186,7 +6222,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       )}
                       {wHasSets && (
                         <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
-                          {wSetsParti.map((p, j) => (
+                          {intervalResult ? (
+                            <IntervalResultRounds intervalResult={intervalResult} t={t} />
+                          ) : wSetsParti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
                               <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
                               <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
