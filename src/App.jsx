@@ -42,6 +42,7 @@ import { fetchProgressionForMember, formatProgressionNote } from './performanceP
 import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
+  resolveIntervalStructure, intervalTimelineLines,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
@@ -9536,6 +9537,14 @@ function App() {
       // P9.4 - the ONE shared structured-workout projection (also feeds the
       // logger + Coach Preview). member mode + the athlete's gender.
       const structured = vk ? composeStructuredWorkoutDisplay({ doc, variantKey: vk, mode: 'member', gender: genderKey }) : null
+      const baseLines = (structured && structured.lines.length) ? structured.lines : (v.movements || [])
+      // INC-07 - a structured per-interval Intervals section renders as a
+      // work/rest TIMELINE (0:40 <station> / 0:20 Rest), not a bare movement
+      // list. Legacy Intervals / every other format: unchanged.
+      const timeline = intervalTimelineLines(section?.format, section?.formatConfig, baseLines)
+      if (timeline) {
+        return { ...VARIANTE_CONFIG[i], ...v, movements: timeline, weightMale: null, weightFemale: null, structured: !!(structured && structured.lines.length), intervalTimeline: true }
+      }
       if (structured && structured.lines.length) {
         return { ...VARIANTE_CONFIG[i], ...v, movements: structured.lines, weightMale: null, weightFemale: null, structured: true }
       }
@@ -10596,7 +10605,7 @@ function App() {
                           <div style={{ marginTop: '16px' }}>
                             {miscari.map((m, mi) => (
                               <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                {memberMovementLine(m, v.structured, activeAthleteGenderKey)}
+                                {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
                               </div>
                             ))}
                           </div>
@@ -10667,7 +10676,7 @@ function App() {
                                 <div style={{ marginTop: '16px' }}>
                                   {miscari.map((m, mi) => (
                                     <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                      {memberMovementLine(m, v.structured, activeAthleteGenderKey)}
+                                      {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
                                     </div>
                                   ))}
                                 </div>

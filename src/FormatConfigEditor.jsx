@@ -284,7 +284,14 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <DurationField key={key} label={label} seconds={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
         )
         if (field.type === 'number') return (
-          <NumberField key={key} label={label} value={cfg[key] ?? field.default ?? null} onChange={v => setField(key, v)} />
+          // INC-07 - a legacy Intervals row stores `rounds` (flat count), not
+          // `roundCount`. Show that value in the Rounds field so editing a
+          // legacy workout is not broken; it only becomes the stored
+          // `roundCount` (upgrading the row to structured) once the coach
+          // actually edits the field.
+          <NumberField key={key} label={label}
+            value={cfg[key] ?? (key === 'roundCount' ? cfg.rounds : undefined) ?? field.default ?? null}
+            onChange={v => setField(key, v)} />
         )
         if (field.type === 'select') return (
           <SelectField key={key} label={label} value={cfg[key] ?? field.default ?? null} options={field.options} onChange={v => setField(key, v)} />

@@ -205,11 +205,18 @@ export const WORKOUT_FORMATS = {
   // Aceeasi structura ca Tabata (runde de lucru/odihna, scor = reps) - acelasi
   // motiv pentru simpleReps: o runda e un singur numar de reps, nu un set
   // repetabil cu greutate.
+  // INC-07 - STRUCTURED per-interval Intervals. The coach authors roundCount
+  // (real repeated rounds), workSec, restSec + a per-variant station list; the
+  // save path derives the legacy `rounds` (= roundCount × stationCount) and
+  // stamps `stationMode:'per-interval'` / `restPlacement:'after-each-station'`
+  // for readers. `rounds` is NOT a schema field any more (never authored) but
+  // legacy rows that still carry it keep rendering/logging flat (INC-07 §21) -
+  // resolveIntervalStructure gates structured mode on the stored stationMode.
   'Intervals': {
     family: 'sets', rowMode: 'interval',
     simpleReps: true,
     config: {
-      rounds: { type: 'number', required: true, labelKey: 'fmtRounds' },
+      roundCount: { type: 'number', required: true, labelKey: 'fmtRounds' },
       workSec: { type: 'duration', required: true, labelKey: 'fmtWork' },
       restSec: { type: 'duration', required: true, labelKey: 'fmtRest' },
       scoringMode: { type: 'select', options: ['Lowest Reps', 'Total Reps'], required: true, default: 'Total Reps', labelKey: 'fmtIntervalScoring' },
@@ -850,12 +857,21 @@ export function parseFormatHeader(headerStr) {
 // pentru afisare/compatibilitate cu header-ul text vechi "TIP mm:ss" - nu
 // toate formatele au o durata clara (ex. Death By e open-ended), caz in care
 // intoarce null si header-ul ramane fara durata (optionala oricum).
-export function estimateTotalDurationSec(formatId, config) {
+export function estimateTotalDurationSec(formatId, config, movements) {
   const cfg = config || {}
   if (formatId === 'AMRAP') return cfg.durationSec || null
   if (['For Time', 'Chipper', 'Ladder', 'RFT', 'Partner WOD'].includes(formatId)) return cfg.timeCapSec || cfg.durationSec || null
   if (formatId === 'EMOM') return (parseInt(cfg.totalRounds) || 0) * (cfg.intervalSec || 60) || null
-  if (formatId === 'Tabata' || formatId === 'Intervals') return (parseInt(cfg.rounds) || 8) * ((cfg.workSec || 20) + (cfg.restSec || 10)) || null
+  if (formatId === 'Tabata' || formatId === 'Intervals') {
+    // INC-07 - structured per-interval Intervals: roundCount × stationCount ×
+    // (work + rest). The derived legacy `rounds` already equals that product
+    // once saved, so a 2-arg call on a stored row still gets the right total;
+    // pass `movements` from the editor (before `rounds` is derived) to compute
+    // it from roundCount + the live station list.
+    const iv = resolveIntervalStructure(formatId, cfg, movements)
+    if (iv && iv.structured && iv.totalDurationSec != null) return iv.totalDurationSec
+    return (parseInt(cfg.rounds) || 8) * ((cfg.workSec || 20) + (cfg.restSec || 10)) || null
+  }
   if (formatId === 'Buy-In/Cash-Out') return cfg.mainDurationSec || null
   if (formatId === 'AMRAP with Buy-In') return cfg.totalDurationSec || null
   if (formatId === 'Chained AMRAP') return (cfg.stages || []).reduce((sum, s) => sum + (s.durationSec || 0), 0) || null
@@ -981,7 +997,14 @@ export function resolveMemberHeaderTiming(formatId, config, legacyDuration, t) {
 //    nevoie de context ca sa se inteleaga singure - startReps, targetSets
 //    etc, liste de miscari) raman pe randul generic eticheta: valoare, ca sa
 //    nu piarda tacut informatie - nicio schimbare de comportament acolo.
-const MEMBER_ROUNDS_KEYS = ['rounds', 'totalRounds']
+// INC-07 - `roundCount` (structured Intervals) is preferred over the legacy
+// `rounds` (which, for a structured workout, is the DERIVED scoreable-interval
+// count and must never be shown as the round count - §88).
+const MEMBER_ROUNDS_KEYS = ['roundCount', 'rounds', 'totalRounds']
+// Legacy config keys that may carry a round count without a matching schema
+// field on the current format (an Intervals workout saved before INC-07 has
+// `format_config.rounds` but the schema now only declares `roundCount`).
+const MEMBER_LEGACY_ROUNDS_KEYS = new Set(['rounds'])
 // Aceleasi campuri pe care formatMemberHeaderTiming le poate consuma (direct
 // sau prin estimateTotalDurationSec) - marcate "consumed" fara sa produca un
 // rand propriu aici, altfel ar aparea A DOUA OARA pe randul generic
@@ -997,7 +1020,7 @@ const MEMBER_BARE_VALUE_TYPES = new Set(['repsSchemeList'])
 const MEMBER_BARE_VALUE_SELECT_FIELDS = new Set(['splitType', 'baseFormat', 'scoringMode', 'ladderType'])
 // Campuri care descriu doar modelul de date al lui Forge, fara niciun sens
 // pt un sportiv nici macar aratate ca valoare goala.
-const MEMBER_SUPPRESSED_FIELDS = new Set(['structure'])
+const MEMBER_SUPPRESSED_FIELDS = new Set(['structure', 'stationMode', 'restPlacement', 'rounds'])
 // Universal Visual Hierarchy Rule - o linie generata aici nu e automat
 // "metadata muted": doar campurile care descriu STRICT scorarea/logarea
 // (scoringMode - "Total Reps" vs "Lowest Reps" nu schimba CE faci fizic,
@@ -1034,11 +1057,22 @@ function computeMemberDetailLines(formatId, config, t, suppressTimingKeys) {
   const { consumedKeys } = computeFormatPrimaryLabel(formatId, cfg)
   const consumed = new Set(consumedKeys)
   if (suppressTimingKeys) MEMBER_HEADER_TIMING_KEYS.forEach(k => consumed.add(k))
+  // INC-07 - a structured per-interval Interval shows its work/rest schedule as
+  // the station TIMELINE (Home renders intervalTimelineLines); the bare
+  // "Work: 0:40" / "Rest: 0:20" generic lines would just duplicate it. Legacy
+  // Intervals / Tabata keep those lines (no timeline is shown for them).
+  if (isStructuredInterval(cfg)) { consumed.add('workSec'); consumed.add('restSec') }
 
-  const roundsKey = MEMBER_ROUNDS_KEYS.find(k => fields[k] && cfg[k] != null && cfg[k] !== '' && !consumed.has(k))
+  // INC-07 - a structured Interval carries `roundCount` (semantic rounds) and,
+  // for legacy compat, a derived `rounds` (= roundCount × stationCount). Show
+  // `roundCount` when present; fall back to a legacy `rounds` even if the
+  // current schema no longer declares it as a field.
+  const roundsKey = MEMBER_ROUNDS_KEYS.find(k =>
+    (fields[k] || MEMBER_LEGACY_ROUNDS_KEYS.has(k)) && cfg[k] != null && cfg[k] !== '' && !consumed.has(k))
   if (roundsKey) {
     prescriptionLines.push(`${cfg[roundsKey]} ${t?.memberWodRoundsLabel || 'Rounds'}`)
     consumed.add(roundsKey)
+    consumed.add('rounds') // never also emit the derived compat count
   }
 
   // Ladder: directia (Ascending/Descending/Asc-Desc) e deja lizibila DIN
@@ -1140,10 +1174,132 @@ export function removeSetRow(rowsByKey, key, idx) {
   return { ...rowsByKey, [key]: (rowsByKey[key] || []).filter((_, i) => i !== idx) }
 }
 
+// INC-07 - is this workout line pure timing (rest), never a movement? A
+// structured interval workout carries rest as format_config.restSec, never in
+// the movement list; this is a safety net (+ it keeps a stray "…Rest" line out
+// of the station list when one slips through a legacy paste). Matches "Rest",
+// ":20 Rest", "2:00 Rest", "20s Rest", "Rest 0:20".
+export function isRestLine(text) {
+  const s = String(text ?? '').trim().toLowerCase()
+  if (!s) return false
+  const dur = '[:\\d.]*\\d[:\\d.]*\\s*(?:s|sec|secs|second|seconds|m|min|mins|minute|minutes)?'
+  return new RegExp(`^(?:${dur}\\s*)?rest(?:\\s*${dur})?$`).test(s)
+}
+
+// INC-07 - THE canonical structural resolver for interval / station workouts.
+// One pure function; Home, Coach Preview, the logger and the duration helper
+// all consume its output so no surface re-derives "rounds × stations" on its
+// own.
+//
+// STRUCTURED (new, explicit): format_config carries
+//   { stationMode:'per-interval', roundCount:N, workSec, restSec,
+//     restPlacement:'after-each-station' }
+// and `movements` is the list of scoreable stations. Then:
+//   roundCount            = N (the coach's real repeated rounds)
+//   stationCount          = scoreable stations in `movements` (rest excluded)
+//   scoreableIntervalCount = roundCount × stationCount   (DERIVED, never stored as truth)
+//   totalDurationSec       = roundCount × stationCount × (workSec + restSec)
+//                            for restPlacement 'after-each-station'
+//
+// LEGACY (everything else - existing Intervals/Tabata with only
+// `format_config.rounds`): `rounds` stays "number of flat score inputs",
+// movements are decorative. NEVER reinterpreted (INC-07 audit §J proved other
+// production Intervals workouts use the identical legacy schema for
+// structurally different concepts). `15 ÷ 3 = 5` is not applied to anything.
+export function isStructuredInterval(config) {
+  return !!config && config.stationMode === 'per-interval' && Number(config.roundCount) > 0
+}
+
+export function resolveIntervalStructure(formatId, config, movements) {
+  const fmt = getFormat(formatId)
+  if (!fmt || fmt.rowMode !== 'interval') return null
+  const cfg = config || {}
+  const workSec = Number(cfg.workSec) || 0
+  const restSec = Number(cfg.restSec) || 0
+
+  if (!isStructuredInterval(cfg)) {
+    const n = parseInt(cfg.rounds) || (formatId === 'Tabata' ? 8 : 0)
+    return {
+      structured: false,
+      roundCount: n,
+      stationCount: 0,
+      stations: [],
+      scoreableIntervalCount: n,
+      workSec: cfg.workSec != null ? workSec : null,
+      restSec: cfg.restSec != null ? restSec : null,
+      restPlacement: null,
+      totalDurationSec: n && (cfg.workSec != null || cfg.restSec != null) ? n * (workSec + restSec) : null,
+      scoreMode: resolveSetsScoringMode(formatId, cfg),
+    }
+  }
+
+  const roundCount = parseInt(cfg.roundCount) || 0
+  const stations = (Array.isArray(movements) ? movements : [])
+    .map((m) => (typeof m === 'string' ? { name: m } : m))
+    .filter((m) => {
+      const name = m && typeof m.name === 'string' ? m.name.trim() : ''
+      return name && !isRestLine(name)
+    })
+  const stationCount = stations.length
+  const restPlacement = cfg.restPlacement || 'after-each-station'
+  const scoreableIntervalCount = roundCount * stationCount
+  const totalDurationSec = restPlacement === 'between-rounds'
+    ? roundCount * (stationCount * workSec) + Math.max(0, roundCount) * restSec
+    : roundCount * stationCount * (workSec + restSec)
+
+  return {
+    structured: true,
+    roundCount,
+    stationCount,
+    stations,
+    scoreableIntervalCount,
+    workSec,
+    restSec,
+    restPlacement,
+    totalDurationSec: totalDurationSec || null,
+    scoreMode: resolveSetsScoringMode(formatId, cfg),
+  }
+}
+
+// INC-07 - deterministic round-major key for one structured-interval score
+// input. Station index (1-based) is part of the key so a movement repeated
+// inside a round stays two distinct inputs (§33/§41); the name is kept for a
+// readable logger label. Order across keys is R1/S1, R1/S2, … R{n}/S{m}.
+export function intervalStationKey(roundIndex, stationIndex, stationName) {
+  return `Rundă ${roundIndex} · ${stationIndex}. ${stationName}`
+}
+
+// INC-07 - the ONE structured-interval display timeline: interleaves each
+// station's work interval with its rest, so Home / Coach Preview show
+//   0:40  Handstand Push-up
+//   0:20  Rest
+//   0:40  Renegade Row @ 17.5 kg
+//   0:20  Rest
+//   …
+// instead of "15 Rounds / Work 0:40 / Rest 0:20" + a disconnected movement
+// list. `stationDisplayLines` is the already-resolved per-variant station list
+// (P9.4 output or legacy names). Returns null for a legacy / non-structured
+// interval (caller keeps its existing rendering). Rest lines only when
+// restSec > 0 and restPlacement is 'after-each-station'.
+export function intervalTimelineLines(formatId, config, stationDisplayLines) {
+  const iv = resolveIntervalStructure(formatId, config, stationDisplayLines)
+  if (!iv || !iv.structured || iv.stationCount === 0) return null
+  const work = iv.workSec ? secToTime(iv.workSec) : null
+  const rest = iv.restSec ? secToTime(iv.restSec) : null
+  const showRest = rest && iv.restPlacement !== 'between-rounds'
+  const out = []
+  iv.stations.forEach((st) => {
+    out.push(work ? `${work}  ${st.name}` : st.name)
+    if (showRest) out.push(`${rest}  Rest`)
+  })
+  return out
+}
+
 // Genereaza randurile initiale goale pentru formatele family:'sets', pe baza
 // config-ului definit de admin - ex. EMOM cu totalRounds:12 -> 12 randuri
 // "Min 1".."Min 12"; Tabata cu rounds:8 -> "Rundă 1".."Rundă 8"; Strength Sets
 // cu targetSets:5 -> 5 randuri goale per miscare din `movements`.
+// INC-07 - structured Intervals -> roundCount × stationCount rows, round-major.
 export function defaultRowsForFormat(formatId, config, movements) {
   const fmt = getFormat(formatId)
   if (fmt.family !== 'sets') return {}
@@ -1161,6 +1317,19 @@ export function defaultRowsForFormat(formatId, config, movements) {
     return out
   }
   if (formatId === 'Tabata' || formatId === 'Intervals') {
+    // INC-07 - structured per-interval Intervals: one input per station per
+    // round, round-major. roundCount × stationCount inputs, ZERO for rest.
+    const iv = resolveIntervalStructure(formatId, config, movements)
+    if (iv && iv.structured) {
+      const out = {}
+      for (let r = 1; r <= iv.roundCount; r++) {
+        iv.stations.forEach((st, si) => {
+          out[intervalStationKey(r, si + 1, st.name)] = [emptyRow()]
+        })
+      }
+      return out
+    }
+    // Legacy Intervals / Tabata - flat "Rundă i" inputs, movements decorative.
     const n = parseInt(config?.rounds) || 8
     const out = {}
     for (let i = 1; i <= n; i++) out[`Rundă ${i}`] = [emptyRow()]

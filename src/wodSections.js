@@ -16,7 +16,7 @@
 // workoutFormats.js) ca sa poata fi testate direct, fara sa importe intreaga
 // componenta React.
 
-import { VARIANTE_WEIGHT_BASE, AUTO_DURATION_FORMAT_IDS, estimateTotalDurationSec } from './workoutFormats'
+import { VARIANTE_WEIGHT_BASE, AUTO_DURATION_FORMAT_IDS, estimateTotalDurationSec, isRestLine } from './workoutFormats'
 import {
   buildLegacyArtifactsForVariant,
   parsePastedMovementLine,
@@ -342,8 +342,31 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
     }
   }
 
+  // INC-07 - a structured per-interval Intervals section: the coach authored
+  // `roundCount` (real rounds). Derive the legacy compat `rounds`
+  // (= roundCount × RX station count, rest excluded), stamp the discriminators
+  // for readers, and compute duration from that structure. An Intervals
+  // section whose config never got a `roundCount` (a pre-INC-07 legacy row the
+  // coach did not re-author) is left exactly as-is - legacy flat.
+  const primaryFormatConfig = (() => {
+    const c = primary.formatConfig || {}
+    if (primary.format !== 'Intervals' || c.roundCount == null || !(Number(c.roundCount) > 0)) return c
+    const rxSv = primary.variants?.rx || {}
+    const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
+    const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
+    const roundCount = Number(c.roundCount)
+    return {
+      ...c,
+      stationMode: 'per-interval',
+      restPlacement: c.restPlacement || 'after-each-station',
+      rounds: stationCount > 0 ? roundCount * stationCount : roundCount,
+    }
+  })()
+
   const autoDurationSec = AUTO_DURATION_FORMAT_IDS.includes(primary.format)
-    ? estimateTotalDurationSec(primary.format, primary.formatConfig) : null
+    ? estimateTotalDurationSec(primary.format, primaryFormatConfig,
+        (primary.variants?.rx?.instances?.length ? primary.variants.rx.instances : primary.variants?.rx?.movements))
+    : null
   const durationStr = autoDurationSec != null
     ? `${Math.floor(autoDurationSec / 60)}:${String(autoDurationSec % 60).padStart(2, '0')}`
     : `${parseInt(primary.durationMin) || 0}:${String(parseInt(primary.durationSec) || 0).padStart(2, '0')}`
@@ -374,7 +397,7 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   return {
     type: primary.format || 'AMRAP',
     duration: durationStr,
-    format_config: Object.keys(primary.formatConfig || {}).length > 0 ? primary.formatConfig : null,
+    format_config: Object.keys(primaryFormatConfig || {}).length > 0 ? primaryFormatConfig : null,
     name: primary.name.trim() || null,
     movement_prescriptions: prescriptions,
     ...nonPrimaryFields('warmup', warmupS),

@@ -60,6 +60,12 @@ function toFormatConfig(fc: any) {
   return {
     timeCapMinutes: fc?.timeCapMinutes ?? null,
     rounds: fc?.rounds ?? null,
+    // INC-07 - structured per-interval Intervals (Fight Gone Bad style):
+    // roundCount = the real repeated rounds, stationMode marks each movement as
+    // its own scoreable timed work interval. Passed through verbatim; the client
+    // derives the legacy `rounds` = roundCount × station count.
+    roundCount: fc?.roundCount ?? null,
+    stationMode: fc?.stationMode === "per-interval" ? "per-interval" : null,
     intervalSeconds: fc?.intervalSeconds ?? null,
     workSeconds: fc?.workSeconds ?? null,
     restSeconds: fc?.restSeconds ?? null,

@@ -1,8 +1,11 @@
-# INC-07 — Interval / Station Workout Structure Semantics — AUDIT + MANDATORY STOP
+# INC-07 — Interval / Station Workout Structure Semantics
 
 **Date:** 2026-09-01
-**Status:** **STOPPED before implementation** — §94 / §95 / §31 / §10-Outcome-D conditions met.
-**Repo:** `WOD-SIMPLE` (audit only — **zero code, zero DB, zero deploy**).
+**Status:** audit STOPPED for owner approval → **owner approved** → **IMPLEMENTED + SHIPPED**.
+See "IMPLEMENTATION + CLOSURE" at the end for the delivered contract; the audit below is
+retained as the root-cause record.
+**Repo:** `WOD-SIMPLE`. Client-side + one authorized `format_config` correction. ZERO schema
+change, ZERO migration, ZERO `wod_logs` mutation.
 **Adjacent phases:** P9.5.6 / P9.5.7 / P9.5.8 / P9.5.8.1 / P10 / INC-06 / INC-04 — untouched, all GREEN.
 
 ---
@@ -232,3 +235,146 @@ Coach Preview, and the result surfaces. Logger becomes a `roundCount × stationC
 `estimateTotalDurationSec`, new resolver, `computeSetsScore` key-ordering), `FormatLogger.jsx`
 (interval matrix), `FormatConfigEditor.jsx` (Builder fields), `App.jsx` (Home render of the
 station timeline + logger wiring), `supabase/functions/analyze-workout/{prompt,openaiSchema,transform}.ts`, `prescriptionContract` parity if the resolver is shared with `forge-admin-web`. ~8–10 files, new tests, and the one owner-sanctioned production edit. Non-trivial; needs its own implementation ticket after the contract is approved.
+
+---
+
+# IMPLEMENTATION + CLOSURE (owner approved 2026-09-01)
+
+## Owner-approved contract (final, as persisted)
+
+`format_config` for a **structured per-interval** Intervals workout:
+
+```json
+{
+  "roundCount": 5,
+  "stationMode": "per-interval",
+  "restPlacement": "after-each-station",
+  "workSec": 40,
+  "restSec": 20,
+  "scoringMode": "Total Reps",
+  "rounds": 15
+}
+```
+
+- **`roundCount`** — the real number of repeated rounds. THE canonical semantic round count.
+- **`stationMode: 'per-interval'`** — the structural discriminator. `resolveIntervalStructure`
+  treats a workout as structured **iff** this is stored **and** `roundCount > 0`.
+- **`restPlacement: 'after-each-station'`** — the only value this phase implements; the field
+  exists so other placements can be added later without another contract change.
+- **`rounds`** (legacy) — kept and re-derived on every save (= `roundCount × stationCount`)
+  so surfaces not yet migrated, `estimateTotalDurationSec` on a stored row, and any external
+  reader still get a sane number. It equals the DERIVED scoreable-interval count, **never**
+  the round count (§88).
+- **`scoreableStationCount`** = scoreable stations in `movements` (rest lines excluded via
+  `isRestLine`). **`scoreableIntervalCount`** = `roundCount × stationCount` — derived, never
+  stored as truth.
+- Duration = `roundCount × stationCount × (workSec + restSec)` for `after-each-station`
+  → incident `5 × 3 × 60 = 900 s = 15:00` (unchanged).
+
+**Legacy Intervals / Tabata** (only `format_config.rounds`, no `stationMode`) — untouched.
+`resolveIntervalStructure` returns `{ structured:false }`; every surface keeps its
+pre-INC-07 behaviour. The two other production Intervals workouts (2026-08-14, 2026-08-21 —
+audit §J) are not re-saved and never reinterpreted. `15 divided by 3 = 5` is applied to nothing.
+
+## The shared resolver (`src/workoutFormats.js`)
+
+- **`resolveIntervalStructure(formatId, config, movements)`** -> `{ structured, roundCount,
+  stationCount, stations, scoreableIntervalCount, workSec, restSec, restPlacement,
+  totalDurationSec, scoreMode }` — the ONE structural truth. Home, Coach Preview, the
+  logger and `estimateTotalDurationSec` all consume it.
+- **`isStructuredInterval(config)`** — the discriminator (config-only).
+- **`isRestLine(text)`** — rest never counts as a station.
+- **`intervalStationKey(round, station, name)`** = `Runda {r} . {s}. {name}` —
+  deterministic round-major score key; the station index keeps a movement repeated inside a
+  round two distinct inputs (§33/§41).
+- **`intervalTimelineLines(formatId, config, stationLines)`** -> `["0:40  Handstand Push-up",
+  "0:20  Rest", ...]` for structured; `null` for legacy.
+
+## Surface-by-surface
+
+| Surface | Behaviour |
+|---|---|
+| **Builder** (`FormatConfigEditor` + `Intervals` schema) | schema field `rounds` -> **`roundCount`** (label unchanged, "Rounds"). Legacy rows show their stored `rounds` value in that field so editing is not broken; it becomes stored `roundCount` (upgrading the row to structured) only once the coach edits it. Work / Rest fields unchanged. No new controls, no icons, no redesign. |
+| **Builder save** (`wodSections.legacyPayloadFromSections`) | Intervals section with `roundCount > 0`: derive `rounds = roundCount x RX-station-count`, stamp `stationMode` / `restPlacement`, compute duration from the structure. An Intervals section whose config never got a `roundCount` is written back exactly as loaded — stays legacy flat. |
+| **AI Analyze** (`openaiSchema` + `prompt` + `transform` + `workoutIntelligence`) | new `roundCount` + `stationMode` in the contract; the prompt tells the model to emit `roundCount` = the real rounds (NEVER `rounds x stations`), `stationMode:'per-interval'`, and put each scoreable station (no "Rest") in `movements`. `transform.ts` passes them through; the client translator keeps them when present, else stays the legacy `rounds` model. No invention — leave both null when structure is unclear. |
+| **Engine V2** | `workout_sections.format_config` is a verbatim mirror of `wods.format_config`. No divergent model. `legacy_wod_id` / date identity untouched. |
+| **Member Home / Coach Preview** | round label from **`roundCount`** -> "5 Rounds"; the bare "Work: 0:40 / Rest: 0:20" generic lines are suppressed for structured; the station list is replaced by the **timeline** `0:40 <station> / 0:20 Rest / ...`. Same white surfaces / typography / borders / green CTA. No icons. Duration still "15:00". |
+| **Logger** (`FormatLogger.SetsFields`) | structured -> **round-grouped stacked layout**: `roundCount` groups, one reps input per station, round header ("RUNDA 1"). `roundCount x stationCount` inputs, round-major keys, zero Rest inputs. Stacked (not a matrix) -> usable on the narrowest phones. Same input styling, no icons. Legacy -> unchanged flat "Runda i". |
+| **Score persistence** | reuses `wod_logs.sets` (`{ [intervalStationKey]: [{reps,...}] }`). 15 keys, round-major. Zero DB change. |
+| **Result aggregation / Leaderboard** | `computeSetsScore` sums `Object.values(sets).flat()` — key-agnostic -> Total Reps = sum of all 15 station values, unchanged (INC-06). Ranking untouched (§46). |
+| **Result detail / Journal / Share** | render from the log's own frozen `format_config_snapshot` (P10). Old flat logs stay flat. No surface prints "15 rounds". |
+
+## The one-off production correction (§49 — the only authorized mutation)
+
+**`wods` `2ed71d47` + its Engine V2 metcon section** `format_config`:
+`{restSec:20, rounds:15, workSec:40}` -> `{restSec:20, workSec:40, roundCount:5,
+stationMode:'per-interval', restPlacement:'after-each-station', rounds:15}` (`rounds:15`
+unchanged — it already equalled `5 x 3`). `scoringMode` left as stored. Duration "15:00"
+unchanged. The 3 RX + 3 Intermediate stations untouched.
+
+**Pre-mutation checks (§50/§54) — all passed:**
+- ID `2ed71d47-9484-4062-9505-ca70aa9a3e70`, `type='Intervals'`, `format_config` exactly the
+  audited `{restSec:20, rounds:15, workSec:40}`, 3 RX + 3 Int stations, `duration='15:00'`.
+- **2 existing `wod_logs`** (owner's INC-06 test rows). Each carries its own frozen
+  `format_config_snapshot = {rounds:15}` (no `stationMode`). `resolveIntervalStructure` on a
+  log reads the snapshot -> legacy -> flat 15 entries -> rendering unchanged;
+  `computeSetsScore` sums the 15 `sets` values -> Total Reps unchanged. No reinterpretation,
+  no conflict. -> proceed.
+
+**Zero** `wod_logs` / `skill_logs` / score / snapshot / performed-prescription mutation.
+
+## Files changed
+
+- `src/workoutFormats.js` — `Intervals` schema (`rounds`->`roundCount`); `+ isRestLine`,
+  `+ isStructuredInterval`, `+ resolveIntervalStructure`, `+ intervalStationKey`,
+  `+ intervalTimelineLines`; `defaultRowsForFormat` (structured branch);
+  `computeMemberDetailLines` (roundCount label + suppress work/rest for structured);
+  `estimateTotalDurationSec` (structured-aware, optional `movements` arg).
+- `src/wodSections.js` — `legacyPayloadFromSections`: structured-Intervals `primaryFormatConfig`
+  derivation + duration from resolver.
+- `src/FormatLogger.jsx` — `SetsFields` round-grouped structured-interval branch.
+- `src/FormatConfigEditor.jsx` — `roundCount` number field shows legacy `rounds` as fallback.
+- `src/workoutIntelligence.js` — `Intervals` AI translator keeps `roundCount`/`stationMode`.
+- `src/App.jsx` — `metconVariantsForDisplay` emits the interval timeline; `memberMovementLine`
+  renders timeline lines verbatim.
+- `supabase/functions/analyze-workout/{openaiSchema,prompt,transform}.ts` — `roundCount` +
+  `stationMode` in the AI contract, FGB-style guidance, no pre-multiplication.
+- `src/inc07IntervalStationStructure.test.js` — new, 32 tests.
+
+## DB impact
+**0 schema . 0 migrations . 0 columns . 0 tables . 0 backfills . 0 `wod_logs` mutations.**
+One authorized `UPDATE` of `format_config` on one `wods` row + its mirrored
+`workout_sections` row (§49).
+
+## Regression
+- Full `vitest run` — **1670 passed** / 9 pre-existing Deno failures (unchanged baseline).
+- `appHookOrderIntegrity` 3 . `eslint src/*` **0 errors** . `vite build` clean.
+- INC-06 (38) . P9.5.6 . P9.5.7 . P9.5.8 . P9.5.8.1 . P10 . P9.4 . P9.3 . `wodSections` .
+  `workoutIntelligence` . `workoutComposer` — all pass, untouched.
+
+## Remaining limitations
+1. **`forge-admin-web` programming Builder** still authors the legacy `rounds` model for a
+   new Intervals workout. Its RESULT surfaces are unaffected (aggregate score is
+   format-agnostic). Parity port = a scoped follow-up. The primary Builder (WOD-SIMPLE
+   Admin) and the incident's authoring path (AI Analyze) are fixed.
+2. **Non-uniform / explicit per-station rest** is not authored — only uniform `restSec` +
+   `restPlacement:'after-each-station'`. Contract has room for it without a schema change.
+3. **Non-rep stations** (calories/distance per interval) still score as reps for structured
+   Intervals — `simpleReps` unchanged (§39). Capability boundary, documented.
+4. **Legacy Intervals opened in the WOD-SIMPLE editor**: the Rounds field shows the stored
+   flat `rounds`; editing + saving upgrades the row to structured. Deliberate re-authoring;
+   the two legacy production rows are historical and will not be re-saved.
+5. The `"Max.reps:"` prefix on the incident's station names (a pre-INC-06 AI-parse artifact)
+   is shown as-is — a pre-existing display-cleanup concern, out of INC-07 scope.
+
+## Adjacent phase status
+P9.5.6 GREEN . P9.5.7 GREEN . P9.5.8 GREEN . P9.5.8.1 GREEN . P10 GREEN . INC-06 GREEN .
+INC-04 GREEN — all untouched.
+
+## Deploy / production smoke
+_Recorded at deploy._
+
+## INC-07 final status
+**CLOSED** on merge + green production Home / Logger / Builder smoke.
+
+## No unrelated phase started.

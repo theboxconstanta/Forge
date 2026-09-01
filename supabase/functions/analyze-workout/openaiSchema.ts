@@ -116,6 +116,14 @@ const FORMAT_CONFIG_DEF = {
   properties: {
     timeCapMinutes: { type: ['number', 'null'] },
     rounds: { type: ['number', 'null'] },
+    // INC-07 - for Intervals with distinct scoreable stations (Fight Gone Bad
+    // style): roundCount = the ACTUAL number of repeated rounds (never rounds ×
+    // stations); stationMode 'per-interval' marks that each movement is its own
+    // timed scoreable work interval inside every round.
+    roundCount: { type: ['number', 'null'] },
+    // free string ('per-interval' or null) - transform.ts validates it; a
+    // nullable enum is avoided (same strict-mode caution as `stages` above).
+    stationMode: { type: ['string', 'null'] },
     intervalSeconds: { type: ['number', 'null'] },
     workSeconds: { type: ['number', 'null'] },
     restSeconds: { type: ['number', 'null'] },
@@ -130,7 +138,7 @@ const FORMAT_CONFIG_DEF = {
     stages: { type: 'array', items: { $ref: '#/$defs/stage' } },
   },
   required: [
-    'timeCapMinutes', 'rounds', 'intervalSeconds', 'workSeconds',
+    'timeCapMinutes', 'rounds', 'roundCount', 'stationMode', 'intervalSeconds', 'workSeconds',
     'restSeconds', 'startReps', 'incrementReps', 'stages',
   ],
 }

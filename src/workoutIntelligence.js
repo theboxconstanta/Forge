@@ -89,7 +89,14 @@ const FORMAT_CONFIG_TRANSLATORS = {
   'Death By Weight': (c) => ({ intervalSec: c.intervalSeconds }),
   'EMOM': (c) => ({ totalRounds: c.rounds, intervalSec: c.intervalSeconds }),
   'Tabata': (c) => ({ rounds: c.rounds, workSec: c.workSeconds, restSec: c.restSeconds }),
-  'Intervals': (c) => ({ rounds: c.rounds, workSec: c.workSeconds, restSec: c.restSeconds }),
+  // INC-07 - structured per-interval Intervals: keep the AI's roundCount (real
+  // rounds) + stationMode; the save path (legacyPayloadFromSections) derives
+  // the legacy `rounds` = roundCount × station count and stamps restPlacement.
+  // When the AI could not resolve the structure (roundCount/stationMode null)
+  // it stays the legacy flat model (`rounds`), unchanged.
+  'Intervals': (c) => (c?.stationMode === 'per-interval' && Number(c?.roundCount) > 0
+    ? { roundCount: c.roundCount, stationMode: 'per-interval', restPlacement: 'after-each-station', workSec: c.workSeconds, restSec: c.restSeconds }
+    : { rounds: c.rounds, workSec: c.workSeconds, restSec: c.restSeconds }),
   'Weightlifting': () => ({}),
   'Complex': (c) => ({ rounds: c.rounds }),
   'AMRAP with Buy-In': (c) => ({ totalDurationSec: min2sec(c.timeCapMinutes) }),

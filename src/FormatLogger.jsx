@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey } from './workoutFormats'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 import { secToTime } from './utils'
 
@@ -268,6 +268,50 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
   const score = computeSetsScore(formatId, config, rowsByKey)
   const Row = getFormat(formatId).simpleReps ? SimpleRepsRow : SetsRows
+
+  // INC-07 - structured per-interval Intervals: the score inputs are grouped by
+  // SEMANTIC round (roundCount groups), each holding exactly one reps input per
+  // scoreable station. Round-major keys (intervalStationKey); Rest never gets
+  // an input. Round groups stack vertically - usable on the narrowest phones,
+  // no matrix, no icons. Same white/typography language as the rest of the
+  // logger.
+  const iv = resolveIntervalStructure(formatId, config, movements)
+  if (iv && iv.structured && iv.stationCount > 0) {
+    const setStationReps = (key, row, value) => onChange({ ...rowsByKey, [key]: [{ ...row, reps: value }] })
+    return (
+      <>
+        {Array.from({ length: iv.roundCount }, (_, ri) => {
+          const r = ri + 1
+          return (
+            <div key={r} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: r < iv.roundCount ? '1px solid #f0f0f0' : 'none' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
+                {(t?.skillLogSetLabel ? t.skillLogSetLabel(r) : `Rundă ${r}`).toUpperCase()}
+              </div>
+              {iv.stations.map((st, si) => {
+                const key = intervalStationKey(r, si + 1, st.name)
+                const row = (rowsByKey[key] && rowsByKey[key][0]) || { reps: '', weight: '', completed: false }
+                return (
+                  <div key={key} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{st.name}</div>
+                    <input type="number" inputMode="numeric" value={row.reps || ''}
+                      onChange={e => setStationReps(key, row, e.target.value)}
+                      placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+                      style={{ width: '84px', flexShrink: 0, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+        {score != null && (
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+            {setsScoreLabel(resolveSetsScoringMode(formatId, config), t)}: {score}
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <>
       {Object.entries(rowsByKey).map(([key, rows]) => (
