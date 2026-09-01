@@ -200,16 +200,18 @@ programmed set.
   warnings, untouched lines).
 - `vite build` — clean (`index-*.js` ~1219 kB).
 
-## §Z. Production acceptance
-- **Owner account (admin), prod alias:** _to record post-deploy_ — RX-only WOD (2026-09-01)
-  ⇒ Home shows RX accordion only; CTA "Log — RX"; Intermediate/Beginner/OnRamp absent.
+## §Z. Production acceptance (verified LIVE 2026-09-01)
+- **Owner account (admin), `forge-delta-ivory.vercel.app`:** RX-only WOD (2026-09-01
+  "Intervals") ⇒ Home WOD card shows **only the RX accordion** + CTA **"Log — RX"**.
+  Intermediate / Beginner / OnRamp **absent**. (Pre-fix, the same account showed all four
+  accordions — see the P9.5.8 report's own smoke note.)
+- **Builder, same account + same workout:** WOD editor Metcon section shows all four
+  authoring tabs **RX · Intermediate · Beginner · OnRamp** + "Generate Variants" — unchanged.
 - **Pure member account:** NOT VERIFIED (no member login available to this session).
-- **Builder:** admin opens the same workout in the WOD editor ⇒ Intermediate/Beginner/OnRamp
-  authoring tabs still present.
-- **Console:** app-error free (known Chrome-extension "message channel closed" noise only).
+- **Console:** app-error free (only the known Chrome-extension "message channel closed" noise).
 
-## §AA. Commit — _filled at deploy_
-## §AB. Bundle — _filled at deploy_
+## §AA. Commit — `0933839` (WOD-SIMPLE, `theboxconstanta/Forge` main)
+## §AB. Bundle — `dist/assets/index-DOY_FQE8.js` live on the prod alias
 ## §AC. app_version — `member-variant-role-gating-p9581-20260901`
 
 ## §AD. Remaining limitations
