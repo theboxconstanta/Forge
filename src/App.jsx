@@ -30,6 +30,7 @@ import {
   syncWorkoutEngineV2FromLegacyWod, deleteWorkoutEngineV2ByLegacyWodId,
   loadFromWorkoutEngineV2, mapLegacyWodToWorkout, metconScalingVariantsForDisplay,
   effectiveLeaderboardVisible,
+  getProgrammedVariantLevels, isProgrammedVariant, resolveDefaultProgrammedVariantKey,
 } from './workoutEngine'
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay, buildCurrentBenchmarkBests, buildRecentBenchmarkProgress } from './benchmarkHistory'
@@ -7432,9 +7433,20 @@ function App() {
   useEffect(() => {
     if (variantaAleasa !== null) return
     if (!wodZiData || !userProfile?.usual_level) return
-    const idx = VARIANTE_WEIGHT_BASE.findIndex(v => v.key === userProfile.usual_level)
+    // P9.5.8 - the pre-selection is a SOFT default, never a bypass of the
+    // programmed-variant contract: only auto-select `usual_level` when the
+    // coach actually programmed that variant for today's metcon. Otherwise
+    // fall back to RX (if programmed) or the first programmed level; if the
+    // workout carries no programming signal at all, leave the choice unmade
+    // (the accordion below then offers all four, unchanged).
+    const wf = wodZiWorkoutV2 || mapLegacyWodToWorkout(wodZiData)
+    const metcon = (wf?.sections || []).find(s => s.slotKey === 'metcon') || null
+    const doc = wodZiData?.movement_prescriptions ?? null
+    const defaultKey = resolveDefaultProgrammedVariantKey(metcon, doc, userProfile.usual_level)
+    if (!defaultKey) return
+    const idx = VARIANTE_WEIGHT_BASE.findIndex(v => v.key === defaultKey)
     if (idx !== -1) setVariantaAleasa(idx)
-  }, [wodZiData, userProfile?.usual_level])
+  }, [wodZiData, wodZiWorkoutV2, userProfile?.usual_level])
 
   // INC-02 (SENTRY-CYAN-HARBOR-4T) - efectul de mai sus doar SELECTEAZA o
   // varianta cand apare un WOD oficial; nimic nu o CURATA cand acel WOD
@@ -8932,6 +8944,19 @@ function App() {
       || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
+    // P9.5.8 - DEFENSIVE SAVE GUARD. A member's selected variant must be one
+    // the coach actually programmed for the FROZEN logging target
+    // (logPrimarySectionV / activePrescriptionDoc, captured at "Log Score" -
+    // never a re-fetched mutable workout). Fail closed: no silent coercion (an
+    // Intermediate selection is NEVER rewritten to RX). admin/coach are exempt
+    // (same rationale as the Home picker); an unclassifiable workout (empty
+    // programmed set) passes through unchanged (isProgrammedVariant -> true).
+    if (variantaAleasa !== null && logWodZiData && !isAdmin && !isCoach
+        && !isProgrammedVariant(logPrimarySectionV, activePrescriptionDoc, VARIANTE_CONFIG[variantaAleasa]?.nivel)) {
+      showToast(t.toastVariantNotProgrammed)
+      setWodSaving(false)
+      return
+    }
     // INC-04 - every official-variant identity/content read below comes from
     // the FROZEN logging context (logWodZiData / logWodZiWorkoutV2 /
     // logPrimarySectionV), captured when "Log Score" was pressed - never the
@@ -9433,6 +9458,18 @@ function App() {
   const activePrescriptionDoc = inFrozenLogFlow
     ? (logCtx.prescriptionDoc ?? null)
     : (wodZiData?.movement_prescriptions ?? null)
+
+  // P9.5.8 - the variant levels the coach ACTUALLY programmed for the metcon
+  // being shown on the Home card (canonical keys, data-driven - see
+  // getProgrammedVariantLevels). A member may select only these; admin/coach
+  // are never restricted (they need every variant visible for programming and
+  // coaching). An empty result = no programming signal the persisted model can
+  // classify -> `memberVariantAllowed` returns true for all four, keeping the
+  // pre-P9.5.8 behaviour rather than rendering an empty selector.
+  const homeProgrammedVariantKeys = getProgrammedVariantLevels(primarySectionV, activePrescriptionDoc)
+  const memberVariantAllowed = (levelOrKey) =>
+    isAdmin || isCoach || homeProgrammedVariantKeys.length === 0
+    || homeProgrammedVariantKeys.includes(variantKeyFromLevel(levelOrKey))
 
   // Reface cele 4 variante de afisat (aceeasi ordine ca VARIANTE_CONFIG) din
   // sectiunea primara a modelului de domeniu - logica pura (RX = baza
@@ -10480,7 +10517,8 @@ function App() {
                       variantaAleasa e deja indexul corect (pre-selectat din
                       usual_level, vezi efectul de sincronizare de mai sus) -
                       refolosit direct, nicio logica noua de potrivire. */}
-                  {!isAdmin && !isCoach && userProfile?.usual_level && variantaAleasa !== null ? (() => {
+                  {!isAdmin && !isCoach && userProfile?.usual_level && variantaAleasa !== null
+                    && memberVariantAllowed(VARIANTE_CONFIG[variantaAleasa]?.nivel) ? (() => {
                     const v = metconVariantsForDisplay(primarySectionV)[variantaAleasa]
                     if (!v) return null
                     const miscari = v.movements
@@ -10532,6 +10570,11 @@ function App() {
                   })() : (
                   <div style={{ marginTop: '24px' }}>
                     {(() => { const accordionScheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []; return metconVariantsForDisplay(primarySectionV).map((v, i) => {
+                      // P9.5.8 - a member may select only the variants the coach
+                      // programmed for this metcon. admin/coach still see all
+                      // four; an unclassifiable workout also keeps all four
+                      // (memberVariantAllowed handles both fallbacks).
+                      if (!memberVariantAllowed(v.level)) return null
                       const miscari = v.movements
                       const notaVarianta = v.notes
                       const isSelected = variantaAleasa === i
@@ -10603,10 +10646,21 @@ function App() {
                       selected date (a fetch for the selected day has landed);
                       clicking freezes that exact workout identity for the
                       whole logging session. Never falls back to today. */}
-                  <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={variantaAleasa === null || !homeDisplayIsCurrent}
-                    style={{ width: '100%', padding: '12px', background: (variantaAleasa !== null && homeDisplayIsCurrent) ? '#ABE73C' : '#ccc', color: (variantaAleasa !== null && homeDisplayIsCurrent) ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: (variantaAleasa !== null && homeDisplayIsCurrent) ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
-                    {variantaAleasa !== null ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
+                  {(() => {
+                    // P9.5.8 - a stale selection pointing at a variant the coach
+                    // did NOT program for the CURRENTLY displayed metcon (e.g. the
+                    // member picked Intermediate on another day, then navigated
+                    // here) must not be loggable. memberVariantAllowed is
+                    // true for admin/coach and for an unclassifiable workout.
+                    const variantReadyToLog = variantaAleasa !== null && memberVariantAllowed(VARIANTE_CONFIG[variantaAleasa]?.nivel)
+                    const canLog = variantReadyToLog && homeDisplayIsCurrent
+                    return (
+                  <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={!canLog}
+                    style={{ width: '100%', padding: '12px', background: canLog ? '#ABE73C' : '#ccc', color: canLog ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: canLog ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                    {variantReadyToLog ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
+                    )
+                  })()}
                 </div>
               )}
               {wodDeschis && !workoutForDisplay && (

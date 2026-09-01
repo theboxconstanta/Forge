@@ -17,7 +17,7 @@
 // ca restul codebase-ului (composeAmrapResult etc in workoutFormats.js),
 // testabile direct cu fixture-uri, fara mock pe supabase.
 import { supabase } from './supabase.js'
-import { movementObjectsForV2 } from './prescriptionContract.js'
+import { movementObjectsForV2, variantKeyFromLevel } from './prescriptionContract.js'
 
 // ============================================================
 // Derivarea score_type din format - SINGURA sursa "vie" e catalogul
@@ -265,6 +265,98 @@ export function metconScalingVariantsForDisplay(section) {
       weightMale: w.male || null, weightFemale: w.female || null,
     }
   })
+}
+
+// ============================================================================
+// P9.5.8 - PROGRAMMED VARIANT AVAILABILITY CONTRACT
+// ------------------------------------------------------------
+// The variant levels a coach EXPLICITLY programmed for a metcon (primary)
+// section. "Programmed" is DATA-DRIVEN, never label-driven: a variant counts
+// only when the coach put real content into it -
+//   - RX     : the section has base movements, a base description, a base
+//              per-gender weight, or a structured `rx` prescription.
+//   - scaled : that level appears in `scalingVersions` WITH movements or a
+//              note, OR carries a per-gender weight in metadata.legacyWeights
+//              (a load/distance/calorie-differentiated variant that shares
+//              RX's movements is still a real variant - P9.5.8 s6), OR has a
+//              structured prescription for that key.
+// An untouched variant tab in the coach editor persists as all-empty
+// (movements [], notes null, weights null, no structured entry - see
+// forge-admin-web `sectionEditing.legacyPayloadFromSections`), so an
+// absent/empty variant is reliably distinguishable from a programmed one,
+// and this resolver NEVER fills the gap (RX + OnRamp does not imply
+// Intermediate). RX is NOT assumed to exist (P9.5.8 s3): a metcon whose only
+// content is an Intermediate variant yields ['intermediate'].
+//
+// Returns canonical contract keys ('rx'|'intermediate'|'beginner'|'onramp')
+// in canonical order, aligned with variantKeyFromLevel / VARIANTE_WEIGHT_BASE.
+// An EMPTY result means "no programming signal anywhere" - the caller keeps
+// its pre-P9.5.8 behaviour (offer all four) rather than render an empty
+// selector; the conservative fallback for a workout shape the persisted
+// model cannot classify. Documented, never a silent coercion.
+// ============================================================================
+const P958_SCALED_LEVELS = ['intermediate', 'beginner', 'on_ramp']
+
+function legacyWeightIsSet(section, level) {
+  const w = section?.metadata?.legacyWeights?.[level]
+  if (!w) return false
+  const has = (x) => x != null && String(x).trim() !== ''
+  return has(w.male) || has(w.female)
+}
+
+function structuredVariantIsProgrammed(doc, variantKey) {
+  const moves = doc?.variants?.[variantKey]?.movements
+  return Array.isArray(moves) && moves.length > 0
+}
+
+/** The variant levels a coach explicitly programmed for `section`, as
+ * canonical keys ('rx'|'intermediate'|'beginner'|'onramp'), canonical order.
+ * `doc` is the structured movement_prescriptions document (optional). */
+export function getProgrammedVariantLevels(section, doc = null) {
+  if (!section) return []
+  const out = []
+  const rxHasContent =
+    (section.movements || []).length > 0 ||
+    (typeof section.description === 'string' && section.description.trim() !== '') ||
+    legacyWeightIsSet(section, 'rx') ||
+    structuredVariantIsProgrammed(doc, 'rx')
+  if (rxHasContent) out.push('rx')
+  for (const level of P958_SCALED_LEVELS) {
+    const key = variantKeyFromLevel(level) // 'on_ramp' -> 'onramp'
+    const sv = (section.scalingVersions || []).find((x) => x.level === level)
+    const svHasContent = !!sv && (
+      (sv.movements || []).length > 0 ||
+      (typeof sv.notes === 'string' && sv.notes.trim() !== '')
+    )
+    if (svHasContent || legacyWeightIsSet(section, level) || structuredVariantIsProgrammed(doc, key)) {
+      out.push(key)
+    }
+  }
+  return out
+}
+
+/** Whether `levelOrKey` (any display-side spelling) is among `section`'s
+ * explicitly programmed variants. An empty programmed set (unclassifiable
+ * workout) returns true for every key - the caller's pre-P9.5.8 fallback. */
+export function isProgrammedVariant(section, doc, levelOrKey) {
+  const key = variantKeyFromLevel(levelOrKey)
+  if (!key) return false
+  const programmed = getProgrammedVariantLevels(section, doc)
+  if (programmed.length === 0) return true
+  return programmed.includes(key)
+}
+
+/** The variant a member logging screen should DEFAULT to: the member's usual
+ * level when it is actually programmed, else RX when programmed, else the
+ * first programmed level, else null (caller leaves the selection unmade).
+ * `usualLevelKey` is a VARIANTE_WEIGHT_BASE key or null. */
+export function resolveDefaultProgrammedVariantKey(section, doc, usualLevelKey) {
+  const programmed = getProgrammedVariantLevels(section, doc)
+  if (programmed.length === 0) return null
+  const usual = variantKeyFromLevel(usualLevelKey)
+  if (usual && programmed.includes(usual)) return usual
+  if (programmed.includes('rx')) return 'rx'
+  return programmed[0]
 }
 
 // ============================================================
