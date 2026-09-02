@@ -65,7 +65,7 @@ describe('P9.5.2 — validatePerformedPrescription (mirrors the DB trigger)', ()
   })
 
   it('rejects bad version / non-array movements / missing instanceId / dup id', () => {
-    expect(validatePerformedPrescription({ version: 2, movements: [] }).valid).toBe(false)
+    expect(validatePerformedPrescription({ version: 3, movements: [] }).valid).toBe(false)
     expect(validatePerformedPrescription({ version: 1, movements: 'no' }).valid).toBe(false)
     expect(validatePerformedPrescription({ version: 1, movements: [{ name: 'x' }] }).valid).toBe(false)
     expect(validatePerformedPrescription({ version: 1, movements: [

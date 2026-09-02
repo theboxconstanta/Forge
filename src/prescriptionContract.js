@@ -673,15 +673,22 @@ export function resolveNumericInput(raw, opts = {}) {
 // (migration 20260831090000) for structure / enum / type.
 // ============================================================================
 
-export const PERFORMED_PRESCRIPTION_VERSION = 1
+// P9.5.2A - v2 adds per-movement `sourceInstanceId` (the PROGRAMMED instance an
+// entry derives from) + a `notPerformed` sentinel, enabling GLOBAL 1->N / 1->0
+// performed composition. v1 docs are read with v1 (positional) semantics and are
+// never rewritten. Both versions pass the DB trigger.
+export const PERFORMED_PRESCRIPTION_VERSION = 2
+export const PERFORMED_PRESCRIPTION_VERSIONS = [1, 2]
 // The metrics the athlete-side Edit flow may change. `reps` is workout
-// STRUCTURE (locked in V1); it only ever carries over unchanged.
+// STRUCTURE; it only ever carries over unchanged EXCEPT that an added movement
+// (P9.5.2A) may inherit its source's reps where deterministically valid (D3).
 export const PERFORMED_EDITABLE_METRICS = ['load', 'distance', 'calories']
 
 /** The initial performed draft for a variant = a deep VALUE clone of the frozen
- * programmed instances, tagged. Returns null when the variant has no structured
- * programmed prescription (caller then hides Edit — §42 legacy). Pure — the
- * caller is responsible for having frozen `doc`. */
+ * programmed instances, tagged v2, each entry anchored to its own programmed
+ * `instanceId` (sourceInstanceId). Returns null when the variant has no
+ * structured programmed prescription (caller then hides Edit — §42 legacy).
+ * Pure — the caller is responsible for having frozen `doc`. */
 export function buildPerformedPrescriptionDraft({ doc, variantKey, sectionId = null }) {
   const vObj = doc?.variants?.[variantKey]
   if (!vObj || !Array.isArray(vObj.movements) || vObj.movements.length === 0) return null
@@ -690,7 +697,10 @@ export function buildPerformedPrescriptionDraft({ doc, variantKey, sectionId = n
     variantKey: variantKey ?? null,
     sectionId: sectionId ?? null,
     source: 'performed',
-    movements: snapshotPrescriptionDoc(vObj.movements),
+    movements: snapshotPrescriptionDoc(vObj.movements).map((m) => ({
+      ...m,
+      sourceInstanceId: m.sourceInstanceId ?? m.instanceId,
+    })),
   }
 }
 
@@ -702,7 +712,8 @@ export function validatePerformedPrescription(doc) {
   const errors = []
   const push = (m) => errors.push(m)
   if (typeof doc !== 'object' || Array.isArray(doc)) return { valid: false, errors: ['must be an object'] }
-  if (doc.version !== PERFORMED_PRESCRIPTION_VERSION) push(`version must be ${PERFORMED_PRESCRIPTION_VERSION}`)
+  const v2 = doc.version === 2
+  if (!PERFORMED_PRESCRIPTION_VERSIONS.includes(doc.version)) push(`version must be one of ${PERFORMED_PRESCRIPTION_VERSIONS.join('/')}`)
   if (doc.variantKey != null && !VARIANT_KEYS.includes(doc.variantKey)) push(`variantKey invalid: "${doc.variantKey}"`)
   if (!Array.isArray(doc.movements)) return { valid: false, errors: [...errors, 'movements must be an array'] }
   const seen = new Set()
@@ -716,6 +727,18 @@ export function validatePerformedPrescription(doc) {
     if ('canonicalMovementId' in mv && mv.canonicalMovementId !== null && typeof mv.canonicalMovementId !== 'string') {
       push(`(${id}): canonicalMovementId must be a string or null`)
     }
+    // P9.5.2A v2 - sourceInstanceId anchors the entry to a programmed instance;
+    // notPerformed marks a source the athlete did not perform (sentinel entry).
+    if ('sourceInstanceId' in mv && mv.sourceInstanceId != null && typeof mv.sourceInstanceId !== 'string') {
+      push(`(${id}): sourceInstanceId must be a string or null`)
+    }
+    if ('notPerformed' in mv && typeof mv.notPerformed !== 'boolean') {
+      push(`(${id}): notPerformed must be a boolean`)
+    }
+    if (v2 && (typeof mv.sourceInstanceId !== 'string' || mv.sourceInstanceId.length === 0)) {
+      push(`(${id}): v2 movement needs a non-empty sourceInstanceId`)
+    }
+    if (mv.notPerformed === true) continue // sentinel carries a name only, no metric specs
     for (const mk of METRIC_KEYS) {
       if (!(mk in mv)) continue
       const spec = mv[mk]
@@ -761,15 +784,59 @@ function performedComparableInstances(instances, gender) {
   })
 }
 
+/** P9.5.2A - the ordered performed-composition GROUPS of a v2 doc: one per
+ * programmed source, in programmed order, each `{ sourceInstanceId, entries,
+ * notPerformed }`. `entries` are the contiguous performed movements sharing that
+ * `sourceInstanceId` (a `notPerformed` group has one sentinel entry and
+ * `notPerformed:true`). A v1 doc (or a v2 entry missing its anchor) falls back
+ * to one group per entry keyed by its own instanceId. Pure. */
+export function performedCompositionGroups(performedDoc) {
+  const movements = Array.isArray(performedDoc?.movements) ? performedDoc.movements : []
+  const order = []
+  const byId = new Map()
+  for (const mv of movements) {
+    const src = (typeof mv?.sourceInstanceId === 'string' && mv.sourceInstanceId) || mv?.instanceId || null
+    if (src == null) continue
+    if (!byId.has(src)) { byId.set(src, { sourceInstanceId: src, entries: [], notPerformed: false }); order.push(src) }
+    const g = byId.get(src)
+    if (mv.notPerformed === true) g.notPerformed = true
+    g.entries.push(mv)
+  }
+  return order.map((id) => byId.get(id))
+}
+
+/** P9.5.2A - the performed entries for one programmed source (the composition
+ * that replaced / extends it). Empty array when the source is untouched-absent;
+ * a single `notPerformed` sentinel when the athlete marked it not performed. */
+export function performedEntriesForSource(performedDoc, sourceInstanceId) {
+  const g = performedCompositionGroups(performedDoc).find((x) => x.sourceInstanceId === sourceInstanceId)
+  return g ? g.entries : []
+}
+
 /** True when the performed doc resolves — for THIS athlete — to exactly the
- * programmed variant (same movements, order, identity, and resolved
- * load / distance / calorie / reps values). The caller stores NULL then
- * (§22 dirty state: identical ⇒ performed_prescription stays NULL).
- * `gender`: 'male' | 'female' | null. */
+ * programmed variant. The caller stores NULL then (§22 / §24: identical ⇒
+ * performed_prescription stays NULL). `notPerformed` NEVER matches (§25).
+ * v2: source-anchored (each programmed source must resolve 1→1 to itself, no
+ * extra sources, programmed order). v1: positional (legacy). `gender`:
+ * 'male' | 'female' | null. */
 export function performedMatchesProgrammed(performedDoc, programmedDoc, variantKey, gender) {
   if (performedDoc == null) return true
   const prog = programmedDoc?.variants?.[variantKey]?.movements
   if (!Array.isArray(prog)) return false
+  if (performedDoc.version === 2) {
+    if ((performedDoc.movements || []).some((m) => m?.notPerformed === true)) return false
+    const groups = performedCompositionGroups(performedDoc)
+    if (groups.length !== prog.length) return false
+    for (let i = 0; i < prog.length; i++) {
+      const g = groups[i]
+      if (!g || g.sourceInstanceId !== prog[i].instanceId) return false
+      if (g.entries.length !== 1) return false
+      const a = performedComparableInstances([g.entries[0]], gender)
+      const b = performedComparableInstances([prog[i]], gender)
+      if (JSON.stringify(a) !== JSON.stringify(b)) return false
+    }
+    return true
+  }
   const a = performedComparableInstances(performedDoc.movements, gender)
   const b = performedComparableInstances(prog, gender)
   return JSON.stringify(a) === JSON.stringify(b)
@@ -799,6 +866,7 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
     name: targetRow?.name ?? instance.name,
     canonicalMovementId: targetRow?.id ?? null,
   }
+  if (instance.sourceInstanceId != null) next.sourceInstanceId = instance.sourceInstanceId
   if (instance.reps) next.reps = instance.reps
   for (const mk of PERFORMED_EDITABLE_METRICS) {
     if (instance[mk] && (allowed.length === 0 || allowed.includes(mk))) next[mk] = instance[mk]
@@ -808,6 +876,99 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
     name: instance.name,
   }
   return next
+}
+
+/** P9.5.2A - append a performed movement under `sourceInstanceId`, directly
+ * after the last entry already sharing that source (§13/§14). Fresh instanceId;
+ * inherits the source's `reps` when `inheritReps` (D3 - caller decides per score
+ * family); seeds ONLY the metric specs the target movement's capability allows
+ * (§37), empty. Pure — returns a new doc. No-op (returns doc) when the doc is not
+ * v2 or the source is unknown. */
+export function addPerformedMovement(performedDoc, sourceInstanceId, targetRow, capability, { inheritReps = false } = {}) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) return performedDoc
+  const movements = performedDoc.movements
+  const srcEntry = movements.find((m) => (m.sourceInstanceId ?? m.instanceId) === sourceInstanceId && m.notPerformed !== true)
+  const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
+  const added = {
+    instanceId: newInstanceId(),
+    sourceInstanceId,
+    name: targetRow?.name ?? '',
+    canonicalMovementId: targetRow?.id ?? null,
+  }
+  if (inheritReps && srcEntry?.reps) added.reps = snapshotPrescriptionDoc(srcEntry.reps)
+  for (const mk of PERFORMED_EDITABLE_METRICS) {
+    if (allowed.includes(mk)) {
+      added[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
+        : mk === 'distance' ? { mode: 'universal', value: null, unit: 'm' }
+        : { mode: 'universal', value: null }
+    }
+  }
+  let lastIdx = -1
+  movements.forEach((m, i) => { if ((m.sourceInstanceId ?? m.instanceId) === sourceInstanceId) lastIdx = i })
+  const next = movements.slice()
+  next.splice(lastIdx >= 0 ? lastIdx + 1 : movements.length, 0, added)
+  return { ...performedDoc, movements: next }
+}
+
+/** P9.5.2A - remove ONE performed entry by instanceId. Does NOT allow emptying a
+ * source's composition: when the entry is the last non-sentinel one for its
+ * source, the doc is returned UNCHANGED and `blockedLastMovement` is true — the
+ * caller must offer "Mark not performed" instead (§20 / D2=B). Pure. */
+export function deletePerformedMovement(performedDoc, instanceId) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) {
+    return { doc: performedDoc, blockedLastMovement: false }
+  }
+  const target = performedDoc.movements.find((m) => m.instanceId === instanceId)
+  if (!target) return { doc: performedDoc, blockedLastMovement: false }
+  const src = target.sourceInstanceId ?? target.instanceId
+  const siblings = performedDoc.movements.filter((m) => (m.sourceInstanceId ?? m.instanceId) === src && m.notPerformed !== true)
+  if (siblings.length <= 1) return { doc: performedDoc, blockedLastMovement: true }
+  return {
+    doc: { ...performedDoc, movements: performedDoc.movements.filter((m) => m.instanceId !== instanceId) },
+    blockedLastMovement: false,
+  }
+}
+
+/** P9.5.2A (D2=B) - mark a programmed source NOT PERFORMED: drop its entries,
+ * insert ONE sentinel `{ notPerformed:true }` carrying the programmed name for
+ * display. Never `0 reps`, never `[]` (§21/§22). Pure. */
+export function markSourceNotPerformed(performedDoc, sourceInstanceId, programmedName) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) return performedDoc
+  const kept = []
+  let inserted = false
+  for (const m of performedDoc.movements) {
+    const isSrc = (m.sourceInstanceId ?? m.instanceId) === sourceInstanceId
+    if (!isSrc) { kept.push(m); continue }
+    if (!inserted) {
+      kept.push({
+        instanceId: newInstanceId(),
+        sourceInstanceId,
+        name: programmedName || m.name || 'Movement',
+        canonicalMovementId: null,
+        notPerformed: true,
+      })
+      inserted = true
+    }
+  }
+  return { ...performedDoc, movements: kept }
+}
+
+/** P9.5.2A (§23) - restore a NOT-PERFORMED source to a single performed entry
+ * cloned from the frozen programmed instance. Pure. */
+export function restoreSourcePerformed(performedDoc, sourceInstanceId, programmedInstance) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) return performedDoc
+  const clone = programmedInstance
+    ? { ...snapshotPrescriptionDoc(programmedInstance), sourceInstanceId }
+    : null
+  const out = []
+  let done = false
+  for (const m of performedDoc.movements) {
+    const isSrc = (m.sourceInstanceId ?? m.instanceId) === sourceInstanceId
+    if (!isSrc) { out.push(m); continue }
+    if (!done && clone) out.push(clone)
+    done = true
+  }
+  return { ...performedDoc, movements: out }
 }
 
 /** Set one editable metric's universal value on a performed instance (the
@@ -833,14 +994,30 @@ export function setPerformedMetricValue(instance, metric, value, unit) {
  * structurally invalid / empty (caller then keeps its programmed rendering -
  * fail closed). Pure. Same rendering engine as the member workout screen / logger
  * / snapshot (P9.4 `composeStructuredWorkoutDisplay`). */
-export function composePerformedResultLines(performedDoc, gender) {
+export function composePerformedResultLines(performedDoc, gender, opts = {}) {
   if (performedDoc == null) return null
   if (!validatePerformedPrescription(performedDoc).valid) return null
   if (!Array.isArray(performedDoc.movements) || performedDoc.movements.length === 0) return null
-  const display = composeStructuredWorkoutDisplay({
-    instances: performedDoc.movements, mode: 'member', gender: gender ?? null,
-  })
-  return (display && Array.isArray(display.lines) && display.lines.length) ? display.lines : null
+  const notPerformedSuffix = opts.notPerformedSuffix || '— not performed'
+  // P9.5.2A - a v2 doc can carry `notPerformed` sentinels (no metric specs) and
+  // an arbitrary 1->N composition. Render group by group, in array order: real
+  // entries through the shared engine, a sentinel as "Name — not performed".
+  const groups = performedDoc.version === 2
+    ? performedCompositionGroups(performedDoc)
+    : [{ entries: performedDoc.movements, notPerformed: false }]
+  const lines = []
+  for (const g of groups) {
+    if (g.notPerformed) {
+      const nm = g.entries[0]?.name || 'Movement'
+      lines.push(`${nm} ${notPerformedSuffix}`.trim())
+      continue
+    }
+    const real = g.entries.filter((e) => e.notPerformed !== true)
+    if (real.length === 0) continue
+    const display = composeStructuredWorkoutDisplay({ instances: real, mode: 'member', gender: gender ?? null })
+    if (display && Array.isArray(display.lines)) lines.push(...display.lines)
+  }
+  return lines.length ? lines : null
 }
 
 // ============================================================================

@@ -159,10 +159,154 @@ saved after this ships.
 
 ---
 
-## 6. Verdict
+## 6. Decision
 
-`1 → N` composition, `notPerformed`, Modified → Mixed, and full performed
-movement/load detail are ready to build with **zero DB migration**. **D4 REVISED
-applied to INC-07/08 Intervals is a §71-#7 stop** — a new owner-level structured
-result model. Awaiting the owner's choice of Option 1 / 2 / 3. No code, contract,
-or schema changed.
+**Owner approved OPTION 2 (2026-09-02).** Build the smallest versioned,
+backward-compatible structured-result extension that makes P9.5.2A semantically
+correct for BOTH INC-11 Sequential AMRAP and INC-07/08 structured Intervals. No
+Option 1 approximation.
+
+---
+
+## 7. Versioned structured-result contract (Option 2)
+
+### 7.1 `performed_prescription` v2 — the composition (all formats)
+
+`PERFORMED_PRESCRIPTION_VERSION: 1 → 2`. Additive; v1 docs stay v1 (read with v1
+semantics, never rewritten — §backward-compat). Two new optional fields per
+movement:
+
+```jsonc
+{
+  "version": 2,
+  "variantKey": "rx|intermediate|beginner|onramp|null",
+  "sectionId": "…|null",
+  "source": "performed",
+  "movements": [
+    {
+      "instanceId": "mi_…",            // stable, unique within the doc (as v1)
+      "sourceInstanceId": "mi_…",      // NEW — the PROGRAMMED instance this entry
+                                       //   derives from. An unchanged/replaced
+                                       //   original carries its own id; an added
+                                       //   sibling carries the source's id.
+      "name": "Burpee",
+      "canonicalMovementId": "uuid|null",
+      "reps": {…}?, "load": {…}?, "distance": {…}?, "calories": {…}?,
+      "substitutedFrom": {…}?,          // as v1
+      "notPerformed": true?            // NEW — sentinel: this source was NOT
+                                       //   performed. The ONLY entry for that
+                                       //   sourceInstanceId; carries the
+                                       //   programmed name for display; no metrics.
+    }
+  ]
+}
+```
+
+- **Flat + ordered** (§8/§29). Groups are *derived* by partitioning on
+  `sourceInstanceId`, preserving array order. Entries of one group are
+  contiguous. Group order follows programmed source order.
+- **1 → 1**: one entry, `sourceInstanceId === programmed instanceId` (may be
+  substituted — `applyPerformedSubstitution`, `sourceInstanceId` unchanged).
+- **1 → N**: N contiguous entries sharing one `sourceInstanceId`, insertion
+  order preserved (§6/§9), duplicates allowed (§10).
+- **1 → 0 / Not Performed** (D2=B): exactly one sentinel
+  `{ instanceId, sourceInstanceId, name:<programmed name>, notPerformed:true }`.
+  Never `0 reps`, never `[]`, never a missing/deleted source (§21/§22).
+- **Rep inheritance** (D3=A): an added entry inherits the source instance's
+  resolved `reps` for round-structured families where the target is unambiguous
+  (For Time / RFT / Chipper / Ladder, AMRAP Repeated Rounds, EMOM, Intervals,
+  Sequential-AMRAP fixed stations, Strength). Left blank otherwise. No invented
+  reps.
+- **Normalization → NULL** (§24, T7): if every programmed source resolves 1 → 1
+  to exactly its programmed instance (identity + athlete-resolved
+  reps/load/distance/calories equal) with no `notPerformed`, same count/order →
+  store NULL. **`notPerformed` NEVER normalizes** (§25).
+- **Capabilities** (§37): added entry seeds only the metric specs its canonical
+  movement allows (`resolveMovementCapability`). REST excluded from the selector
+  (§16).
+
+**DB validation:** the live trigger `validate_wod_log_performed_prescription()`
+hard-codes `version = '1'` → a v2 doc would be rejected. One
+`CREATE OR REPLACE FUNCTION` migration widens it to accept `1` **or** `2`,
+validates the two new optional fields (`sourceInstanceId` string,
+`notPerformed` boolean; a `notPerformed` entry skips metric-completeness), and
+stays `SECURITY INVOKER`, fail-closed. **No table / column / index / RLS change.**
+`wod_logs.performed_prescription` is the same jsonb column. Owner flagged this as
+NOT a "DB schema migration"; documented here for transparency.
+
+### 7.2 Structured Intervals — `wod_logs.sets` v2 rows (INC-07/08)
+
+`sets` stays `{ <intervalStationKey>: [row, …] }`. The key is
+`intervalStationKey(round, stationIndex, PROGRAMMED station name)` — **frozen at
+save from the programmed station** (round / station identity + round-major order
++ `parseIntervalStationKey` all unchanged — §interval-identity). One programmed
+`(round, station)` cell now holds **0 / 1 / N rows**.
+
+Row v2 form (a row **with** a `pm` key = new contract; **without** = legacy
+INC-08 row, rendered exactly as today):
+
+```jsonc
+{
+  "reps": "10", "weight": "", "completed": true,
+  "pm": {                              // NEW — performed-movement marker
+    "instanceId": "mi_…",
+    "sourceInstanceId": "mi_…",        // = the programmed station's instance
+    "name": "Burpee",
+    "canonicalMovementId": "uuid|null",
+    "notPerformed": true?              // a not-performed cell = ONE row, reps ""
+  }
+}
+```
+
+- **Score** (`Total Reps`): `computeSetsScore` already flattens every row of
+  every key and sums `reps` — **N rows per cell sum automatically, zero change**.
+  A `notPerformed` cell (`reps:""`) → `parseInt("")` = NaN → filtered → **0
+  contribution** (§interval-rep-aggregation, S6). **No double-count** — the
+  programmed target is provenance only; it is never a row (§39, S4).
+- `Lowest Reps` mode: unchanged (`Math.min` over the same flattened rows).
+- **Projection**: `resolveStructuredIntervalResult` gains a `performedEntries`
+  array per cell (legacy cell → single entry, unchanged output shape otherwise).
+  `5 × 3` stays `5 × 3` (§interval-identity, S1); a split cell has 2
+  `performedEntries` (S2/S3).
+- **Reopen**: `sets` rows carry `pm` → the interval logger rebuilds the per-cell
+  composition; `performed_prescription` v2 carries the same identity for the
+  editor. No collapse to programmed A (§reopen, S23).
+
+### 7.3 Sequential AMRAP — no new persisted field (INC-11)
+
+Score stays `wod_logs.result` (text) via `composeSequentialAmrapResult`.
+
+- `resolveSequentialAmrapStations` is fed the **performed composition** (from
+  `performed_prescription` v2) instead of the programmed movement list when an
+  overlay exists: each performed entry becomes one station in the flat ordered
+  list, carrying its inherited `reps` (→ `fixed`/`open` role via the existing
+  `repTargetOf`). A `notPerformed` source → one station, empty (not reached / 0).
+- `sequentialAmrapTotalReps` and the leaderboard's `partialRepsOfLog(log, true)`
+  operate on the (now longer) result string unchanged — Σ includes every split
+  child (§4, S19).
+- `autoCompleteSequentialProgress`: prior FIXED stations (incl. split children
+  with inherited targets) auto-complete to target → Σ = actual work; the
+  programmed parent is not itself a station → **no double-count** (S22).
+- not-reached ≠ explicit zero, open-station semantics, deterministic reopen —
+  all preserved; the helpers are unchanged, only their `stations` input widens
+  (S20/S21/S23).
+- **Reopen**: `stations` resolved from `performed_prescription` v2 →
+  `parseSequentialAmrapResult(log.result, stations)`.
+
+### 7.4 Backward compatibility (mandatory)
+
+| Old log | Detection | Rendering |
+|---|---|---|
+| INC-07/08 interval, `sets` rows without `pm` | no `pm` key on any row | INC-08 `resolveStructuredIntervalResult` v1 path (`rows[0]`), unchanged |
+| INC-11 sequential, `performed_prescription` NULL or `version 1` | version check | stations from frozen movement lines (current path) |
+| Any log, `performed_prescription version 1` | `doc.version === 1` | v1 positional semantics, never rewritten |
+
+**No historical backfill. No reinterpretation. No mutation of old logs.** New
+saves use v2; old reads use their own frozen version (§backward-compatibility).
+
+### 7.5 Zero schema migration
+
+`performed_prescription` and `sets` are existing jsonb columns. The only DDL is
+one `CREATE OR REPLACE FUNCTION` on the validation trigger (no table/column/
+index/RLS). If implementation surfaces a real need for `ALTER TABLE` / a new
+column, **STOP and report** (§database).
