@@ -130,6 +130,16 @@ export function sequentialAmrapMixedUnitConflict({ instances, lines } = {}) {
   return !res.supported && res.reason === 'mixed-unit'
 }
 
+// INC-11.1 - does the Sequence AMRAP logger hold a MEANINGFUL result? True iff
+// at least one station carries an explicit value. An explicit "0" counts (owner
+// decision #3 - reached and performed zero); a blank / untouched station does
+// NOT. NEVER numeric truthiness on the total - a legitimate 0-rep result must
+// still save (INC-11.1 §7). Save validation and the logger agree on "result
+// exists" because both ask this one helper (INC-11.1 §3/§18).
+export function hasSequentialAmrapInput(performedRaw) {
+  return (performedRaw || []).some((v) => v != null && String(v).trim() !== '')
+}
+
 // INC-11 §15 - STRICT sequential order: recording progress on a later station
 // means every FIXED station before it was necessarily completed to target. Fill
 // only empty fixed stations that are strictly before the furthest station the

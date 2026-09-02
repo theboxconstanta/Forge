@@ -219,3 +219,62 @@ of the generic model", its DEFINITION must be corrected:
 | 3 | 3C — preserve not-reached vs 0 in storage, no extra UI | §3.4 |
 | 4 | 4a-ii vocabulary + derive fixed/open from structured `reps` (no `targetType` enum) | §3.1 / §3.2 |
 | 5 | 5A — classic AMRAP unchanged; Total Reps sequential-only | §3.5 |
+
+---
+
+## 10. INC-11.1 — Sequential AMRAP save-validation failure (2026-09-02)
+
+**Production incident.** After INC-11 went live and the incident workout was
+corrected to `structure:'Sequence'`, the new logger resolved it correctly and
+computed `TOTAL REPS: 139` for `50/50 · 75/75 · 14`, but **Save WOD** failed with
+*"Fill in at least the result, time, or a movement!"*.
+
+**Root cause.** `saveWodLog`'s result-presence guards —
+`areContiut` (primary path, `App.jsx:9069`) and `areContiutSectiune`
+(section-scored path, `App.jsx:9017`) — checked only pre-INC-11 fields:
+`wodResult`, `wodRoundsCompleted`, `wodTime`, `wodMiscari.length`, `wodSets`,
+`wodCompleted`, and the chained-stage check. **Neither looked at
+`wodPartialReps`**, which is the ONLY state `SequentialAmrapFields` writes
+(`onChange({ partialReps })` → `setWodPartialReps`). A fully-logged sequential
+result was therefore `areContiut === false` → rejected. `composeWodLogFieldsInner`
+was already correct — the payload never got built because the guard returned
+first. The edit path (`.update`) has no such guard and was unaffected.
+
+**State mismatch.**
+- `SequentialAmrapFields` produces → `wodPartialReps = ['50','75','14']`
+  (`wodResult=''`, `wodRoundsCompleted=''`, `wodTime=''`).
+- Old guard expected → a non-empty `wodResult` / `wodRoundsCompleted` /
+  `wodTime` / `wodMiscari` / `wodSets` / `wodCompleted` / chained state.
+
+**Fix (minimal, shared).** New pure helper
+`hasSequentialAmrapInput(performedRaw)` in `src/sequentialAmrap.js` — true iff at
+least one station carries an explicit value; an explicit `"0"` counts (owner
+decision #3), a blank/untouched station does not, **never numeric truthiness on
+the total** (a legitimate 0-rep result must save). Both guards OR in
+`isSequentialAmrap(activeLogFormatId, activeLogFormatConfig) && hasSequentialAmrapInput(wodPartialReps)`.
+The logger's live Total and the save guard now derive "a result exists" from the
+same helper → **LOGGER HAS RESULT ⇔ SAVE HAS RESULT**.
+
+**Behaviour.**
+
+| State | Save | Canonical score |
+|---|---|---|
+| `42 / — / —` | ✅ | 42 |
+| `50 / 63 / —` | ✅ | 113 |
+| `50 / 75 / 14` (incident) | ✅ | **139** |
+| `50 / 75 / 0` (explicit zero) | ✅ | 125 (result text keeps `", 0 …"`) |
+| `50 / 75 / —` (open not reached) | ✅ | 125 (open omitted from text) |
+| `— / — / 14` (only open, priors auto-completed §15) | ✅ | 139 |
+| all stations blank | ❌ (empty-result rejection preserved) | — |
+| single open station `37` | ✅ | 37 |
+| single open station explicit `0` | ✅ | 0 |
+| single open station blank | ❌ | — |
+| classic repeated-round AMRAP | ✅ unchanged (Rounds + Additional Reps; `isSequentialAmrap` false → OR term never fires) | — |
+
+**Scope.** `App.jsx` (2 guards), `src/sequentialAmrap.js` (1 helper),
+`src/inc11_1SequentialAmrapSave.test.js` (16 tests). 0 schema / migration /
+backfill / historical-log / workout-definition changes. No other score family
+touched. `saveSkillLog` (a Sequence-AMRAP *skill section* — no production
+instance, AMRAP skill sections do not exist in this gym) still composes via the
+generic sequential path; a dedicated branch there is a deferred INC-11 edge, not
+a save-validation failure and out of INC-11.1 scope.

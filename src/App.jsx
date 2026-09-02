@@ -81,7 +81,7 @@ import { resolveResultMovementLines } from './resultWorkoutLines'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
-import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult } from './sequentialAmrap'
+import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult, hasSequentialAmrapInput } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
@@ -9007,8 +9007,16 @@ function App() {
         (s?.roundsCompleted || '').toString().trim() !== ''
         || (s?.partialReps || []).some(v => (v || '').toString().trim() !== '')
         || Object.values(s?.sets || {}).flat().some(r => (r?.reps || '').toString().trim() !== '' || (r?.weight || '').toString().trim() !== ''))
+      // INC-11.1 - a Sequence AMRAP stores its result as per-station progress in
+      // wodPartialReps, not wodResult/wodRoundsCompleted - the legacy guard read
+      // neither, so a fully-logged sequential result ("50/50, 75/75, 14") was
+      // rejected as empty. Same shared helper the logger uses; explicit "0"
+      // counts, blank does not (never numeric truthiness).
+      const seqAmrapAreContiutSectiune = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
+        && hasSequentialAmrapInput(wodPartialReps)
       const areContiutSectiune = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim()
         || Object.keys(wodSets).length > 0 || wodCompleted || wodWeightLogged.trim() || chainedAreContiutSectiune
+        || seqAmrapAreContiutSectiune
       if (!areContiutSectiune) { showToast(t.toastFillResultOrTime); return }
       setWodSaving(true)
       const sectionHeaderLine = `${logTargetSection.format || ''}${logTargetSection.title ? ' — "' + logTargetSection.title + '"' : ''}`.trim()
@@ -9050,8 +9058,16 @@ function App() {
       (s?.roundsCompleted || '').toString().trim() !== ''
       || (s?.partialReps || []).some(v => (v || '').toString().trim() !== '')
       || Object.values(s?.sets || {}).flat().some(r => (r?.reps || '').toString().trim() !== '' || (r?.weight || '').toString().trim() !== ''))
+    // INC-11.1 - a Sequence AMRAP stores its result as per-station progress in
+    // wodPartialReps (SequentialAmrapFields), not wodResult / wodRoundsCompleted;
+    // the legacy guard checked neither, so a fully-logged sequential result
+    // ("50/50, 75/75, 14" -> 139) failed as "empty". Same shared helper the
+    // logger's Total uses; an explicit "0" counts, a blank station does not
+    // (never numeric truthiness - INC-11.1 §7).
+    const seqAmrapAreContiut = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
+      && hasSequentialAmrapInput(wodPartialReps)
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
-      || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut
+      || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut || seqAmrapAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     // P9.5.8 / P9.5.8.1 - DEFENSIVE SAVE GUARD, ROLE-INDEPENDENT. A logged
