@@ -59,6 +59,7 @@ import {
   hydrateInstancesFromLegacy,
 } from './wodSections'
 import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence'
+import { diffAiVsSaved } from './aiProvenanceDiff'
 import { buildAggregateLeaderboard } from './aggregateLeaderboard'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import { composeSection } from './workoutComposer'
@@ -2945,6 +2946,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // real si efectul se opreste oricum singur (garda lui existenta), deci
   // flag-ul nu mai e nevoie dupa primul Save.
   const [creatingNewWod, setCreatingNewWod] = useState(false)
+  // P11.1 - AI Analyze provenance. The run id + immutable AI-normalized baseline
+  // captured in analyzeWorkout(); consumed once in saveWod() to link the run to
+  // the saved workout with a semantic diff. Cleared / marked abandoned when the
+  // builder is reset from a non-AI source. Best-effort throughout.
+  const aiRunIdRef = useRef(null)
+  const aiBaselineRef = useRef(null)
+  const aiRunLinkedRef = useRef(false)
   // Compact accordion (vezi PastWodCard) - un singur WOD trecut expandat
   // deodata; id-ul WOD-ului, nu un boolean per rand, ca sa garanteze usor
   // regula "doar unul deschis" fara sa umble prin toata lista la fiecare tap.
@@ -3902,6 +3910,39 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // din workoutIntelligence.js). Placeholder deliberat pt reclick (WI-2 va
   // decide politica reala): daca formularul are deja continut, il
   // suprascrie fara confirmare.
+  // P11.1 - link the AI run to the workout the coach just saved, with the
+  // deterministic semantic diff. Once per run. Best-effort: RLS lets a
+  // coach/admin update only their own gym's run; the DB trigger enforces
+  // immutability + fill-once. A failure is logged, never surfaced.
+  const linkAiRunOnSave = async (savedWodId, finalSections) => {
+    const runId = aiRunIdRef.current, baseline = aiBaselineRef.current
+    if (!runId || !baseline || aiRunLinkedRef.current) return
+    aiRunLinkedRef.current = true
+    try {
+      const diff = diffAiVsSaved(baseline, finalSections)
+      let workoutId = null
+      if (savedWodId) {
+        const { data: w } = await supabase.from('workouts').select('id').eq('legacy_wod_id', savedWodId).maybeSingle()
+        workoutId = w?.id ?? null
+      }
+      const { error } = await supabase.from('ai_analysis_runs').update({
+        saved_at: new Date().toISOString(), wod_id: savedWodId, workout_id: workoutId,
+        saved_output: finalSections, semantic_diff: diff,
+        edit_severity: diff.severity, outcome: diff.outcome,
+      }).eq('id', runId)
+      if (error) console.error('linkAiRunOnSave failed:', error.message)
+    } catch (e) { console.error('linkAiRunOnSave threw:', e) }
+  }
+
+  // P11.1 - the AI draft was discarded / replaced without a save.
+  const markAiRunAbandonedIfUnlinked = () => {
+    const runId = aiRunIdRef.current
+    aiRunIdRef.current = null; aiBaselineRef.current = null
+    if (!runId || aiRunLinkedRef.current) return
+    supabase.from('ai_analysis_runs').update({ outcome: 'abandoned' }).eq('id', runId).is('saved_at', null)
+      .then(({ error }) => { if (error) console.error('markAiRunAbandoned failed:', error.message) })
+  }
+
   const analyzeWorkout = async () => {
     if (!aiParseText.trim() || aiAnalyzing) return
     setAiAnalyzing(true)
@@ -3916,6 +3957,12 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       if (!res.ok || json.error) throw new Error(json.error || t.toastGenericError)
       const mapped = sectionsFromAiAnalysis(json)
       if (mapped.length === 0) { showToast(t.toastAnalyzeWorkoutEmpty); setAiAnalyzing(false); return }
+      // P11.1 - capture the AI run id + a deep clone of the exact draft handed
+      // to the Builder, as the immutable semantic-diff baseline.
+      markAiRunAbandonedIfUnlinked()
+      aiRunIdRef.current = json.aiRunId ?? null
+      aiBaselineRef.current = json.aiRunId ? JSON.parse(JSON.stringify(mapped)) : null
+      aiRunLinkedRef.current = false
       const flags = deriveReviewFlags(json)
       // open: true - draftul trebuie sa fie "imediat gata de revizuire"
       // (cerinta WI-1), nu ascuns dupa carduri colapsate pe care coach-ul
@@ -3973,6 +4020,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       // reusita) - wods ramane sursa de adevar, o eroare aici doar se
       // logheaza (vizibila in Sentry), fara sa afecteze coach-ul.
       syncWorkoutEngineV2FromLegacyWod(data)
+      linkAiRunOnSave(data.id, flushed)
       showToast(sectionLabel ? t.toastSectionSaved(sectionLabel) : (editWodId ? t.toastWodUpdatedAdmin : t.toastWodCreatedAdmin))
       setWodCleanSnapshot(JSON.stringify(flushed))
       await fetchWods(); onWodChanged?.()
@@ -4069,6 +4117,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // dataWod si editWodId - folosita de cancelEditWod (care le reseteaza
   // separat).
   const resetWodFormFields = () => {
+    markAiRunAbandonedIfUnlinked() // P11.1
     const blank = DEFAULT_NEW_WOD_SECTIONS()
     setWodSections(blank)
     setWodCleanSnapshot(JSON.stringify(blank))

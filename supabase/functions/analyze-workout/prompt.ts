@@ -127,3 +127,10 @@ Reguli:
 }
 
 export const SYSTEM_PROMPT = buildSystemPrompt()
+
+// P11.1 — stable semantic version of the analyze-workout prompt. Bump
+// INTENTIONALLY when any prompt block, heuristic, format hint, or the appended
+// movement grounding changes in a way that could shift model behaviour. NOT a
+// git hash — a human-meaningful identifier stamped on every ai_analysis_runs row
+// so "did prompt vN beat vN-1" is answerable.
+export const PROMPT_VERSION = "analyze-prompt-2026-09-02-inc11";

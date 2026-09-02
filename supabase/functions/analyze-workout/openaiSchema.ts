@@ -270,3 +270,8 @@ export const WORKOUT_ANALYSIS_JSON_SCHEMA = {
   },
   required: ['title', 'sections'],
 }
+
+// P11.1 — stable semantic version of the Structured Outputs schema. Bump
+// INTENTIONALLY on any field / enum / $def change. Stamped on every
+// ai_analysis_runs row.
+export const SCHEMA_VERSION = 'analyze-schema-2026-09-02-inc11'

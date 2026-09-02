@@ -12,6 +12,13 @@
 import { SCORE_TYPE_VALUES, WORKOUT_FORMAT_VALUES } from "./openaiSchema.ts";
 import { resolveCanonicalMovement } from "./movementCatalog.ts";
 
+// P11.1 — stable semantic version of the flat-AI-JSON -> normalized-output
+// transform (toWorkoutSections + deriveLegacyFields + resolveCanonicalMovement
+// fallback). Bump INTENTIONALLY when the mapping/derivation changes. Stamped on
+// every ai_analysis_runs row so a normalized-output discrepancy can be
+// attributed to MODEL vs TRANSFORM vs COACH (P11 audit section 7).
+export const TRANSFORM_VERSION = "analyze-transform-2026-09-02-inc11";
+
 function toWeightSpec(male: number | null, female: number | null, unit: string | null) {
   if (male == null && female == null) return null;
   return { male: male ?? null, female: female ?? null, unit: unit === "lbs" ? "lbs" : "kg" };
