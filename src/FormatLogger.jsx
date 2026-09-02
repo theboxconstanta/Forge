@@ -277,7 +277,7 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
   )
 }
 
-function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t }) {
+function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition }) {
   const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
   const score = computeSetsScore(formatId, config, rowsByKey)
   const Row = getFormat(formatId).simpleReps ? SimpleRepsRow : SetsRows
@@ -291,6 +291,29 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   const iv = resolveIntervalStructure(formatId, config, movements)
   if (iv && iv.structured && iv.stationCount > 0) {
     const setStationReps = (key, row, value) => onChange({ ...rowsByKey, [key]: [{ ...row, reps: value }] })
+    // P9.5.2A - a (round, station) cell whose PROGRAMMED movement the athlete
+    // split / changed / marked not-performed renders one reps input per
+    // performed movement, saved as N `sets` rows each with a `pm` marker.
+    // computeSetsScore already sums every row. Legacy cells unchanged.
+    const comp = intervalComposition || null
+    const cellEntriesFor = (si) => {
+      const srcId = comp?.stationSourceIds?.[si]
+      const e = srcId ? comp?.bySource?.[srcId] : null
+      return (Array.isArray(e) && e.length) ? e : null
+    }
+    const writeComposedCell = (key, entries, changedInstanceId, value) => {
+      const existing = rowsByKey[key] || []
+      const next = entries.map((ent) => {
+        if (ent.notPerformed) return { reps: '', weight: '', completed: false, pm: { instanceId: `${key}::np`, sourceInstanceId: ent.sourceInstanceId, name: ent.name, canonicalMovementId: null, notPerformed: true } }
+        const prev = existing.find((x) => x.pm?.instanceId === ent.instanceId) || { reps: '', weight: '', completed: false }
+        return {
+          ...prev,
+          reps: ent.instanceId === changedInstanceId ? value : (prev.reps || ''),
+          pm: { instanceId: ent.instanceId, sourceInstanceId: ent.sourceInstanceId, name: ent.name, canonicalMovementId: ent.canonicalMovementId ?? null },
+        }
+      })
+      onChange({ ...rowsByKey, [key]: next })
+    }
     return (
       <>
         {Array.from({ length: iv.roundCount }, (_, ri) => {
@@ -302,6 +325,36 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
               </div>
               {iv.stations.map((st, si) => {
                 const key = intervalStationKey(r, si + 1, st.name)
+                const entries = cellEntriesFor(si)
+                if (entries && entries.some((e) => e.notPerformed)) {
+                  return (
+                    <div key={key} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '13px', color: '#9A9A9A', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontStyle: 'italic' }}>{st.name}</div>
+                      <span style={{ fontSize: '12px', color: '#9A9A9A', flexShrink: 0 }}>{t?.performedNotPerformedShort || 'not performed'}</span>
+                    </div>
+                  )
+                }
+                if (entries) {
+                  const cellRows = rowsByKey[key] || []
+                  return (
+                    <div key={key} style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '12px', color: '#9A9A9A', marginBottom: '4px' }}>{st.name}</div>
+                      {entries.map((ent) => {
+                        const row = cellRows.find((x) => x.pm?.instanceId === ent.instanceId) || { reps: '' }
+                        return (
+                          <div key={ent.instanceId} style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '10px' }}>
+                            <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{ent.name}</div>
+                            <input type="number" inputMode="numeric" value={row.reps || ''}
+                              onChange={e => writeComposedCell(key, entries, ent.instanceId, e.target.value)}
+                              aria-label={`${ent.name} ${t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `round ${r}`} reps`}
+                              placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+                              style={{ width: '84px', flexShrink: 0, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                }
                 const row = (rowsByKey[key] && rowsByKey[key][0]) || { reps: '', weight: '', completed: false }
                 return (
                   <div key={key} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -345,14 +398,14 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations, intervalComposition }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
 
   if (format.family === 'sets') {
     return <SetsFields formatId={formatId} config={config} movements={movements || []} sets={v.sets}
-      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} />
+      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} intervalComposition={intervalComposition} />
   }
 
   if (format.family === 'mixed') {

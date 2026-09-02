@@ -42,7 +42,7 @@ import { fetchProgressionForMember, formatProgressionNote } from './performanceP
 import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAnalytics'
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
-  resolveIntervalStructure, intervalTimelineLines,
+  resolveIntervalStructure, intervalTimelineLines, isRestLine, intervalStationKey,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText, partialRepsOfLog,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
@@ -9861,6 +9861,33 @@ function App() {
     : null
   const sequentialAmrapStations = (sequentialAmrapResolved && sequentialAmrapResolved.supported)
     ? sequentialAmrapResolved.stations : null
+  // P9.5.2A - structured Intervals per-cell performed composition. Maps each
+  // PROGRAMMED station (by ordered index, rest excluded) to its
+  // sourceInstanceId, then to the athlete's performed entries for that source.
+  // Fed to FormatLogger so one (round, station) cell renders N reps inputs and
+  // saves N `sets` rows (each with a `pm` marker). INC-07/08 R×S identity
+  // unchanged. null unless a v2 overlay is modified for an interval format.
+  const intervalCompositionActive = (performedCommitted?.version === 2
+    && getFormat(activeLogFormatId)?.rowMode === 'interval'
+    && Array.isArray(frozenProgrammedInstances)
+    && performedIsModified(performedCommitted, activePrescriptionDoc, frozenVariantKey, memberGenderKey))
+    ? (() => {
+        const stationInsts = frozenProgrammedInstances.filter((m) => m?.name && !isRestLine(m.name))
+        const stationSourceIds = stationInsts.map((m) => m.instanceId)
+        const bySource = {}
+        for (const g of performedCompositionGroups(performedCommitted)) {
+          if (g.notPerformed) {
+            bySource[g.sourceInstanceId] = [{ notPerformed: true, sourceInstanceId: g.sourceInstanceId, name: stationInsts.find((s) => s.instanceId === g.sourceInstanceId)?.name || g.entries[0]?.name || 'Movement' }]
+          } else {
+            bySource[g.sourceInstanceId] = g.entries.filter((e) => e.notPerformed !== true).map((e) => ({
+              instanceId: e.instanceId, sourceInstanceId: g.sourceInstanceId,
+              name: e.name, canonicalMovementId: e.canonicalMovementId ?? null,
+            }))
+          }
+        }
+        return { stationSourceIds, bySource }
+      })()
+    : null
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
   // (logare noua sau editare) - vezi resultCompositionModified in workoutFormats.js. Pt o
   // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
@@ -11453,7 +11480,15 @@ function App() {
               const check = validatePerformedPrescription(draft)
               if (!check.valid) { showToast(t.performedEditInvalid); return }
               const matches = performedMatchesProgrammed(draft, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
-              setPerformedCommitted(matches ? null : draft)
+              const committed = matches ? null : draft
+              // P9.5.2A - a structured-interval composition change redefines the
+              // per-cell score inputs; clear any reps already entered so the
+              // logger rebuilds cleanly from the new composition (no orphan rows
+              // → no double count).
+              const prevSig = JSON.stringify((performedCommitted?.movements || []).map(m => [m.sourceInstanceId, m.instanceId, m.notPerformed]))
+              const nextSig = JSON.stringify((committed?.movements || []).map(m => [m.sourceInstanceId, m.instanceId, m.notPerformed]))
+              if (getFormat(activeLogFormatId)?.rowMode === 'interval' && prevSig !== nextSig) setWodSets({})
+              setPerformedCommitted(committed)
               setPerformedDraft(null)
               setLogWodEditMode(false)
             }
@@ -11545,6 +11580,7 @@ function App() {
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
                   movements={miscariPentruLog} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
+                  intervalComposition={intervalCompositionActive}
                   value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
                   onChange={dispatchScorePatch}
                   weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
@@ -11666,6 +11702,7 @@ function App() {
               config={activeLogFormatConfig}
               movements={miscariPentruLog}
               sequentialAmrapStations={sequentialAmrapStations}
+              intervalComposition={intervalCompositionActive}
               prescribedWeight={prescribedWeightPentruLog}
               rxStatus={liveRxStatus}
               value={{

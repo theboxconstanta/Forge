@@ -135,7 +135,7 @@ function FinishedCappedToggle({ mode, onPick, t }) {
 }
 
 export default function UniversalScoreInput({
-  def, formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus,
+  def, formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, intervalComposition,
 }) {
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
@@ -147,6 +147,7 @@ export default function UniversalScoreInput({
       <FormatLogger
         formatId={formatId} config={config} movements={movements} value={v} onChange={onChange}
         weightUnit={weightUnit} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus}
+        intervalComposition={intervalComposition}
       />
     )
   }
