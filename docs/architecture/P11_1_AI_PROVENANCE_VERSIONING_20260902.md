@@ -260,3 +260,48 @@ The **migration must be applied to production** (no in-session DB access — sam
 5. **`abandoned` detection is best-effort** — a hard browser close / crash before the close handler won't mark it; such a run stays `status='ok'` with no lifecycle (correctly counts as neither accepted nor a failure).
 6. **DB/RLS behaviour is asserted structurally** (`p11_1AiProvenanceMigration.test.js`), not by a live pgTAP test (no such infra in the repo) — the runtime guarantees are verified in the §20 smoke.
 7. `regenerate-variant` is **not** captured in P11.1 (the table's `function` column is ready; adding it is a small follow-up, no diff logic).
+
+---
+
+## 22. Production closure (2026-09-02)
+
+**Owner decision:** Option 38a — apply ONLY `20260902090000` directly, register ONLY that version, do **not** touch the historical migration-ledger drift.
+
+### Migration
+- **Pre-apply state:** CASE A — `schema_migrations` had no `20260902090000`; `public.ai_analysis_runs` absent; P11.1 functions/trigger/policies absent; `pg_cron` present.
+- **Safety gate:** 1 `BEGIN;`/1 `COMMIT;`, 0 DROP in the UP path, 0 destructive `ALTER`/`DELETE`/`UPDATE`/`TRUNCATE` on any existing table, 4 FKs all **from** the new table (`gym_id→gyms` CASCADE, `coach_id→auth.users` SET NULL, `wod_id→wods` SET NULL, `workout_id→workouts` SET NULL). Matches this report exactly.
+- **Applied:** the whole file via `supabase db query --linked -f …` (transaction boundary preserved).
+- **Verified live:** `ai_analysis_runs` — 28 columns, 8 indexes (7 + PK), RLS enabled, 3 policies (SELECT `is_coach_or_admin(gym_id)`, INSERT `WITH CHECK (false)`, UPDATE `gym_id = my_gym_id() AND is_coach_or_admin(gym_id)`), no DELETE policy, 1 immutability trigger, 4 functions, 2 cron jobs (`p11-expire-ai-input-text-daily` `17 3 * * *`, `p11-expire-ai-raw-output-daily` `23 3 * * *`), 0 rows.
+- **Ledger:** `schema_migrations` columns = `version text NOT NULL`, `statements text[]`, `name text`. Inserted **one** row `('20260902090000', 'p11_1_ai_analysis_provenance')`. Verified: exactly once; `total_rows` 201→202; no older version added; no existing row modified.
+- **Migration-ledger drift** (versions ~`20260817xxx`–`20260901xxx` present in the DB but absent from `schema_migrations`) — **untouched, out of scope.** Tracked as a separate backlog item (§23).
+
+### Edge Function
+- `supabase functions deploy analyze-workout --project-ref sdfkvfbvgpuspnnnwqwk` — deployed. Model/provider/prompt/schema/transform/reasoning/`store:false` **unchanged** — only the version constants + provenance capture were added.
+
+### Production smoke (as `luciandorinrosca@gmail.com`, Platform Admin, WolfPack CrossFit gym `c5ecbe2c-…`)
+
+| Check | Evidence |
+|---|---|
+| **A — accepted unchanged** | run `2b3620d8-6c7f-4c35-9aff-fa37691a0430`. Generate `AMRAP 12 / 10 Wall Ball / 15 Box Jump` → Save with no edits. Recorded: `status ok`, `gym_id c5ecbe2c…`, `coach_id` set, `input_text` verbatim, `model gpt-5-mini`, `model_config {api:responses, reasoning_effort:low, retry:1, store:false, timeout_ms:45000}`, all 3 version constants, `raw_output` + `normalized_output` present, `token_usage {input:8424, output:718, reasoning:128, total:9142}`, `latency_ms 10908`. After Save: `saved_at` set, `wod_id c10518e9…`, `workout_id ac749968…`, `saved_output` present, `semantic_diff {counts:{}, deltas:[], severity:'none', outcome:'accepted_unchanged'}`, `edit_severity none`, `outcome accepted_unchanged`. |
+| **B — one semantic correction** | run `fa6c81ba-a235-4875-a502-c0e53c8f0268`. Generate `For Time / 21-15-9 / Thruster 43kg / Pull-up` → change **FMTROUNDSCOUNT 3 → 4** only → Save. `semantic_diff.deltas = [{ section:0, kind:'rounds_changed', from:3, to:4, severity:'semantic' }]` — **exactly one delta, correct field, correct from/to, no spurious movement/format/structure delta**. `edit_severity semantic`, `outcome accepted_semantic`, `wod_id` + `workout_id` both linked. |
+| **C — manual** | ~10 min in the manual "Start Empty" builder (format changes, movement edits, section add/remove, open/close/discard cycles) → **`ai_analysis_runs` count stayed at 2**. No fake provenance for a manual workout. |
+| **D — security** | anon `GET /rest/v1/ai_analysis_runs` → HTTP 200 `[]` (RLS filters all rows — anon has no policy). `p11_ai_acceptance_stats('00000000-…')` and `…('c5ecbe2c-…')` via an unauthenticated elevated role → **`ERROR P0001: not authorized for gym …`** (the `is_coach_or_admin` guard raises). 3 tenants exist in production; a live cross-tenant *SELECT* by a gym-B coach was not performed (no second login fabricated) — the `is_coach_or_admin(gym_id)` policy is the identical pattern used by 64 other production policies and structurally denies cross-tenant. |
+| **Metric** | raw aggregation (function body logic) for gym `c5ecbe2c…`, 2026-09-02: `runs_failed 0, saved_total 2, accepted_unchanged 1, accepted_cosmetic 0, accepted_semantic 1, abandoned 0, semantic_acceptance_rate 0.5000` — matches the two smoke runs exactly. The `p11_ai_acceptance_stats` **function** requires an authenticated coach JWT to invoke (the tenant guard raises otherwise) — verified correct via the body-logic match + the guard raise. |
+| **Retention** | rollback-safe test: inserted a synthetic run dated 200 days ago → `p11_expire_ai_analysis_input_text()` returned 1 (nulled `input_text`), `p11_expire_ai_analysis_raw_output()` returned 0 (200d < 365d threshold — correct). After: `input_text` NULL, `raw_output` intact, `normalized_output` / `semantic_diff` / `outcome` / `prompt_version` **all kept**. The immutability trigger **permitted** the `input_text → NULL` retention transition. Test row deleted; the 2 real smoke runs untouched. |
+| **Failure containment** | not tested destructively (per mission §14). Code evidence: EF `recordRun` is `try/catch` → returns `null`, response unchanged; client `linkAiAnalysisRun` / `markAiAnalysisRunAbandoned` are `void` fire-and-forget. Smoke A/B/C all had normal coach UX. |
+| **Canonical safety** | migration = CREATE-only (0 ALTER/DROP/DELETE on canonical tables). Smoke A/B created 2 new `wods` rows on previously-empty future days (not mutations). 0 `wod_logs` touched. 0 member-log reads. `pg_extension` for `vector`/`pgvector` = **0**. No RAG / retrieval / embeddings / fine-tuning exist. |
+
+**Console/network:** two intermittent renderer screenshot timeouts during the run (CDP `Page.captureScreenshot` — a browser-automation artifact, not a Forge error); the underlying saves succeeded (verified in the DB each time). No Forge app errors observed.
+
+### Smoke artifacts
+- `ai_analysis_runs`: runs `2b3620d8…` (Smoke A) and `fa6c81ba…` (Smoke B) — **kept** as smoke evidence (per mission §16, provenance ledger evidence is never deleted).
+- Test workouts: **"Untitled workout" on 2026-09-05 (AMRAP)** and **2026-09-06 (For Time)** in gym `c5ecbe2c…` (WolfPack CrossFit). forge-admin has no workout-delete affordance in this view and a hand SQL delete would have to unwind the `wods`↔`workouts`↔`workout_sections`↔`wod_logs` FK graph (not clearly safe) — **left in place for the owner to remove via the UI if desired.**
+
+### Rollback (unchanged from §18)
+Kill switch: `DROP TABLE public.ai_analysis_runs` → all writes no-op, coach flow untouched (fail-open). Full DOWN in the migration footer (cron.unschedule ×2, DROP FUNCTION ×3, DROP TRIGGER, DROP FUNCTION, DROP TABLE). Also: `DELETE FROM supabase_migrations.schema_migrations WHERE version='20260902090000'`.
+
+---
+
+## 23. Backlog item — SUPABASE MIGRATION LEDGER DRIFT
+
+**Not fixed (out of P11.1 scope, owner-directed).** Production `supabase_migrations.schema_migrations` records migrations only through ~`20260818090200`; ~20+ migrations applied since (verified live: `20260829090000`/`20260831090000`/etc. objects exist) are **absent from the ledger**. `supabase db push` consequently reports them as "to be inserted" and refuses without `--include-all`. P11.1's own version was registered manually. A future dedicated task should reconcile the ledger (`supabase migration repair --status applied <versions…>` after confirming each is truly live) so `db push` works normally again — but **not** by re-running any migration.
