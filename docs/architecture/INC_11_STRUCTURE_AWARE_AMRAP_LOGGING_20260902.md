@@ -278,3 +278,37 @@ touched. `saveSkillLog` (a Sequence-AMRAP *skill section* — no production
 instance, AMRAP skill sections do not exist in this gym) still composes via the
 generic sequential path; a dedicated branch there is a deferred INC-11 edge, not
 a save-validation failure and out of INC-11.1 scope.
+
+### 10.1 Deploy & production smoke (2026-09-02)
+
+- **Merged:** WOD-SIMPLE `main` `9e5abf6..5cd89fe` (INC-11.1 = `5cd89fe`). forge-admin-web
+  `main` `b9f04d6` (INC-11, no INC-11.1 changes there). Both branches deleted.
+- **Deployed:** prod bundle `assets/index-BYjq-rg1.js` (verified contains
+  `hasSequentialAmrapInput`'s body `.some(e=>e!=null&&String(e).trim()!==\`\`)`,
+  `SEQUENTIAL_AMRAP`, `structure==='Sequence'`).
+- **`app_version`:** to be bumped to `structure-aware-amrap-inc11-20260902` (owner;
+  no service-role DB access in-session).
+- **Incident workout identified:** the "AMRAP 10:00 / 50 burpee pull-up / 75
+  Russian Kettlebell Swing @ 24 kg / Max. Reps burpee pull-ups" WOD dated
+  **2026-09-03**, already carrying `structure: Sequence` (owner applied the
+  authorised definition correction before this ticket) — the member logger
+  resolves it as fixed 50 / fixed 75 / open.
+
+**Smoke (as the owner account, in `https://forge-delta-ivory.vercel.app`, all
+test logs deleted afterward):**
+
+| Check | Result |
+|---|---|
+| A — incident logger | "YOUR PROGRESS": burpee pull-up `50 /50`, Russian Kettlebell Swing `75 /75`, Max reps burpee pull-ups `—`. **No** Rounds Completed / Additional Reps. |
+| A — enter 50 / 75 / 14 | live **TOTAL REPS: 139** |
+| A — **Save WOD** | **succeeded** (share card + "WOD saved! 🎉"); frozen result `50/50 burpee pull-up, 75/75 Russian Kettlebell Swing, 14 Max. Reps burpee pull-ups`; `logged_at` 09/02 09:30 (capped to now, not the 09/03 workout date — INC-09) |
+| A — Journal | `139 total reps · 50/50 burpee pull-up, 75/75 Russian Kettlebell Swing, 14 Max. Reps burpee pull-ups` |
+| A — Leaderboard | 🥇 **139 reps**, RX, 1 participant, AMRAP 10:00 |
+| A — Result Detail (leaderboard expand) | `50/50 …, 75/75 …, 14 Max. Reps …` + 139 reps; no Not-RX / completion badge |
+| B — classic AMRAP (free log, structure "Repeated Rounds", 5 PU / 10 push / 15 squat) | logger showed **ROUNDS COMPLETED** + **PARTIAL ROUND** (not station progress). Save succeeded → result **`4 runde + 3/5 Pull-ups`** (rounds+partial, not Total Reps) |
+| C — historical | historical RFT (`3 runde complete · 21:00`) and structured Intervals (Round 1–5 × 3 stations) render unchanged from frozen provenance; classic-vs-sequential is gated only on `config.structure === 'Sequence'`, absent on every pre-INC-11 snapshot → no reclassification |
+| INC-09 latest-log selection | unchanged (future workout logged at "now", not future-dated) |
+| P10 | unchanged (frozen-provenance rendering intact) |
+| Console | only the generic Chrome-extension `"message channel closed"` exception (not from Forge); 0 app errors, 0 React errors, 0 failed Supabase requests across the whole flow |
+
+**INC-11 + INC-11.1: production smoke GREEN.**
