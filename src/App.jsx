@@ -1003,25 +1003,46 @@ function performedResolvedValue(spec, gender) {
   return { value: gender === 'female' ? f : gender === 'male' ? m : (m ?? f), unit: r.unit ?? null }
 }
 
-function PerformedEditRow({ inst, gender, movementIndex, onChange, t }) {
-  const [subOpen, setSubOpen] = useState(false)
+// P9.5.2A - one movement-library search box, reused for BOTH "Change movement"
+// (mode replace) and "+ Add movement" (mode append). No second search impl.
+function PerformedMovementSearch({ movementIndex, placeholder, noMatch, onPick, onCancel }) {
   const [query, setQuery] = useState('')
   const rows = movementIndex?.rows ?? []
   const matches = query.trim().length >= 2
     ? rows.filter(r => r.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6)
     : []
+  return (
+    <div style={{ marginTop: '8px', position: 'relative' }}>
+      <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') onCancel?.() }} placeholder={placeholder} autoFocus
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+      {matches.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: '1px solid #E4E4E4', overflow: 'hidden' }}>
+          {matches.map((r) => (
+            <div key={r.id} onClick={() => onPick(r)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px' }}>{r.name}</div>
+          ))}
+        </div>
+      )}
+      {query.trim().length >= 2 && matches.length === 0 && (
+        <div style={{ fontSize: '11px', color: '#9A9A9A', marginTop: '6px' }}>{noMatch}</div>
+      )}
+    </div>
+  )
+}
+
+function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, deletable, t }) {
+  const [subOpen, setSubOpen] = useState(false)
   const repsSpec = resolveSpec(inst.reps, gender)
   const repsText = repsSpec ? (repsSpec.mode === 'text' ? repsSpec.text : (repsSpec.value ?? repsSpec.bothValues?.filter(v => v != null).join('/'))) : null
   const presentMetrics = PERFORMED_EDITABLE_METRICS.filter(k => inst[k])
   const pickSubstitute = (row) => {
     onChange(applyPerformedSubstitution(inst, row, resolveMovementCapability(row)))
-    setSubOpen(false); setQuery('')
+    setSubOpen(false)
   }
   return (
     <div style={{ padding: '14px 0', borderTop: '1px solid #F3F4F6' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name}</div>
+          <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name || t.performedEditPickMovement}</div>
           {repsText != null && repsText !== '' && (
             <div style={{ fontSize: '12px', color: '#9A9A9A', marginTop: '2px' }}>{t.performedEditRepsLocked(repsText)}</div>
           )}
@@ -1029,26 +1050,21 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, t }) {
             <div style={{ fontSize: '11px', color: '#B7791F', marginTop: '3px' }}>{t.performedEditSubstitutedFrom(inst.substitutedFrom.name)}</div>
           )}
         </div>
-        <button onClick={() => setSubOpen(v => !v)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '12px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-          {subOpen ? t.performedEditSubCancel : t.performedEditSubstitute}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+          <button onClick={() => setSubOpen(v => !v)} aria-label={t.performedEditSubstitute} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '12px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }}>
+            {subOpen ? t.performedEditSubCancel : t.performedEditSubstitute}
+          </button>
+          {deletable && (
+            <button onClick={onDelete} aria-label={t.performedEditDeleteMovement} style={{ background: 'none', border: 'none', color: '#B91C1C', fontSize: '12px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }}>
+              {t.performedEditDeleteMovement}
+            </button>
+          )}
+        </div>
       </div>
 
       {subOpen && (
-        <div style={{ marginTop: '8px', position: 'relative' }}>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder={t.performedEditSubPlaceholder} autoFocus
-            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
-          {matches.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: '1px solid #E4E4E4', overflow: 'hidden' }}>
-              {matches.map((r) => (
-                <div key={r.id} onClick={() => pickSubstitute(r)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px' }}>{r.name}</div>
-              ))}
-            </div>
-          )}
-          {query.trim().length >= 2 && matches.length === 0 && (
-            <div style={{ fontSize: '11px', color: '#9A9A9A', marginTop: '6px' }}>{t.performedEditSubNoMatch}</div>
-          )}
-        </div>
+        <PerformedMovementSearch movementIndex={movementIndex} placeholder={t.performedEditSubPlaceholder}
+          noMatch={t.performedEditSubNoMatch} onPick={pickSubstitute} onCancel={() => setSubOpen(false)} />
       )}
 
       {presentMetrics.length > 0 && (
@@ -1079,18 +1095,76 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, t }) {
   )
 }
 
-function PerformedEditPanel({ draft, gender, movementIndex, onChange, onCancel, onDone, t }) {
-  const movements = draft?.movements ?? []
-  const patchInstance = (idx, nextInst) => onChange({ ...draft, movements: movements.map((m, i) => (i === idx ? nextInst : m)) })
+// P9.5.2A - grouped performed-composition editor. One block per PROGRAMMED
+// source (sourceInstanceId), each with its flat ordered list of performed
+// movements (Change / Delete per entry), a group-level "+ Add movement" below
+// the fields, and a "Mark not performed" / "Restore" toggle. Programmed
+// prescription is never touched.
+function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances, inheritReps, onChange, onCancel, onDone, showToast, t }) {
+  const [addOpenFor, setAddOpenFor] = useState(null)
+  const groups = performedCompositionGroups(draft)
+  const progBySource = new Map((programmedInstances || []).map(p => [p.instanceId, p]))
+  const patchInstance = (instanceId, nextInst) => onChange({
+    ...draft, movements: draft.movements.map(m => (m.instanceId === instanceId ? nextInst : m)),
+  })
+  const removeInstance = (instanceId) => {
+    const res = deletePerformedMovement(draft, instanceId)
+    if (res.blockedLastMovement) { showToast?.(t.performedEditDeleteLastBlocked); return }
+    onChange(res.doc)
+  }
+  const addUnder = (sourceInstanceId, row) => {
+    onChange(addPerformedMovement(draft, sourceInstanceId, row, resolveMovementCapability(row), { inheritReps: !!inheritReps }))
+    setAddOpenFor(null)
+  }
   return (
     <div>
       <div style={{ fontSize: '16px', fontWeight: 700, color: '#0E0E0E', marginBottom: '4px' }}>{t.performedEditTitle}</div>
       <div style={{ fontSize: '12px', color: '#9A9A9A', marginBottom: '14px', lineHeight: 1.5 }}>{t.performedEditSubtitle}</div>
       <div style={{ borderBottom: '1px solid #F3F4F6' }}>
-        {movements.map((inst, idx) => (
-          <PerformedEditRow key={inst.instanceId} inst={inst} gender={gender} movementIndex={movementIndex}
-            onChange={(next) => patchInstance(idx, next)} t={t} />
-        ))}
+        {groups.map((g) => {
+          const prog = progBySource.get(g.sourceInstanceId)
+          const progName = prog?.name || g.entries[0]?.name || 'Movement'
+          const realEntries = g.entries.filter(e => e.notPerformed !== true)
+          return (
+            <div key={g.sourceInstanceId} style={{ borderTop: '1px solid #F3F4F6', paddingTop: '4px' }}>
+              {g.notPerformed ? (
+                <div style={{ padding: '14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ fontSize: '15px', color: '#9A9A9A', fontWeight: 600, fontStyle: 'italic' }}>
+                    {t.performedEditNotPerformedLabel(progName)}
+                  </div>
+                  <button onClick={() => onChange(restoreSourcePerformed(draft, g.sourceInstanceId, prog || null))}
+                    style={{ background: 'none', border: 'none', color: '#0E0E0E', fontSize: '12px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+                    {t.performedEditRestoreMovement}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {realEntries.map((inst) => (
+                    <PerformedEditRow key={inst.instanceId} inst={inst} gender={gender} movementIndex={movementIndex}
+                      onChange={(next) => patchInstance(inst.instanceId, next)}
+                      onDelete={() => removeInstance(inst.instanceId)}
+                      deletable={realEntries.length > 1} t={t} />
+                  ))}
+                  {addOpenFor === g.sourceInstanceId ? (
+                    <PerformedMovementSearch movementIndex={movementIndex} placeholder={t.performedEditAddPlaceholder}
+                      noMatch={t.performedEditSubNoMatch} onPick={(row) => addUnder(g.sourceInstanceId, row)} onCancel={() => setAddOpenFor(null)} />
+                  ) : (
+                    <div style={{ display: 'flex', gap: '16px', padding: '6px 0 12px' }}>
+                      <button onClick={() => setAddOpenFor(g.sourceInstanceId)}
+                        style={{ background: 'none', border: 'none', color: '#0E0E0E', fontSize: '13px', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px', cursor: 'pointer', padding: 0 }}>
+                        {t.performedEditAddMovement}
+                      </button>
+                      <button onClick={() => onChange(markSourceNotPerformed(draft, g.sourceInstanceId, progName))}
+                        style={{ background: 'none', border: 'none', color: '#9A9A9A', fontSize: '13px', cursor: 'pointer', padding: 0 }}>
+                        {t.performedEditMarkNotPerformed}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
         <button onClick={onCancel} style={{ flex: 1, padding: '13px', background: '#fff', color: '#0E0E0E', border: '1px solid #E4E4E4', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditCancel}</button>
@@ -11352,12 +11426,17 @@ function App() {
             // read-only workout rows below show what THEY did; the programmed
             // prescription stays untouched in activePrescriptionDoc / snapshot.
             const performedActive = !!performedCommitted && performedIsModified(performedCommitted, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
-            const performedDisplay = performedActive
-              ? composeStructuredWorkoutDisplay({ instances: performedCommitted.movements, mode: 'member', gender: memberGenderKey })
-              : structuredDisplay
-            const rows = performedDisplay
-              ? performedDisplay.movements.map(m => ({ line: m.line }))
-              : (logWodZiData[cheie] || []).map(line => ({ line }))
+            // P9.5.2A - performed rows come from the group-aware projection
+            // (renders each 1->N child + a "not performed" line for a marked
+            // source); the programmed prescription is never consulted here.
+            const performedLines = performedActive
+              ? composePerformedResultLines(performedCommitted, memberGenderKey, { notPerformedSuffix: t.performedNotPerformedSuffix })
+              : null
+            const rows = (performedLines && performedLines.length)
+              ? performedLines.map(line => ({ line }))
+              : (structuredDisplay
+                  ? structuredDisplay.movements.map(m => ({ line: m.line }))
+                  : (logWodZiData[cheie] || []).map(line => ({ line })))
             // Edit is offered ONLY for a structured variant with a KNOWN member
             // gender (§57 - an unknown gender against sex-specific prescriptions
             // is a HARD STOP for this path: hide Edit rather than guess). Legacy
@@ -11382,9 +11461,11 @@ function App() {
               return (
                 <PerformedEditPanel
                   draft={performedDraft} gender={memberGenderKey} movementIndex={memberMovementIndex}
+                  programmedInstances={activePrescriptionDoc?.variants?.[frozenVariantKey]?.movements || []}
+                  inheritReps
                   onChange={setPerformedDraft}
                   onCancel={() => { setPerformedDraft(null); setLogWodEditMode(false) }}
-                  onDone={commitPerformedEdit} t={t} />
+                  onDone={commitPerformedEdit} showToast={showToast} t={t} />
               )
             }
             // P9.5.3 - RFT / For Time / Chipper / Ladder / Partner WOD store
