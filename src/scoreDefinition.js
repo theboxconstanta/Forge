@@ -9,10 +9,10 @@
 // No new scoring engine. No MULTI_SCORE abstraction — SETS / STAGES / multiple
 // scored sections already cover Forge's real multi-score cases.
 
-import { getFormat, effectiveScoreMode, isSequentialFormat, TIME_CAP_LABEL_FORMAT_IDS } from './workoutFormats'
+import { getFormat, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, TIME_CAP_LABEL_FORMAT_IDS } from './workoutFormats'
 
 export const SCORE_KINDS = [
-  'TIME', 'TIME_CAPPED', 'ROUNDS_REPS', 'REPS', 'LOAD', 'DISTANCE', 'CALORIES',
+  'TIME', 'TIME_CAPPED', 'ROUNDS_REPS', 'SEQUENTIAL_AMRAP', 'REPS', 'LOAD', 'DISTANCE', 'CALORIES',
   'SETS', 'STAGES', 'NONE', 'FREE',
 ]
 
@@ -65,6 +65,13 @@ export function scoreDefinitionFor(formatId, formatConfig, opts = {}) {
   const mode = effectiveScoreMode(formatId, config) || format.scoreMode
 
   if (mode === 'amrap') {
+    // INC-11 - a Sequence AMRAP (owner-flagged `structure:'Sequence'`, never
+    // inferred) is ordered station progress, not Rounds + Additional Reps. The
+    // caller passes the resolved rep-only station list (structured-first);
+    // absent / mixed-unit -> fall back to the classic ROUNDS_REPS input.
+    if (isSequentialAmrap(formatId, config) && Array.isArray(opts.sequentialAmrapStations) && opts.sequentialAmrapStations.length > 0) {
+      return { kind: 'SEQUENTIAL_AMRAP', stations: opts.sequentialAmrapStations, integer: true }
+    }
     return { kind: 'ROUNDS_REPS', roundsKnown: null, integer: true }
   }
 

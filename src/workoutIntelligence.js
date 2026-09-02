@@ -78,7 +78,9 @@ export function composeMovementLine(m) {
 // nu se populeaza pt el pana cand cineva adauga explicit o traducere.
 const min2sec = (min) => (min != null ? Math.round(min * 60) : null)
 const FORMAT_CONFIG_TRANSLATORS = {
-  'AMRAP': (c) => ({ durationSec: min2sec(c.timeCapMinutes) }),
+  // INC-11 - carry the AI-detected progression structure. Only 'Sequence'
+  // passes (absent = classic repeated rounds; no key written - back-compatible).
+  'AMRAP': (c) => ({ durationSec: min2sec(c.timeCapMinutes), ...(c.structure === 'Sequence' ? { structure: 'Sequence' } : {}) }),
   'Ascending AMRAP': (c) => ({ durationSec: min2sec(c.timeCapMinutes), startReps: c.startReps, incrementReps: c.incrementReps }),
   'For Time': (c) => ({ rounds: c.rounds, timeCapSec: min2sec(c.timeCapMinutes) }),
   'RFT': (c) => ({ rounds: c.rounds, timeCapSec: min2sec(c.timeCapMinutes) }),
@@ -461,6 +463,15 @@ export function deriveReviewFlags(analysis) {
       const populated = Object.fromEntries(Object.entries(rawConfig).filter(([, v]) => v != null))
       const missing = missingRequiredConfigFields(s.format, populated)
       if (missing.length > 0) push(i, 'needs_review', `config: ${missing.join(', ')}`)
+
+      // INC-11 - a Sequence AMRAP is scored as Total Reps; a station measured in
+      // calories / distance has no canonical progress score (owner decision #2).
+      // Flag it for the coach - Forge will fall back to the classic Rounds +
+      // Additional Reps logger rather than invent mixed-unit arithmetic.
+      if (s.format === 'AMRAP' && s.formatConfig?.structure === 'Sequence') {
+        const mixed = (s.movements || []).some(m => (m.reps == null) && (m.calories != null || m.distance != null))
+        if (mixed) push(i, 'needs_review', 'sequential AMRAP with a calorie/distance station is not scoreable as Total Reps')
+      }
 
       const weightRelevant = s.scoreType === 'Weight' || getFormat(s.format)?.prEligible
       const anyWeighted = (s.movements || []).some(m => m.weight)

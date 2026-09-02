@@ -2,7 +2,9 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey } from './workoutFormats'
+import { resolveSequentialAmrapStations } from './sequentialAmrap'
+import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 import { secToTime } from './utils'
 
@@ -153,9 +155,20 @@ function WeightField({ weightLogged, onChange, t, rxStatus }) {
   )
 }
 
-function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, prescribedWeight, finishedRounds, rxStatus }) {
+function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPartial, sequentialAmrap, sequentialAmrapStations, prescribedWeight, finishedRounds, rxStatus }) {
   const greutateField = prescribedWeight ? <WeightField weightLogged={value.weightLogged} onChange={onChange} t={t} rxStatus={rxStatus} /> : null
   if (scoreMode === 'amrap') {
+    // INC-11 - a Sequence AMRAP (owner-flagged, never inferred) logs ordered
+    // station progress, not Rounds + Additional Reps. Stations come pre-resolved
+    // from the frozen structured prescription when available; otherwise from the
+    // movement text lines. A rep-only sequence is required (`.supported`); a
+    // mixed-unit body falls back to the classic input (owner decision #2).
+    if (sequentialAmrap) {
+      const seq = sequentialAmrapStations || resolveSequentialAmrapStations({ lines: movements }).stations
+      if (seq && seq.length > 0) {
+        return <>{greutateField}<SequentialAmrapFields stations={seq} performed={value.partialReps} onChange={onChange} t={t} /></>
+      }
+    }
     return <>{greutateField}<RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} /></>
   }
   if (scoreMode === 'single_value') {
@@ -332,7 +345,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
@@ -367,7 +380,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
             weightUnit={weightUnit} t={t} />
         ))}
         <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
-        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus} sequentialPartial={isSequentialFormat(formatId, config)} />
+        <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus} sequentialPartial={isSequentialFormat(formatId, config)} sequentialAmrap={isSequentialAmrap(formatId, config)} />
         {hasCashOut && (
           <>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
@@ -450,7 +463,7 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   const efectiveMovements = format.ascending
     ? ascendingMovementsForRound(movements || [], (parseInt(v.roundsCompleted) || 0) + 1, config?.startReps, config?.incrementReps)
     : (movements || [])
-  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} prescribedWeight={prescribedWeight} rxStatus={rxStatus} finishedRounds={config?.rounds} />
+  return <ScoredFields scoreMode={scoreMode} movements={efectiveMovements} value={v} onChange={patch} t={t} sequentialPartial={isSequentialFormat(formatId, config)} sequentialAmrap={isSequentialAmrap(formatId, config)} sequentialAmrapStations={sequentialAmrapStations} prescribedWeight={prescribedWeight} rxStatus={rxStatus} finishedRounds={config?.rounds} />
 }
 
 export function PrCandidatesConfirm({ candidates, onDismiss, onConfirm, onDone, t }) {

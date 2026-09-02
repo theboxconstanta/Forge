@@ -124,6 +124,14 @@ const FORMAT_CONFIG_DEF = {
     // free string ('per-interval' or null) - transform.ts validates it; a
     // nullable enum is avoided (same strict-mode caution as `stages` above).
     stationMode: { type: ['string', 'null'] },
+    // INC-11 - AMRAP / For Time progression structure. 'Sequence' = a finite
+    // ONE-WAY pass (buy-in, chipper, or buy-in + a final "max reps" station);
+    // 'Repeated Rounds' / null = repeat the round list until time expires. Free
+    // string (transform.ts validates) - same strict-mode caution as stationMode.
+    // Per-movement fixed vs open target is derived on the client from each
+    // movement's `reps` (number = fixed, null = the open/max station) - the model
+    // does NOT tag movements.
+    structure: { type: ['string', 'null'] },
     intervalSeconds: { type: ['number', 'null'] },
     workSeconds: { type: ['number', 'null'] },
     restSeconds: { type: ['number', 'null'] },
@@ -138,7 +146,7 @@ const FORMAT_CONFIG_DEF = {
     stages: { type: 'array', items: { $ref: '#/$defs/stage' } },
   },
   required: [
-    'timeCapMinutes', 'rounds', 'roundCount', 'stationMode', 'intervalSeconds', 'workSeconds',
+    'timeCapMinutes', 'rounds', 'roundCount', 'stationMode', 'structure', 'intervalSeconds', 'workSeconds',
     'restSeconds', 'startReps', 'incrementReps', 'stages',
   ],
 }

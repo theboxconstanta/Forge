@@ -15,6 +15,7 @@
 
 import { useState } from 'react'
 import FormatLogger from './FormatLogger'
+import SequentialAmrapFields from './SequentialAmrapFields'
 import { resolveNumericInput } from './prescriptionContract'
 import { secToTime } from './utils'
 
@@ -183,6 +184,19 @@ export default function UniversalScoreInput({
       <div style={card}>
         {weightBlock}
         <RoundsAndAdditionalReps v={v} patch={patch} t={t} roundsPlaceholder="7" repsPlaceholder="12" />
+      </div>
+    )
+  }
+
+  // INC-11 - Sequence AMRAP: ordered station progress + live Total Reps. Reuses
+  // the existing `partialReps` value slot; composeWodLogFields writes the frozen
+  // sequential result string.
+  if (kind === 'SEQUENTIAL_AMRAP') {
+    return (
+      <div style={card}>
+        {weightBlock}
+        <SequentialAmrapFields stations={def.stations} performed={v.partialReps}
+          onChange={(p) => patch(p)} t={t} />
       </div>
     )
   }

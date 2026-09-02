@@ -66,6 +66,13 @@ function toFormatConfig(fc: any) {
     // derives the legacy `rounds` = roundCount × station count.
     roundCount: fc?.roundCount ?? null,
     stationMode: fc?.stationMode === "per-interval" ? "per-interval" : null,
+    // INC-11 - AMRAP / For Time progression structure. Only the two canonical
+    // values pass through; anything else -> null (absent = classic repeated
+    // rounds). Per-movement fixed/open role is derived on the client from
+    // `reps`, never tagged here (owner decision #4).
+    structure: fc?.structure === "Sequence" ? "Sequence"
+      : fc?.structure === "Repeated Rounds" ? "Repeated Rounds"
+      : null,
     intervalSeconds: fc?.intervalSeconds ?? null,
     workSeconds: fc?.workSeconds ?? null,
     restSeconds: fc?.restSeconds ?? null,

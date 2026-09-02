@@ -43,10 +43,10 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   resolveIntervalStructure, intervalTimelineLines,
-  composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText,
+  composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText, partialRepsOfLog,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
-  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat,
+  VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat, isSequentialAmrap,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
   isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
@@ -81,6 +81,7 @@ import { resolveResultMovementLines } from './resultWorkoutLines'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
+import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
@@ -2334,6 +2335,11 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         ? (log._setsScore != null ? `${log._setsScore}${setsWeightScored ? ((log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg') : ` ${t.clasamentRepsUnit}`}` : '—')
                         : effFormat?.family === 'chained'
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
+                        // INC-11 - Sequence AMRAP: canonical Total Reps, same read
+                        // as the sort (partialRepsOfLog, isSequential). Classic
+                        // repeated-round AMRAP keeps "N runde + M" untouched.
+                        : (isSequentialAmrap(effFormatId, effFormatConfig) && log.result)
+                        ? `${partialRepsOfLog({ result: log.result }, true)} ${t.clasamentRepsUnit}`
                         : (log.time_result || log.result || '—')
                       const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
                       // P9.5.6 - AXIS B only: did the athlete materially change
@@ -6157,8 +6163,15 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // stie de ele - construim direct din log_meta (totalReps +
               // textul deja compus per etapa, fara niciun re-parse).
               const chainedTotalReps = formatAfisat?.family === 'chained' ? (w.log_meta?.totalReps ?? null) : null
+              // INC-11 - a Sequence AMRAP result ("50/50 A, 63/75 B") is ordered
+              // station progress; lead with the canonical Total Reps (owner
+              // decision #5/#57), then the per-station detail. Same read as
+              // sortSectionLogs (partialRepsOfLog, isSequential).
+              const sequentialAmrapTotal = (isSequentialAmrap(formatTipResolvat, formatConfigResolvat) && w.result)
+                ? partialRepsOfLog({ result: w.result }, true) : null
               const rezultatBucati = wSetsText != null ? [wSetsText]
                 : chainedTotalReps != null ? [t.jurnalTotalRepsLabel(chainedTotalReps), ...(w.log_meta?.stages || []).map(s => s.text).filter(Boolean)]
+                : sequentialAmrapTotal != null ? [t.jurnalTotalRepsLabel(sequentialAmrapTotal), ...rezultatBucatiRaw]
                 : ascendingTotalReps != null ? [t.jurnalTotalRepsLabel(ascendingTotalReps), ...rezultatBucatiRaw]
                 : rezultatBucatiRaw
               const areRezultatFinal = areRezultat || (chainedTotalReps != null)
@@ -8875,6 +8888,23 @@ function App() {
     // n-a terminat e absenta Timpului; in acel caz compunem direct din
     // repetarile per miscare (cu fallback la prescris pt cele netouched).
     const isSequential = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
+    // INC-11 - a Sequence AMRAP freezes ordered station progress. NOT "capped"
+    // (an AMRAP clock always expires - never DNF/capped, §39/§40): completion_state
+    // stays null exactly like a classic AMRAP. An untouched later station = NOT
+    // REACHED (omitted from the result); prior FIXED targets auto-complete (§15).
+    // Leaderboard Total Reps is read back by partialRepsOfLog(log, true) - the
+    // existing sequential ranking path, INC-09 selection untouched.
+    if (isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)) {
+      const stations = sequentialAmrapStations
+        || resolveSequentialAmrapStations({ lines: miscariPentruLog }).stations
+      const result = (stations && stations.length)
+        ? composeSequentialAmrapResult(stations, wodPartialReps)
+        : composeAmrapResult(wodRoundsCompleted, wodPartialReps, miscariPentruLog)
+      return {
+        result: result || null, time_result: null, completion_state: null,
+        sets: null, log_meta: null, weight_logged: wodWeightLogged.trim() || null,
+      }
+    }
     // LEADERBOARD_FINISH_TIME_INVESTIGATION.md - RFT/For Time (Repeated
     // Rounds)/Partner WOD sunt exact subsetul NEsecvential, scoreMode
     // 'fortime_or_amrap' - pt acest subset isSequential e mereu fals si
@@ -9625,15 +9655,30 @@ function App() {
   // which, in a frozen flow, is logCtx.prescriptionDoc (frozen at click) -
   // never re-resolved from live wods. null -> legacy text fallback.
   const frozenVariantKey = variantaAleasa !== null ? variantKeyFromLevel(VARIANTE_CONFIG[variantaAleasa]?.nivel) : null
-  const structuredLogLines = (variantaAleasa !== null && frozenVariantKey)
-    ? (composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })?.lines ?? null)
+  const structuredLogDisplay = (variantaAleasa !== null && frozenVariantKey)
+    ? (composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey }) ?? null)
     : null
+  const structuredLogLines = structuredLogDisplay?.lines ?? null
   const miscariPentruLog = editLogId
     ? editLogMiscari
     : logTargetSection ? (logTargetSection.movements || []).map(m => m.name)
     : (variantaAleasa !== null && logWodZiData
         ? (wodMiscariCustom ?? (structuredLogLines && structuredLogLines.length ? structuredLogLines : (logWodZiData[VARIANTE_CONFIG[variantaAleasa]?.key] ?? [])))
         : wodMiscari)
+  // INC-11 - the ordered rep-only station list for a Sequence AMRAP, resolved
+  // ONCE here (structured frozen prescription first via decision #4 precedence,
+  // else the movement text lines) and fed to the score-definition, the logger
+  // and composeWodLogFields so no surface re-derives it. `.supported` is false
+  // for a mixed-unit body -> callers keep the classic Rounds+Additional input.
+  const sequentialAmrapActive = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
+  const sequentialAmrapResolved = sequentialAmrapActive
+    ? resolveSequentialAmrapStations({
+        instances: (structuredLogDisplay?.movements && structuredLogDisplay.movements.length) ? structuredLogDisplay.movements : null,
+        lines: miscariPentruLog,
+      })
+    : null
+  const sequentialAmrapStations = (sequentialAmrapResolved && sequentialAmrapResolved.supported)
+    ? sequentialAmrapResolved.stations : null
   // Greutatea prescrisa a variantei active, pt genul propriu al membrului
   // (logare noua sau editare) - vezi resultCompositionModified in workoutFormats.js. Pt o
   // sectiune suplimentara, ramane goala aici - resolveSectionStandardKg
@@ -11056,7 +11101,17 @@ function App() {
                 // format ca orice rezultat salvat (non-null) e o compunere de
                 // repetari per miscare, fara sa mai ghicim din tiparul textului.
                 const areRundeCompuse = /^\d+\s+runde/.test((log.result || '').trim())
-                if (isSequentialFormat(formatId, formatConfigForEdit)) {
+                if (isSequentialAmrap(formatId, formatConfigForEdit)) {
+                  // INC-11 - reopen the frozen sequential-AMRAP result against
+                  // its own stations (index-keyed so a repeated movement name
+                  // stays two stations). P10 - stations from the FROZEN config +
+                  // frozen movement lines, never today's workout.
+                  const seqStations = resolveSequentialAmrapStations({ lines: movimenteLog }).stations
+                  const partialArr = (seqStations && seqStations.length && log.result)
+                    ? parseSequentialAmrapResult(log.result, seqStations)
+                    : (log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => ''))
+                  setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
+                } else if (isSequentialFormat(formatId, formatConfigForEdit)) {
                   const partialArr = log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => '')
                   setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps(partialArr)
                 } else if (format.scoreMode === 'amrap' || (format.scoreMode === 'fortime_or_amrap' && areRundeCompuse)) {
@@ -11224,6 +11279,9 @@ function App() {
             // Finished / Did-not-finish choice for capped For-Time workouts.
             const scoreDef = scoreDefinitionFor(activeLogFormatId, activeLogFormatConfig, {
               legacyDurationSec: timeToSec(logWodZiData?.duration),
+              // INC-11 - resolved rep-only station list for a Sequence AMRAP
+              // (null when classic / mixed-unit -> classic ROUNDS_REPS input).
+              sequentialAmrapStations,
             })
             // P9.5.3 - a STRUCTURED per-movement metcon shows every load in the
             // workout body and offers the P9.5.2 Edit flow for performed loads;
@@ -11411,6 +11469,7 @@ function App() {
               formatId={activeLogFormatId}
               config={activeLogFormatConfig}
               movements={miscariPentruLog}
+              sequentialAmrapStations={sequentialAmrapStations}
               prescribedWeight={prescribedWeightPentruLog}
               rxStatus={liveRxStatus}
               value={{

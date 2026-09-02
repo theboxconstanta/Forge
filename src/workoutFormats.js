@@ -39,9 +39,20 @@ export const AUTO_DURATION_FORMAT_IDS = ['EMOM', 'Tabata', 'Intervals']
 // literal) - catalogul e partajat intre UI romana/engleza, vezi
 // FormatConfigEditor care rezolva `t[labelKey]`.
 export const WORKOUT_FORMATS = {
+  // INC-11 - AMRAP is a TIME ENVELOPE, not a progression structure. `structure`
+  // is the explicit discriminator (same concept + same canonical vocabulary as
+  // For Time's `structure`): 'Repeated Rounds' (classic - repeat the round list
+  // until the clock expires, scored Rounds + Additional Reps) vs 'Sequence' (a
+  // finite ordered pass - buy-in / chipper / buy-in + max-reps tail - scored as
+  // ordered station progress + Total Reps). ABSENT = 'Repeated Rounds' (every
+  // legacy AMRAP; `required:false`, never inferred from movement text - INC-11
+  // §31/§65). Member display suppresses it (MEMBER_SUPPRESSED_FIELDS).
   'AMRAP': {
     family: 'scored', scoreMode: 'amrap',
-    config: { durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' } },
+    config: {
+      durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' },
+      structure: { type: 'select', options: ['Sequence', 'Repeated Rounds'], required: false, default: 'Repeated Rounds', labelKey: 'fmtAmrapStructure' },
+    },
   },
   // AMRAP cu runde care cresc (ex. "AVALANCHE": 3-3, 6-6, 9-9... burpees si
   // deadlifts, +3 la fiecare runda) - gasit deja programat manual la aceasta
@@ -694,8 +705,21 @@ export function effectiveScoreMode(formatId, config) {
 // descrescatoare e prin definitie secventiala, fara varianta "runde
 // repetate"). Orice cod care citea inainte direct `.sequentialPartial`
 // (static, din catalog) trebuie sa foloseasca acum aceasta functie.
+// INC-11 - a base AMRAP whose coach explicitly marked it a finite one-way pass
+// (`format_config.structure === 'Sequence'`). Base 'AMRAP' only: 'Ascending
+// AMRAP' is inherently a repeated round (increasing targets) and never carries
+// `structure`. ABSENT / 'Repeated Rounds' -> false (classic behaviour, the
+// default for every legacy AMRAP - never guessed from movement text).
+export function isSequentialAmrap(formatId, config) {
+  return formatId === 'AMRAP' && config?.structure === 'Sequence'
+}
+
 export function isSequentialFormat(formatId, config) {
   if (formatId === 'For Time') return config?.structure !== 'Repeated Rounds'
+  // INC-11 - a Sequence AMRAP ranks + logs as ordered station progress (Total
+  // Reps), exactly the existing sequential path (sortSectionLogs skips the
+  // rounds diff and sums partial reps; the edit flow re-parses per-movement).
+  if (isSequentialAmrap(formatId, config)) return true
   // Lucrul principal al unui Buy-In/Cash-Out cu mainFormat "For Time" e o
   // secventa (nu runde repetate, spre deosebire de "For Time" simplu, care
   // are un camp explicit `structure` pt asta) - acelasi motiv ca Chipper mai

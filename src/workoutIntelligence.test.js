@@ -132,6 +132,18 @@ describe('sectionFromAiSection - primary section', () => {
     expect(Array.isArray(s.variants.rx.movements)).toBe(true)
   })
 
+  it('INC-11 - carries formatConfig.structure "Sequence" through (AI/manual parity)', () => {
+    const s = sectionFromAiSection(section({ formatConfig: { ...section().formatConfig, structure: 'Sequence' } }), true)
+    expect(s.formatConfig).toEqual({ durationSec: 1200, structure: 'Sequence' })
+  })
+
+  it('INC-11 - "Repeated Rounds" / null structure writes NO key (back-compatible)', () => {
+    const repeated = sectionFromAiSection(section({ formatConfig: { ...section().formatConfig, structure: 'Repeated Rounds' } }), true)
+    expect(repeated.formatConfig).toEqual({ durationSec: 1200 })
+    const none = sectionFromAiSection(section({ formatConfig: { ...section().formatConfig, structure: null } }), true)
+    expect(none.formatConfig).toEqual({ durationSec: 1200 })
+  })
+
   it('picks the RX variant weight from the first weighted movement', () => {
     const s = sectionFromAiSection(section({ movements: [toMovementShape(movement({ weightMale: 43, weightFemale: 30, weightUnit: 'kg' }))] }), true)
     expect(s.variants.rx.weight).toEqual({ male: '43kg', female: '30kg' })
