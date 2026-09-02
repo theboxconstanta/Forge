@@ -26,13 +26,42 @@ export function parseIntervalStationKey(key) {
   return { roundIndex: parseInt(m[1], 10), stationIndex: parseInt(m[2], 10), name: m[3] }
 }
 
-function repsOf(rows) {
-  const row = Array.isArray(rows) ? rows[0] : null
-  if (!row) return null
-  const v = row.reps
+function repsStr(v) {
   // 0 is a real logged value; '' / null / undefined = not logged (partial).
   if (v === '' || v == null) return null
   return String(v)
+}
+
+function repsOf(rows) {
+  const row = Array.isArray(rows) ? rows[0] : null
+  return row ? repsStr(row.reps) : null
+}
+
+// P9.5.2A - the performed composition of ONE (round, station) cell. A row with a
+// `pm` marker is a performed-movement entry (new v2 contract); a row without is
+// a legacy INC-08 score row. Legacy cell -> one entry (name null). v2 cell -> N
+// entries; a `pm.notPerformed` row -> the whole cell was not performed.
+function cellComposition(rows) {
+  const arr = Array.isArray(rows) ? rows : []
+  const isV2 = arr.some((r) => r && r.pm)
+  if (!isV2) {
+    const r0 = arr[0] || null
+    const reps = r0 ? repsStr(r0.reps) : null
+    return { reps, v2: false, notPerformed: false, performedEntries: r0 ? [{ name: null, canonicalMovementId: null, reps, notPerformed: false }] : [] }
+  }
+  const notPerformed = arr.some((r) => r?.pm?.notPerformed === true)
+  const performedEntries = arr.map((r) => ({
+    name: r.pm?.name ?? null,
+    canonicalMovementId: r.pm?.canonicalMovementId ?? null,
+    reps: repsStr(r.reps),
+    notPerformed: r.pm?.notPerformed === true,
+  }))
+  // Cell aggregate reps = sum of the entries' numeric reps (null when the cell
+  // was untouched / not-performed). computeSetsScore already sums the raw rows;
+  // this is display-only, no double count.
+  const nums = performedEntries.filter((e) => !e.notPerformed).map((e) => parseFloat(e.reps)).filter((n) => Number.isFinite(n))
+  const reps = notPerformed ? null : (nums.length ? String(nums.reduce((a, b) => a + b, 0)) : null)
+  return { reps, v2: true, notPerformed, performedEntries }
 }
 
 /**
@@ -62,7 +91,7 @@ export function resolveStructuredIntervalResult(log) {
   const parsed = Object.entries(log.sets || {})
     .map(([key, rows]) => {
       const p = parseIntervalStationKey(key)
-      return p ? { ...p, reps: repsOf(rows) } : null
+      return p ? { ...p, ...cellComposition(rows) } : null
     })
     .filter(Boolean)
   // The snapshot claims structured but the keys are not the round-major form
@@ -82,12 +111,21 @@ export function resolveStructuredIntervalResult(log) {
   }
 
   const byKey = new Map(inRange.map((p) => [`${p.roundIndex}:${p.stationIndex}`, p]))
+  const hasComposition = inRange.some((p) => p.v2)
   const rounds = []
   for (let r = 1; r <= roundCount; r++) {
     const stations = []
     for (let s = 1; s <= stationCount; s++) {
       const hit = byKey.get(`${r}:${s}`)
-      stations.push({ stationIndex: s, label: stationLabels[s - 1], reps: hit ? hit.reps : null })
+      stations.push({
+        stationIndex: s,
+        label: stationLabels[s - 1],
+        reps: hit ? hit.reps : null,
+        // P9.5.2A - per-cell performed composition (INC-07/08 round/station
+        // identity unchanged). Legacy cell -> single entry (name null).
+        performedEntries: hit ? hit.performedEntries : [],
+        notPerformed: hit ? !!hit.notPerformed : false,
+      })
     }
     rounds.push({ roundIndex: r, stations })
   }
@@ -98,6 +136,7 @@ export function resolveStructuredIntervalResult(log) {
     stationCount,
     stationLabels,
     rounds,
+    hasComposition,
     expectedScoreEntryCount: roundCount * stationCount,
     actualScoreEntryCount: parsed.length,
     extraEntries,

@@ -5820,12 +5820,39 @@ function IntervalResultRounds({ intervalResult, t }) {
           <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', marginBottom: '2px' }}>
             {t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(rd.roundIndex) : `Rundă ${rd.roundIndex}`}
           </div>
-          {rd.stations.map((st) => (
-            <div key={st.stationIndex} style={{ fontSize: '11px', color: '#888', display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '1px 0' }}>
-              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{st.label}</span>
-              <span style={{ flexShrink: 0 }}>{st.reps != null ? `${st.reps} ${repsWord}` : '—'}</span>
-            </div>
-          ))}
+          {rd.stations.map((st) => {
+            // P9.5.2A - a station whose performed composition was split / changed
+            // / not performed shows the actual movements under its label; the
+            // frozen (round, station) identity is unchanged.
+            const comp = (st.performedEntries || []).filter((e) => e && (e.name || e.notPerformed))
+            if (st.notPerformed) {
+              return (
+                <div key={st.stationIndex} style={{ fontSize: '11px', color: '#888', display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '1px 0' }}>
+                  <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{st.label}</span>
+                  <span style={{ flexShrink: 0, fontStyle: 'italic' }}>{t?.performedNotPerformedShort || 'not performed'}</span>
+                </div>
+              )
+            }
+            if (comp.length > 0) {
+              return (
+                <div key={st.stationIndex} style={{ padding: '1px 0' }}>
+                  <div style={{ fontSize: '11px', color: '#888' }}>{st.label}</div>
+                  {comp.map((e, ei) => (
+                    <div key={ei} style={{ fontSize: '11px', color: '#888', display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '0 0 0 10px' }}>
+                      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{e.name || st.label}</span>
+                      <span style={{ flexShrink: 0 }}>{e.reps != null ? `${e.reps} ${repsWord}` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+            return (
+              <div key={st.stationIndex} style={{ fontSize: '11px', color: '#888', display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '1px 0' }}>
+                <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{st.label}</span>
+                <span style={{ flexShrink: 0 }}>{st.reps != null ? `${st.reps} ${repsWord}` : '—'}</span>
+              </div>
+            )
+          })}
         </div>
       ))}
     </>
