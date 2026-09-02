@@ -2,7 +2,7 @@
 
 **Priority:** P11 / AI Learning Foundation
 **Date:** 2026-09-02
-**Status:** AUDIT COMPLETE — **implementation BLOCKED on owner decisions D1–D3 (§ "Owner decisions required")**
+**Status:** **CLOSED / GREEN** — D1 = A, D2 = A, D3 = B (owner-approved). Migration `20260902100000` applied to production; extractor + trigger + stats live; smoke A/B/C/E + integration D/idempotency/security all pass.
 **Mode:** evidence-first · deterministic · tenant-safe · minimal · reversible · **no retrieval / no RAG / no embeddings / no fine-tuning**
 
 Retrieval remains **OFF**. Nothing in P11.2 feeds evidence into a prompt, a few-shot block, a training file, or the model. P11.2 produces *queryable evidence only*.
@@ -219,4 +219,67 @@ P11.3 = **read-model / relational retrieval design** (still no embeddings): give
 
 ---
 
-**HARD STOP** — awaiting owner decisions D1, D2, D3. No schema, migration, Edge Function, or client code has been changed by this audit. Retrieval / RAG / embeddings / fine-tuning / member-performance intelligence / INC-10: not started.
+---
+
+## 10. Implementation (D1=A · D2=A · D3=B) — CLOSED/GREEN 2026-09-02
+
+Migration **`supabase/migrations/20260902100000_p11_2_ai_correction_evidence.sql`** (additive, 1 `BEGIN`/1 `COMMIT`, full DOWN + kill switch). Applied to production; ledger version `20260902100000` registered (only that one — the historical drift is untouched, §11).
+
+### 10.1 Objects
+
+| Object | Notes |
+|---|---|
+| `public.ai_correction_evidence` (24 cols) | append-only. `ai_run_id → ai_analysis_runs` CASCADE, `gym_id → gyms` CASCADE, `coach_id → auth.users` SET NULL. `UNIQUE (ai_run_id, correction_path, extractor_version)` = the replay key. CHECK: `evidence_type ∈ {correction, coach_completion}`; `taxonomy_kind` in a fixed 18-value set; `reliability ∈ {DETERMINISTIC, AMBIGUOUS, UNSUPPORTED}`; `variant ∈ {rx, intermediate, beginner, onramp}`; `gender_dimension ∈ {universal, male, female, sex_specific}`; **`taxonomy_kind <> 'REST_TIME' OR (movement_id IS NULL AND movement_name IS NULL)`** (REST is never a movement). 8 indexes. |
+| RLS | SELECT `is_coach_or_admin(gym_id)`; INSERT `WITH CHECK (false)`; UPDATE `USING (false)`; **no DELETE policy**. Only the SECURITY DEFINER extractor writes. |
+| `enforce_ai_correction_evidence_immutability()` + `BEFORE UPDATE` trigger | raises on any UPDATE (append-only). **UPDATE-only** — never blocks an `ON DELETE CASCADE`. |
+| `p11_extract_correction_evidence(p_run_id uuid)` SECURITY DEFINER | the extractor. `c_extractor := 'p11.2-correction-extractor-v1'`. Deterministic, idempotent (`ON CONFLICT DO NOTHING`), replayable. Reads **only** the frozen `ai_analysis_runs.normalized_output / saved_output / semantic_diff` for one run. No current-WOD read, no `wod_logs` read. |
+| `p11_ai_analysis_run_extract_trg()` + `ai_analysis_runs_extract_evidence` `AFTER UPDATE` trigger | fires once on `saved_at NULL → NOT NULL`, wrapped in `EXCEPTION WHEN OTHERS THEN RAISE WARNING` — **fail-open: learning extraction never blocks the coach's Save-linkage**. No automatic historical backfill (only new transitions). |
+| `p11_correction_evidence_stats(p_gym_id, …)` SECURITY DEFINER, tenant-guarded | returns a jsonb object. Run-level denominator (`eligible_saved_runs`, `accepted_*_runs`, `runs_with_evidence`) is reported **separately** from evidence-row counts. Breakdowns by taxonomy_kind / variant / gender_dimension / movement / format / structure / extractor_version. **No rows/rows ratio.** REVOKEd from anon; GRANT to authenticated. |
+| helpers | `p11_norm_movement_name(text)` (byte-for-byte the JS `normMovementName`), `p11_2_spec_parts(jsonb)` (parses a `semantic_diff` metric tuple), `p11_2_describe(...)`, `p11_2_section_fingerprint(jsonb)`, `p11_2_emit_evidence(...)` (internal, REVOKEd from PUBLIC/anon/authenticated). |
+
+### 10.2 Shape correction found during smoke
+
+`ai_analysis_runs.normalized_output` is **not** the `EditableSection[]` the diff ran against — it is the flat `WorkoutAnalysis` the Edge Function produced (`transform.ts toWorkoutAnalysis`), a JSON **object** with `.sections[]` (`.scalingVersions[]`), `.scaling{}`, `.movements[]`. `saved_output` **is** the `EditableSection[]` array. The extractor was corrected: movement identity comes from `saved_output` + the `name` the diff already records in every movement/metric delta; D2 (whole-tier completion) derives the AI-produced tiers from `normalized_output.sections[].scalingVersions[].level` (`on_ramp → onramp`) + non-null `.scaling{}` keys, and **emits nothing if neither signal is present** (§38 — no fabricated certainty).
+
+### 10.3 Classification (extractor v1)
+
+- **Cosmetic deltas** (`title_changed`, `note_changed`, `movement_renamed`) → **skipped**, zero rows (mission #8).
+- Section deltas → `FORMAT / STRUCTURE / SCORE_FAMILY / DURATION / ROUNDS / REST_TIME / SECTION_ADD / SECTION_REMOVE`, `DETERMINISTIC`.
+- Movement structural → `MOVEMENT_ADD / MOVEMENT_REMOVE / MOVEMENT_IDENTITY`; `MOVEMENT_ORDER` is **AMBIGUOUS + eligibility `ambiguous`** when a movement repeats in the `from` key list.
+- Metric deltas (`reps/load/distance/calories`) → split by dimension: both-`sex_specific` emits a `male` row and/or a `female` row only for the halves that actually changed; universal/text emits one `universal` row; a mode change emits one `sex_specific` row.
+- **`coach_completion`**: the `from` side of a metric delta is `NULL` → `PRESCRIPTION_COMPLETION` (field-level, per dimension). A whole `intermediate/beginner/onramp` tier the AI never produced but the coach saved → `VARIANT_COMPLETION`. Never mixed with `correction`.
+- **Eligibility gate**: `status = 'ok'` · `saved_at` set · `wod_id` set · `saved_output` is an array · `outcome ∈ {accepted_unchanged, accepted_cosmetic, accepted_semantic}`. → `abandoned` / `save_failed` / failed / manual runs produce **zero** rows.
+
+### 10.4 Tests
+
+- `src/p11_2AiCorrectionEvidenceMigration.test.js` — 33 structural assertions (additive, append-only, RLS, fail-open trigger, REST-not-a-movement CHECK, idempotency key, no backfill, no embeddings, D1/D2/D3 shape).
+- **Production integration (synthetic runs, real trigger + extractor, `ROLLBACK`)**: S1 variant isolation → 3 independent variant LOAD rows, no RX, no spurious completion; S2 gender → exactly one `female` row; S3 → 3 `VARIANT_COMPLETION`; S4 `structure` → 1 `STRUCTURE`; S5 unchanged → 0; S6 `rest_changed` → 1 `REST_TIME`, `movement_name NULL`; S7 null-from load → 1 `PRESCRIPTION_COMPLETION`; S8 `reps_changed` → 1 `REPS` (never LOAD); reorder-with-repeat → `AMBIGUOUS`; abandoned / failed → 0; extractor replayed 3× → still one row set (idempotent).
+- Full regression: `1828` vitest tests pass (the 10 failing files are the pre-existing Deno-EF-under-vitest `@std/assert` resolution errors — unrelated). `analyze-workout` Deno tests 6/6. `vite build` clean.
+
+### 10.5 Production smoke (forge-admin, gym `c5ecbe2c…`, WolfPack CrossFit)
+
+| Smoke | Run | Result |
+|---|---|---|
+| **A** — Generate + Save unchanged | `e7a54cbb-2c6e-463d-a06a-6b272c831622` | `outcome accepted_unchanged`; trigger fired; **0 evidence rows** |
+| **B** — Generate + change one Intermediate field | `0c677beb-781c-4209-9184-afc142717127` | 1 row: `correction / REPS / intermediate / universal / 10→8` (trigger fired while the extractor still had the pre-fix eligibility bug → re-run of the fixed extractor produced the row; kept as smoke evidence) |
+| **C** — change Intermediate + On-Ramp independently | `13ae4ecc-6366-4d3e-9d4e-98f827ac7ff2` | **exactly 2 rows**, distinct `correction_path`: `…vintermediate…reps_changed` (10→9) and `…vonramp…reps_changed` (6→5). No RX/Beginner row. Trigger auto-fired. |
+| **D** — AI omission / coach completion | — | Not reproduced in the browser (the model reliably produces the tiers it is given; the AI-omits-a-tier case needs a manual add). Proven deterministically by integration S3 (3 `VARIANT_COMPLETION`) + S7 (field-level `PRESCRIPTION_COMPLETION`). **Smoke limitation stated.** |
+| **E** — Repeated Rounds → Sequence | `2a9dd7eb-be76-47bb-b367-b8d24303aa94` | 1 row: `correction / STRUCTURE / field structure / null → "Sequence"`. Trigger auto-fired. |
+| **F** — manual workout | — | Manual authoring creates no `ai_analysis_runs` row → no trigger → no evidence (established by P11.1 Smoke C). |
+| **G** — security | — | anon `GET /rest/v1/ai_correction_evidence` → HTTP 200 `[]` (RLS). anon `rpc/p11_correction_evidence_stats` → `42501 permission denied for function`. `p11_correction_evidence_stats` tenant guard raises `not authorized for gym …` for a non-coach caller (real + fake gym). Cross-tenant is the identical `is_coach_or_admin(gym_id)` pattern as 64 other production policies. |
+
+**Final production state:** 4 evidence rows across 3 runs (B: 1, C: 2, E: 1), all `evidence_type = correction`, all `DETERMINISTIC`, all with `ai_run_id` + `gym_id`. `pg_extension` for vector/pgvector = 0. Test workouts on 2026-09-20…09-23 (gym `c5ecbe2c…`) left in place as smoke artifacts (no forge-admin delete affordance; SQL delete would unwind the `wods`↔`workouts` FK graph).
+
+### 10.6 Rollback
+
+`DROP TABLE public.ai_correction_evidence CASCADE;` — the AFTER trigger then no-ops (its INSERT target is gone → caught by the fail-open sub-block), coach authoring is completely unaffected. Full DOWN in the migration footer + `DELETE FROM supabase_migrations.schema_migrations WHERE version='20260902100000'`.
+
+---
+
+## 11. Backlog — P11.x INTERVAL / FORMAT-PARAM LEARNING EVIDENCE COVERAGE (NOT implemented)
+
+D3 = B: P11.2 consumes P11.1's `semantic_diff` as-is. P11.1's `sectionFormatSig` does **not** emit deterministic deltas for `workSec`, `restPlacement`, `intervalSec`, `startReps`, `incrementReps`, Tabata-specific work/rest, Chained-format params, or other format-specific interval parameters — so corrections to those fields are **not** captured as evidence. A future phase (**P11.x — Interval / Format-Param Learning Evidence Coverage**) would additively extend `aiProvenanceDiff` `sectionFormatSig` (both synced copies) + a new taxonomy kind, re-parity-test, redeploy `analyze-workout`. Do **not** start without a new request.
+
+---
+
+**HARD STOP.** Retrieval / RAG / embeddings / pgvector / few-shot / dynamic prompt augmentation / fine-tuning / member-performance intelligence / global example promotion / P11.3 / INC-10: not started. No AI Analyze prompt change. Evidence is never fed back to the model.
