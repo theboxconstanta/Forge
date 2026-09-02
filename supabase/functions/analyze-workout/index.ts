@@ -18,6 +18,17 @@ import { buildSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
 import { toWorkoutAnalysis, validateWorkoutAnalysis, TRANSFORM_VERSION } from "./transform.ts";
 import { matchBenchmark } from "./benchmarks.ts";
 import { CORS, OpenAiHttpError, callOpenAiWithRetry, errorResponse } from "../_shared/openai.ts";
+import { extractLearningContext, LEARNING_CONTEXT_VERSION } from "./learningContext.ts";
+import { selectAndSerialize } from "./learningHints.ts";
+
+// P11.4 - controlled learning-hint injection. Runtime kill switch / mode via
+// env (no redeploy). Unknown/missing => off (fail-safe; production is NEVER
+// silently active).
+export function resolveLearningMode(raw: string | undefined): "off" | "shadow" | "active" {
+  const v = (raw || "").trim().toLowerCase();
+  return v === "shadow" || v === "active" ? v : "off";
+}
+const LEARNING_READ_MODEL_VERSION = "p11.3-read-model-v1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -97,6 +108,124 @@ export function tokenUsageOf(raw: any) {
 // P11.1 - one best-effort provenance insert. Returns the run id, or null if the
 // insert failed / the ledger table does not exist yet (fail-open: the caller
 // ignores null and the coach flow is untouched).
+// P11.4 - gather learning hints BEFORE the model call. Fully fail-open: any
+// failure => zero hints, empty fragment, Analyze continues unchanged. Never
+// throws. Retrieval is bounded by an internal deadline so it cannot eat the
+// OpenAI timeout budget.
+// deno-lint-ignore no-explicit-any
+async function gatherLearning(admin: any, mode: "off" | "shadow" | "active", gymId: string, workout: string, gymMovementNames: string[]): Promise<{
+  fragment: string;
+  record: Record<string, unknown>;
+}> {
+  const base = {
+    learning_mode: mode,
+    read_model_version: LEARNING_READ_MODEL_VERSION,
+    selector_version: "p11.4-selector-v1",
+    serializer_version: "p11.4-hint-serializer-v1",
+    prompt_version: PROMPT_VERSION,
+    retrieval_status: "disabled" as string,
+    retrieval_latency_ms: null as number | null,
+    error_class: null as string | null,
+    query_context: {} as unknown,
+    candidate_hint_count: 0,
+    selected_hint_count: 0,
+    selected_hints: [] as unknown[],
+    prompt_fragment_chars: 0,
+    prompt_fragment_sha256: null as string | null,
+  };
+  if (mode === "off") return { fragment: "", record: base };
+
+  const startedAt = Date.now();
+  try {
+    const ctx = extractLearningContext(workout, gymMovementNames);
+    const queries: Record<string, unknown>[] = [];
+    // LOAD - one query per deterministically detected (movement, variant, unit)
+    for (const d of ctx.detected) {
+      if (!d.variant || !d.unit) continue;
+      queries.push({
+        p_gym_id: gymId, p_taxonomy: "LOAD", p_variant: d.variant,
+        p_movement_name: d.movementName, p_unit: d.unit,
+        p_gender_dimension: d.genderDimension === "universal" ? "universal" : null,
+        p_format: ctx.formatExplicit ? ctx.format : null, p_max_patterns: 10,
+      });
+    }
+    // VARIANT_COMPLETION - for each scaling tier the input did NOT label
+    if (ctx.formatExplicit) {
+      for (const v of ctx.absentScalingTiers) {
+        queries.push({ p_gym_id: gymId, p_taxonomy: "VARIANT_COMPLETION", p_variant: v, p_format: ctx.format, p_evidence_type: "coach_completion", p_max_patterns: 5 });
+      }
+    }
+    // STRUCTURE - ONLY when the raw input literally declared it
+    if (ctx.structureExplicit && ctx.formatExplicit) {
+      queries.push({ p_gym_id: gymId, p_taxonomy: "STRUCTURE", p_format: ctx.format, p_structure: ctx.structure, p_max_patterns: 5 });
+    }
+
+    base.query_context = {
+      contextVersion: ctx.contextVersion, format: ctx.format, formatExplicit: ctx.formatExplicit,
+      structure: ctx.structure, structureExplicit: ctx.structureExplicit,
+      scalingLabelsPresent: ctx.scalingLabelsPresent, absentScalingTiers: ctx.absentScalingTiers,
+      detected: ctx.detected, diagnostics: ctx.diagnostics, queryCount: queries.length,
+    };
+
+    if (queries.length === 0) {
+      base.retrieval_status = "no_context";
+      base.retrieval_latency_ms = Date.now() - startedAt;
+      return { fragment: "", record: base };
+    }
+
+    const DEADLINE_MS = 2500;
+    const readModels = await Promise.race([
+      Promise.all(queries.map(async (q) => {
+        const { data, error } = await admin.rpc("p11_3_retrieve_impl", q);
+        if (error) throw new Error(error.message);
+        return data;
+      })),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("retrieval_deadline")), DEADLINE_MS)),
+    ]);
+
+    const sel = selectAndSerialize({ readModels: readModels as unknown[], allowStructure: ctx.structureExplicit });
+    base.retrieval_latency_ms = Date.now() - startedAt;
+    base.candidate_hint_count = sel.candidateHintCount;
+    base.selected_hint_count = sel.selectedHints.length;
+    base.selected_hints = sel.selectedHints.map((h) => ({
+      taxonomy: h.taxonomy, variant: h.variant, movement: h.movement, unit: h.unit,
+      format: h.format, structureNorm: h.structureNorm, evidenceType: h.evidenceType,
+      distinctRunCount: h.distinctRunCount, beforeValue: h.beforeValue, afterValue: h.afterValue,
+    }));
+    base.prompt_fragment_chars = sel.promptFragmentChars;
+
+    if (sel.selectedHints.length === 0) {
+      base.retrieval_status = sel.candidateHintCount === 0 ? "no_matches" : "no_eligible_hints";
+      return { fragment: "", record: base };
+    }
+    if (mode === "shadow") {
+      base.retrieval_status = "shadow_selected";
+      return { fragment: "", record: base };
+    }
+    base.retrieval_status = "active_selected";
+    base.prompt_fragment_sha256 = await sha256Hex(sel.promptFragment);
+    return { fragment: sel.promptFragment, record: base };
+  } catch (e) {
+    base.retrieval_status = "retrieval_failed";
+    base.retrieval_latency_ms = Date.now() - startedAt;
+    base.error_class = String((e as Error)?.message || e).slice(0, 60).replace(/[^a-z0-9_:\- ]/gi, "");
+    return { fragment: "", record: base };
+  }
+}
+
+// P11.4 - best-effort companion-ledger write, keyed 1:1 to the P11.1 run id.
+// Never throws; a failure here never invalidates the Analyze result.
+// deno-lint-ignore no-explicit-any
+async function recordLearning(admin: any, aiRunId: string | null, gymId: string | null, coachId: string, rec: Record<string, unknown>): Promise<void> {
+  if (!aiRunId || !gymId) return;
+  try {
+    const { error } = await admin.from("ai_analysis_run_learning").insert({ ai_run_id: aiRunId, gym_id: gymId, coach_id: coachId, ...rec });
+    if (error) console.error("analyze-workout: ai_analysis_run_learning insert failed", error.message);
+  } catch (e) {
+    console.error("analyze-workout: ai_analysis_run_learning insert threw", e);
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function recordRun(admin: any, fields: Record<string, unknown>): Promise<string | null> {
   try {
@@ -194,13 +323,22 @@ Deno.serve(async (req) => {
       gymMovementNames = (movementRows ?? []).map((m: { name: string }) => m.name);
     }
 
+    // P11.4 - deterministic pre-model learning retrieval (fail-open). The
+    // fragment is non-empty ONLY in ACTIVE mode with >=1 eligible pattern.
+    const learningMode = resolveLearningMode(Deno.env.get("P11_LEARNING_HINTS_MODE"));
+    const learning = canRecord
+      ? await gatherLearning(admin, learningMode, provGymId!, workout, gymMovementNames)
+      : { fragment: "", record: { learning_mode: learningMode, retrieval_status: "disabled" } as Record<string, unknown> };
+    const recordLearningFor = (aiRunId: string | null) =>
+      recordLearning(admin!, aiRunId, provGymId, caller.id, learning.record);
+
     // deno-lint-ignore no-explicit-any
     let raw: any;
     try {
       raw = await callOpenAiWithRetry({
         apiKey: OPENAI_API_KEY!,
         model: OPENAI_MODEL,
-        systemPrompt: buildSystemPrompt(gymMovementNames),
+        systemPrompt: buildSystemPrompt(gymMovementNames, learning.fragment),
         userContent: workout,
         schemaName: "workout_analysis",
         jsonSchema: WORKOUT_ANALYSIS_JSON_SCHEMA,
@@ -211,7 +349,7 @@ Deno.serve(async (req) => {
       } else {
         console.error("analyze-workout: cererea către OpenAI a eșuat", err);
       }
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "error", error_detail: "openai_unreachable", latency_ms: Date.now() - runStartedAt });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "error", error_detail: "openai_unreachable", latency_ms: Date.now() - runStartedAt }));
       return errorResponse(502, "Serviciul AI nu a putut fi contactat, încearcă din nou");
     }
 
@@ -221,7 +359,7 @@ Deno.serve(async (req) => {
 
     if (raw.status === "incomplete") {
       console.error("analyze-workout: răspuns incomplet", JSON.stringify(raw.incomplete_details));
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "truncated", error_detail: "response_incomplete", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "truncated", error_detail: "response_incomplete", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage }));
       return errorResponse(502, "Răspunsul AI a fost trunchiat, încearcă un text mai scurt");
     }
 
@@ -231,7 +369,7 @@ Deno.serve(async (req) => {
     const refusal = message?.content?.find((c: any) => c.type === "refusal");
     if (refusal) {
       console.error("analyze-workout: AI a refuzat cererea", refusal.refusal);
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "refused", error_detail: String(refusal.refusal).slice(0, 500), completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "refused", error_detail: String(refusal.refusal).slice(0, 500), completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage }));
       return errorResponse(422, "AI a refuzat să analizeze acest text");
     }
 
@@ -239,7 +377,7 @@ Deno.serve(async (req) => {
     const textPart = message?.content?.find((c: any) => c.type === "output_text");
     if (!textPart?.text) {
       console.error("analyze-workout: răspuns fără output_text", JSON.stringify(raw).slice(0, 2000));
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "no_output_text", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "no_output_text", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage }));
       return errorResponse(502, "Răspuns AI invalid");
     }
 
@@ -249,7 +387,7 @@ Deno.serve(async (req) => {
       flat = JSON.parse(textPart.text);
     } catch {
       console.error("analyze-workout: JSON invalid din partea AI", String(textPart.text).slice(0, 2000));
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "json_parse_failed", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "json_parse_failed", completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage }));
       return errorResponse(502, "Răspuns AI invalid (JSON)");
     }
 
@@ -257,13 +395,14 @@ Deno.serve(async (req) => {
     const validationErrors = validateWorkoutAnalysis(analysis);
     if (validationErrors.length) {
       console.error("analyze-workout: răspuns AI invalid după validare", validationErrors, JSON.stringify(flat).slice(0, 2000));
-      if (canRecord) await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "shape_validation:" + validationErrors.join("; ").slice(0, 400), raw_output: flat, normalized_output: analysis, completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage });
+      if (canRecord) await recordLearningFor(await recordRun(admin, { ...provCommon, status: "invalid", error_detail: "shape_validation:" + validationErrors.join("; ").slice(0, 400), raw_output: flat, normalized_output: analysis, completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage }));
       return errorResponse(502, "Răspuns AI invalid (schemă)");
     }
 
     const aiRunId = canRecord
       ? await recordRun(admin, { ...provCommon, status: "ok", raw_output: flat, normalized_output: analysis, completed_at: completedAt, latency_ms: latencyMs, token_usage: tokenUsage })
       : null;
+    await recordLearningFor(aiRunId);
 
     return new Response(JSON.stringify({ ...analysis, aiRunId }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (err) {

@@ -2,7 +2,7 @@
 
 **Priority:** P11 / AI Learning Activation
 **Date:** 2026-09-02
-**Status:** **AUDIT COMPLETE — implementation BLOCKED on owner decisions D1 + D2** (§ "Owner decisions required"). D3 + D4 have recommended defaults and proceed once D1/D2 are set.
+**Status:** **CLOSED / GREEN.** Owner-approved D1 = A, D2 = A, D3 = A, D4 = A. Migration `20260902120000` applied; `analyze-workout` redeployed; smoke OFF / SHADOW / ACTIVE(zero-hint) / SAVE all pass. **Final production mode: `shadow`** (ACTIVE not proven with real evidence — no ≥3-run exact-consistent pattern exists in production yet).
 **Mode:** controlled · tenant-scoped · deterministic · auditable · fail-open · kill-switched · minimal prompt augmentation · **no embeddings / no vector / no fine-tuning / no member-performance / no global cross-tenant**
 
 P11.4 is the first phase permitted to change AI Analyze behaviour. A learning hint is **historical tenant-specific evidence**, never a rule.
@@ -167,4 +167,95 @@ Two-pass model pipeline (unless D1 = B). Embeddings / pgvector / vector search. 
 
 ---
 
-**HARD STOP — awaiting owner decisions D1 (single-pass subset vs two-pass) and D2 (companion table vs extend P11.1).** D3 (default `off` + kill switch) and D4 (exact / supported / consistent / ≤5 thresholds) proceed on the recommended defaults once D1/D2 are set. No Edge Function, prompt, schema, or migration has been changed by this audit. Member-performance intelligence / embeddings / vector search / fine-tuning / global cross-tenant learning / INC-10: not started.
+---
+
+## 7. Implementation (D1=A · D2=A · D3=A · D4=A) — CLOSED/GREEN 2026-09-02
+
+### 7.1 Audit correction re STRUCTURE (§1)
+
+`Structure: Sequence` / `Structure: Repeated Rounds` is the **only** deterministic pre-model source (`detectStructure` — a single literal regex). Structure is **never** inferred from layout / rep pattern / "max reps" / line count / format. When it is not literally declared, STRUCTURE patterns are **SHADOW-diagnostic only** and excluded from the ACTIVE selected-hint set (`selectAndSerialize({ allowStructure: false })`).
+
+### 7.2 ACTIVE taxonomy allowlist (§2)
+
+`["LOAD", "VARIANT_COMPLETION", "STRUCTURE"]` — and `STRUCTURE` only when `structureExplicit`. Everything else (`REPS`, `ROUNDS`, `REST_TIME`, `PRESCRIPTION_COMPLETION`, movement-level) is **not** ACTIVE-eligible in v1: REPS/ROUNDS/REST need `structure` or `movement_position` precision that cannot be built pre-model; PRESCRIPTION_COMPLETION needs a pre-model `field` + an omission prediction. They still run in SHADOW retrieval for diagnostics.
+
+### 7.3 Deterministic pre-model context extractor (§3-§6)
+
+`supabase/functions/analyze-workout/learningContext.ts` (`LEARNING_CONTEXT_VERSION = 'p11.4-context-v1'`, pure, Deno-tested):
+- **movement**: exact canonical / alias / naive-plural match of `CANONICAL_MOVEMENTS` + `MOVEMENT_ALIASES` + the gym's own `movements.name` (longest-key-first; overlapping equal-length different-canonical spans → dropped + `ambiguous_movement:` diagnostic). No fuzzy, no embeddings.
+- **variant**: line-leading label only — `RX:` / `Intermediate:` / `Beginner:` / `Scaled:` (→ `beginner`) / `On-Ramp:` (→ `onramp`) / `Masters:` (ignored — not a P11 variant).
+- **unit / gender**: `\d+(/\d+)?\s*(kg|lb)` on the movement's **own line only** (never spills onto an adjacent line); slash → `sex_specific`.
+- **format**: explicit leading canonical token only (`AMRAP` / `For Time` / `EMOM` / `Tabata` / `RFT` / `Chipper` / `Ladder` / `Death By` / `Intervals` / …). Never from layout.
+- **structure**: §7.1.
+- **absentScalingTiers**: of `intermediate/beginner/onramp`, those with no label → VARIANT_COMPLETION query candidates.
+
+### 7.4 Retrieval (server-side, fail-open, §7-§8-§33)
+
+In `index.ts` `gatherLearning(admin, mode, gymId, workout, gymMovementNames)`:
+- `mode = off` → skip everything, `retrieval_status = 'disabled'`.
+- else derive context → build queries (LOAD per `{movement, variant, unit}`; VARIANT_COMPLETION per absent tier when format explicit; STRUCTURE when structure+format explicit).
+- `admin.rpc('p11_3_retrieve_impl', q)` for each, wrapped in `Promise.race` with a **2500 ms deadline**. Any failure (RPC error / timeout / deadline / malformed) → `retrieval_status = 'retrieval_failed'`, `error_class` slug, **0 hints, Analyze continues unchanged**.
+- `service_role` gained `EXECUTE` on `p11_3_retrieve_impl` via the migration (still `REVOKE`d from anon/authenticated). The EF passes the **server-resolved** `provGymId`; the client can supply workout text only.
+- `selectAndSerialize({ readModels, allowStructure })` → whitelisted machine hints + prompt fragment.
+- `mode = shadow` → hints recorded, **fragment discarded**, prompt unchanged.
+- `mode = active` → fragment injected, `prompt_fragment_sha256` recorded.
+
+### 7.5 Selector + serializer (§15-§32)
+
+`learningHints.ts` (`LEARNING_SELECTOR_VERSION = 'p11.4-selector-v1'`, `LEARNING_HINT_SERIALIZER_VERSION = 'p11.4-hint-serializer-v1'`):
+- A pattern is eligible **iff** `strength = 'supported'` AND `conflictState = 'CONSISTENT'` AND `distinctRunCount >= 3` AND `strongContextCount = 0` AND `broaderContextCount = 0` AND `exactContextCount >= 1` AND taxonomy in the ACTIVE allowlist. observation_only / weak / MIXED / CONFLICTING / strong / broad → never.
+- Order: `distinctRunCount` desc → `latestObservedAt` desc → `patternKey`. Max **5**.
+- Templates (fixed sentences, numeric/enum/catalog-name slots only):
+  - LOAD → `In N prior comparable {Variant} {Movement} load corrections, AI proposals were changed to {after} {unit}.`
+  - VARIANT_COMPLETION → `In N prior comparable analyses, the coach added the {Variant} variant after AI analysis omitted it.`
+  - STRUCTURE → `In N comparable {format} analyses, the coach changed the structure from {before} to {after}.`
+- **Sanitisation**: movement name → strip `\r\n\t` + `[^A-Za-z0-9 &/'’.\-]`; **reject** if `> 34` chars or `> 5` words (a non-movement / injection string cannot enter the prompt). `afterValue` is the sole value of a CONSISTENT `afterDistribution`. No `always/must/should/correct/required`.
+- Prompt fragment hard cap **1000 chars**, truncated by whole hints.
+
+### 7.6 Prompt (§22-§24, §55)
+
+`prompt.ts` `buildSystemPrompt(extraMovementNames, learningFragment = '')` — the fragment is inserted **after** the movement/alias blocks and **before** the hard `Reguli:` block, under the header `FORGE TENANT-SPECIFIC HISTORICAL COACH EVIDENCE (advisory, not rules)` with an explicit "the Forge rules below remain authoritative" clause. `PROMPT_VERSION` → **`analyze-prompt-2026-09-02-p11-4`** (bumped). `SCHEMA_VERSION` / `TRANSFORM_VERSION` **unchanged**. Model / `MODEL_CONFIG` / Structured Outputs schema **unchanged**.
+
+### 7.7 Companion ledger (D2, §13-§16)
+
+`public.ai_analysis_run_learning` — PK `ai_run_id` (1:1) FK → `ai_analysis_runs` `ON DELETE CASCADE`; 18 cols (`learning_mode`, `read_model_version`, `selector_version`, `serializer_version`, `prompt_version`, `retrieval_status` (7-value CHECK), `retrieval_latency_ms`, `error_class`, `query_context` jsonb, `candidate_hint_count`, `selected_hint_count`, `selected_hints` jsonb (whitelisted facts only), `prompt_fragment_chars`, `prompt_fragment_sha256`). RLS: `SELECT` `is_coach_or_admin(gym_id)`; `INSERT`/`UPDATE` restrictive `false` for `authenticated`; no `DELETE` policy. `BEFORE UPDATE` immutability trigger (UPDATE-only, never blocks cascade). Written best-effort by `recordLearning(admin, aiRunId, gymId, coachId, rec)` **after** `recordRun` returns the id — on every terminal path (ok / truncated / refused / invalid). `recordRun` failure ⇒ no orphan learning row.
+
+### 7.8 Measurement (§35, §55-§56)
+
+`p11_learning_effect_stats(p_gym_id, p_from, p_to, p_prompt_version, p_model)` — tenant-guarded, read-only, returns `byMode` → per `learning_mode`: `runs_total, runs_failed, saved_total, accepted_unchanged, accepted_cosmetic, accepted_semantic, semantic_acceptance_rate, retrieval_failed_count, avg_selected_hint_count`. Version-aware. Ships with a `note` disclaiming any causal AI-improvement claim (§56). **Self-reinforcement (§38/§54):** an `active` accepted-as-proposed run creates **no** P11.2 correction row (P11.2 only stores corrections/completions); `learning_mode` provenance keeps `active` runs separable from organic acceptance forever.
+
+### 7.9 Tests
+
+- `supabase/functions/analyze-workout/learning.test.ts` — **15 Deno tests** (context: variant/unit/gender/position, structure-only-when-declared, no-label⇒no-variant, gym-name detection, format-not-from-layout; selector: supported-consistent-exact ⇒ 1 factual hint (no normative words), weak/observation_only/conflicting/MIXED ⇒ 0, strong/broad ⇒ 0, STRUCTURE gated on `allowStructure`, VARIANT_COMPLETION distinct, non-allowlisted taxonomy ⇒ 0, injection string rejected outright, max-5 deterministic order, zero read models; `resolveLearningMode` fail-safe). All pass (with the 6 P11.1 EF tests → 21/21).
+- `src/p11_4LearningHintProvenanceMigration.test.js` — **18 structural** (additive/P11.1 frozen, companion shape, append-only, RLS, tenant-guarded measurement, `service_role`-only engine grant, no embeddings). All pass.
+- **Production DB integration** (`ROLLBACK`): companion immutability enforced, `service_role` can call `p11_3_retrieve_impl`, cascade delete removes the companion row, stats aggregate by mode.
+- Full regression: **1878** vitest pass (11 failing files = pre-existing Deno-EF-under-vitest `@std/assert` loader errors, now incl. `learning.test.ts` — unrelated). `deno check` clean. `vite build` clean.
+
+### 7.10 Production smoke
+
+| Smoke | Run | Result |
+|---|---|---|
+| **OFF** | `8079c73c` | `learning_mode off`, `retrieval_status disabled`, 0 hints, `prompt_fragment_chars 0`, companion row written, `prompt_version analyze-prompt-2026-09-02-p11-4`. |
+| **SHADOW** | `71de4cf8` | context extracted end-to-end (`format AMRAP`, 4 movements w/ variant+unit+position, `absentScalingTiers [beginner,onramp]`), 6 queries, retrieval ran via `service_role` (**138 ms**), `no_matches`, 0 hints, **prompt unchanged**. |
+| **ACTIVE / no qualifying hint** | `c17e24fc` (EMOM) | `learning_mode active`, retrieval ran, `no_matches`, **0 hints, no learning section**, normal AI result. |
+| **SAVE (learning-active)** | `c17e24fc` | Save → `saved_at`+`wod_id` set, `outcome accepted_unchanged`, `edit_severity none` — **P11.1 lifecycle intact**; **0 P11.2 evidence rows** (self-reinforcement guard); companion row immutable. |
+| **ACTIVE / qualifying hint** | — | Production has **no** ≥3-run exact-consistent pattern (4 evidence rows, none forming one). Not fabricated (§64). ACTIVE selection + serialization + injection are proven by the Deno test suite (LOAD golden, VARIANT_COMPLETION, STRUCTURE, sanitisation). **Smoke limitation stated.** |
+| **Security** | — | anon `rpc/p11_3_retrieve_impl` → `42501` (P11.3). `p11_learning_effect_stats` tenant guard raises for a non-coach. Companion RLS: coach/admin SELECT only, no client write. Gym is server-resolved; client sends workout text only. |
+
+**Final state:** 4 companion rows (off ×1, shadow ×1, active ×2), all modes distinguishable. `pg_extension` vector = 0. **Production mode = `shadow`** (`P11_LEARNING_HINTS_MODE` secret). Test workouts on 2026-09-24…09-26 (gym `c5ecbe2c…`) left as smoke artifacts.
+
+### 7.11 Rollback
+
+`P11_LEARNING_HINTS_MODE=off` (or unset) — instant, no redeploy, no schema change, evidence untouched. Full DOWN in the migration footer (`DROP TABLE ai_analysis_run_learning` + `DROP FUNCTION p11_learning_effect_stats` + `REVOKE … FROM service_role` + `DELETE` the ledger row). After `DROP TABLE`, the EF's best-effort companion insert silently no-ops (fail-open); `p11_3_retrieve_impl` still exists for P11.3.
+
+### 7.12 Limitations
+
+Recall is thin until (a) coaches paste variant-labelled workouts (they already do) and (b) ≥3 comparable corrections accumulate per context. REPS / ROUNDS / REST_TIME / interval-param learning is not ACTIVE-eligible (pre-model structure/position unknown). ACTIVE end-to-end injection is proven by tests, not a live qualifying production smoke. Format detection is medium-confidence; a mis-detected format only lowers a LOAD pattern's match level to `strong` (⇒ excluded), never mis-injects.
+
+## 8. Recommended next phase (not started)
+
+**P11.5 — controlled ACTIVE rollout + first measurement**, once real evidence accumulates: flip `P11_LEARNING_HINTS_MODE=active` for the owner's gym, run `p11_learning_effect_stats` weekly by `prompt_version`, and only then consider a two-pass design (D1 = B) if SHADOW-measured recall proves insufficient.
+
+---
+
+**HARD STOP.** Member-performance intelligence / embeddings / vector search / fine-tuning / global cross-tenant learning / two-pass Analyze / INC-10: not started. AI Analyze model, Structured Outputs schema, and transform are unchanged; hard Forge invariants remain authoritative above every learning hint.

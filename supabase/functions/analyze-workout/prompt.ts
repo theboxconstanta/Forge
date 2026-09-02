@@ -90,9 +90,16 @@ Cateva WOD-uri sunt cunoscute ("Girls" si Hero WODs, ex. Fran, Grace, Helen, Ann
 // no argument (or []), buildSystemPrompt() produces exactly the prompt
 // this file always had - SYSTEM_PROMPT below stays as a stable default
 // export for any caller that doesn't need gym context.
-export function buildSystemPrompt(extraMovementNames: string[] = []): string {
+export function buildSystemPrompt(extraMovementNames: string[] = [], learningFragment = ''): string {
   const gymMovementsBlock = extraMovementNames.length
     ? `\n\nMiscari suplimentare, specifice acestei sali (foloseste-le si pe astea pt "canonicalName" cand se potrivesc, la fel ca lista principala de mai sus):\n${extraMovementNames.join(', ')}`
+    : ''
+  // P11.4 - tenant-specific historical coach evidence (advisory). Placed BELOW
+  // the task/context blocks but ABOVE the hard "Reguli:" block so the canonical
+  // rules always adjudicate. Empty unless learning mode is ACTIVE and >=1
+  // exact/supported/consistent pattern was selected.
+  const learningBlock = learningFragment && learningFragment.trim()
+    ? `\n\n${learningFragment.trim()}\n`
     : ''
   return `Esti un antrenor CrossFit expert care analizeaza un antrenament (WOD) lipit de un coach si il transforma intr-un array ordonat de sectiuni, conform schemei JSON impuse.
 
@@ -117,7 +124,7 @@ ${CANONICAL_MOVEMENTS.join(', ')}${gymMovementsBlock}
 Abrevieri/prescurtari uzuale in CrossFit (foloseste-le pt "canonicalName" cand "name" e scris prescurtat - name ramane textul original/prescurtat, doar canonicalName devine forma completa):
 ${Object.entries(MOVEMENT_ALIASES).map(([abbr, full]) => `${abbr.toUpperCase()} -> ${full}`).join(', ')}
 Trateaza si formele de plural normal (Thrusters -> Thruster, Burpees -> Burpee, Snatches -> Snatch) la fel - name pastreaza forma din text, canonicalName devine forma canonica la singular.
-
+${learningBlock}
 Reguli:
 - Nu inventa informatii care nu reies din text - orice camp necunoscut ramane null (sau array gol pt liste). Cand esti nesigur intre doua variante plauzibile, alege null/valoarea mai conservatoare, NU o presupunere plauzibila.
 - "name" e textul miscarii asa cum apare/e normalizat din original; "canonicalName" e potrivirea din lista de mai sus (direct sau prin alias/plural) sau null.
@@ -133,4 +140,4 @@ export const SYSTEM_PROMPT = buildSystemPrompt()
 // movement grounding changes in a way that could shift model behaviour. NOT a
 // git hash — a human-meaningful identifier stamped on every ai_analysis_runs row
 // so "did prompt vN beat vN-1" is answerable.
-export const PROMPT_VERSION = "analyze-prompt-2026-09-02-inc11";
+export const PROMPT_VERSION = "analyze-prompt-2026-09-02-p11-4";
