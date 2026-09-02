@@ -1,9 +1,13 @@
 # P9.5.2A — Global Performed Movement Composition (Add / Change / Delete / Not Performed)
 
 **Date:** 2026-09-02
-**Status:** **IMPLEMENTATION HALTED AT STOP CONDITION §71-#7 — OWNER DECISION REQUIRED**
-on structured-family (Sequential AMRAP / Intervals) performed-rep scoring.
+**Status:** **OPTION 2 IMPLEMENTED — code + migration + tests + regression GREEN; production smoke PENDING (needs a logged-in member session).**
 **Priority:** P1 — member logging / result truth / leaderboard classification.
+
+Commits on `main`: `bdba1a9` (contract v2), `497b9d6` (validator migration +
+INC-08 projection), `4c3b3bf` (Sequential AMRAP station swap), `f3c8258`
+(grouped editor), `6f8db37` (Intervals per-cell inputs + save), `7128280` (S/T
+tests). `app_version` bump + production smoke deferred to the owner smoke pass.
 
 Owner decisions received and authoritative: **D1 = A** (flat ordered list +
 `sourceInstanceId`), **D2 = B** (explicit *Mark Not Performed*), **D3 = A**
@@ -308,5 +312,34 @@ saves use v2; old reads use their own frozen version (§backward-compatibility).
 
 `performed_prescription` and `sets` are existing jsonb columns. The only DDL is
 one `CREATE OR REPLACE FUNCTION` on the validation trigger (no table/column/
-index/RLS). If implementation surfaces a real need for `ALTER TABLE` / a new
-column, **STOP and report** (§database).
+index/RLS) — `supabase/migrations/20260902140000_p9_5_2a_performed_prescription_v2.sql`,
+applied + registered on the linked prod DB, verified: a v2 composition +
+`notPerformed` doc INSERTs (ROLLBACK); a v2 doc missing `sourceInstanceId` is
+rejected. No `ALTER TABLE` needed.
+
+### 7.6 As-built — file map
+
+| Area | File(s) |
+|---|---|
+| Contract v2 | `src/prescriptionContract.js` ⇄ `forge-admin-web/.../prescriptionContract.ts` — `PERFORMED_PRESCRIPTION_VERSION=2`, `performedCompositionGroups`, `performedEntriesForSource`, `performedStationInstances`, `addPerformedMovement`, `deletePerformedMovement`, `markSourceNotPerformed`, `restoreSourcePerformed`, source-anchored `performedMatchesProgrammed`, group-aware `composePerformedResultLines` |
+| DB validator | `supabase/migrations/20260902140000_…` |
+| Interval result projection | `src/resultIntervalStructure.js` — per-cell `performedEntries` + `notPerformed` + `hasComposition`; `src/App.jsx` `IntervalResultRounds` renders it |
+| Sequential AMRAP | `src/App.jsx` — `sequentialAmrapStations` resolves from `performedStationInstances` when a v2 overlay is modified; reopen from `log.performed_prescription` |
+| Interval logger | `src/FormatLogger.jsx` `SetsFields` (structured branch) — N reps inputs / cell, `pm`-marked rows; `src/App.jsx` `intervalCompositionActive` + threading via `src/UniversalScoreInput.jsx` |
+| Editor UI | `src/App.jsx` `PerformedMovementSearch` / `PerformedEditRow` / `PerformedEditPanel` (grouped) |
+| i18n | `src/translations.js` — `performedEdit{DeleteMovement,AddMovement,MarkNotPerformed,RestoreMovement,…}` RO + EN |
+| Modified → Mixed (D6) | unchanged — `isMixedCategory(…, log.performed_prescription)` already routes any non-null overlay to Mixed; `_nivelOriginal` preserves the programmed tier |
+| Tests | `src/p9_5_2aPerformedComposition.test.js` (17), `src/p9_5_2aStructuredScoring.test.js` (10) |
+
+### 7.7 Known limitations (v1 of Option 2)
+
+- Result-card "not performed" line renders the EN suffix `— not performed`
+  regardless of locale (`resolveResultMovementLines` is a pure module with no
+  `t`); the logger + editor are localised.
+- An Intervals composition change made AFTER reps were already entered resets
+  the per-cell score inputs (`commitPerformedEdit` clears `wodSets` on an
+  interval station-signature change) — deliberate, prevents orphan rows /
+  double count; the athlete re-enters reps for the new composition.
+- `N → 1` composition — deferred (D5).
+- Rep editing of existing (non-added) movements for non-structured families —
+  still locked (P9.5.2 scope).
