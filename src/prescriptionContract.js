@@ -813,6 +813,41 @@ export function performedEntriesForSource(performedDoc, sourceInstanceId) {
   return g ? g.entries : []
 }
 
+/** P9.5.2A - EXPAND a v2 performed doc into the flat ordered instance list that
+ * feeds structured-station resolution (Sequential AMRAP `resolveSequentialAmrap
+ * Stations({instances})`, structured Intervals per-cell). One entry per
+ * performed movement; a NOT-PERFORMED source becomes ONE entry carrying the
+ * programmed name + reps (so the station keeps its identity + target) plus
+ * `notPerformed:true` (the logger pre-fills an explicit 0, distinct from
+ * not-reached). `programmedInstances` = the frozen programmed variant movements
+ * (for the not-performed clone + a fallback anchor). Returns null for a v1 /
+ * absent doc — caller keeps the programmed station list. Pure. */
+export function performedStationInstances(performedDoc, programmedInstances) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) return null
+  const progById = new Map((programmedInstances || []).map((p) => [p.instanceId, p]))
+  const out = []
+  for (const g of performedCompositionGroups(performedDoc)) {
+    if (g.notPerformed) {
+      const prog = progById.get(g.sourceInstanceId)
+      out.push({
+        instanceId: g.entries[0]?.instanceId || g.sourceInstanceId,
+        sourceInstanceId: g.sourceInstanceId,
+        name: prog?.name || g.entries[0]?.name || 'Movement',
+        // No rep target — an explicit 0, never auto-completed as a fixed
+        // station and never "not reached" (§22: contributes 0 performed reps).
+        reps: null,
+        notPerformed: true,
+      })
+      continue
+    }
+    for (const e of g.entries) {
+      if (e.notPerformed === true) continue
+      out.push({ ...e, notPerformed: false })
+    }
+  }
+  return out
+}
+
 /** True when the performed doc resolves — for THIS athlete — to exactly the
  * programmed variant. The caller stores NULL then (§22 / §24: identical ⇒
  * performed_prescription stays NULL). `notPerformed` NEVER matches (§25).

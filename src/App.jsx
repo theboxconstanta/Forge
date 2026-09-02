@@ -76,6 +76,8 @@ import {
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
   composePerformedResultLines, snapshotDisplayLines,
+  performedCompositionGroups, performedEntriesForSource, performedStationInstances,
+  addPerformedMovement, deletePerformedMovement, markSourceNotPerformed, restoreSourcePerformed,
 } from './prescriptionContract'
 import { resolveResultProvenance } from './resultProvenance'
 import { resolveResultMovementLines } from './resultWorkoutLines'
@@ -9763,9 +9765,23 @@ function App() {
   // and composeWodLogFields so no surface re-derives it. `.supported` is false
   // for a mixed-unit body -> callers keep the classic Rounds+Additional input.
   const sequentialAmrapActive = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
+  // P9.5.2A - when the athlete has a v2 performed composition overlay for the
+  // frozen variant, structured stations (Sequential AMRAP here, structured
+  // Intervals below) resolve from the PERFORMED composition, not the programmed
+  // list: each performed movement is one station, a NOT-PERFORMED source is one
+  // station (explicit 0). The programmed prescription stays untouched.
+  const frozenProgrammedInstances = (activePrescriptionDoc && frozenVariantKey)
+    ? (activePrescriptionDoc?.variants?.[frozenVariantKey]?.movements ?? null)
+    : null
+  const performedStationInstancesActive = (performedCommitted?.version === 2
+    && performedIsModified(performedCommitted, activePrescriptionDoc, frozenVariantKey, memberGenderKey))
+    ? performedStationInstances(performedCommitted, frozenProgrammedInstances)
+    : null
   const sequentialAmrapResolved = sequentialAmrapActive
     ? resolveSequentialAmrapStations({
-        instances: (structuredLogDisplay?.movements && structuredLogDisplay.movements.length) ? structuredLogDisplay.movements : null,
+        instances: performedStationInstancesActive
+          ? performedStationInstancesActive
+          : ((structuredLogDisplay?.movements && structuredLogDisplay.movements.length) ? structuredLogDisplay.movements : null),
         lines: miscariPentruLog,
       })
     : null
@@ -11198,7 +11214,14 @@ function App() {
                   // its own stations (index-keyed so a repeated movement name
                   // stays two stations). P10 - stations from the FROZEN config +
                   // frozen movement lines, never today's workout.
-                  const seqStations = resolveSequentialAmrapStations({ lines: movimenteLog }).stations
+                  // P9.5.2A - a v2 performed composition overlay redefines the
+                  // station list (each performed movement = one station).
+                  const seqPerformedInst = log.performed_prescription?.version === 2
+                    ? performedStationInstances(log.performed_prescription, null)
+                    : null
+                  const seqStations = resolveSequentialAmrapStations(
+                    seqPerformedInst ? { instances: seqPerformedInst } : { lines: movimenteLog },
+                  ).stations
                   const partialArr = (seqStations && seqStations.length && log.result)
                     ? parseSequentialAmrapResult(log.result, seqStations)
                     : (log.result ? parsePartialText(log.result, movimenteLog) : movimenteLog.map(() => ''))

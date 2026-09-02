@@ -32,11 +32,6 @@ function repsStr(v) {
   return String(v)
 }
 
-function repsOf(rows) {
-  const row = Array.isArray(rows) ? rows[0] : null
-  return row ? repsStr(row.reps) : null
-}
-
 // P9.5.2A - the performed composition of ONE (round, station) cell. A row with a
 // `pm` marker is a performed-movement entry (new v2 contract); a row without is
 // a legacy INC-08 score row. Legacy cell -> one entry (name null). v2 cell -> N
