@@ -187,7 +187,7 @@ export function BottomSheet({ onClose, children, maxHeight = '85%' }) {
 export function MembershipCoverageDialog({ t, onClose }) {
   return (
     <Modal title={t.membershipCoverageDialogTitle} onClose={onClose}>
-      <div style={{ ...TYPO.secondary, color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
+      <div style={{ ...TYPO.secondary, fontSize: '14px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>
         <p style={{ margin: '0 0 10px' }}>{t.membershipCoverageDialogBody1}</p>
         <p style={{ margin: 0 }}>{t.membershipCoverageDialogBody2}</p>
       </div>

@@ -5,16 +5,20 @@
 // Weights are limited to 400/500/600 everywhere except where noted.
 //
 // ---------------------------------------------------------------------------
-// LEGACY. `TYPO` is the pre-v1 scale. It is FROZEN — its ~14 remaining call
-// sites (all `...TYPO.pageTitle`) must render unchanged until the Visual System
-// v1 typography migration (Stage 3). New code uses `TYPE` (below).
+// LEGACY. `TYPO` is the pre-v1 scale. Its remaining call sites (mostly
+// `...TYPO.pageTitle`) are being migrated to the `TYPE` roles by the Visual
+// System v1 typography stages. Stage 3 brought `pageTitle` onto the approved
+// PAGE TITLE role (20 / 600). New code uses `TYPE` (below).
 // ---------------------------------------------------------------------------
 export const TYPO = {
   // Display / month titles ("August 2026", "July 02")
   display: { fontSize: '24px', fontWeight: '600', lineHeight: '28px', letterSpacing: '-0.02em' },
 
   // Page titles ("Leaderboard", "Membership", "Profile", "Workout")
-  pageTitle: { fontSize: '22px', fontWeight: '600' },
+  // Visual System v1 Stage 3: 22 -> 20 to match the approved PAGE TITLE role.
+  // Tightens the top-of-screen hierarchy so the page title reads as a title,
+  // not a display headline. Size only — weight and metrics unchanged.
+  pageTitle: { fontSize: '20px', fontWeight: '600' },
 
   // Section labels ("TODAY", "MONDAY", "WORKOUT OF THE DAY", "PARTICIPANTS")
   sectionLabel: { fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' },

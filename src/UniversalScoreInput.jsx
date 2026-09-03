@@ -61,13 +61,13 @@ function TimeRow({ time, onChange, ariaPrefix }) {
       <div style={{ flex: 1 }}>
         <input type="number" min="0" inputMode="numeric" value={mm || ''} aria-label={`${ariaPrefix} minutes`}
           onChange={e => onChange(`${e.target.value}:${ss || '00'}`)} placeholder="17" style={{ ...numInput, textAlign: 'center' }} />
-        <div style={{ fontSize: '10px', color: '#B5B5B5', marginTop: '4px', textAlign: 'center' }}>min</div>
+        <div style={{ fontSize: '11px', color: '#B5B5B5', marginTop: '4px', textAlign: 'center' }}>min</div>
       </div>
       <span style={{ alignSelf: 'flex-start', fontSize: '20px', fontWeight: '600', color: '#CFCFCF', marginTop: '11px' }}>:</span>
       <div style={{ flex: 1 }}>
         <input type="number" min="0" max="59" inputMode="numeric" value={ss || ''} aria-label={`${ariaPrefix} seconds`}
           onChange={e => onChange(`${mm || '0'}:${e.target.value}`)} placeholder="42" style={{ ...numInput, textAlign: 'center' }} />
-        <div style={{ fontSize: '10px', color: '#B5B5B5', marginTop: '4px', textAlign: 'center' }}>sec</div>
+        <div style={{ fontSize: '11px', color: '#B5B5B5', marginTop: '4px', textAlign: 'center' }}>sec</div>
       </div>
     </div>
   )
@@ -159,7 +159,7 @@ export default function UniversalScoreInput({
       <div style={{ ...label, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>{t?.logWodWeightLabel || 'Weight'}</span>
         {rxStatus && (
-          <span style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, padding: '2px 8px', borderRadius: '999px',
+          <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, padding: '2px 8px', borderRadius: '999px',
             color: rxStatus === 'rx' ? '#3D8B3D' : '#9A6B00', background: rxStatus === 'rx' ? '#EAF6EA' : '#FDF3DC' }}>
             {rxStatus === 'rx' ? (t?.logWodRxBadge || 'RX') : (t?.logWodNotRxBadge || 'Not Rx')}
           </span>

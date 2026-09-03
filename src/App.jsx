@@ -1192,7 +1192,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
 // PWA-native (inline styles), not a component copy.
 // ===========================================================================
 const pmpeNumInput = { width: '52px', padding: '6px 4px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }
-const pmpeLink = { background: 'none', border: 'none', color: '#888', fontSize: '10px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }
+const pmpeLink = { background: 'none', border: 'none', color: '#888', fontSize: '11px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }
 const pmpeIconBtn = { width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', color: '#666', cursor: 'pointer', flexShrink: 0 }
 const PMPE_QTY = ['reps', 'distance', 'calories']
 
@@ -1241,7 +1241,7 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
   const isInt = metric === 'reps' || metric === 'calories'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-      <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', color: '#999' }}>{label}</span>
+      <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#999' }}>{label}</span>
       {isText ? (
         <input style={{ ...pmpeNumInput, width: '76px' }} value={spec?.text ?? ''} placeholder="21-15-9" aria-label={`${label} scheme`} onChange={e => onChange({ mode: 'text', text: e.target.value })} />
       ) : mode === 'sex_specific' ? (
@@ -1255,7 +1255,7 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
         <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.value)} ariaLabel={label} onCommit={n => onChange({ ...spec, mode: 'universal', value: n, ...carry })} />
       )}
       {showUnit && (
-        <select style={{ fontSize: '10px', border: '1px solid #e0e0e0', borderRadius: '6px', padding: '3px' }} value={unit} aria-label={`${label} unit`} onChange={e => onChange({ ...spec, mode: spec?.mode ?? defaultMode, unit: e.target.value })}>
+        <select style={{ fontSize: '11px', border: '1px solid #e0e0e0', borderRadius: '6px', padding: '3px' }} value={unit} aria-label={`${label} unit`} onChange={e => onChange({ ...spec, mode: spec?.mode ?? defaultMode, unit: e.target.value })}>
           {metric === 'load' ? <><option value="kg">kg</option><option value="lb">lb</option></> : <><option value="m">m</option><option value="km">km</option><option value="ft">ft</option><option value="mi">mi</option></>}
         </select>
       )}
@@ -1952,7 +1952,7 @@ function Timer({ onBack, defaultFortime, t }) {
           <div key={m.id} onClick={() => setMod(m.id)}
             style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: mod === m.id ? '#f0f0f0' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <m.icon size={18} color={mod === m.id ? '#0E0E0E' : '#888'} strokeWidth={2} />
-            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', lineHeight: 1.2, color: mod === m.id ? '#0E0E0E' : '#888' }}>{m.lbl}</div>
+            <div style={{ fontSize: '11px', fontWeight: mod === m.id ? '600' : '400', lineHeight: 1.2, color: mod === m.id ? '#0E0E0E' : '#888' }}>{m.lbl}</div>
           </div>
         ))}
       </div>
@@ -2383,10 +2383,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                     {sectionLogs.length} {t.clasamentParticipantWord(sectionLogs.length, genderTab)}
                   </div>
                   {isForTime && (
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '11px', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
                   )}
                   {!isForTime && sectionLogs.some(l => l.result) && (
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', lineHeight: 1.35, color: '#aaa' }}>🔄 AMRAP</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '11px', lineHeight: 1.35, color: '#aaa' }}>🔄 AMRAP</div>
                   )}
                 </div>
                 {/* Sub-grupuri pe greutate (RX intai, fara header suplimentar; apoi
@@ -2523,14 +2523,14 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               {log.variant_level && (
                                 <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                                   <div>
-                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
+                                    <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
                                     <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                       <LevelDot nivel={log.variant_level} /> {log.variant_level}
                                     </div>
                                   </div>
                                   {log.weight_logged?.trim() && (
                                     <div>
-                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
+                                      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
                                       <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>
                                         {log.weight_logged.trim()}
                                         {log._prescribedWeight && !weightMatches(log.weight_logged, log._prescribedWeight) && (
@@ -2550,7 +2550,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               )}
                               {areRezultatFinal && (
                                 <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: cardMovementLines.length > 0 ? '10px' : '0', borderTop: cardMovementLines.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                                  <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                                   <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{rezultatBucati.join(' · ')}</div>
                                 </div>
                               )}
@@ -2572,7 +2572,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                   hardcodata 'TOTAL' pt orice scor. */}
                               {showSetsScoreAtEnd && (
                                 <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t.clasamentSetsScoreLabel[resolveSetsScoringMode(effFormatId, effFormatConfig)] || t.jurnalResultLabel}
                                   </div>
                                   <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{result}</div>
@@ -2580,7 +2580,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               )}
                               {noteLog && noteLog.trim() && (
                                 <div>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                                  <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
                                   <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                                 </div>
                               )}
@@ -2812,7 +2812,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
             return (
               <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '58px', flexShrink: 0 }}>
                 <AvatarCircle name={mName} avatarUrl={m.avatar_url} size={50} />
-                <span style={{ fontSize: '10px', lineHeight: 1.2, color: '#555', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{mName}</span>
+                <span style={{ fontSize: '11px', lineHeight: 1.2, color: '#555', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{mName}</span>
               </div>
             )
           })}
@@ -2853,9 +2853,9 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '500', lineHeight: 1.35, color: '#aaa' }}>{relativeTime(post.created_at)}</span>
+                  <span style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa' }}>{relativeTime(post.created_at)}</span>
                   {post.variant_level && (
-                    <span style={{ fontSize: '10px', lineHeight: 1.2, padding: '1px 7px', borderRadius: '20px', background: variantaBg[post.variant_level] || '#f0f0f0', color: variantaColor[post.variant_level] || '#888', fontWeight: '500' }}>{post.variant_level}</span>
+                    <span style={{ fontSize: '11px', lineHeight: 1.2, padding: '1px 7px', borderRadius: '20px', background: variantaBg[post.variant_level] || '#f0f0f0', color: variantaColor[post.variant_level] || '#888', fontWeight: '500' }}>{post.variant_level}</span>
                   )}
                 </div>
               </div>
@@ -6163,7 +6163,7 @@ function RecentPrsSection({ events, benchmarksById, onSelectMovement, onSelectBe
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{scoreLabel(event.score_value, event.score_unit)}</div>
                 {!event.is_first_recorded && event.improvement_value != null && (
-                  <div style={{ fontSize: '10px', color: '#3C9F3C', fontWeight: '600' }}>↑ {scoreLabel(event.improvement_value, event.score_unit)}</div>
+                  <div style={{ fontSize: '11px', color: '#3C9F3C', fontWeight: '600' }}>↑ {scoreLabel(event.improvement_value, event.score_unit)}</div>
                 )}
               </div>
             </div>
@@ -6349,7 +6349,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
                       {resultModifiedLog && <NotRxdBadge t={t} compact variant={w.variant_level} />}
                     </div>
@@ -6370,7 +6370,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ marginTop: '4px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Calendar size={10} strokeWidth={2} />
                       {new Date(w.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -6384,7 +6384,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '2px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>{wodSubtitlu}</div>
                   )}
                   {progressionNote && (
-                    <div style={{ marginTop: '4px', fontSize: '11px', lineHeight: 1.35, color: '#666', fontWeight: '500' }}>{progressionNote}</div>
+                    <div style={{ marginTop: '4px', fontSize: '12px', lineHeight: 1.35, color: '#666', fontWeight: '500' }}>{progressionNote}</div>
                   )}
                   {!isOpen && !areRezultatFinal && (
                     <div style={{ marginTop: '6px', fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>—</div>
@@ -6394,13 +6394,13 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       {cardMovementLines.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {cardMovementLines.map((m, j) => (
-                            <div key={j} style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
+                            <div key={j} style={{ fontSize: '13px', lineHeight: 1.5, color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
                       {areRezultatFinal && (
                         <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{rezultatBucati.join(' · ')}</div>
                         </div>
                       )}
@@ -6410,16 +6410,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                             <IntervalResultRounds intervalResult={intervalResult} t={t} />
                           ) : wSetsParti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
-                              <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
+                              <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
+                              <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
                             </div>
                           ))}
                         </div>
                       )}
                       {noteLog && noteLog.trim() && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                          <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                          <div style={{ fontSize: '14px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                         </div>
                       )}
                       {!areDetaliiFinal && (
@@ -6470,7 +6470,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 <div key={sl.id} onClick={() => { toggleClosed(skillKey); setConfirmDeleteSkill(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteSkill && (
                         confirmDeleteSkill === skillKey ? (
@@ -6488,7 +6488,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{skillOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ marginTop: '4px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Calendar size={10} strokeWidth={2} />
                       {new Date(sl.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -6502,7 +6502,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {skillScorText != null && (
                         <div style={{ marginBottom: '12px' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{skillScorText}</div>
                         </div>
                       )}
@@ -6510,8 +6510,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         <div style={{ marginBottom: sl.notes ? '10px' : 0 }}>
                           {parti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.miscare}</div>
-                              <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
+                              <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.miscare}</div>
+                              <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
                             </div>
                           ))}
                         </div>
@@ -6522,8 +6522,8 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       )}
                       {sl.notes && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                          <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{sl.notes}</div>
+                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                          <div style={{ fontSize: '14px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{sl.notes}</div>
                         </div>
                       )}
                       {onEditSkill && (
@@ -10269,7 +10269,7 @@ function App() {
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
             <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
-            <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
+            <div style={{ fontSize: '14px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
           </div>
         </div>
       )}
@@ -10488,7 +10488,7 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
-                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
                     style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
@@ -11110,7 +11110,7 @@ function App() {
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><ClipboardList size={36} color="#0E0E0E" strokeWidth={1.5} /></div>
               <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '6px' }}>{onlinePaymentsAvailable ? t.noMembershipTitle : t.subNoActive}</div>
-              <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#888', marginBottom: onlinePaymentsAvailable ? '14px' : '0' }}>{onlinePaymentsAvailable ? t.noMembershipText : t.subContactCoachAdd}</div>
+              <div style={{ fontSize: '14px', lineHeight: 1.5, color: '#888', marginBottom: onlinePaymentsAvailable ? '14px' : '0' }}>{onlinePaymentsAvailable ? t.noMembershipText : t.subContactCoachAdd}</div>
               {onlinePaymentsAvailable && (
                 <button onClick={() => { fetchCatalogPlans(); setScreen('catalog') }}
                   style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -11193,7 +11193,7 @@ function App() {
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
                 {viitoare.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
+                    <div style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
                     {viitoare.map(c => (
                       <div key={c.id} style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #0E0E0E' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
@@ -11215,7 +11215,7 @@ function App() {
                 )}
                 {trecute.length > 0 && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
+                    <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
                     {trecute.map(c => (
                       <div key={c.id} style={{ background: '#fafafa', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #e0e0e0' }}>
                         <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
@@ -11244,7 +11244,7 @@ function App() {
           {catalogLoading ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: '13px', lineHeight: 1.35 }}>{t.catalogLoading}</div>
           ) : catalogPlans.length === 0 ? (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', color: '#888', fontSize: '13px', lineHeight: 1.5 }}>{t.catalogEmpty}</div>
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', color: '#888', fontSize: '14px', lineHeight: 1.5 }}>{t.catalogEmpty}</div>
           ) : (
             catalogPlans.map(p => (
               <button key={p.id} onClick={() => startCheckout(p.id)} disabled={checkoutLoading}
@@ -11470,7 +11470,7 @@ function App() {
               {editLogHeader ? (
                 <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
               ) : null}
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '11px' }}>{t.logWodReorderHint}</span></div>
               <SortableList
                 items={editLogMiscari}
                 onReorder={setEditLogMiscari}
@@ -11673,11 +11673,11 @@ function App() {
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                         <div style={{ flex: 1 }}>
                           <input type="number" min="0" value={wodDurataMin} onChange={e => setWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
+                          <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
                         </div>
                         <div style={{ flex: 1 }}>
                           <input type="number" min="0" max="59" value={wodDurataSec} onChange={e => setWodDurataSec(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+                          <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
                         </div>
                       </div>
                     </>
@@ -11715,7 +11715,7 @@ function App() {
                 )
               })() : (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '11px' }}>{t.logWodReorderHint}</span></div>
                   <SortableList
                     items={wodMiscari}
                     onReorder={setWodMiscari}
@@ -11850,7 +11850,7 @@ function App() {
               config={newHeroWodFormatConfig} onConfigChange={setNewHeroWodFormatConfig} t={t} />
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.heroWodReorderHint}</span></div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '11px' }}>{t.heroWodReorderHint}</span></div>
             <SortableList
               items={newHeroWodMiscari}
               onReorder={setNewHeroWodMiscari}
@@ -11886,7 +11886,7 @@ function App() {
                         <input type="number" min="0" value={prRoundsCompleted} onChange={e => setPrRoundsCompleted(e.target.value)} placeholder={t.prRoundsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                         {miscariHeroPr.length > 0 && (
                           <div style={{ marginBottom: '12px' }}>
-                            <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '8px' }}>{t.prPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.prPartialRoundHint}</span></div>
+                            <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '8px' }}>{t.prPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '11px' }}>{t.prPartialRoundHint}</span></div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               {miscariHeroPr.map((m, i) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -11909,11 +11909,11 @@ function App() {
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prMinutesLabel}</div>
+                                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prMinutesLabel}</div>
                               </div>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prSecondsLabel}</div>
+                                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prSecondsLabel}</div>
                               </div>
                             </div>
                           )
@@ -12111,12 +12111,12 @@ function App() {
                 </div>
               </div>
               {collapsedRecord && !isOpen && (
-                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>
                   {new Date(collapsedRecord.recorded_at).toLocaleDateString(localeFor(lang))}{collapsedRecord.notes ? ' · ' + collapsedRecord.notes : ''}
                 </div>
               )}
               {!collapsedRecord && !isOpen && wodInfo && (
-                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
+                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
               )}
               {isOpen && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
@@ -12157,7 +12157,7 @@ function App() {
                   )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
+                      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
                         {PCT_BARA.map(pct => {
                           const w = Math.round(bestKg * pct / 100 * 2) / 2
@@ -12173,7 +12173,7 @@ function App() {
                   )}
                   {cat === 'WEIGHTLIFTING' && repRows && repRows.length > 0 ? (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {repRows.map(({ reps, record }) => (
                         <div key={reps}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid #FFFFFF' }}>
@@ -12190,7 +12190,7 @@ function App() {
                     </div>
                   ) : records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {records.slice(0, 5).map((r, j) => (
                         <div key={j}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #FFFFFF' : 'none' }}>
@@ -12241,9 +12241,9 @@ function App() {
                 <div key={cat} style={{ marginBottom: '20px' }}>
                   <div onClick={() => { setCatDeschise(prev => ({ ...prev, [cat]: !prev[cat] })); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#0E0E0E' ? '#ABE73C' : '#fff', flexShrink: 0 }}>
                       {esteOpen ? '▲' : '▼'}
                     </div>
@@ -12284,9 +12284,9 @@ function App() {
                   {/* Header clickabil */}
                   <div onClick={() => { setHeroWodsDeschis(v => !v); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
                       {heroWodsDeschis ? '▲' : '▼'}
                     </div>
@@ -12307,7 +12307,7 @@ function App() {
                       }
                       {/* Linie separator + formular WOD nou */}
                       <div style={{ borderTop: '2px dashed #f0f0f0', padding: '14px' }}>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
+                        <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
                             value={heroWodNouInput}
@@ -12331,7 +12331,7 @@ function App() {
             {miscariFaraCat.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
                   <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                 </div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -12395,23 +12395,23 @@ function App() {
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: summary.previous ? '1fr 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
                       <div>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
+                        <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
                         <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.best, t) || '—'}</div>
-                        <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                        <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
                         <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
-                        <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>
                           {new Date(summary.latest.logged_at).toLocaleDateString(localeFor(lang))}
                           {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '600' }}>★ {t.benchmarkNewBestBadge}</span>}
                         </div>
                       </div>
                       {summary.previous && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
+                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
                           <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.previous, t) || '—'}</div>
-                          <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                          <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
                         </div>
                       )}
                     </div>
@@ -12420,7 +12420,7 @@ function App() {
                     )}
                   </div>
                 )}
-                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   {(summary?.history || []).map((log, idx, arr) => (
                     <div key={log.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
@@ -12429,7 +12429,7 @@ function App() {
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {summary.best?.id === log.id && <span style={{ fontSize: '10px', fontWeight: '600', color: '#8a9a3c' }}>★</span>}
                           {log.completion_state === 'capped' && (
-                            <span style={{ fontSize: '9px', fontWeight: '600', lineHeight: 1.2, color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
+                            <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
                           )}
                           {/* P9.5.5 - a modified attempt (scaled load / substitution /
                               performed overlay) is never shown here unmarked, even
@@ -12471,14 +12471,14 @@ function App() {
             ) : (
               <>
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                  <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
-                  <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>
+                  <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>
                     {new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}
                     {comparisonModeLabel(history.latest) && <span style={{ marginLeft: '6px', color: '#888' }}>· {comparisonModeLabel(history.latest)}</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   {history.history.map((entry, idx, arr) => (
                     <div key={entry.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -12682,7 +12682,7 @@ function App() {
               {/* Zile header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
                 {ziuaLitereCalendar.map((z, zi) => (
-                  <div key={zi} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '600', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
+                  <div key={zi} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
                 ))}
               </div>
               {/* Grid zile */}

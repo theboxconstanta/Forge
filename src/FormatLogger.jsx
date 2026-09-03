@@ -105,11 +105,11 @@ function TimeResultFields({ result, time, onChange, t, hideResult }) {
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
             <input type="number" min="0" value={tMin || ''} onChange={e => onChange({ time: `${e.target.value}:${tSec || '00'}` })} placeholder="4" style={inputStyle} />
-            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t?.logWodMinutesLabel || 'min'}</div>
+            <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t?.logWodMinutesLabel || 'min'}</div>
           </div>
           <div style={{ flex: 1 }}>
             <input type="number" min="0" max="59" value={tSec || ''} onChange={e => onChange({ time: `${tMin || '0'}:${e.target.value}` })} placeholder="22" style={inputStyle} />
-            <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t?.logWodSecondsLabel || 'sec'}</div>
+            <div style={{ fontSize: '11px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t?.logWodSecondsLabel || 'sec'}</div>
           </div>
         </div>
       </div>
