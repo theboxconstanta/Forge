@@ -15,8 +15,9 @@
 // existing `value.partialReps`); onChange({ partialReps }).
 
 import { autoCompleteSequentialProgress, sequentialAmrapTotalReps } from './sequentialAmrap'
+import { COLORS } from './theme'
 
-const rowStyle = { display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderTop: '1px solid #F3F4F6' }
+const rowStyle = { display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderTop: `1px solid ${COLORS.divider}` }
 const numStyle = { width: '76px', flexShrink: 0, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '15px', fontWeight: '600', background: '#fafafa', boxSizing: 'border-box', textAlign: 'center' }
 
 export default function SequentialAmrapFields({ stations, performed, onChange, t }) {

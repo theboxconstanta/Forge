@@ -82,6 +82,7 @@ import {
 import { resolveResultProvenance } from './resultProvenance'
 import { resolveResultMovementLines } from './resultWorkoutLines'
 import { dedupLatestPerMember, monotonicLoggedAt } from './leaderboardSelection'
+import { COLORS } from './theme'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
@@ -750,7 +751,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
                   black, per the mission's explicit "keep the bar visually
                   light" instruction. Same isActive/onClick mechanism. */}
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#B7E63A' : '#9CA3AF'} />
-              <span className="text-[11px]" style={{ color: isActive ? '#111111' : '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              <span className="text-[11px]" style={{ color: isActive ? COLORS.text.primary : '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap' }}>
                 {t[labelKey]}
               </span>
               {badge != null && (
@@ -1015,9 +1016,9 @@ function PerformedMovementSearch({ movementIndex, placeholder, noMatch, onPick, 
   return (
     <div style={{ marginTop: '8px', position: 'relative' }}>
       <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') onCancel?.() }} placeholder={placeholder} autoFocus
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
       {matches.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: '1px solid #E4E4E4', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
           {matches.map((r) => (
             <div key={r.id} onClick={() => onPick(r)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px' }}>{r.name}</div>
           ))}
@@ -1049,7 +1050,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
     setSubOpen(false)
   }
   return (
-    <div style={{ padding: '14px 0', borderTop: '1px solid #F3F4F6' }}>
+    <div style={{ padding: '14px 0', borderTop: `1px solid ${COLORS.divider}` }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name || t.performedEditPickMovement}</div>
@@ -1087,7 +1088,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
                   {t[`performedEditMetric_${metric}`] || PERFORMED_METRIC_LABEL[metric] || metric.toUpperCase()}
                 </span>
                 <PmpeNumField
-                  style={{ width: '64px', padding: '8px 6px', borderRadius: '8px', border: '1px solid #E4E4E4', fontSize: '13px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }}
+                  style={{ width: '64px', padding: '8px 6px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }}
                   integer={metric === 'calories' || metric === 'reps'}
                   value={typeof value === 'number' ? value : null}
                   ariaLabel={`${inst.name} performed ${metric}`}
@@ -1130,13 +1131,13 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
     <div>
       <div style={{ fontSize: '16px', fontWeight: 700, color: '#0E0E0E', marginBottom: '4px' }}>{t.performedEditTitle}</div>
       <div style={{ fontSize: '12px', color: '#9A9A9A', marginBottom: '14px', lineHeight: 1.5 }}>{t.performedEditSubtitle}</div>
-      <div style={{ borderBottom: '1px solid #F3F4F6' }}>
+      <div style={{ borderBottom: `1px solid ${COLORS.divider}` }}>
         {groups.map((g) => {
           const prog = progBySource.get(g.sourceInstanceId)
           const progName = prog?.name || g.entries[0]?.name || 'Movement'
           const realEntries = g.entries.filter(e => e.notPerformed !== true)
           return (
-            <div key={g.sourceInstanceId} style={{ borderTop: '1px solid #F3F4F6', paddingTop: '4px' }}>
+            <div key={g.sourceInstanceId} style={{ borderTop: `1px solid ${COLORS.divider}`, paddingTop: '4px' }}>
               {g.notPerformed ? (
                 <div style={{ padding: '14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                   <div style={{ fontSize: '15px', color: '#9A9A9A', fontWeight: 600, fontStyle: 'italic' }}>
@@ -1177,7 +1178,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
         })}
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-        <button onClick={onCancel} style={{ flex: 1, padding: '13px', background: '#fff', color: '#0E0E0E', border: '1px solid #E4E4E4', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditCancel}</button>
+        <button onClick={onCancel} style={{ flex: 1, padding: '13px', background: '#fff', color: '#0E0E0E', border: `1px solid ${COLORS.border}`, borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditCancel}</button>
         <button onClick={onDone} style={{ flex: 1, padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>{t.performedEditDone}</button>
       </div>
     </div>
@@ -2398,7 +2399,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                     )}
                     {group.logs.map((log, i) => {
                       const name = log.profile?.full_name || log.profile?.email?.split('@')[0] || t.clasamentAnonymous
-                      const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : null
+                      const medalColor = i === 0 ? COLORS.ranking.gold : i === 1 ? COLORS.ranking.silver : i === 2 ? COLORS.ranking.bronze : null
                       // P10 - primary-part cards carry the provenance frozen on
                       // their own log (_prov, set in splitRxSiMixed); format
                       // identity for classification / score interpretation comes
@@ -2434,7 +2435,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         : (isSequentialAmrap(effFormatId, effFormatConfig) && log.result)
                         ? `${partialRepsOfLog({ result: log.result }, true)} ${t.clasamentRepsUnit}`
                         : (log.time_result || log.result || '—')
-                      const borderColor = i === 0 ? nivel.culoare : i === 1 ? '#B0B0B0' : i === 2 ? '#CD7F32' : '#e0e0e0'
+                      const borderColor = i === 0 ? nivel.culoare : i === 1 ? COLORS.ranking.silver : i === 2 ? COLORS.ranking.bronze : COLORS.border
                       // P9.5.6 - AXIS B only: did the athlete materially change
                       // the SELECTED variant's prescription? Identical rule to
                       // the leaderboard bucket (isMixedCategory). Completion /
@@ -2611,7 +2612,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
               <div style={{ marginBottom: '20px' }}>
                 {aggregateLeaderboard.entries.map((entry, i) => {
                   const name = entry.profile?.full_name || entry.profile?.email?.split('@')[0] || t.clasamentAnonymous
-                  const medalColor = i === 0 ? '#D4AF37' : i === 1 ? '#A8A8A8' : i === 2 ? '#CD7F32' : '#e0e0e0'
+                  const medalColor = i === 0 ? COLORS.ranking.gold : i === 1 ? COLORS.ranking.silver : i === 2 ? COLORS.ranking.bronze : COLORS.border
                   const unit = entry.result.unit
                   const displayValue = unit === 'seconds' ? secToTime(entry.result.value)
                     : unit === 'kg' ? `${entry.result.value}kg`
@@ -10486,7 +10487,7 @@ function App() {
                 <div style={{ fontSize: '14px', fontWeight: '400', lineHeight: '20px', color: '#6B7280' }}>{t.homeGreeting(prenume)}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
                     <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', letterSpacing: '0.08em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
@@ -10518,10 +10519,10 @@ function App() {
             <div style={{ padding: '10px 20px 4px' }}>
               <div onClick={() => { setCalPickerYear(selData.getFullYear()); setCalPickerMonth(selData.getMonth()); setShowCalPicker(true) }}
                 style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: '9px', padding: '10px 12px 10px 4px', margin: '-10px -12px -10px -4px' }}>
-                <span style={{ fontSize: '24px', fontWeight: '600', color: '#111111', letterSpacing: '-0.02em', lineHeight: '28px', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: '24px', fontWeight: '600', color: COLORS.text.primary, letterSpacing: '-0.02em', lineHeight: '28px', fontVariantNumeric: 'tabular-nums' }}>
                   {(() => { const m = selData.toLocaleDateString(localeFor(lang), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1) })()} {selData.getFullYear()}
                 </span>
-                <ChevronDown size={19} color="#111111" strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
+                <ChevronDown size={19} color={COLORS.text.primary} strokeWidth={2.5} style={{ position: 'relative', top: '2px' }} />
               </div>
               {!esteAzi && (
                 <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
@@ -10553,11 +10554,11 @@ function App() {
                         // ramasa pe cardul anterior selectat, permanent, in interiorul randului cu
                         // scroll orizontal). NU se elimina - vezi PAST tuning report.
                         transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? '#111111' : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
-                      <span style={{ fontSize: '18px', fontWeight: '500', color: '#111111', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
-                      <span style={{ fontSize: '11px', color: selectat ? '#111111' : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '500', color: selectat ? COLORS.text.primary : '#9CA3AF', letterSpacing: '0.04em' }}>{ziuaLitera}</span>
+                      <span style={{ fontSize: '18px', fontWeight: '500', color: COLORS.text.primary, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{dayNum}</span>
+                      <span style={{ fontSize: '11px', color: selectat ? COLORS.text.primary : '#9CA3AF', fontWeight: '400' }}>{luna}</span>
                       {(areWod || areRez) && (
-                        <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? '#111111' : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
+                        <span style={{ position: 'absolute', top: '5px', right: '7px', fontSize: '8px', lineHeight: 1, color: selectat ? COLORS.text.primary : '#B7E63A' }}>{areRez ? '✓' : '⚡'}</span>
                       )}
                     </div>
                   )
@@ -10572,7 +10573,7 @@ function App() {
                 styling only (border/radius/time-block/text colors). */}
             <div style={{ padding: '0 20px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', color: '#111111' }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', color: COLORS.text.primary }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
                 <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
               </div>
               {claseZi.length === 0 ? (
@@ -10591,7 +10592,7 @@ function App() {
                           <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>{c.name || t.homeDefaultClassName}</div>
                           <div style={{ fontSize: '13px', fontWeight: '400', lineHeight: '18px', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -10667,7 +10668,7 @@ function App() {
                             const interactive = canToggleAtt && attInteractive
                             const pending = pendingCheckins.has(m.bookingId)
                             return (
-                              <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                              <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
                                 <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={34} />
                                 <div style={{ flex: 1, fontSize: '16px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
                                 {interactive ? (
@@ -10736,7 +10737,7 @@ function App() {
             <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#111111', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
+                  <div style={{ fontSize: '12px', color: COLORS.text.primary, fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
                   {/* Universal Member Workout Format Header - cardul de Acasa
                       ramane strict un punct de intrare minimal: doar nume +
                       buton. Formatul/time cap-ul/preview-ul de miscari NU mai
@@ -10745,10 +10746,10 @@ function App() {
                       expandat (WorkoutFormatHeader, vezi mai jos). */}
                   {workoutForDisplay ? (
                     workoutForDisplay.title && (
-                      <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>"{workoutForDisplay.title}"</div>
+                      <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>"{workoutForDisplay.title}"</div>
                     )
                   ) : (
-                    <div style={{ fontSize: '16px', fontWeight: '500', color: '#111111' }}>{t.homeNoWodToday}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>{t.homeNoWodToday}</div>
                   )}
                   {logZiWod && (
                     <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -10779,7 +10780,7 @@ function App() {
                     both states (was a heavy full-black fill when expanded);
                     a subtle border communicates "expanded" instead of an
                     inverted dark fill. Same onClick/wodDeschis toggle. */}
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F3F4F6', border: wodDeschis ? '1.5px solid #D1D5DB' : 'none', color: '#111111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F3F4F6', border: wodDeschis ? '1.5px solid #D1D5DB' : 'none', color: COLORS.text.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
                   {wodDeschis ? '−' : '+'}
                 </div>
               </div>
@@ -10940,7 +10941,7 @@ function App() {
                         {miscari.length > 0 && (
                           <div style={{ marginTop: '16px' }}>
                             {miscari.map((m, mi) => (
-                              <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                              <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
                                 {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
                               </div>
                             ))}
@@ -10950,7 +10951,7 @@ function App() {
                           <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
                         ))}
                         {notaVarianta && (
-                          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
+                          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                             <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
                           </div>
@@ -11011,7 +11012,7 @@ function App() {
                               {miscari.length > 0 && (
                                 <div style={{ marginTop: '16px' }}>
                                   {miscari.map((m, mi) => (
-                                    <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                    <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
                                       {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
                                     </div>
                                   ))}
@@ -11021,7 +11022,7 @@ function App() {
                                 <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
                               ))}
                               {notaVarianta && (
-                                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
+                                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
                                   <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                                   <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
                                 </div>
@@ -11070,17 +11071,17 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CreditCard size={17} color="#6B7280" strokeWidth={1.75} />
-                    <div style={{ fontSize: '13px', fontWeight: '400', color: '#111111' }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '400', color: COLORS.text.primary }}>{abonamentReal.subscription_plans?.name || t.homeDefaultSubscriptionName}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {sessTotal ? (
                       <div style={{ fontSize: '16px', fontWeight: '500', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-                        <span style={{ color: '#111111' }}>{sessUsed}</span>
+                        <span style={{ color: COLORS.text.primary }}>{sessUsed}</span>
                         <span style={{ color: '#D1D5DB', fontWeight: '400' }}> / </span>
-                        <span style={{ color: '#111111' }}>{sessTotal}</span>
+                        <span style={{ color: COLORS.text.primary }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '16px', color: '#111111', fontWeight: '500' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '16px', color: COLORS.text.primary, fontWeight: '500' }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
@@ -11606,7 +11607,7 @@ function App() {
                       {rows.map((r, i) => {
                         const { namePart, rxPart } = splitPrescriptionLine(r.line)
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '12px', padding: '11px 0', borderTop: i > 0 ? '1px solid #F3F4F6' : 'none' }}>
+                          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '12px', padding: '11px 0', borderTop: i > 0 ? `1px solid ${COLORS.divider}` : 'none' }}>
                             <span style={{ flex: 1, fontSize: '15px', color: '#0E0E0E', lineHeight: 1.4, minWidth: 0, wordBreak: 'break-word' }}>{namePart}</span>
                             {rxPart && <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', flexShrink: 0, whiteSpace: 'nowrap' }}>@ {rxPart}</span>}
                           </div>
@@ -11631,7 +11632,7 @@ function App() {
                 <div style={{ marginTop: '16px' }}>
                   <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
                   <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder}
-                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #E4E4E4', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.border}`, fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
                 </div>
 
                 <button onClick={saveWodLog} disabled={wodSaving}

@@ -18,10 +18,11 @@ import FormatLogger from './FormatLogger'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { resolveNumericInput } from './prescriptionContract'
 import { secToTime } from './utils'
+import { COLORS } from './theme'
 
 const card = { background: '#fff', border: '1px solid #ECECEC', borderRadius: '16px', padding: '16px' }
 const label = { fontSize: '11px', fontWeight: '600', letterSpacing: '0.04em', color: '#9A9A9A', textTransform: 'uppercase', marginBottom: '8px' }
-const numInput = { width: '100%', padding: '13px 14px', borderRadius: '12px', border: '1px solid #E4E4E4', fontSize: '17px', fontWeight: '600', color: '#0E0E0E', background: '#fff', boxSizing: 'border-box', outline: 'none' }
+const numInput = { width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.border}`, fontSize: '17px', fontWeight: '600', color: '#0E0E0E', background: '#fff', boxSizing: 'border-box', outline: 'none' }
 const unitTxt = { fontSize: '13px', fontWeight: '600', color: '#9A9A9A', marginLeft: '10px', alignSelf: 'center' }
 
 function NumRow({ value, onCommit, integer, ariaLabel, placeholder, suffix, width }) {
@@ -118,7 +119,7 @@ function RoundsAndAdditionalReps({ v, patch, t, roundsPlaceholder, repsPlacehold
 // completion_state stays completed / capped.
 function FinishedCappedToggle({ mode, onPick, t }) {
   const btn = (active) => ({
-    flex: 1, padding: '12px 8px', borderRadius: '12px', border: `1px solid ${active ? '#0E0E0E' : '#E4E4E4'}`,
+    flex: 1, padding: '12px 8px', borderRadius: '12px', border: `1px solid ${active ? '#0E0E0E' : COLORS.border}`,
     background: active ? '#0E0E0E' : '#fff', color: active ? '#fff' : '#6B6B6B',
     fontSize: '13px', fontWeight: active ? '700' : '500', cursor: 'pointer',
   })
