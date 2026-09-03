@@ -1,13 +1,19 @@
 # P9.5.2A — Global Performed Movement Composition (Add / Change / Delete / Not Performed)
 
-**Date:** 2026-09-02
-**Status:** **OPTION 2 IMPLEMENTED — code + migration + tests + regression GREEN; production smoke PENDING (needs a logged-in member session).**
+**Date:** 2026-09-02 → **CLOSED/GREEN 2026-09-03**
+**Status:** **CLOSED / GREEN.** Option 2 shipped. Production smoke PASSED
+(latest canonical submission wins regardless of score; Modified → Mixed
+Categories; edited reps/composition reflected; Journal ↔ Leaderboard consistent;
+refresh preserved). `app_version` = `perf-movement-composition-p9-5-2a-20260903`;
+prod bundle `assets/index-CIODaqJd.js`.
 **Priority:** P1 — member logging / result truth / leaderboard classification.
 
-Commits on `main`: `bdba1a9` (contract v2), `497b9d6` (validator migration +
-INC-08 projection), `4c3b3bf` (Sequential AMRAP station swap), `f3c8258`
-(grouped editor), `6f8db37` (Intervals per-cell inputs + save), `7128280` (S/T
-tests). `app_version` bump + production smoke deferred to the owner smoke pass.
+Commits on `main`: `bdba1a9` contract v2 · `497b9d6` validator migration +
+INC-08 projection · `4c3b3bf` Sequential AMRAP station swap · `f3c8258` grouped
+editor · `6f8db37` Intervals per-cell inputs + save · `7128280` S/T tests ·
+`3241e7c` as-built doc · `dbc41c2` editable performed reps · `d76e56e` doc ·
+`b02a3c2` INC-09 latest-log LB fix · `6d20305` doc. forge-admin-web `fcbb7a1` +
+`f9cbef7` (contract parity). Migration `20260902140000` (applied + registered).
 
 Owner decisions received and authoritative: **D1 = A** (flat ordered list +
 `sourceInstanceId`), **D2 = B** (explicit *Mark Not Performed*), **D3 = A**
@@ -162,6 +168,25 @@ anchor for historical re-projection; the new provenance applies only to logs
 saved after this ships.
 
 ---
+
+## 6a. Production smoke — PASSED (2026-09-03)
+
+Owner ran the smoke on live (member `97a4e88a` "Test", wod `1858f4da` Sequence
+AMRAP chipper + a structured Intervals workout). Confirmed:
+
+- **latest canonical submission wins regardless of score** — a newer
+  edited/re-logged result replaces an older better-scoring one in the
+  leaderboard (INC-09 LB fix `b02a3c2`);
+- a **Modified** result routes to **Mixed Categories**, programmed variant
+  preserved;
+- **edited performed reps / composition** are reflected in the score, Journal
+  and Leaderboard detail;
+- **Journal ↔ Leaderboard consistent** (same canonical latest row);
+- **refresh preserves** the correct result.
+
+Then: `app_version` bumped to `perf-movement-composition-p9-5-2a-20260903`; prod
+bundle `assets/index-CIODaqJd.js` verified to carry the P9.5.2A markers
+(`sourceInstanceId`, Mark-Not-Performed RO+EN, `performedEditMetric_reps`).
 
 ## 6. Decision
 
