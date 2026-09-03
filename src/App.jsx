@@ -1025,7 +1025,7 @@ function PerformedMovementSearch({ movementIndex, placeholder, noMatch, onPick, 
         </div>
       )}
       {query.trim().length >= 2 && matches.length === 0 && (
-        <div style={{ fontSize: '11px', color: '#9A9A9A', marginTop: '6px' }}>{noMatch}</div>
+        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#9A9A9A', marginTop: '6px' }}>{noMatch}</div>
       )}
     </div>
   )
@@ -1053,12 +1053,12 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
     <div style={{ padding: '14px 0', borderTop: `1px solid ${COLORS.divider}` }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name || t.performedEditPickMovement}</div>
+          <div style={{ fontSize: '15px', lineHeight: 1.3, color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name || t.performedEditPickMovement}</div>
           {repsText != null && repsText !== '' && !repsIsEditable && (
-            <div style={{ fontSize: '12px', color: '#9A9A9A', marginTop: '2px' }}>{t.performedEditRepsLocked(repsText)}</div>
+            <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#9A9A9A', marginTop: '2px' }}>{t.performedEditRepsLocked(repsText)}</div>
           )}
           {inst.substitutedFrom && (
-            <div style={{ fontSize: '11px', color: '#B7791F', marginTop: '3px' }}>{t.performedEditSubstitutedFrom(inst.substitutedFrom.name)}</div>
+            <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#B7791F', marginTop: '3px' }}>{t.performedEditSubstitutedFrom(inst.substitutedFrom.name)}</div>
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
@@ -1084,7 +1084,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
             const { value, unit } = performedResolvedValue(inst[metric], gender)
             return (
               <label key={metric} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', color: '#9A9A9A', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', textTransform: 'uppercase' }}>
                   {t[`performedEditMetric_${metric}`] || PERFORMED_METRIC_LABEL[metric] || metric.toUpperCase()}
                 </span>
                 <PmpeNumField
@@ -1129,7 +1129,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
   }
   return (
     <div>
-      <div style={{ fontSize: '16px', fontWeight: 700, color: '#0E0E0E', marginBottom: '4px' }}>{t.performedEditTitle}</div>
+      <div style={{ fontSize: '16px', fontWeight: 600, lineHeight: 1.3, color: '#0E0E0E', marginBottom: '4px' }}>{t.performedEditTitle}</div>
       <div style={{ fontSize: '12px', color: '#9A9A9A', marginBottom: '14px', lineHeight: 1.5 }}>{t.performedEditSubtitle}</div>
       <div style={{ borderBottom: `1px solid ${COLORS.divider}` }}>
         {groups.map((g) => {
@@ -1140,7 +1140,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
             <div key={g.sourceInstanceId} style={{ borderTop: `1px solid ${COLORS.divider}`, paddingTop: '4px' }}>
               {g.notPerformed ? (
                 <div style={{ padding: '14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                  <div style={{ fontSize: '15px', color: '#9A9A9A', fontWeight: 600, fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '15px', lineHeight: 1.3, color: '#9A9A9A', fontWeight: 600, fontStyle: 'italic' }}>
                     {t.performedEditNotPerformedLabel(progName)}
                   </div>
                   <button onClick={() => onChange(restoreSourcePerformed(draft, g.sourceInstanceId, prog || null))}
@@ -1179,7 +1179,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
       </div>
       <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
         <button onClick={onCancel} style={{ flex: 1, padding: '13px', background: '#fff', color: '#0E0E0E', border: `1px solid ${COLORS.border}`, borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditCancel}</button>
-        <button onClick={onDone} style={{ flex: 1, padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>{t.performedEditDone}</button>
+        <button onClick={onDone} style={{ flex: 1, padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{t.performedEditDone}</button>
       </div>
     </div>
   )
@@ -1791,9 +1791,9 @@ function WorkoutFormatHeader({ formatId, formatConfig, legacyDuration, t }) {
   const { primary, secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, formatConfig, legacyDuration, t)
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: '12px', rowGap: '2px' }}>
-      <span style={{ fontSize: '20px', fontWeight: '600', color: '#0E0E0E' }}>{primary}</span>
+      <span style={{ fontSize: '20px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{primary}</span>
       {secondaryValue && (
-        <span style={{ fontSize: '16px', fontWeight: '600', color: '#EF4444', flexShrink: 0 }}>
+        <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1.3, color: '#EF4444', flexShrink: 0 }}>
           {secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue}
         </span>
       )}
@@ -2323,10 +2323,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', background: '#FFFFFF', borderRadius: '12px', padding: '8px 12px' }}>
         <button onClick={() => goDay(-1)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>
+          <div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.35, color: '#0E0E0E' }}>
             {isToday ? t.clasamentToday : new Date(selectedDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })}
           </div>
-          {wodZiData ? <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', color: '#bbb', marginTop: '1px' }}>{t.clasamentNoWod}</div>}
+          {wodZiData ? <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '1px' }}>{wodZiData.type} {formatWodDurata(wodZiData.duration)}</div> : <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#bbb', marginTop: '1px' }}>{t.clasamentNoWod}</div>}
         </div>
         {/* INC-06 - forward navigation is NOT capped at today. A workout can be
             programmed for a future business date and logged from Home before that
@@ -2349,24 +2349,24 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px' }}>{t.clasamentLoading}</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px', lineHeight: 1.35 }}>{t.clasamentLoading}</div>
       ) : totalLogs === 0 && !(aggregateLeaderboard && aggregateLeaderboard.entries.length > 0) ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
           <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Flag size={36} color="#ccc" strokeWidth={1.5} /></div>
-          <div style={{ fontSize: '14px', fontWeight: '500', color: '#888', marginBottom: '6px' }}>{t.clasamentEmptyTitle}</div>
-          <div style={{ fontSize: '12px', color: '#aaa' }}>{t.clasamentEmptySubtitle}</div>
+          <div style={{ fontSize: '14px', fontWeight: '500', lineHeight: 1.3, color: '#888', marginBottom: '6px' }}>{t.clasamentEmptyTitle}</div>
+          <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>{t.clasamentEmptySubtitle}</div>
         </div>
       ) : (
         <div>
           {renderGroups.map((renderGroup) => (
             <div key={renderGroup.partId}>
               {renderGroup.partLabel && (
-                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
                   {renderGroup.partLabel}
                 </div>
               )}
               {renderGroup.partLabel && renderGroup.blocks.length === 0 && (
-                <div style={{ fontSize: '12px', color: '#bbb', marginBottom: '16px' }}>{t.clasamentSectionEmptyLabel}</div>
+                <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#bbb', marginBottom: '16px' }}>{t.clasamentSectionEmptyLabel}</div>
               )}
               {renderGroup.blocks.map(({ nivel, weightGroups }) => {
             const sectionLogs = weightGroups.flatMap(g => g.logs)
@@ -2376,17 +2376,17 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
               <div key={nivel.id} style={{ marginBottom: '20px' }}>
                 {/* Header secțiune */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '600', color: nivel.culoare, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '600', lineHeight: 1.3, color: nivel.culoare, letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <LevelDot nivel={nivel.id} /> {nivel.id}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500' }}>
+                  <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500', lineHeight: 1.35 }}>
                     {sectionLogs.length} {t.clasamentParticipantWord(sectionLogs.length, genderTab)}
                   </div>
                   {isForTime && (
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
                   )}
                   {!isForTime && sectionLogs.some(l => l.result) && (
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#aaa' }}>🔄 AMRAP</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', lineHeight: 1.35, color: '#aaa' }}>🔄 AMRAP</div>
                   )}
                 </div>
                 {/* Sub-grupuri pe greutate (RX intai, fara header suplimentar; apoi
@@ -2501,11 +2501,11 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                             </div>
                             <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                             <div style={{ flex: 1 }}>
-                              <div style={{ ...TYPO.primary, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ ...TYPO.primary, lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {name}
                                 {resultModifiedLog && <NotRxdBadge t={t} compact variant={log.variant_level} />}
                               </div>
-                              <div style={{ fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
                                 <Clock size={10} strokeWidth={2} />
                                 {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
                               </div>
@@ -2513,7 +2513,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                             <div style={{ textAlign: 'right' }}>
                               <div style={{ ...TYPO.numericLarge, color: nivel.culoare }}>{result}</div>
                               {log.time_result && log.result && (
-                                <div style={{ fontSize: '11px', color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
+                                <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
                               )}
                             </div>
                             <span style={{ fontSize: '13px', color: '#ccc', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
@@ -2523,18 +2523,18 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               {log.variant_level && (
                                 <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                                   <div>
-                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
-                                    <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.clasamentVariantLabel}</div>
+                                    <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                       <LevelDot nivel={log.variant_level} /> {log.variant_level}
                                     </div>
                                   </div>
                                   {log.weight_logged?.trim() && (
                                     <div>
-                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
-                                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600' }}>
+                                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.logWodWeightLabel}</div>
+                                      <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>
                                         {log.weight_logged.trim()}
                                         {log._prescribedWeight && !weightMatches(log.weight_logged, log._prescribedWeight) && (
-                                          <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '500', marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
+                                          <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '500', lineHeight: 1.35, marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
                                         )}
                                       </div>
                                     </div>
@@ -2544,14 +2544,14 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               {cardMovementLines.length > 0 && (
                                 <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                                   {cardMovementLines.map((m, j) => (
-                                    <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
+                                    <div key={j} style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                                   ))}
                                 </div>
                               )}
                               {areRezultatFinal && (
                                 <div style={{ marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: cardMovementLines.length > 0 ? '10px' : '0', borderTop: cardMovementLines.length > 0 ? '1px solid #f0f0f0' : 'none' }}>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                                  <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{rezultatBucati.join(' · ')}</div>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                                  <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{rezultatBucati.join(' · ')}</div>
                                 </div>
                               )}
                               {wHasSets && (
@@ -2560,8 +2560,8 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                     <IntervalResultRounds intervalResult={intervalResult} t={t} />
                                   ) : wSetsParti.map((p, j) => (
                                     <div key={j} style={{ marginBottom: '6px' }}>
-                                      <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
-                                      <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
+                                      <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
+                                      <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
                                     </div>
                                   ))}
                                 </div>
@@ -2572,20 +2572,20 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                   hardcodata 'TOTAL' pt orice scor. */}
                               {showSetsScoreAtEnd && (
                                 <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t.clasamentSetsScoreLabel[resolveSetsScoringMode(effFormatId, effFormatConfig)] || t.jurnalResultLabel}
                                   </div>
-                                  <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '700' }}>{result}</div>
+                                  <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{result}</div>
                                 </div>
                               )}
                               {noteLog && noteLog.trim() && (
                                 <div>
-                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                                  <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                                  <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                                 </div>
                               )}
                               {!areDetaliiFinal && (
-                                <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
+                                <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>{t.jurnalNoDetails}</div>
                               )}
                             </div>
                           )}
@@ -2606,7 +2606,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
               raman intotdeauna vizibile, neschimbate. */}
           {aggregateLeaderboard && aggregateLeaderboard.entries.length > 0 && (
             <div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', margin: '18px 0 10px', paddingTop: '8px', borderTop: '2px solid #f0f0f0' }}>
                 {aggregateLeaderboard.label}
               </div>
               <div style={{ marginBottom: '20px' }}>
@@ -2619,10 +2619,10 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                     : `${entry.result.value} ${unit}`
                   return (
                     <div key={entry.memberId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fff', borderRadius: '10px', marginBottom: '6px', borderLeft: `3px solid ${medalColor}` }}>
-                      <div style={{ width: '20px', fontSize: '12px', fontWeight: '700', color: '#888', textAlign: 'center' }}>{i + 1}</div>
+                      <div style={{ width: '20px', fontSize: '12px', fontWeight: '600', lineHeight: 1.2, color: '#888', textAlign: 'center' }}>{i + 1}</div>
                       <AvatarCircle name={name} avatarUrl={entry.profile?.avatar_url} size={32} />
-                      <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{name}</div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#0E0E0E' }}>{displayValue}</div>
+                      <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{name}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E' }}>{displayValue}</div>
                     </div>
                   )
                 })}
@@ -5127,7 +5127,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#0E0E0E' : eTrecut ? '#f0f0f0' : '#0E0E0E', borderRadius: '20px', padding: '5px 14px' }}>
-                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '600', letterSpacing: '0.08em' }}>{t.adminClassTodayBadge}</span>}
+                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em' }}>{t.adminClassTodayBadge}</span>}
                       <span style={{ fontSize: '13px', fontWeight: '600', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
                     </div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
@@ -6349,7 +6349,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
                       {resultModifiedLog && <NotRxdBadge t={t} compact variant={w.variant_level} />}
                     </div>
@@ -6370,7 +6370,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <Calendar size={10} strokeWidth={2} />
                       {new Date(w.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -6381,27 +6381,27 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     </span>
                   </div>
                   {wodSubtitlu && (
-                    <div style={{ marginTop: '2px', fontSize: '12px', color: '#888' }}>{wodSubtitlu}</div>
+                    <div style={{ marginTop: '2px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>{wodSubtitlu}</div>
                   )}
                   {progressionNote && (
-                    <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', fontWeight: '600' }}>{progressionNote}</div>
+                    <div style={{ marginTop: '4px', fontSize: '11px', lineHeight: 1.35, color: '#666', fontWeight: '600' }}>{progressionNote}</div>
                   )}
                   {!isOpen && !areRezultatFinal && (
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#aaa' }}>—</div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>—</div>
                   )}
                   {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {cardMovementLines.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {cardMovementLines.map((m, j) => (
-                            <div key={j} style={{ fontSize: '12px', color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
+                            <div key={j} style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
                       {areRezultatFinal && (
                         <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
-                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{rezultatBucati.join(' · ')}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{rezultatBucati.join(' · ')}</div>
                         </div>
                       )}
                       {wHasSets && (
@@ -6410,20 +6410,20 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                             <IntervalResultRounds intervalResult={intervalResult} t={t} />
                           ) : wSetsParti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600' }}>{p.cheie}</div>
-                              <div style={{ fontSize: '11px', color: '#888' }}>{p.seturiTxt}</div>
+                              <div style={{ fontSize: '12px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
+                              <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
                             </div>
                           ))}
                         </div>
                       )}
                       {noteLog && noteLog.trim() && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
-                          <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.jurnalNoteLabel}</div>
+                          <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#555', fontStyle: 'italic' }}>{noteLog.trim()}</div>
                         </div>
                       )}
                       {!areDetaliiFinal && (
-                        <div style={{ fontSize: '12px', color: '#aaa' }}>{t.jurnalNoDetails}</div>
+                        <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>{t.jurnalNoDetails}</div>
                       )}
                       {onEditWod && (
                         <button onClick={(e) => { e.stopPropagation(); onEditWod(w) }}
@@ -6502,7 +6502,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {skillScorText != null && (
                         <div style={{ marginBottom: '12px' }}>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600' }}>{skillScorText}</div>
                         </div>
                       )}
@@ -10488,7 +10488,7 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{wodLogs.length}</div>
-                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', letterSpacing: '0.08em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
+                    <div style={{ fontSize: '9px', color: '#9CA3AF', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em', marginTop: '1px' }}>{t.homeSessionsLabel}</div>
                   </div>
                   <div onClick={() => { setPrevScreen('home'); setScreen('profile') }}
                     style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#0E0E0E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
@@ -10573,7 +10573,7 @@ function App() {
                 styling only (border/radius/time-block/text colors). */}
             <div style={{ padding: '0 20px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.08em', color: COLORS.text.primary }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em', color: COLORS.text.primary }}>{esteAzi ? t.homeTodayLabel : selData.toLocaleDateString(localeFor(lang), { weekday: 'long' }).toUpperCase()}</div>
                 <div style={{ fontSize: '13px', color: '#6B7280', fontWeight: '500' }}>{t.homeScheduleClassCount(claseZi.length)}</div>
               </div>
               {claseZi.length === 0 ? (
@@ -10737,7 +10737,7 @@ function App() {
             <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '22px', margin: '0 20px 12px', padding: '18px 20px' }}>
               <div onClick={() => setWodDeschis(!wodDeschis)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: COLORS.text.primary, fontWeight: '600', letterSpacing: '0.08em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
+                  <div style={{ fontSize: '12px', color: COLORS.text.primary, fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em', marginBottom: '6px' }}>{t.homeWodBadge}</div>
                   {/* Universal Member Workout Format Header - cardul de Acasa
                       ramane strict un punct de intrare minimal: doar nume +
                       buton. Formatul/time cap-ul/preview-ul de miscari NU mai
@@ -11582,11 +11582,11 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #ECECEC', background: '#fff' }}>
                     <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} size={6} />
-                    <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
                   </div>
                   {performedActive && (
                     <div style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: '999px', background: '#FEF3E2', border: '1px solid #F5D9AE' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.04em', color: '#B7791F' }}>{t.performedModifiedTag}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#B7791F' }}>{t.performedModifiedTag}</span>
                     </div>
                   )}
                   {editEligible && (
@@ -11600,7 +11600,7 @@ function App() {
                 <div style={{ marginBottom: '26px' }}>
                   <WorkoutFormatHeader formatId={activeLogFormatId} formatConfig={activeLogFormatConfig} legacyDuration={formatWodDurata(logWodZiData?.duration)} t={t} />
                   {scheduleLines.prescriptionLines.map((l, i) => (
-                    <div key={i} style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: i === 0 ? '6px' : '2px' }}>{l}</div>
+                    <div key={i} style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: i === 0 ? '6px' : '2px' }}>{l}</div>
                   ))}
                   {rows.length > 0 && (
                     <div style={{ marginTop: '16px' }}>
@@ -11616,11 +11616,11 @@ function App() {
                     </div>
                   )}
                   {scheduleLines.metadataLines.map((l, i) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#9A9A9A', marginTop: i === 0 ? '14px' : '2px' }}>{l}</div>
+                    <div key={i} style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#9A9A9A', marginTop: i === 0 ? '14px' : '2px' }}>{l}</div>
                   ))}
                 </div>
 
-                <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.07em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
+                <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
                   movements={miscariPentruLog} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
@@ -11630,13 +11630,13 @@ function App() {
                   weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
 
                 <div style={{ marginTop: '16px' }}>
-                  <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
+                  <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodNoteLabel}</div>
                   <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder}
                     style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.border}`, fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
                 </div>
 
                 <button onClick={saveWodLog} disabled={wodSaving}
-                  style={{ width: '100%', padding: '15px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '700', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>
+                  style={{ width: '100%', padding: '15px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>
                   {wodSaving ? t.logWodSaving : (editLogId ? t.logWodSaveEdit : t.logWodSaveNew)}
                 </button>
               </>
@@ -12403,7 +12403,7 @@ function App() {
                         <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
                         <div style={{ fontSize: '10px', color: '#bbb' }}>
                           {new Date(summary.latest.logged_at).toLocaleDateString(localeFor(lang))}
-                          {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '700' }}>★ {t.benchmarkNewBestBadge}</span>}
+                          {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '600' }}>★ {t.benchmarkNewBestBadge}</span>}
                         </div>
                       </div>
                       {summary.previous && (
@@ -12426,7 +12426,7 @@ function App() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {summary.best?.id === log.id && <span style={{ fontSize: '10px', fontWeight: '700', color: '#8a9a3c' }}>★</span>}
+                          {summary.best?.id === log.id && <span style={{ fontSize: '10px', fontWeight: '600', color: '#8a9a3c' }}>★</span>}
                           {log.completion_state === 'capped' && (
                             <span style={{ fontSize: '9px', fontWeight: '600', color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
                           )}

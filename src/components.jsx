@@ -89,7 +89,7 @@ export function Modal({ title, onClose, children, maxWidth = '360px' }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth, width: '100%' }}>
-        <div id="modal-title" style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{title}</div>
+        <div id="modal-title" style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '8px' }}>{title}</div>
         {children}
       </div>
     </div>
@@ -192,7 +192,7 @@ export function MembershipCoverageDialog({ t, onClose }) {
         <p style={{ margin: 0 }}>{t.membershipCoverageDialogBody2}</p>
       </div>
       <button onClick={onClose}
-        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', ...TYPO.buttonPrimary, cursor: 'pointer' }}>
+        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', ...TYPO.buttonPrimary, fontWeight: '600', cursor: 'pointer' }}>
         {t.membershipCoverageDialogButton}
       </button>
     </Modal>

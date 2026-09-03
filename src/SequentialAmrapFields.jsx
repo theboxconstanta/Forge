@@ -41,7 +41,7 @@ export default function SequentialAmrapFields({ stations, performed, onChange, t
 
   return (
     <div style={{ marginBottom: '14px' }}>
-      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em' }}>
         {t?.logWodSequentialStationsLabel || 'PROGRESUL TĂU'}
       </div>
       <div>
@@ -51,10 +51,10 @@ export default function SequentialAmrapFields({ stations, performed, onChange, t
           const labelText = st.role === 'open' ? `${maxPrefix} ${cleanName(st.name)}` : st.name
           return (
             <div key={st.index ?? i} style={{ ...rowStyle, borderTop: i === 0 ? 'none' : rowStyle.borderTop }}>
-              <div style={{ flex: 1, minWidth: 0, fontSize: '14px', color: '#0E0E0E', overflowWrap: 'anywhere' }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: '14px', lineHeight: 1.4, color: '#0E0E0E', overflowWrap: 'anywhere' }}>
                 {labelText}
                 {willAutoFill && (
-                  <span style={{ fontSize: '11px', color: '#9A9A9A', marginLeft: '8px' }}>
+                  <span style={{ fontSize: '11px', lineHeight: 1.35, color: '#9A9A9A', marginLeft: '8px' }}>
                     {(t?.logWodSequentialAutoDone && t.logWodSequentialAutoDone(st.target)) || `✓ ${st.target}`}
                   </span>
                 )}
@@ -75,7 +75,7 @@ export default function SequentialAmrapFields({ stations, performed, onChange, t
           )
         })}
       </div>
-      <div style={{ marginTop: '14px', fontSize: '13px', fontWeight: '700', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px' }}>
+      <div style={{ marginTop: '14px', fontSize: '13px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px' }}>
         {(t?.logWodTotalRepsLabel || 'TOTAL REPS')}: {total}
       </div>
     </div>

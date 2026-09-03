@@ -9,7 +9,7 @@ import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 import { secToTime } from './utils'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
-const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }
+const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }
 
 // Eticheta unui rand poate fi chiar numele miscarii (Superset/Weightlifting -
 // "Row") sau un interval cu miscare atasata (EMOM - "Min 1 · Row") - in ambele
@@ -188,7 +188,7 @@ function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPart
         <>
           {greutateField}
           <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult />
-          <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodSequentialHint || 'Dacă nu ai terminat în time cap, ajustează repetările de mai jos la miscările unde nu ai ajuns:'}</div>
+          <div style={{ fontSize: '11px', lineHeight: 1.4, color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodSequentialHint || 'Dacă nu ai terminat în time cap, ajustează repetările de mai jos la miscările unde nu ai ajuns:'}</div>
           <SequentialPartialFields movements={movements} partialReps={value.partialReps} onChange={onChange} t={t} />
         </>
       )
@@ -216,13 +216,13 @@ function ScoredFields({ scoreMode, movements, value, onChange, t, sequentialPart
         {greutateField}
         <TimeResultFields result={value.result} time={value.time} onChange={onChange} t={t} hideResult={roundsCunoscute} />
         {roundsCunoscute && !hasTime && (
-          <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>
+          <div style={{ fontSize: '11px', lineHeight: 1.4, color: '#aaa', margin: '-6px 0 10px' }}>
             {t?.logWodFinishedRoundsHint ? t.logWodFinishedRoundsHint(finishedRounds) : `Dacă termini, se înregistrează automat ${finishedRounds} runde complete.`}
           </div>
         )}
         {!hasTime && (
           <>
-            <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
+            <div style={{ fontSize: '11px', lineHeight: 1.4, color: '#aaa', margin: '-6px 0 10px' }}>{t?.logWodFortimeOrAmrapHint || 'Dacă nu ai terminat în time cap, completează în loc runde + reps parțiale:'}</div>
             <RoundsPartialFields movements={movements} roundsCompleted={value.roundsCompleted} partialReps={value.partialReps} onChange={onChange} t={t} />
           </>
         )}
@@ -320,7 +320,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           const r = ri + 1
           return (
             <div key={r} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: r < iv.roundCount ? '1px solid #f0f0f0' : 'none' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
                 {(t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `Rundă ${r}`).toUpperCase()}
               </div>
               {iv.stations.map((st, si) => {
@@ -370,7 +370,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           )
         })}
         {score != null && (
-          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding:'10px 12px', marginBottom: '14px' }}>
             {setsScoreLabel(resolveSetsScoringMode(formatId, config), t)}: {score}
           </div>
         )}
@@ -386,7 +386,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           weightUnit={weightUnit} t={t} />
       ))}
       {score != null && (
-        <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding:'10px 12px', marginBottom: '14px' }}>
           {/* INC-06 - key the label off the CANONICAL resolver, not the raw
               config: a coach-programmed Intervals/Tabata that never picked a
               scoringMode still scores by the schema default ('Total Reps'), and

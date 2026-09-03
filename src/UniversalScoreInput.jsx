@@ -21,7 +21,7 @@ import { secToTime } from './utils'
 import { COLORS } from './theme'
 
 const card = { background: '#fff', border: '1px solid #ECECEC', borderRadius: '16px', padding: '16px' }
-const label = { fontSize: '11px', fontWeight: '600', letterSpacing: '0.04em', color: '#9A9A9A', textTransform: 'uppercase', marginBottom: '8px' }
+const label = { fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', textTransform: 'uppercase', marginBottom: '8px' }
 const numInput = { width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.border}`, fontSize: '17px', fontWeight: '600', color: '#0E0E0E', background: '#fff', boxSizing: 'border-box', outline: 'none' }
 const unitTxt = { fontSize: '13px', fontWeight: '600', color: '#9A9A9A', marginLeft: '10px', alignSelf: 'center' }
 
@@ -63,7 +63,7 @@ function TimeRow({ time, onChange, ariaPrefix }) {
           onChange={e => onChange(`${e.target.value}:${ss || '00'}`)} placeholder="17" style={{ ...numInput, textAlign: 'center' }} />
         <div style={{ fontSize: '10px', color: '#B5B5B5', marginTop: '4px', textAlign: 'center' }}>min</div>
       </div>
-      <span style={{ alignSelf: 'flex-start', fontSize: '20px', fontWeight: '700', color: '#CFCFCF', marginTop: '11px' }}>:</span>
+      <span style={{ alignSelf: 'flex-start', fontSize: '20px', fontWeight: '600', color: '#CFCFCF', marginTop: '11px' }}>:</span>
       <div style={{ flex: 1 }}>
         <input type="number" min="0" max="59" inputMode="numeric" value={ss || ''} aria-label={`${ariaPrefix} seconds`}
           onChange={e => onChange(`${mm || '0'}:${e.target.value}`)} placeholder="42" style={{ ...numInput, textAlign: 'center' }} />
@@ -159,7 +159,7 @@ export default function UniversalScoreInput({
       <div style={{ ...label, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>{t?.logWodWeightLabel || 'Weight'}</span>
         {rxStatus && (
-          <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px',
+          <span style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, padding: '2px 8px', borderRadius: '999px',
             color: rxStatus === 'rx' ? '#3D8B3D' : '#9A6B00', background: rxStatus === 'rx' ? '#EAF6EA' : '#FDF3DC' }}>
             {rxStatus === 'rx' ? (t?.logWodRxBadge || 'RX') : (t?.logWodNotRxBadge || 'Not Rx')}
           </span>
