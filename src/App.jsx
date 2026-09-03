@@ -993,7 +993,7 @@ function memberMovementLine(line, structured, genderKey) {
 // programmed workout (wods / Engine V2) - it edits a LOCAL DRAFT only, which
 // the parent persists to wod_logs.performed_prescription on Save.
 // ===========================================================================
-const PERFORMED_METRIC_LABEL = { load: 'Load', distance: 'Distance', calories: 'Calories' }
+const PERFORMED_METRIC_LABEL = { reps: 'Reps', load: 'Load', distance: 'Distance', calories: 'Calories' }
 
 function performedResolvedValue(spec, gender) {
   const r = resolveSpec(spec, gender)
@@ -1029,11 +1029,20 @@ function PerformedMovementSearch({ movementIndex, placeholder, noMatch, onPick, 
   )
 }
 
-function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, deletable, t }) {
+function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, deletable, repsEditable, t }) {
   const [subOpen, setSubOpen] = useState(false)
   const repsSpec = resolveSpec(inst.reps, gender)
   const repsText = repsSpec ? (repsSpec.mode === 'text' ? repsSpec.text : (repsSpec.value ?? repsSpec.bothValues?.filter(v => v != null).join('/'))) : null
-  const presentMetrics = PERFORMED_EDITABLE_METRICS.filter(k => inst[k])
+  // P9.5.2A - REPS is a PERFORMED quantity, not a locked structural value: an
+  // editable control wherever the movement carries a numeric reps spec AND the
+  // score family isn't one that owns per-round/per-station reps elsewhere
+  // (structured Intervals - the round-by-round logger is authoritative there).
+  // A text reps scheme (e.g. "21-15-9") stays read-only context.
+  const repsIsEditable = !!repsEditable && !!inst.reps && repsSpec?.mode !== 'text' && !inst.notPerformed
+  const presentMetrics = [
+    ...(repsIsEditable ? ['reps'] : []),
+    ...PERFORMED_EDITABLE_METRICS.filter(k => inst[k]),
+  ]
   const pickSubstitute = (row) => {
     onChange(applyPerformedSubstitution(inst, row, resolveMovementCapability(row)))
     setSubOpen(false)
@@ -1043,7 +1052,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '15px', color: '#0E0E0E', fontWeight: 600, wordBreak: 'break-word' }}>{inst.name || t.performedEditPickMovement}</div>
-          {repsText != null && repsText !== '' && (
+          {repsText != null && repsText !== '' && !repsIsEditable && (
             <div style={{ fontSize: '12px', color: '#9A9A9A', marginTop: '2px' }}>{t.performedEditRepsLocked(repsText)}</div>
           )}
           {inst.substitutedFrom && (
@@ -1074,11 +1083,11 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
             return (
               <label key={metric} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', color: '#9A9A9A', textTransform: 'uppercase' }}>
-                  {t[`performedEditMetric_${metric}`] || PERFORMED_METRIC_LABEL[metric]}
+                  {t[`performedEditMetric_${metric}`] || PERFORMED_METRIC_LABEL[metric] || metric.toUpperCase()}
                 </span>
                 <PmpeNumField
                   style={{ width: '64px', padding: '8px 6px', borderRadius: '8px', border: '1px solid #E4E4E4', fontSize: '13px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }}
-                  integer={metric === 'calories'}
+                  integer={metric === 'calories' || metric === 'reps'}
                   value={typeof value === 'number' ? value : null}
                   ariaLabel={`${inst.name} performed ${metric}`}
                   onCommit={(n) => onChange(setPerformedMetricValue(inst, metric, n, unit))}
@@ -1100,7 +1109,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
 // movements (Change / Delete per entry), a group-level "+ Add movement" below
 // the fields, and a "Mark not performed" / "Restore" toggle. Programmed
 // prescription is never touched.
-function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances, inheritReps, onChange, onCancel, onDone, showToast, t }) {
+function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances, inheritReps, repsEditable, onChange, onCancel, onDone, showToast, t }) {
   const [addOpenFor, setAddOpenFor] = useState(null)
   const groups = performedCompositionGroups(draft)
   const progBySource = new Map((programmedInstances || []).map(p => [p.instanceId, p]))
@@ -1143,7 +1152,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
                     <PerformedEditRow key={inst.instanceId} inst={inst} gender={gender} movementIndex={movementIndex}
                       onChange={(next) => patchInstance(inst.instanceId, next)}
                       onDelete={() => removeInstance(inst.instanceId)}
-                      deletable={realEntries.length > 1} t={t} />
+                      deletable={realEntries.length > 1} repsEditable={repsEditable} t={t} />
                   ))}
                   {addOpenFor === g.sourceInstanceId ? (
                     <PerformedMovementSearch movementIndex={movementIndex} placeholder={t.performedEditAddPlaceholder}
@@ -11498,6 +11507,7 @@ function App() {
                   draft={performedDraft} gender={memberGenderKey} movementIndex={memberMovementIndex}
                   programmedInstances={activePrescriptionDoc?.variants?.[frozenVariantKey]?.movements || []}
                   inheritReps
+                  repsEditable={getFormat(activeLogFormatId)?.rowMode !== 'interval'}
                   onChange={setPerformedDraft}
                   onCancel={() => { setPerformedDraft(null); setLogWodEditMode(false) }}
                   onDone={commitPerformedEdit} showToast={showToast} t={t} />

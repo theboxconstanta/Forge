@@ -930,7 +930,11 @@ export function addPerformedMovement(performedDoc, sourceInstanceId, targetRow, 
     name: targetRow?.name ?? '',
     canonicalMovementId: targetRow?.id ?? null,
   }
-  if (inheritReps && srcEntry?.reps) added.reps = snapshotPrescriptionDoc(srcEntry.reps)
+  // D3 - inherit the source's reps as the INITIAL DEFAULT (editable after),
+  // only when the target movement's capability actually counts reps (§R13).
+  if (inheritReps && srcEntry?.reps && (allowed.length === 0 || allowed.includes('reps'))) {
+    added.reps = snapshotPrescriptionDoc(srcEntry.reps)
+  }
   for (const mk of PERFORMED_EDITABLE_METRICS) {
     if (allowed.includes(mk)) {
       added[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
