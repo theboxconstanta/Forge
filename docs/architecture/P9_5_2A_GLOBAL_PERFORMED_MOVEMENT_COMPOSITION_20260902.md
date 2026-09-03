@@ -331,6 +331,27 @@ rejected. No `ALTER TABLE` needed.
 | Modified → Mixed (D6) | unchanged — `isMixedCategory(…, log.performed_prescription)` already routes any non-null overlay to Mixed; `_nivelOriginal` preserves the programmed tier |
 | Tests | `src/p9_5_2aPerformedComposition.test.js` (17), `src/p9_5_2aStructuredScoring.test.js` (10) |
 
+### 7.6b Performed reps are editable (owner follow-up, commit `dbc41c2`)
+
+D3 inheritance is the **initial default, not a lock**. `PerformedEditRow`
+renders an editable `REPS` control (integer `PmpeNumField`, same as
+load/distance/calories) wherever:
+- the entry carries a **numeric** reps spec (a text scheme `"21-15-9"` stays
+  read-only context), **and**
+- the score family is **not structured Intervals** (`repsEditable = getFormat(id).rowMode !== 'interval'` —
+  the round-by-round interval logger owns per-round reps), **and**
+- the entry is not a `notPerformed` sentinel.
+
+Applies to the **original** performed entry and to **added** movements.
+`addPerformedMovement` inherits the source reps only when the target movement's
+capability counts reps (`allowed` includes `reps`, or is unknown) — a
+distance/calorie movement added under a rep source gets no spurious REPS field
+(§R13). Edited reps flow to: Modified/Mixed (`performedMatchesProgrammed`
+compares resolved reps; restoring exact programmed reps → NULL), Journal /
+Leaderboard (`renderInstanceLine` leads with the reps token), and Sequential
+AMRAP score (`repTargetOf` reads the edited spec value → station target). Tests
+`src/p9_5_2aPerformedReps.test.js` (R1–R16). **Production smoke still owed.**
+
 ### 7.7 Known limitations (v1 of Option 2)
 
 - Result-card "not performed" line renders the EN suffix `— not performed`
