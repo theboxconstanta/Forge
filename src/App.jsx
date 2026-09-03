@@ -1246,9 +1246,9 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
         <input style={{ ...pmpeNumInput, width: '76px' }} value={spec?.text ?? ''} placeholder="21-15-9" aria-label={`${label} scheme`} onChange={e => onChange({ mode: 'text', text: e.target.value })} />
       ) : mode === 'sex_specific' ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-          <span style={{ color: '#bbb', fontSize: '11px' }}>M</span>
+          <span style={{ color: COLORS.text.muted, fontSize: '11px' }}>M</span>
           <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.male)} ariaLabel={`${label} men`} onCommit={n => onChange({ ...spec, mode: 'sex_specific', male: n, ...carry })} />
-          <span style={{ color: '#bbb', fontSize: '11px' }}>F</span>
+          <span style={{ color: COLORS.text.muted, fontSize: '11px' }}>F</span>
           <PmpeNumField style={pmpeNumInput} integer={isInt} value={pmpeAsNum(spec?.female)} ariaLabel={`${label} women`} onCommit={n => onChange({ ...spec, mode: 'sex_specific', female: n, ...carry })} />
         </span>
       ) : (
@@ -1962,9 +1962,9 @@ function Timer({ onBack, defaultFortime, t }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>Time cap</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>{t.timerTimeCapSubtitle}</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.max(1, p.fortime - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.max(1, p.fortime - 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                 <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.fortime} min</span>
-                <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.min(60, p.fortime + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.min(60, p.fortime + 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
@@ -1972,9 +1972,9 @@ function Timer({ onBack, defaultFortime, t }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerAmrapDurationLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>As Many Rounds As Possible</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.max(1, p.amrap - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.max(1, p.amrap - 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                 <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.amrap} min</span>
-                <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.min(60, p.amrap + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.min(60, p.amrap + 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
@@ -1983,17 +1983,17 @@ function Timer({ onBack, defaultFortime, t }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerEmomTotalDurationLabel}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => { setConfig(p => ({ ...p, emom: Math.max(1, p.emom - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, emom: Math.max(1, p.emom - 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.emom} min</span>
-                  <button onClick={() => { setConfig(p => ({ ...p, emom: Math.min(30, p.emom + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, emom: Math.min(30, p.emom + 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>{t.timerSecondsPerMinuteSubtitle}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.max(10, p.emomInterval - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.max(10, p.emomInterval - 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.emomInterval}s</span>
-                  <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.min(120, p.emomInterval + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.min(120, p.emomInterval + 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
             </>
@@ -2003,25 +2003,25 @@ function Timer({ onBack, defaultFortime, t }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerRoundsLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 8</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.max(1, p.tabataRunde - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.max(1, p.tabataRunde - 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '30px', textAlign: 'center' }}>{config.tabataRunde}</span>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.min(20, p.tabataRunde + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.min(20, p.tabataRunde + 1) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerWorkIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 20 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.max(5, p.tabataLucru - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.max(5, p.tabataLucru - 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '40px', textAlign: 'center' }}>{config.tabataLucru}s</span>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.min(60, p.tabataLucru + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.min(60, p.tabataLucru + 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerRestIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 10 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.max(5, p.tabataOdihna - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.max(5, p.tabataOdihna - 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
                   <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '40px', textAlign: 'center' }}>{config.tabataOdihna}s</span>
-                  <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.min(60, p.tabataOdihna + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
+                  <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.min(60, p.tabataOdihna + 5) })); reset() }} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
             </>
@@ -2073,8 +2073,8 @@ function Timer({ onBack, defaultFortime, t }) {
               <div style={{ fontSize: '11px', lineHeight: 1.2, color: '#888', marginBottom: '4px' }}>{t.timerRoundsCounterLabel}</div>
               <div style={{ fontSize: '42px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
-                <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '18px', cursor: 'pointer' }}>−</button>
-                <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #0E0E0E', background: '#f0f0f0', fontSize: '18px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>+</button>
+                <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '18px', cursor: 'pointer' }}>−</button>
+                <button onClick={() => setRunde(r => r + 1)} style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid #0E0E0E', background: '#f0f0f0', fontSize: '18px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
@@ -2872,7 +2872,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
                   </button>
                 ) : (
                   <button onClick={() => setConfirmDeletePost(post.id)}
-                    style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>
+                    style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '9px 6px', margin: '-9px -6px', flexShrink: 0 }}>
                     ×
                   </button>
                 )
@@ -6367,7 +6367,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                           </button>
                         ) : (
                           <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(logKey) }}
-                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '9px 6px', margin: '-9px -6px' }}>
                             ×
                           </button>
                         )
@@ -6485,7 +6485,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                           </button>
                         ) : (
                           <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteSkill(skillKey) }}
-                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+                            style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '9px 6px', margin: '-9px -6px' }}>
                             ×
                           </button>
                         )
@@ -11224,7 +11224,7 @@ function App() {
                     {trecute.map(c => (
                       <div key={c.id} style={{ background: '#fafafa', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #e0e0e0' }}>
                         <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
-                        <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#ccc', marginTop: '3px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: COLORS.text.muted, marginTop: '3px' }}>
                           {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · {c.coach}
                         </div>
                       </div>
@@ -11287,7 +11287,7 @@ function App() {
 
           {logTab === 'liber' && (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: COLORS.text.muted }}>{t.adminWodNameOptional}</span></div>
               <input value={freeLogName} onChange={e => setFreeLogName(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"'
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{t.logFreeTextTitle}</div>
@@ -11641,7 +11641,7 @@ function App() {
                 </div>
 
                 <button onClick={saveWodLog} disabled={wodSaving}
-                  style={{ width: '100%', padding: '15px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>
+                  style={{ width: '100%', padding: '14px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>
                   {wodSaving ? t.logWodSaving : (editLogId ? t.logWodSaveEdit : t.logWodSaveNew)}
                 </button>
               </>
@@ -11775,7 +11775,7 @@ function App() {
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
-              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
+              style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
               {wodSaving ? t.logWodSaving : editLogId ? t.logWodSaveEdit : t.logWodSaveNew}
             </button>
           </div>
@@ -11828,7 +11828,7 @@ function App() {
               <input value={skillLogNote} onChange={e => setSkillLogNote(e.target.value)} placeholder={t.skillLogNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveSkillLog} disabled={skillLogSaving}
-              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: skillLogSaving ? 'not-allowed' : 'pointer', opacity: skillLogSaving ? 0.7 : 1 }}>
+              style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: skillLogSaving ? 'not-allowed' : 'pointer', opacity: skillLogSaving ? 0.7 : 1 }}>
               {skillLogSaving ? t.skillLogSaving : t.skillLogSaveButton}
             </button>
           </div>
@@ -11867,7 +11867,7 @@ function App() {
               weightUnit={userProfile?.weight_unit} t={t} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
-            style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
+            style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
             {newHeroWodSaving ? t.heroWodSaving : editHeroWodId ? t.heroWodSaveEdit : t.heroWodSaveNew}
           </button>
         </div>
@@ -11971,7 +11971,7 @@ function App() {
                 <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prNoteLabel}</div>
                 <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder={t.prNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                 <button onClick={savePR} disabled={prSaving}
-                  style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
+                  style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
                   {prSaving ? t.prSaving : editPrId ? t.prSaveEdit : t.prSaveNew}
                 </button>
               </>
@@ -12109,19 +12109,19 @@ function App() {
                     </button>
                   ) : (
                     <button onClick={(e) => { e.stopPropagation(); setPrConfirmDelete(movement) }}
-                      style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>
+                      style={{ fontSize: '16px', color: '#ccc', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1, padding: '9px 6px', margin: '-9px -6px', flexShrink: 0 }}>
                       ×
                     </button>
                   )}
                 </div>
               </div>
               {collapsedRecord && !isOpen && (
-                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted, marginTop: '2px' }}>
                   {new Date(collapsedRecord.recorded_at).toLocaleDateString(localeFor(lang))}{collapsedRecord.notes ? ' · ' + collapsedRecord.notes : ''}
                 </div>
               )}
               {!collapsedRecord && !isOpen && wodInfo && (
-                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
+                <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted, marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
               )}
               {isOpen && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
@@ -12248,7 +12248,7 @@ function App() {
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted, marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#0E0E0E' ? '#ABE73C' : '#fff', flexShrink: 0 }}>
                       {esteOpen ? '▲' : '▼'}
                     </div>
@@ -12291,7 +12291,7 @@ function App() {
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted, marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
                       {heroWodsDeschis ? '▲' : '▼'}
                     </div>
@@ -12402,12 +12402,12 @@ function App() {
                       <div>
                         <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
                         <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.best, t) || '—'}</div>
-                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
                         <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
-                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted }}>
                           {new Date(summary.latest.logged_at).toLocaleDateString(localeFor(lang))}
                           {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '600' }}>★ {t.benchmarkNewBestBadge}</span>}
                         </div>
@@ -12416,7 +12416,7 @@ function App() {
                         <div>
                           <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
                           <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.previous, t) || '—'}</div>
-                          <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                          <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
                         </div>
                       )}
                     </div>
@@ -12478,7 +12478,7 @@ function App() {
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                   <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
-                  <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#bbb' }}>
+                  <div style={{ fontSize: '11px', lineHeight: 1.35, color: COLORS.text.muted }}>
                     {new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}
                     {comparisonModeLabel(history.latest) && <span style={{ marginLeft: '6px', color: '#888' }}>· {comparisonModeLabel(history.latest)}</span>}
                   </div>
@@ -12572,7 +12572,7 @@ function App() {
             </div>
 
             <button onClick={saveMyProfile} disabled={profileSaving}
-              style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: profileSaving ? 'default' : 'pointer', opacity: profileSaving ? 0.6 : 1 }}>
               {profileSaving ? t.profileSaving : t.profileSaveButton}
             </button>
           </div>
@@ -12687,7 +12687,7 @@ function App() {
               {/* Zile header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
                 {ziuaLitereCalendar.map((z, zi) => (
-                  <div key={zi} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#bbb', paddingBottom: '4px' }}>{z}</div>
+                  <div key={zi} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: COLORS.text.muted, paddingBottom: '4px' }}>{z}</div>
                 ))}
               </div>
               {/* Grid zile */}
