@@ -755,7 +755,7 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
                 {t[labelKey]}
               </span>
               {badge != null && (
-                <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-bold text-white">
+                <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-semibold text-white">
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
@@ -1952,7 +1952,7 @@ function Timer({ onBack, defaultFortime, t }) {
           <div key={m.id} onClick={() => setMod(m.id)}
             style={{ width: '72px', height: '72px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: mod === m.id ? '2px solid #0E0E0E' : '1px solid #e0e0e0', background: mod === m.id ? '#f0f0f0' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <m.icon size={18} color={mod === m.id ? '#0E0E0E' : '#888'} strokeWidth={2} />
-            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', color: mod === m.id ? '#0E0E0E' : '#888' }}>{m.lbl}</div>
+            <div style={{ fontSize: '9px', fontWeight: mod === m.id ? '600' : '400', lineHeight: 1.2, color: mod === m.id ? '#0E0E0E' : '#888' }}>{m.lbl}</div>
           </div>
         ))}
       </div>
@@ -1960,20 +1960,20 @@ function Timer({ onBack, defaultFortime, t }) {
         <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           {mod === 'fortime' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>Time cap</div><div style={{ fontSize: '11px', color: '#888' }}>{t.timerTimeCapSubtitle}</div></div>
+              <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>Time cap</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>{t.timerTimeCapSubtitle}</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.max(1, p.fortime - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.fortime} min</span>
+                <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.fortime} min</span>
                 <button onClick={() => { setConfig(p => ({ ...p, fortime: Math.min(60, p.fortime + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
               </div>
             </div>
           )}
           {mod === 'amrap' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerAmrapDurationLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>As Many Rounds As Possible</div></div>
+              <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerAmrapDurationLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>As Many Rounds As Possible</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.max(1, p.amrap - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.amrap} min</span>
+                <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.amrap} min</span>
                 <button onClick={() => { setConfig(p => ({ ...p, amrap: Math.min(60, p.amrap + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
               </div>
             </div>
@@ -1981,18 +1981,18 @@ function Timer({ onBack, defaultFortime, t }) {
           {mod === 'emom' && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerEmomTotalDurationLabel}</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerEmomTotalDurationLabel}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, emom: Math.max(1, p.emom - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.emom} min</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.emom} min</span>
                   <button onClick={() => { setConfig(p => ({ ...p, emom: Math.min(30, p.emom + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>{t.timerSecondsPerMinuteSubtitle}</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>{t.timerSecondsPerMinuteSubtitle}</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.max(10, p.emomInterval - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '50px', textAlign: 'center' }}>{config.emomInterval}s</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '50px', textAlign: 'center' }}>{config.emomInterval}s</span>
                   <button onClick={() => { setConfig(p => ({ ...p, emomInterval: Math.min(120, p.emomInterval + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
@@ -2001,26 +2001,26 @@ function Timer({ onBack, defaultFortime, t }) {
           {mod === 'tabata' && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerRoundsLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 8</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerRoundsLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 8</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.max(1, p.tabataRunde - 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '30px', textAlign: 'center' }}>{config.tabataRunde}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '30px', textAlign: 'center' }}>{config.tabataRunde}</span>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataRunde: Math.min(20, p.tabataRunde + 1) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerWorkIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 20 sec</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerWorkIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 20 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.max(5, p.tabataLucru - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{config.tabataLucru}s</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '40px', textAlign: 'center' }}>{config.tabataLucru}s</span>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataLucru: Math.min(60, p.tabataLucru + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><div style={{ fontSize: '13px', fontWeight: '500' }}>{t.timerRestIntervalLabel}</div><div style={{ fontSize: '11px', color: '#888' }}>Standard: 10 sec</div></div>
+                <div><div style={{ fontSize: '13px', fontWeight: '500', lineHeight: 1.3 }}>{t.timerRestIntervalLabel}</div><div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888' }}>Standard: 10 sec</div></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.max(5, p.tabataOdihna - 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>−</button>
-                  <span style={{ fontSize: '16px', fontWeight: '600', minWidth: '40px', textAlign: 'center' }}>{config.tabataOdihna}s</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, minWidth: '40px', textAlign: 'center' }}>{config.tabataOdihna}s</span>
                   <button onClick={() => { setConfig(p => ({ ...p, tabataOdihna: Math.min(60, p.tabataOdihna + 5) })); reset() }} style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '16px', cursor: 'pointer' }}>+</button>
                 </div>
               </div>
@@ -2030,20 +2030,20 @@ function Timer({ onBack, defaultFortime, t }) {
       )}
       {countdown !== null && (
         <div style={{ background: '#0E0E0E', borderRadius: '20px', padding: '40px 20px', marginBottom: '14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', color: '#ABE73C', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t.timerGetReady}</div>
+          <div style={{ fontSize: '13px', lineHeight: 1.2, color: '#ABE73C', marginBottom: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t.timerGetReady}</div>
           <div style={{ fontSize: '80px', fontWeight: '600', color: '#fff', lineHeight: 1 }}>{countdown}</div>
-          <div style={{ fontSize: '14px', color: '#ABE73C', marginTop: '8px' }}>
+          <div style={{ fontSize: '14px', lineHeight: 1.4, color: '#ABE73C', marginTop: '8px' }}>
             {countdown <= 3 ? ['', '🔴', '🟡', '🟢'][countdown] + ' ' : ''}{countdown === 1 ? t.timerCountdownGo : countdown <= 3 ? countdown : t.timerCountdownSeconds}
           </div>
         </div>
       )}
       {countdown === null && (
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-          {mod === 'emom' && <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>{t.timerEmomMinuteLabel(minutEmom, config.emom)}</div>}
+          {mod === 'emom' && <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginBottom: '6px' }}>{t.timerEmomMinuteLabel(minutEmom, config.emom)}</div>}
           {mod === 'tabata' && (
             <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>{t.timerTabataRoundLabel(tabataRunda, config.tabataRunde)}</div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#0E0E0E', fontSize: '12px', fontWeight: '600' }}>
+              <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginBottom: '6px' }}>{t.timerTabataRoundLabel(tabataRunda, config.tabataRunde)}</div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 16px', borderRadius: '20px', background: tabataFaza === 'lucru' ? '#FCEBEB' : '#f0f0f0', color: tabataFaza === 'lucru' ? '#791F1F' : '#0E0E0E', fontSize: '12px', fontWeight: '600', lineHeight: 1.2 }}>
                 {tabataFaza === 'lucru' ? <Flame size={13} color="#791F1F" /> : <span>😴</span>}
                 {tabataFaza === 'lucru' ? t.timerWorkPhase(config.tabataLucru) : t.timerRestPhase(config.tabataOdihna)}
               </div>
@@ -2058,9 +2058,9 @@ function Timer({ onBack, defaultFortime, t }) {
             </svg>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
               <div style={{ fontSize: '44px', fontWeight: '600', color: culoareText, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{fmt(secunde)}</div>
-              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>{t.timerDoneLabel} <Dumbbell size={15} color="#0E0E0E" /></div>}
-              {!gata && running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t.timerInProgress}</div>}
-              {!gata && !running && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{secunde === getSec() ? t.timerPressStart : t.timerPaused}</div>}
+              {gata && <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4, marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>{t.timerDoneLabel} <Dumbbell size={15} color="#0E0E0E" /></div>}
+              {!gata && running && <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginTop: '4px' }}>{t.timerInProgress}</div>}
+              {!gata && !running && <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginTop: '4px' }}>{secunde === getSec() ? t.timerPressStart : t.timerPaused}</div>}
             </div>
           </div>
           {mod === 'emom' && (
@@ -2070,8 +2070,8 @@ function Timer({ onBack, defaultFortime, t }) {
           )}
           {mod === 'amrap' && (
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.timerRoundsCounterLabel}</div>
-              <div style={{ fontSize: '42px', fontWeight: '600', color: '#0E0E0E' }}>{runde}</div>
+              <div style={{ fontSize: '11px', lineHeight: 1.2, color: '#888', marginBottom: '4px' }}>{t.timerRoundsCounterLabel}</div>
+              <div style={{ fontSize: '42px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{runde}</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
                 <button onClick={() => setRunde(r => Math.max(0, r - 1))} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '18px', cursor: 'pointer' }}>−</button>
                 <button onClick={() => setRunde(r => r + 1)} style={{ width: '34px', height: '34px', borderRadius: '50%', border: '2px solid #0E0E0E', background: '#f0f0f0', fontSize: '18px', color: '#0E0E0E', fontWeight: '600', cursor: 'pointer' }}>+</button>
@@ -2084,14 +2084,14 @@ function Timer({ onBack, defaultFortime, t }) {
               {gata ? '✓' : running ? '⏸' : '▶'}
             </button>
             {mod === 'amrap'
-              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>+1</button>
+              ? <button onClick={() => setRunde(r => r + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '1px solid #0E0E0E', background: '#f0f0f0', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>+1</button>
               : <div style={{ width: '48px' }} />
             }
           </div>
         </div>
       )}
       {countdown !== null && (
-        <button onClick={reset} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', cursor: 'pointer' }}>
+        <button onClick={reset} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#888', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', lineHeight: 1, cursor: 'pointer' }}>
           {t.timerCancel}
         </button>
       )}
@@ -6384,7 +6384,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '2px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>{wodSubtitlu}</div>
                   )}
                   {progressionNote && (
-                    <div style={{ marginTop: '4px', fontSize: '11px', lineHeight: 1.35, color: '#666', fontWeight: '600' }}>{progressionNote}</div>
+                    <div style={{ marginTop: '4px', fontSize: '11px', lineHeight: 1.35, color: '#666', fontWeight: '500' }}>{progressionNote}</div>
                   )}
                   {!isOpen && !areRezultatFinal && (
                     <div style={{ marginTop: '6px', fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>—</div>
@@ -6553,14 +6553,14 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
   return (
     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
       <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', lineHeight: 1.2, letterSpacing: '0.06em' }}>
           {titleLabel}
           {hiddenFromMembers && (
             <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {skillName && <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{skillName}</div>}
+          {skillName && <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{skillName}</div>}
           <span style={{ fontSize: '10px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
         </div>
       </div>
@@ -6585,16 +6585,16 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
               const complexScheduleLines = formatMemberSkillDetailLines(skillType, restConfig, t)
               return (
                 <div style={{ marginTop: '8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>COMPLEX</div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>COMPLEX</div>
                   {/* Universal Visual Hierarchy Rule - prescriptie (runde etc.)
                       la fel de proeminenta ca restul cardului, nu gri/muted;
                       metadata (scoringMode) ramane discreta, DUPA miscari. */}
                   {complexScheduleLines.prescriptionLines.map((line, li) => (
-                    <div key={li} style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>{line}</div>
+                    <div key={li} style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.35, color: '#0E0E0E', marginTop: '2px' }}>{line}</div>
                   ))}
-                  <div style={{ fontSize: '12px', color: '#555', marginTop: '3px' }}>{complexMovements.join(' + ')}</div>
+                  <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#555', marginTop: '3px' }}>{complexMovements.join(' + ')}</div>
                   {complexScheduleLines.metadataLines.map((line, li) => (
-                    <div key={li} style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>{line}</div>
+                    <div key={li} style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '2px' }}>{line}</div>
                   ))}
                 </div>
               )
@@ -6604,10 +6604,10 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
             return (
               <div style={{ marginTop: '8px' }}>
                 {scheduleLines.prescriptionLines.length > 0 && (
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>{formatTypeLabel(skillType, skillFormatConfig)} — {scheduleLines.prescriptionLines.join(' · ')}</div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.35, color: '#0E0E0E' }}>{formatTypeLabel(skillType, skillFormatConfig)} — {scheduleLines.prescriptionLines.join(' · ')}</div>
                 )}
                 {scheduleLines.metadataLines.length > 0 && (
-                  <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '2px' }}>
                     {scheduleLines.prescriptionLines.length === 0 && `${formatTypeLabel(skillType, skillFormatConfig)} — `}
                     {scheduleLines.metadataLines.join(' · ')}
                   </div>
@@ -6655,7 +6655,7 @@ function SkillHomeSection({ titleLabel, skillMovements, skillName, skillType, sk
           </div>
           {loggable && (
             <button onClick={onLogClick}
-              style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              style={{ marginTop: '10px', width: '100%', padding: '8px', background: logZiSkill ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
               {logZiSkill ? t.homeEditSkillButton : t.homeLogSkillButton}
             </button>
           )}
@@ -6676,7 +6676,7 @@ function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }
   return (
     <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
       <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', lineHeight: 1.2, letterSpacing: '0.06em' }}>
           {section.title || t.wodSectionScoredBadge}
         </div>
         <span style={{ fontSize: '10px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
@@ -6684,21 +6684,21 @@ function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }
       {isOpen && (
         <>
           {describeFormatConfig(section.format, section.formatConfig, t) && (
-            <div style={{ fontSize: '11px', color: '#888', marginTop: '8px' }}>{section.format} — {describeFormatConfig(section.format, section.formatConfig, t)}</div>
+            <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '8px' }}>{section.format} — {describeFormatConfig(section.format, section.formatConfig, t)}</div>
           )}
           <div style={{ marginTop: '10px' }}>
             {movements.map((m, mi) => (
-              <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+              <div key={mi} style={{ fontSize: '13px', lineHeight: 1.4, color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
             ))}
           </div>
           {log && (
-            <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
               <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
             </div>
           )}
           <button onClick={onLogClick}
-            style={{ marginTop: '10px', width: '100%', padding: '8px', background: log ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+            style={{ marginTop: '10px', width: '100%', padding: '8px', background: log ? '#f0f0f0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
             {log ? t.homeEditSkillButton : t.homeLogSkillButton}
           </button>
         </>
@@ -6720,7 +6720,7 @@ function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }
 function NotRxdBadge({ t, compact, variant }) {
   const isRxVariant = String(variant ?? 'rx').toLowerCase().replace(/[_\s-]/g, '') === 'rx'
   return (
-    <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '600', color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
+    <span style={{ fontSize: compact ? '9px' : '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', background: '#f0f0f0', borderRadius: '20px', padding: compact ? '2px 7px' : '4px 10px' }}>
       {isRxVariant ? t.notRxdBadge : t.modifiedBadge}
     </span>
   )
@@ -10268,7 +10268,7 @@ function App() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#E24B4A" strokeWidth={1.5} /></div>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '8px' }}>{t.gymBlockedTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6' }}>{t.gymBlockedText}</div>
           </div>
         </div>
@@ -10526,7 +10526,7 @@ function App() {
               </div>
               {!esteAzi && (
                 <div onClick={() => { setDataAcasa(actualToday); scrollChipToDate(actualToday) }}
-                  style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}>{t.homeBackToToday}</div>
+                  style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', lineHeight: 1, cursor: 'pointer', marginTop: '4px' }}>{t.homeBackToToday}</div>
               )}
             </div>
 
@@ -10592,16 +10592,16 @@ function App() {
                           <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>{c.name || t.homeDefaultClassName}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '500', lineHeight: 1.3, color: COLORS.text.primary }}>{c.name || t.homeDefaultClassName}</div>
                           <div style={{ fontSize: '13px', fontWeight: '400', lineHeight: '18px', color: '#6B7280', marginTop: '2px' }}>{c.coach}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           {rezervat
-                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#B7E63A', padding: '3px 9px', borderRadius: '20px', fontWeight: '600' }}>{t.homeReserved}</span>
+                            ? <span style={{ fontSize: '11px', background: '#0E0E0E', color: '#B7E63A', padding: '3px 9px', borderRadius: '20px', fontWeight: '600', lineHeight: 1.2 }}>{t.homeReserved}</span>
                             : peWaitlist
-                            ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600' }}>{t.homeWaitlisted}</span>
+                            ? <span style={{ fontSize: '11px', color: '#EF9F27', fontWeight: '600', lineHeight: 1.2 }}>{t.homeWaitlisted}</span>
                             : plin
-                            ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
+                            ? <span style={{ fontSize: '11px', color: '#C62828', fontWeight: '600', lineHeight: 1.2, display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Lock size={11} /> {t.homeFull}</span>
                             : <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>{nrRez}/{c.max_spots}</span>}
                           <ChevronRight size={16} color="#D1D5DB" strokeWidth={2} />
                         </div>
@@ -10635,7 +10635,7 @@ function App() {
                 <BottomSheet onClose={() => setClasaHomeSelectata(null)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                     <div>
-                      <div style={{ fontSize: '19px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
+                      <div style={{ fontSize: '19px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', letterSpacing: '-0.2px', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)} · {c.name || t.homeDefaultClassName}</div>
                       <div style={{ fontSize: '13px', color: '#888', marginTop: '3px' }}>{c.coach}</div>
                     </div>
                     <button type="button" onClick={() => setClasaHomeSelectata(null)} aria-label={t.homeClassDetailClose}
@@ -10653,9 +10653,9 @@ function App() {
                     return membri.length > 0 ? (
                       <div style={{ marginBottom: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '600', letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
+                          <div style={{ fontSize: '11px', color: '#aaa', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em' }}>{t.homeParticipantsLabel(cnt, c.max_spots)}</div>
                           {canToggleAtt && nrPrezenti > 0 && (
-                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', background: '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#0E0E0E', background: '#f0f0f0', padding: '2px 8px', borderRadius: '20px' }}>{t.homeAttendanceCheckedCount(nrPrezenti)}</div>
                           )}
                         </div>
                         {canToggleAtt && attInteractive && (
@@ -10670,7 +10670,7 @@ function App() {
                             return (
                               <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 2px', borderBottom: mi < membri.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
                                 <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size={34} />
-                                <div style={{ flex: 1, fontSize: '16px', color: '#0E0E0E', fontWeight: '500', minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
+                                <div style={{ flex: 1, fontSize: '16px', color: '#0E0E0E', fontWeight: '500', lineHeight: 1.3, minWidth: 0 }}>{formatFirstNameLastInitial(m.name)}</div>
                                 {interactive ? (
                                   <button type="button" disabled={pending}
                                     onClick={() => handleHomeCheckIn(c.id, m.memberId, m.bookingId, m.checkedIn)}
@@ -10705,19 +10705,19 @@ function App() {
                       </button>
                     ) : peWaitlist ? (
                       <button onClick={() => toggleWaitlist(c.id)}
-                        style={{ width: '100%', padding: '13px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                        style={{ width: '100%', padding: '13px', background: '#FFF8EC', color: '#B86E00', border: '1px solid #FCDFA0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
                         {t.homeWaitlistCancel}
                       </button>
                     ) : blocat ? (
                       <div style={{ textAlign: 'center', fontSize: '13px', color: '#888', padding: '8px' }}>{t.homeSessionsExhausted}</div>
                     ) : plin ? (
                       <button onClick={() => toggleWaitlist(c.id)}
-                        style={{ width: '100%', padding: '13px', background: '#FFFFFF', color: '#555', border: '1px solid #e0e0e0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                        style={{ width: '100%', padding: '13px', background: '#FFFFFF', color: '#555', border: '1px solid #e0e0e0', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
                         {t.homeJoinWaitlist}
                       </button>
                     ) : (
                       <button onClick={() => { toggleRezervare(c.id); setClasaHomeSelectata(null) }}
-                        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
                         {t.homeBookSpot}
                       </button>
                     )
@@ -10746,13 +10746,13 @@ function App() {
                       expandat (WorkoutFormatHeader, vezi mai jos). */}
                   {workoutForDisplay ? (
                     workoutForDisplay.title && (
-                      <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>"{workoutForDisplay.title}"</div>
+                      <div style={{ fontSize: '16px', fontWeight: '500', lineHeight: 1.3, color: COLORS.text.primary }}>"{workoutForDisplay.title}"</div>
                     )
                   ) : (
-                    <div style={{ fontSize: '16px', fontWeight: '500', color: COLORS.text.primary }}>{t.homeNoWodToday}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '500', lineHeight: 1.5, color: COLORS.text.primary }}>{t.homeNoWodToday}</div>
                   )}
                   {logZiWod && (
-                    <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
                       <span style={{ color: '#0E0E0E' }}>{t.homeWorkoutDone}</span>
                       {logZiWod.variant_level && (
@@ -10764,7 +10764,7 @@ function App() {
                     </div>
                   )}
                   {logZiSkill && (
-                    <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={14} color="#0E0E0E" strokeWidth={2} fill="#ABE73C" />
                       <span style={{ color: '#0E0E0E' }}>{t.homeSkillWorkDone}</span>
                       {wodZiData.skill_name && (
@@ -10806,14 +10806,14 @@ function App() {
                     if (!warmupVisible || warmupMovements.length === 0) return null
                     return (
                       <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>
                           {t.homeWodWarmupTitle}
                           {wodZiData?.warmup_visible === false && (isAdmin || isCoach) && (
                             <span style={{ marginLeft: '6px', fontWeight: '600', textTransform: 'none', letterSpacing: 'normal', color: '#c99a3a' }}>({t.homeWodHiddenFromMembers})</span>
                           )}
                         </div>
                         {warmupMovements.map((m, mi) => (
-                          <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+                          <div key={mi} style={{ fontSize: '13px', lineHeight: 1.4, color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
                         ))}
                       </div>
                     )
@@ -10936,7 +10936,7 @@ function App() {
                             dupa miscari, discret). Clasificarea vine din
                             workoutFormats.js (per camp, nu per format). */}
                         {scheduleLines.prescriptionLines.map((line, li) => (
-                          <div key={li} style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                          <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                         ))}
                         {miscari.length > 0 && (
                           <div style={{ marginTop: '16px' }}>
@@ -10952,7 +10952,7 @@ function App() {
                         ))}
                         {notaVarianta && (
                           <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
-                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                             <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
                           </div>
                         )}
@@ -11006,7 +11006,7 @@ function App() {
                                     comentariul identic din ramura membrului cu o
                                     singura varianta, mai sus. */}
                                 {accordionScheduleLines.prescriptionLines.map((line, li) => (
-                                  <div key={li} style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                                  <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                                 ))}
                               </div>
                               {miscari.length > 0 && (
@@ -11023,7 +11023,7 @@ function App() {
                               ))}
                               {notaVarianta && (
                                 <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
-                                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
+                                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
                                   <span style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.5' }}>{notaVarianta}</span>
                                 </div>
                               )}
@@ -11047,7 +11047,7 @@ function App() {
                     const canLog = variantReadyToLog && homeDisplayIsCurrent
                     return (
                   <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={!canLog}
-                    style={{ width: '100%', padding: '12px', background: canLog ? '#ABE73C' : '#ccc', color: canLog ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: canLog ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
+                    style={{ width: '100%', padding: '12px', background: canLog ? '#ABE73C' : '#ccc', color: canLog ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: canLog ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantReadyToLog ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
                     )
@@ -11081,7 +11081,7 @@ function App() {
                         <span style={{ color: COLORS.text.primary }}>{sessTotal}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '16px', color: COLORS.text.primary, fontWeight: '500' }}>{t.homeUnlimited}</div>
+                      <div style={{ fontSize: '16px', color: COLORS.text.primary, fontWeight: '500', lineHeight: 1.35 }}>{t.homeUnlimited}</div>
                     )}
                   </div>
                 </div>
@@ -11109,8 +11109,8 @@ function App() {
           {!abonamentReal ? (
             <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '30px', textAlign: 'center', marginBottom: '14px' }}>
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><ClipboardList size={36} color="#0E0E0E" strokeWidth={1.5} /></div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '6px' }}>{onlinePaymentsAvailable ? t.noMembershipTitle : t.subNoActive}</div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: onlinePaymentsAvailable ? '14px' : '0' }}>{onlinePaymentsAvailable ? t.noMembershipText : t.subContactCoachAdd}</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '6px' }}>{onlinePaymentsAvailable ? t.noMembershipTitle : t.subNoActive}</div>
+              <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#888', marginBottom: onlinePaymentsAvailable ? '14px' : '0' }}>{onlinePaymentsAvailable ? t.noMembershipText : t.subContactCoachAdd}</div>
               {onlinePaymentsAvailable && (
                 <button onClick={() => { fetchCatalogPlans(); setScreen('catalog') }}
                   style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -11123,13 +11123,13 @@ function App() {
               <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
                 {!abonamentInceput ? <Calendar size={36} color="#0E0E0E" strokeWidth={1.5} /> : sedinteLimitate && sedinteRamase === 0 ? <Flag size={36} color="#0E0E0E" strokeWidth={1.5} /> : <Lock size={36} color="#0E0E0E" strokeWidth={1.5} />}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: !abonamentInceput ? '#0E0E0E' : '#791F1F', marginBottom: '6px' }}>
                 {!abonamentInceput ? t.subScheduled
                   : onlinePaymentsAvailable ? t.noMembershipTitle
                   : sedinteLimitate && sedinteRamase === 0 ? t.subSessionsExhausted
                   : t.subExpired}
               </div>
-              <div style={{ fontSize: '12px', color: !abonamentInceput ? '#0E0E0E' : '#A32D2D' }}>
+              <div style={{ fontSize: '12px', lineHeight: 1.5, color: !abonamentInceput ? '#0E0E0E' : '#A32D2D' }}>
                 {!abonamentInceput
                   ? t.subStartsOn(new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' }))
                   : onlinePaymentsAvailable
@@ -11151,14 +11151,14 @@ function App() {
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid #0E0E0E' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.subActivePlan}</div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name}</div>
+                  <div style={{ fontSize: '11px', lineHeight: 1.2, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{t.subActivePlan}</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{abonamentReal.subscription_plans?.name}</div>
                 </div>
-                <span style={{ background: '#f0f0f0', color: '#0E0E0E', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' }}>{t.subActiveBadge}</span>
+                <span style={{ background: '#f0f0f0', color: '#0E0E0E', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500', lineHeight: 1.2 }}>{t.subActiveBadge}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', color: '#888', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> {t.subValidLabel}</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
+                <span style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> {t.subValidLabel}</span>
+                <span style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#0E0E0E' }}>
                   {new Date(abonamentReal.start_date + 'T00:00:00').toLocaleDateString(localeFor(lang))} – {new Date(abonamentReal.end_date + 'T00:00:00').toLocaleDateString(localeFor(lang))}
                 </span>
               </div>
@@ -11168,15 +11168,15 @@ function App() {
                     <div style={{ width: Math.min(100, ((abonamentReal.sessions_used || 0) / abonamentReal.sessions_total) * 100) + '%', height: '6px', borderRadius: '4px', background: '#EF9F27' }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '12px', color: '#888' }}>{t.subSessionsUsedLabel}</span>
-                    <span style={{ fontSize: '12px', fontWeight: '600' }}>{abonamentReal.sessions_used || 0} / {abonamentReal.sessions_total}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>{t.subSessionsUsedLabel}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35 }}>{abonamentReal.sessions_used || 0} / {abonamentReal.sessions_total}</span>
                   </div>
                 </>
               )}
             </div>
           )}
           <div style={{ background: '#f0f0f0', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', color: '#0E0E0E' }}>{t.subContactCoachFooter}</div>
+            <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#0E0E0E' }}>{t.subContactCoachFooter}</div>
           </div>
 
           {/* Rezervările mele */}
@@ -11190,19 +11190,19 @@ function App() {
             if (viitoare.length === 0 && trecute.length === 0) return null
             return (
               <div style={{ marginTop: '20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '12px' }}>{t.subMyReservations}</div>
                 {viitoare.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
+                    <div style={{ fontSize: '10px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subUpcoming}</div>
                     {viitoare.map(c => (
                       <div key={c.id} style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #0E0E0E' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div>
-                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
-                            <div style={{ fontSize: '11px', color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{c.name || t.homeDefaultClassName}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#0E0E0E', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Calendar size={11} /> {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} /> {c.coach}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} /> {c.coach}</div>
                           </div>
                           <button onClick={() => toggleRezervare(c.id)}
                             style={{ background: 'transparent', color: '#C62828', border: '1px solid #F7C1C1', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -11215,11 +11215,11 @@ function App() {
                 )}
                 {trecute.length > 0 && (
                   <div>
-                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '600', letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
+                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '8px' }}>{t.subHistory}</div>
                     {trecute.map(c => (
                       <div key={c.id} style={{ background: '#fafafa', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', borderLeft: '4px solid #e0e0e0' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
-                        <div style={{ fontSize: '11px', color: '#ccc', marginTop: '3px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#aaa' }}>{c.name || t.homeDefaultClassName}</div>
+                        <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#ccc', marginTop: '3px' }}>
                           {new Date(c.date + 'T00:00:00').toLocaleDateString(localeFor(lang), { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · {c.coach}
                         </div>
                       </div>
@@ -11242,18 +11242,18 @@ function App() {
             <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.catalogTitle}</h1>
           </div>
           {catalogLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: '13px' }}>{t.catalogLoading}</div>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: '13px', lineHeight: 1.35 }}>{t.catalogLoading}</div>
           ) : catalogPlans.length === 0 ? (
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', color: '#888', fontSize: '13px' }}>{t.catalogEmpty}</div>
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', color: '#888', fontSize: '13px', lineHeight: 1.5 }}>{t.catalogEmpty}</div>
           ) : (
             catalogPlans.map(p => (
               <button key={p.id} onClick={() => startCheckout(p.id)} disabled={checkoutLoading}
                 style={{ display: 'block', width: '100%', textAlign: 'left', background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '10px', border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', cursor: checkoutLoading ? 'not-allowed' : 'pointer', opacity: checkoutLoading ? 0.7 : 1 }}>
-                <div style={{ ...TYPO.primary, color: '#0E0E0E', marginBottom: '4px' }}>{p.name}</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>
+                <div style={{ ...TYPO.primary, lineHeight: 1.3, color: '#0E0E0E', marginBottom: '4px' }}>{p.name}</div>
+                <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>
                   {p.sessions ? t.adminPlansSessionsCount(p.sessions) : t.adminPlansUnlimited} · {p.price != null ? t.adminPlansPriceSet(p.price) : t.adminPlansPriceUnset} · {p.duration_months || 1} {(p.duration_months || 1) === 1 ? t.adminPlansMonthSingular : t.adminPlansMonthPlural}
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CreditCard size={14} /> {checkoutLoading ? t.renewNowLoading : t.catalogSelectButton}
                 </div>
               </button>
@@ -11285,7 +11285,7 @@ function App() {
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
               <input value={freeLogName} onChange={e => setFreeLogName(e.target.value)} placeholder='ex: "Fran", "Helen", "Grace"'
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{t.logFreeTextTitle}</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{t.logFreeTextTitle}</div>
               <textarea value={freeLogText} onChange={e => setFreeLogText(e.target.value)}
                 placeholder={t.logFreeTextPlaceholder} rows={6}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
@@ -11470,7 +11470,7 @@ function App() {
               {editLogHeader ? (
                 <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
               ) : null}
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600' }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
               <SortableList
                 items={editLogMiscari}
                 onReorder={setEditLogMiscari}
@@ -11660,7 +11660,7 @@ function App() {
                     excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
                   {AUTO_DURATION_FORMAT_IDS.includes(wodTip) ? (
                     <div>
-                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodDurationLabel}</div>
                       <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
                         {estimateTotalDurationSec(wodTip, wodFormatConfig) != null
                           ? <>{secToTime(estimateTotalDurationSec(wodTip, wodFormatConfig))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
@@ -11669,7 +11669,7 @@ function App() {
                     </div>
                   ) : (
                     <>
-                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodDurationLabel}</div>
+                      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodDurationLabel}</div>
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                         <div style={{ flex: 1 }}>
                           <input type="number" min="0" value={wodDurataMin} onChange={e => setWodDurataMin(e.target.value)} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
@@ -11696,7 +11696,7 @@ function App() {
                 const miscariAfisate = wodMiscariCustom ?? miscariWod
                 return (
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600' }}>{logBusinessDate === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(logBusinessDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{logBusinessDate === actualToday ? t.logWodTodayLabel : t.logWodDateLabel(new Date(logBusinessDate + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' }))}</div>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: describeFormatConfig(logWodZiData.type, logWodZiData.format_config, t) ? '2px' : '10px' }}>
                       {logWodZiData.type} {formatWodDurata(logWodZiData.duration)}
                     </div>
@@ -11715,7 +11715,7 @@ function App() {
                 )
               })() : (
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.logWodReorderHint}</span></div>
                   <SortableList
                     items={wodMiscari}
                     onReorder={setWodMiscari}
@@ -11766,11 +11766,11 @@ function App() {
               }}
               weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.logWodNoteLabel}</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodNoteLabel}</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveWodLog} disabled={wodSaving}
-              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
+              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.7 : 1 }}>
               {wodSaving ? t.logWodSaving : editLogId ? t.logWodSaveEdit : t.logWodSaveNew}
             </button>
           </div>
@@ -11796,10 +11796,10 @@ function App() {
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             {skillNameCurent && (
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px' }}>{skillNameCurent}</div>
+              <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '10px' }}>{skillNameCurent}</div>
             )}
             {getFormat(skillTypeCurent).family !== 'sets' && skillMiscariCurente.map((m, mi) => (
-              <div key={mi} style={{ fontSize: '13px', color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
+              <div key={mi} style={{ fontSize: '13px', lineHeight: 1.4, color: '#0E0E0E', padding: '3px 0' }}>• {m}</div>
             ))}
             <FormatLogger
               formatId={skillTypeCurent}
@@ -11819,11 +11819,11 @@ function App() {
               }}
               weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.skillLogNoteLabel}</div>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.skillLogNoteLabel}</div>
               <input value={skillLogNote} onChange={e => setSkillLogNote(e.target.value)} placeholder={t.skillLogNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
             </div>
             <button onClick={saveSkillLog} disabled={skillLogSaving}
-              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: skillLogSaving ? 'not-allowed' : 'pointer', opacity: skillLogSaving ? 0.7 : 1 }}>
+              style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: skillLogSaving ? 'not-allowed' : 'pointer', opacity: skillLogSaving ? 0.7 : 1 }}>
               {skillLogSaving ? t.skillLogSaving : t.skillLogSaveButton}
             </button>
           </div>
@@ -11843,14 +11843,14 @@ function App() {
             <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{editHeroWodId ? t.heroWodEditTitle : t.heroWodNewTitle}</h1>
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>{t.heroWodNameLabel}</div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.heroWodNameLabel}</div>
             <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder={t.heroWodNamePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
             <FormatConfigEditor formatId={newHeroWodTip} onFormatChange={setNewHeroWodTip}
               config={newHeroWodFormatConfig} onConfigChange={setNewHeroWodFormatConfig} t={t} />
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600' }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.heroWodReorderHint}</span></div>
+            <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.heroWodReorderHint}</span></div>
             <SortableList
               items={newHeroWodMiscari}
               onReorder={setNewHeroWodMiscari}
@@ -11862,7 +11862,7 @@ function App() {
               weightUnit={userProfile?.weight_unit} t={t} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
-            style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
+            style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>
             {newHeroWodSaving ? t.heroWodSaving : editHeroWodId ? t.heroWodSaveEdit : t.heroWodSaveNew}
           </button>
         </div>
@@ -11882,11 +11882,11 @@ function App() {
                   <>
                     {isAmrapHeroPr ? (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prRoundsCompletedLabel}</div>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prRoundsCompletedLabel}</div>
                         <input type="number" min="0" value={prRoundsCompleted} onChange={e => setPrRoundsCompleted(e.target.value)} placeholder={t.prRoundsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                         {miscariHeroPr.length > 0 && (
                           <div style={{ marginBottom: '12px' }}>
-                            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>{t.prPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.prPartialRoundHint}</span></div>
+                            <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '8px' }}>{t.prPartialRoundLabel} <span style={{ fontWeight: '400', fontSize: '10px' }}>{t.prPartialRoundHint}</span></div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               {miscariHeroPr.map((m, i) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -11902,25 +11902,25 @@ function App() {
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
                         {(() => {
                           const [tMin, tSec] = prTimp.split(':')
                           return (
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" value={tMin || ''} onChange={e => setPrTimp(`${e.target.value}:${tSec || '00'}`)} placeholder="4" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prMinutesLabel}</div>
+                                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prMinutesLabel}</div>
                               </div>
                               <div style={{ flex: 1 }}>
                                 <input type="number" min="0" max="59" value={tSec || ''} onChange={e => setPrTimp(`${tMin || '0'}:${e.target.value}`)} placeholder="22" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prSecondsLabel}</div>
+                                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.prSecondsLabel}</div>
                               </div>
                             </div>
                           )
                         })()}
                       </>
                     )}
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prVariantLabel}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prVariantLabel}</div>
                     <select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }}>
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
                     </select>
@@ -11929,7 +11929,7 @@ function App() {
                   <>
                     {CARDIO_CU_CALORII.includes(miscarePR) && (
                       <>
-                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prScoreInLabel}</div>
+                        <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prScoreInLabel}</div>
                         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                           {[{ val: 'm', label: t.prUnitMeters }, { val: 'cal', label: t.prUnitCalories }].map(o => (
                             <div key={o.val} onClick={() => setPrCardioUnit(o.val)}
@@ -11940,33 +11940,33 @@ function App() {
                         </div>
                       </>
                     )}
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prDistanceCaloriesLabel(prCardioUnit)}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prDistanceCaloriesLabel(prCardioUnit)}</div>
                     <input type="number" value={prDistanta} onChange={e => setPrDistanta(e.target.value)} placeholder={t.prDistancePlaceholder(prCardioUnit)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prTimeLabel}</div>
                     <input value={prTimp} onChange={e => setPrTimp(e.target.value)} placeholder={t.prTimePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR) ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prMaxRepsLabel}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prMaxRepsLabel}</div>
                     <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder={t.prRepsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : ['Handstand Hold','L-sit Hold'].includes(miscarePR) ? (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prHoldTimeLabel}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prHoldTimeLabel}</div>
                     <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={t.prHoldPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prWeightLabel(userProfile?.weight_unit || 'kg')}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prWeightLabel(userProfile?.weight_unit || 'kg')}</div>
                     <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={t.prWeightPlaceholder(userProfile?.weight_unit)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
-                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prRepsLabel}</div>
+                    <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prRepsLabel}</div>
                     <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder={t.prRepsFor1rmPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
                 )}
-                <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.prNoteLabel}</div>
+                <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prNoteLabel}</div>
                 <input value={prNote} onChange={e => setPrNote(e.target.value)} placeholder={t.prNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
                 <button onClick={savePR} disabled={prSaving}
-                  style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
+                  style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: prSaving ? 'not-allowed' : 'pointer', opacity: prSaving ? 0.7 : 1 }}>
                   {prSaving ? t.prSaving : editPrId ? t.prSaveEdit : t.prSaveNew}
                 </button>
               </>
@@ -12093,13 +12093,13 @@ function App() {
             <div key={movement} onClick={() => { setPrSelectat(isOpen ? null : movement); setPrConfirmDelete(null) }}
               style={{ padding: '12px 14px', borderBottom: idx < total - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{movement}</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{movement}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: collapsedRecord ? '#0E0E0E' : '#ccc' }}>{collapsedRecord ? formatPR(collapsedRecord, preferredUnit) : '—'}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1, color: collapsedRecord ? '#0E0E0E' : '#ccc' }}>{collapsedRecord ? formatPR(collapsedRecord, preferredUnit) : '—'}</span>
                   <span style={{ fontSize: '11px', color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
                   {isConfirmingDelete ? (
                     <button onClick={(e) => { e.stopPropagation(); deleteMiscarePR(movement) }}
-                      style={{ fontSize: '11px', fontWeight: '600', color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
+                      style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1, color: '#fff', background: '#e53935', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', flexShrink: 0 }}>
                       {t.prDeleteConfirm}
                     </button>
                   ) : (
@@ -12111,12 +12111,12 @@ function App() {
                 </div>
               </div>
               {collapsedRecord && !isOpen && (
-                <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>
+                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>
                   {new Date(collapsedRecord.recorded_at).toLocaleDateString(localeFor(lang))}{collapsedRecord.notes ? ' · ' + collapsedRecord.notes : ''}
                 </div>
               )}
               {!collapsedRecord && !isOpen && wodInfo && (
-                <div style={{ fontSize: '10px', color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
+                <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginTop: '2px' }}>{wodInfo.split('\n')[0]}</div>
               )}
               {isOpen && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }} onClick={e => e.stopPropagation()}>
@@ -12126,6 +12126,7 @@ function App() {
                         <div key={li} style={{
                           fontSize: li === 0 ? '11px' : '13px',
                           fontWeight: li === 0 ? '600' : '400',
+                          lineHeight: li === 0 ? 1.2 : 1.4,
                           color: li === 0 ? '#ABE73C' : '#e0e0e0',
                           marginBottom: li === 0 ? '8px' : '3px',
                           letterSpacing: li === 0 ? '0.8px' : '0',
@@ -12138,7 +12139,7 @@ function App() {
                   )}
                   {cat === 'HERO_WODS' && (
                     <button onClick={() => { setBenchmarkDetailName(movement); setPrevScreen('pr'); setScreen('benchmarkDetail') }}
-                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px' }}>
+                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', marginBottom: '10px' }}>
                       {t.prViewLoggedHistoryButton}
                     </button>
                   )}
@@ -12150,20 +12151,20 @@ function App() {
                         setNewHeroWodMiscari(cw.movements ? cw.movements.split('\n') : []); setNewHeroWodMiscareCurenta('')
                         setPrevScreen('pr'); setScreen('newHeroWod')
                       }}
-                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px' }}>
+                      style={{ width: '100%', padding: '8px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', marginBottom: '14px' }}>
                       {t.prEditHeroWodButton}
                     </button>
                   )}
                   {bestKg && (
                     <div style={{ marginBottom: '14px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prPercentOf1rm(bestKg, preferredUnit)}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
                         {PCT_BARA.map(pct => {
                           const w = Math.round(bestKg * pct / 100 * 2) / 2
                           return (
                             <div key={pct} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: '#f8f8f8', borderRadius: '8px' }}>
-                              <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '600' }}>{pct}%</span>
-                              <span style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{w} {preferredUnit}</span>
+                              <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '600', lineHeight: 1.2 }}>{pct}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{w} {preferredUnit}</span>
                             </div>
                           )
                         })}
@@ -12172,13 +12173,13 @@ function App() {
                   )}
                   {cat === 'WEIGHTLIFTING' && repRows && repRows.length > 0 ? (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {repRows.map(({ reps, record }) => (
                         <div key={reps}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid #FFFFFF' }}>
-                          <span style={{ fontSize: '11px', color: '#aaa' }}>{t.prRepCountLabel(reps)} · {new Date(record.recorded_at).toLocaleDateString(localeFor(lang))}{record.notes ? ' · ' + record.notes : ''}</span>
+                          <span style={{ fontSize: '11px', lineHeight: 1.35, color: '#aaa' }}>{t.prRepCountLabel(reps)} · {new Date(record.recorded_at).toLocaleDateString(localeFor(lang))}{record.notes ? ' · ' + record.notes : ''}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(record, preferredUnit)}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1, color: '#555' }}>{formatPR(record, preferredUnit)}</span>
                             <button onClick={() => startEditPR(record, movement)}
                               style={{ background: '#f0f0f0', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               ✎
@@ -12189,13 +12190,13 @@ function App() {
                     </div>
                   ) : records && records.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
+                      <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '6px' }}>{t.prHistoryLabel}</div>
                       {records.slice(0, 5).map((r, j) => (
                         <div key={j}
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: j < Math.min(records.length, 5) - 1 ? '1px solid #FFFFFF' : 'none' }}>
-                          <span style={{ fontSize: '11px', color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString(localeFor(lang))}{r.notes ? ' · ' + r.notes : ''}</span>
+                          <span style={{ fontSize: '11px', lineHeight: 1.35, color: '#aaa' }}>{new Date(r.recorded_at).toLocaleDateString(localeFor(lang))}{r.notes ? ' · ' + r.notes : ''}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: '#555' }}>{formatPR(r, preferredUnit)}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1, color: '#555' }}>{formatPR(r, preferredUnit)}</span>
                             <button onClick={() => startEditPR(r, movement)}
                               style={{ background: '#f0f0f0', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               ✎
@@ -12206,7 +12207,7 @@ function App() {
                     </div>
                   )}
                   <button onClick={() => { setEditPrId(null); setLogPentruPR(best || null); setMiscarePR(movement); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrVarianta('RX'); setPrevScreen('pr'); setScreen('logPR') }}
-                    style={{ width: '100%', padding: '8px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                    style={{ width: '100%', padding: '8px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
                     {t.prAddNewResult}
                   </button>
                 </div>
@@ -12219,14 +12220,14 @@ function App() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '8px' }}>{t.prScreenTitle} <Trophy size={20} color="#0E0E0E" strokeWidth={2} /></h1>
               <button onClick={() => { setEditPrId(null); setLogPentruPR(null); setMiscarePR(''); setPrValoare(''); setPrReps(''); setPrTimp(''); setPrDistanta(''); setPrCardioUnit('m'); setPrNote(''); setPrevScreen('pr'); setScreen('logPR') }}
-                style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+                style={{ padding: '8px 14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', flexShrink: 0 }}>
                 {t.prNewButton}
               </button>
             </div>
             {prDate.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
                 <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Trophy size={36} color="#ccc" strokeWidth={1.5} /></div>
-                <div style={{ fontSize: '14px' }}>{t.prEmpty}</div>
+                <div style={{ fontSize: '14px', lineHeight: 1.5 }}>{t.prEmpty}</div>
               </div>
             )}
             {['WEIGHTLIFTING', 'GYMNASTICS', 'CARDIO'].map(cat => {
@@ -12240,9 +12241,9 @@ function App() {
                 <div key={cat} style={{ marginBottom: '20px' }}>
                   <div onClick={() => { setCatDeschise(prev => ({ ...prev, [cat]: !prev[cat] })); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: esteOpen ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '600', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
+                    <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prExercisesCount(miscariCat.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: cfg.culoare === '#0E0E0E' ? '#ABE73C' : '#fff', flexShrink: 0 }}>
                       {esteOpen ? '▲' : '▼'}
                     </div>
@@ -12258,7 +12259,7 @@ function App() {
                         />
                       </div>
                       {miscariAfisate.length === 0
-                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#aaa' }}>{t.prNoExerciseFound}</div>
+                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', lineHeight: 1.5, color: '#aaa' }}>{t.prNoExerciseFound}</div>
                         : miscariAfisate.map((m, idx) => renderMiscare(m, idx, miscariAfisate.length, cat))
                       }
                     </div>
@@ -12283,9 +12284,9 @@ function App() {
                   {/* Header clickabil */}
                   <div onClick={() => { setHeroWodsDeschis(v => !v); setPrSelectat(null) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: heroWodsDeschis ? '8px' : '0', cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '600', color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: cfg.culoare, letterSpacing: '1.5px' }}>{cfg.label}</div>
                     <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ fontSize: '10px', color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
+                    <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb', marginRight: '4px' }}>{t.prHeroCompletedCount(cuPR, toateHero.length)}</div>
                     <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: cfg.culoare, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', flexShrink: 0 }}>
                       {heroWodsDeschis ? '▲' : '▼'}
                     </div>
@@ -12301,12 +12302,12 @@ function App() {
                         />
                       </div>
                       {heroAfisate.length === 0
-                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: '#aaa' }}>{t.prNoExerciseFound}</div>
+                        ? <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', lineHeight: 1.5, color: '#aaa' }}>{t.prNoExerciseFound}</div>
                         : heroAfisate.map((m, idx) => renderMiscare(m, idx, heroAfisate.length + 1, 'HERO_WODS'))
                       }
                       {/* Linie separator + formular WOD nou */}
                       <div style={{ borderTop: '2px dashed #f0f0f0', padding: '14px' }}>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHeroCustomLabel}</div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <input
                             value={heroWodNouInput}
@@ -12330,7 +12331,7 @@ function App() {
             {miscariFaraCat.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '600', color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
+                  <div style={{ fontSize: '10px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '1.5px' }}>{t.prOthersLabel}</div>
                   <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
                 </div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -12372,19 +12373,19 @@ function App() {
         return (
           <div style={{ padding: '16px', paddingBottom: '80px' }}>
             <button onClick={() => { setScreen(prevScreen); setBenchmarkDetailId(null); setBenchmarkDetailTier(null) }}
-              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
+              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
               ‹ {t.prHistoryLabel}
             </button>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{t.benchmarkDetailTitle(displayName)}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '18px' }}>{t.benchmarkDetailTitle(displayName)}</div>
             {logs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.benchmarkDetailEmpty}</div>
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px', lineHeight: 1.5 }}>{t.benchmarkDetailEmpty}</div>
             ) : (
               <>
                 {tiers.length > 1 && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
                     {tiers.map(tier => (
                       <div key={tier} onClick={() => setBenchmarkDetailTier(tier)}
-                        style={{ padding: '6px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: tier === activeTier ? '#0E0E0E' : '#f0f0f0', color: tier === activeTier ? '#fff' : '#888' }}>
+                        style={{ padding: '6px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600', lineHeight: 1.2, cursor: 'pointer', background: tier === activeTier ? '#0E0E0E' : '#f0f0f0', color: tier === activeTier ? '#fff' : '#888' }}>
                         {tier} · {summaryByTier[tier].attemptCount}
                       </div>
                     ))}
@@ -12394,41 +12395,41 @@ function App() {
                   <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: summary.previous ? '1fr 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
                       <div>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
-                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.best, t) || '—'}</div>
-                        <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkBestLabel}</div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.best, t) || '—'}</div>
+                        <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.best.logged_at).toLocaleDateString(localeFor(lang))}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
-                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
-                        <div style={{ fontSize: '10px', color: '#bbb' }}>
+                        <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.latest, t) || '—'}</div>
+                        <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>
                           {new Date(summary.latest.logged_at).toLocaleDateString(localeFor(lang))}
                           {summary.isLatestBest && <span style={{ marginLeft: '6px', color: '#8a9a3c', fontWeight: '600' }}>★ {t.benchmarkNewBestBadge}</span>}
                         </div>
                       </div>
                       {summary.previous && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
-                          <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.previous, t) || '—'}</div>
-                          <div style={{ fontSize: '10px', color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
+                          <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkPreviousLabel}</div>
+                          <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{benchmarkScoreDisplay(summary.previous, t) || '—'}</div>
+                          <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>{new Date(summary.previous.logged_at).toLocaleDateString(localeFor(lang))}</div>
                         </div>
                       )}
                     </div>
                     {summary.change && (
-                      <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: '600', color: changeColor(summary.change) }}>{changeLabel(summary.change)}</div>
+                      <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: '600', lineHeight: 1.4, color: changeColor(summary.change) }}>{changeLabel(summary.change)}</div>
                     )}
                   </div>
                 )}
-                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   {(summary?.history || []).map((log, idx, arr) => (
                     <div key={log.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
+                        <span style={{ fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>{new Date(log.logged_at).toLocaleDateString(localeFor(lang))}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {summary.best?.id === log.id && <span style={{ fontSize: '10px', fontWeight: '600', color: '#8a9a3c' }}>★</span>}
                           {log.completion_state === 'capped' && (
-                            <span style={{ fontSize: '9px', fontWeight: '600', color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
+                            <span style={{ fontSize: '9px', fontWeight: '600', lineHeight: 1.2, color: '#C0392B', textTransform: 'uppercase' }}>{t.benchmarkCappedLabel}</span>
                           )}
                           {/* P9.5.5 - a modified attempt (scaled load / substitution /
                               performed overlay) is never shown here unmarked, even
@@ -12436,7 +12437,7 @@ function App() {
                           {resultIsCompositionModified(log, userProfile?.gender, t) && <NotRxdBadge t={t} compact variant={log.variant_level} />}
                         </span>
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', marginTop: '2px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E', marginTop: '2px' }}>
                         {benchmarkScoreDisplay(log, t) || '—'}
                       </div>
                     </div>
@@ -12461,31 +12462,31 @@ function App() {
         return (
           <div style={{ padding: '16px', paddingBottom: '80px' }}>
             <button onClick={() => { setScreen(prevScreen); setMovementDetailKey(null) }}
-              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
+              style={{ background: 'none', border: 'none', color: '#888', fontSize: '13px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', padding: '4px 0', marginBottom: '12px' }}>
               ‹ {t.prHistoryLabel}
             </button>
-            <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '18px' }}>{movementGroupDisplayName(history, movementsById) || '—'}</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '18px' }}>{movementGroupDisplayName(history, movementsById) || '—'}</div>
             {!history ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px' }}>{t.movementDetailEmpty}</div>
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: '13px', lineHeight: 1.5 }}>{t.movementDetailEmpty}</div>
             ) : (
               <>
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
-                  <div style={{ fontSize: '10px', color: '#bbb' }}>
+                  <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, marginBottom: '4px' }}>{t.benchmarkLatestLabel}</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{movementEntryDisplay(history.latest, weightUnit) || '—'}</div>
+                  <div style={{ fontSize: '10px', lineHeight: 1.35, color: '#bbb' }}>
                     {new Date(history.latest.loggedAt).toLocaleDateString(localeFor(lang))}
                     {comparisonModeLabel(history.latest) && <span style={{ marginLeft: '6px', color: '#888' }}>· {comparisonModeLabel(history.latest)}</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
+                <div style={{ fontSize: '10px', color: '#888', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.8px', marginBottom: '8px' }}>{t.prHistoryLabel}</div>
                 <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   {history.history.map((entry, idx, arr) => (
                     <div key={entry.id} style={{ padding: '12px 14px', borderBottom: idx < arr.length - 1 ? '1px solid #f0f0f0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#aaa' }}>
+                      <span style={{ fontSize: '12px', lineHeight: 1.35, color: '#aaa' }}>
                         {new Date(entry.loggedAt).toLocaleDateString(localeFor(lang))}
                         {comparisonModeLabel(entry) && <span style={{ marginLeft: '6px' }}>· {comparisonModeLabel(entry)}</span>}
                       </span>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{movementEntryDisplay(entry, weightUnit) || '—'}</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1, color: '#0E0E0E' }}>{movementEntryDisplay(entry, weightUnit) || '—'}</span>
                     </div>
                   ))}
                 </div>

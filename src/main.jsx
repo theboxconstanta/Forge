@@ -63,10 +63,10 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 const ErrorFallback = () => (
   <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', background: '#fff' }}>
-    <div style={{ fontSize: '17px', fontWeight: '700', color: '#0E0E0E', marginBottom: '8px' }}>Ceva nu a mers bine</div>
-    <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>Am fost notificați automat despre eroare.</div>
+    <div style={{ fontSize: '17px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '8px' }}>Ceva nu a mers bine</div>
+    <div style={{ fontSize: '13px', lineHeight: 1.5, color: '#888', marginBottom: '20px' }}>Am fost notificați automat despre eroare.</div>
     <button onClick={() => window.location.reload()}
-      style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+      style={{ padding: '12px 24px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer' }}>
       Reîncarcă
     </button>
   </div>
