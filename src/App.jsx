@@ -2386,7 +2386,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                     <div style={{ marginLeft: 'auto', fontSize: '12px', lineHeight: 1.35, color: COLORS.text.muted, display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color={COLORS.text.muted} /> for time</div>
                   )}
                   {!isForTime && sectionLogs.some(l => l.result) && (
-                    <div style={{ marginLeft: 'auto', fontSize: '12px', lineHeight: 1.35, color: COLORS.text.muted }}>🔄 AMRAP</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '12px', lineHeight: 1.35, color: COLORS.text.muted, display: 'flex', alignItems: 'center', gap: '3px' }}><RotateCw size={11} color={COLORS.text.muted} /> AMRAP</div>
                   )}
                 </div>
                 {/* Sub-grupuri pe greutate (RX intai, fara header suplimentar; apoi
@@ -2435,7 +2435,12 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                         : (isSequentialAmrap(effFormatId, effFormatConfig) && log.result)
                         ? `${partialRepsOfLog({ result: log.result }, true)} ${t.clasamentRepsUnit}`
                         : (log.time_result || log.result || '—')
-                      const borderColor = i === 0 ? nivel.culoare : i === 1 ? COLORS.ranking.silver : i === 2 ? COLORS.ranking.bronze : COLORS.border
+                      // Stage 5.1 - RAIL = CATEGORY, MEDAL = RANKING. The rail
+                      // was previously rank-based (gold rail / silver / bronze /
+                      // neutral), duplicating the medal and making same-category
+                      // athletes look like different groups. Now every card in a
+                      // category block carries that category's colour.
+                      const borderColor = nivel.culoare
                       // P9.5.6 - AXIS B only: did the athlete materially change
                       // the SELECTED variant's prescription? Identical rule to
                       // the leaderboard bucket (isMixedCategory). Completion /
@@ -2511,7 +2516,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: COLORS.text.primary }}>{result}</div>
+                              <div style={{ fontSize: '16px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: COLORS.text.primary }}>{result}</div>
                               {log.time_result && log.result && (
                                 <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: COLORS.text.muted, fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
                               )}
