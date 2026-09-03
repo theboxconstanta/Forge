@@ -2215,7 +2215,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
         // (resultCompositionModified): a materially modified result (weight below
         // the SELECTED variant's standard, movement change, or performed overlay)
         // lands in Mixed Categories; a merely incomplete/capped one does NOT.
-        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription)
+        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription, { result: log.result, formatId: prov.formatId, formatConfig: prov.formatConfig })
         if (isMixed) mixedLogs.push(logCuDetalii)
         else rxLogs.push(logCuDetalii)
       })
@@ -2448,7 +2448,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // Additional sections (_supportsRx:false) have no scaling
                       // variant to be modified against - no badge.
                       const resultModifiedLog = log._supportsRx
-                        ? resultCompositionModified(log, log._prescribedWeight, log._loggedMovements, log._prescribedMovements)
+                        ? resultCompositionModified(log, log._prescribedWeight, log._loggedMovements, log._prescribedMovements, log._prov?.formatId, log._prov?.formatConfig)
                         : false
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
@@ -5969,9 +5969,9 @@ function IntervalResultRounds({ intervalResult, t }) {
 // score-only result surfaces that render NO movement rows (benchmark history).
 function resultIsCompositionModified(log, gender, t) {
   if (!log) return false
-  const { prescribedWeight, prescribedMovements } = resolveResultProvenance(log)
+  const { prescribedWeight, prescribedMovements, formatId, formatConfig } = resolveResultProvenance(log)
   const loggedMovements = parseWodLogDetails(log, t).miscariAfisate
-  return resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements)
+  return resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements, formatId, formatConfig)
 }
 
 // Results Phase 2 Slice 5 - Analytics Foundation. O singura sursa
@@ -6297,7 +6297,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // prescription? Same canonical rule as the leaderboard bucket.
               // Completion status ("2 rounds complete", capped, DNF) is a
               // SEPARATE axis and never sets this.
-              const resultModifiedLog = resultCompositionModified(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog)
+              const resultModifiedLog = resultCompositionModified(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog, wProv.formatId, wProv.formatConfig)
               // P9.5.7 - the Journal is an ATHLETE RESULT surface: it shows WHAT
               // THE ATHLETE ACTUALLY DID, via the ONE shared projection (performed
               // overlay -> frozen resolved selected-variant snapshot -> frozen
@@ -9453,7 +9453,7 @@ function App() {
           // change, or a material performed_prescription overlay). Completion /
           // "did not finish" NEVER sets this. Same canonical rule as the
           // leaderboard bucket and the Jurnal badge.
-          resultModified: resultCompositionModified({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements),
+          resultModified: resultCompositionModified({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements, activeLogFormatId, activeLogFormatConfig),
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }

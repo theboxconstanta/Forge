@@ -824,10 +824,52 @@ function greutateEsteSubStandard(weightLogged, prescribedWeight) {
 // The SELECTED variant is NEVER mutated - RX stays RX, Intermediate stays
 // Intermediate; only this Modified/As-Prescribed classification and the
 // leaderboard bucket move.
-export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements) {
+// INC-12 - the 4th composition signal (formatId/formatConfig are the FROZEN
+// format resolved by resolveResultProvenance; when absent the term is skipped -
+// a legacy log with no frozen structure is never newly classified, P10 §9).
+export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements, formatId = null, formatConfig = null) {
   return greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
     || movementsChanged(loggedMovements, prescribedMovements)
     || (log?.performed_prescription != null)
+    || (formatId != null && isSequentialFormat(formatId, formatConfig) && sequentialProgressionDeparted(log?.result))
+}
+
+// INC-12 - SEQUENTIAL PROGRESSION COMPOSITION. For a workout whose frozen
+// structure explicitly requires ordered completion (everything isSequentialFormat
+// covers: Sequence AMRAP, For Time-Sequence / Chipper / Ladder, Buy-In/Cash-Out
+// non-AMRAP), a finite/fixed predecessor station must be completed to its target
+// before the next station is reachable.
+//
+// This reads ONLY the FROZEN result string. The "done/target" grammar that
+// composePartialText already writes carries, for every fixed station, the
+// per-athlete frozen target AND the performed value; an open / stopping station
+// renders bare ("5 Name"). Nothing here touches the mutable workout,
+// prescription_snapshot, or performed_prescription (INC-12 §9/§13). The caller
+// gates on isSequentialFormat(frozen format).
+//
+// DEPARTED  iff  some fixed station i has performed(i) < target(i)
+//               AND some later station j > i has performed(j) > 0.
+//   - the final reached station may be partial (no later positive work) - valid (Case A)
+//   - an incomplete station with no later positive work - valid
+//   - open / Max-Reps stations carry no target (bare segment) - never a predecessor
+//   - performed >= target counts as complete (over-log tolerated - INC-12 §7)
+//   - a blank later station is omitted from the string entirely - not "> 0"
+//   - an explicit later "0" renders as "0 Name" - performed 0, NOT "> 0" (INC-12 §4)
+//   - completion_state / elapsed time / score magnitude never participate
+export function sequentialProgressionDeparted(resultString) {
+  const segs = String(resultString || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (segs.length < 2) return false
+  const perf = segs.map((seg) => {
+    const fixed = seg.match(/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)(?:\s|$)/)
+    if (fixed) return { done: parseFloat(fixed[1]), target: parseFloat(fixed[2]) }
+    const bare = seg.match(/^(\d+(?:\.\d+)?)(?:\s|$)/)
+    if (bare) return { done: parseFloat(bare[1]), target: null }
+    return { done: null, target: null }
+  })
+  return perf.some((s, i) => {
+    if (s.target == null || s.done == null || !(s.done < s.target)) return false
+    return perf.slice(i + 1).some((later) => (later.done ?? 0) > 0)
+  })
 }
 
 // Lista de miscari logata difera (orice diferenta - inlocuita, adaugata,
@@ -854,10 +896,13 @@ export function movementsChanged(loggedMovements, prescribedMovements) {
 // finishers by sortSectionLogs), never moved to Mixed, and carries NO badge.
 // Every leaderboard surface that buckets by variant routes through here so the
 // bucket, the badge, the filter and the participant count never disagree.
-export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null) {
+// INC-12 - the optional 6th arg carries the FROZEN result string + frozen format
+// so the sequential-progression term can evaluate; omitted by pre-INC-12 callers
+// (term simply never fires - no behaviour change for non-sequential results).
+export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null, opts = {}) {
   return resultCompositionModified(
-    { weight_logged: weightLogged, performed_prescription: performedPrescription },
-    prescribedWeight, loggedMovements, prescribedMovements,
+    { weight_logged: weightLogged, performed_prescription: performedPrescription, result: opts.result ?? null },
+    prescribedWeight, loggedMovements, prescribedMovements, opts.formatId ?? null, opts.formatConfig ?? null,
   )
 }
 

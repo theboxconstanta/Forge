@@ -173,7 +173,9 @@ describe('P9.5.5 / P9.5.7 §52 — result-card surfaces route through the shared
   it('§9 classification still reads the programmed `miscariAfisate` (NOT cardMovementLines)', () => {
     // the P9.5.4 bucket call and its _loggedMovements must be untouched
     expect(app).toMatch(/_loggedMovements: miscariAfisate/)
-    expect(app).toMatch(/isMixedCategory\(log\.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log\.performed_prescription\)/)
+    // INC-12 adds a 6th opts arg (frozen result string + frozen format); the
+    // first 5 args — including _loggedMovements: miscariAfisate — are unchanged.
+    expect(app).toMatch(/isMixedCategory\(log\.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log\.performed_prescription[,)]/)
     expect(app).not.toMatch(/isMixedCategory\([^)]*cardMovementLines/)
     expect(app).not.toMatch(/_loggedMovements: cardMovementLines/)
   })
@@ -188,7 +190,8 @@ describe('P9.5.5 / P9.5.7 §52 — result-card surfaces route through the shared
     expect(app).toMatch(/function resultIsCompositionModified\(log, gender, t\)/)
     expect(app).toMatch(/resultIsCompositionModified\(log, userProfile\?\.gender, t\) && <NotRxdBadge/)
     // it uses the canonical composition rule, not an ad-hoc check
-    expect(app).toMatch(/return resultCompositionModified\(log, prescribedWeight, loggedMovements, prescribedMovements\)/)
+    // (INC-12 also threads the frozen formatId/formatConfig for the sequential term)
+    expect(app).toMatch(/return resultCompositionModified\(log, prescribedWeight, loggedMovements, prescribedMovements[,)]/)
   })
 
   it('the movement-content result surfaces AND the modified-badge cover the full set', () => {

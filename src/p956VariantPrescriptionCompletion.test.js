@@ -188,17 +188,21 @@ describe('P9.5.6 — wiring: ONE rule for badge + bucket, no completion signal, 
     expect(wf).not.toMatch(/export function isNotRxd/)
     expect(wf).not.toMatch(/const neterminatInTimp/)
   })
-  it('resultCompositionModified is exactly the 3 composition signals — no completion term', () => {
+  it('resultCompositionModified is only composition signals — no completion term (INC-12: sequential departure is composition)', () => {
     const body = wf.slice(wf.indexOf('export function resultCompositionModified'))
     const fn = body.slice(0, body.indexOf('\n}') + 2)
     expect(fn).toMatch(/greutateEsteSubStandard/)
     expect(fn).toMatch(/movementsChanged/)
     expect(fn).toMatch(/performed_prescription != null/)
+    expect(fn).toMatch(/sequentialProgressionDeparted/) // INC-12 4th term
+    // still no completion axis: elapsed time, capped/DNF, or rounds-completed
     expect(fn).not.toMatch(/time_result|completion_state|effectiveScoreMode|neterminat|rounds/)
   })
   it('all 3 result-badge call sites use resultCompositionModified (same rule as isMixedCategory)', () => {
-    expect(app).toMatch(/const resultModifiedLog = log\._supportsRx\s*\n\s*\? resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements\)/) // leaderboard
-    expect(app).toMatch(/const resultModifiedLog = resultCompositionModified\(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog\)/) // Jurnal
+    // INC-12 appends the frozen formatId/formatConfig for the sequential term; the
+    // leading args (the shared bucket/badge signal) are unchanged.
+    expect(app).toMatch(/const resultModifiedLog = log\._supportsRx\s*\n\s*\? resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements[,)]/) // leaderboard
+    expect(app).toMatch(/const resultModifiedLog = resultCompositionModified\(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog[,)]/) // Jurnal
     expect(app).toMatch(/resultModified: resultCompositionModified\(\{ \.\.\.logFields, performed_prescription: performedToSave \}/) // share
   })
   it('the badge label is variant-aware (RX -> "Not RX\'d", else -> "Modified"), data-driven', () => {

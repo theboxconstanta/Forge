@@ -301,7 +301,9 @@ describe('P10 · call-site wiring in App.jsx', () => {
   })
   it('leaderboard cards resolve format identity from the log, not the render group, for the primary part', () => {
     expect(app).toMatch(/const logProv = log\._prov \|\| null/)
-    expect(app).toMatch(/resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements\)/)
+    // INC-12 appends the frozen formatId/formatConfig (log._prov) for the
+    // sequential-progression term; the frozen-prescription args are unchanged.
+    expect(app).toMatch(/resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements[,)]/)
   })
   it('the Journal card classifies against resolveResultProvenance(w)', () => {
     expect(app).toMatch(/const wProv = resolveResultProvenance\(w\)/)

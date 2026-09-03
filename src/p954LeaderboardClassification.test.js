@@ -135,7 +135,10 @@ describe('P9.5.4 §5/§33 — the single leaderboard bucket call site feeds the 
 
   it('that call passes log.performed_prescription so bucket + badge use the same signal', () => {
     const line = app.split('\n').find((l) => l.includes('isMixedCategory('))
-    expect(line).toMatch(/isMixedCategory\(\s*log\.weight_logged\s*,\s*prescribedWeight\s*,\s*miscariAfisate\s*,\s*prescribedMovements\s*,\s*log\.performed_prescription\s*\)/)
+    // INC-12 threads the frozen result string + frozen format through as a 6th
+    // opts arg for the sequential-progression term; the first 5 args (the
+    // shared bucket/badge signal) are unchanged.
+    expect(line).toMatch(/isMixedCategory\(\s*log\.weight_logged\s*,\s*prescribedWeight\s*,\s*miscariAfisate\s*,\s*prescribedMovements\s*,\s*log\.performed_prescription\s*[,)]/)
   })
 
   it('the gender filter (getSectionLogsForTier) runs BEFORE splitRxSiMixed — dimensions stay orthogonal', () => {
