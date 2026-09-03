@@ -2379,14 +2379,14 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                   <div style={{ background: nivel.bg, borderRadius: '10px', padding: '4px 12px', fontSize: '12px', fontWeight: '600', lineHeight: 1.3, color: nivel.culoare, letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <LevelDot nivel={nivel.id} /> {nivel.id}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#bbb', fontWeight: '500', lineHeight: 1.35 }}>
+                  <div style={{ fontSize: '12px', color: COLORS.text.muted, fontWeight: '500', lineHeight: 1.35 }}>
                     {sectionLogs.length} {t.clasamentParticipantWord(sectionLogs.length, genderTab)}
                   </div>
                   {isForTime && (
-                    <div style={{ marginLeft: 'auto', fontSize: '11px', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color="#aaa" /> for time</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '12px', lineHeight: 1.35, color: COLORS.text.muted, display: 'flex', alignItems: 'center', gap: '3px' }}><TimerIcon size={11} color={COLORS.text.muted} /> for time</div>
                   )}
                   {!isForTime && sectionLogs.some(l => l.result) && (
-                    <div style={{ marginLeft: 'auto', fontSize: '11px', lineHeight: 1.35, color: '#aaa' }}>🔄 AMRAP</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '12px', lineHeight: 1.35, color: COLORS.text.muted }}>🔄 AMRAP</div>
                   )}
                 </div>
                 {/* Sub-grupuri pe greutate (RX intai, fara header suplimentar; apoi
@@ -2497,23 +2497,23 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
-                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ ...TYPO.numeric, color: '#888' }}>#{i + 1}</span>}
+                              {medalColor ? <Medal size={22} color={medalColor} strokeWidth={2} /> : <span style={{ ...TYPO.numeric, color: COLORS.text.muted }}>#{i + 1}</span>}
                             </div>
                             <AvatarCircle name={name} avatarUrl={log.profile?.avatar_url} size={36} />
                             <div style={{ flex: 1 }}>
-                              <div style={{ ...TYPO.primary, lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ ...TYPO.primary, lineHeight: 1.3, color: COLORS.text.primary, display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {name}
                                 {resultModifiedLog && <NotRxdBadge t={t} compact variant={log.variant_level} />}
                               </div>
-                              <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
+                              <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: COLORS.text.muted, display: 'flex', alignItems: 'center', gap: '3px', fontVariantNumeric: 'tabular-nums' }}>
                                 <Clock size={10} strokeWidth={2} />
                                 {new Date(log.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ ...TYPO.numericLarge, color: nivel.culoare }}>{result}</div>
+                              <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: COLORS.text.primary }}>{result}</div>
                               {log.time_result && log.result && (
-                                <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
+                                <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: COLORS.text.muted, fontVariantNumeric: 'tabular-nums' }}>{log.result}</div>
                               )}
                             </div>
                             <span style={{ fontSize: '13px', color: '#ccc', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
@@ -2534,7 +2534,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                       <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>
                                         {log.weight_logged.trim()}
                                         {log._prescribedWeight && !weightMatches(log.weight_logged, log._prescribedWeight) && (
-                                          <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '500', lineHeight: 1.35, marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
+                                          <span style={{ fontSize: '12px', color: COLORS.text.muted, fontWeight: '500', lineHeight: 1.35, marginLeft: '5px' }}>{t.clasamentWeightPrescribedSuffix(log._prescribedWeight)}</span>
                                         )}
                                       </div>
                                     </div>
