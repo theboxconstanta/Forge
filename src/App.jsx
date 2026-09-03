@@ -81,6 +81,7 @@ import {
 } from './prescriptionContract'
 import { resolveResultProvenance } from './resultProvenance'
 import { resolveResultMovementLines } from './resultWorkoutLines'
+import { dedupLatestPerMember, monotonicLoggedAt } from './leaderboardSelection'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
@@ -2109,6 +2110,19 @@ const NIVELE = [
   { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
 ]
 
+// INC-09 - representative-log selection lives in src/leaderboardSelection.js
+// (pure, unit-tested). `resolveMonotonicLoggedAt` wraps the sibling query.
+async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, base, excludeId }) {
+  if (!memberId || !wodId) return base
+  let q = supabase.from('wod_logs').select('logged_at').eq('member_id', memberId).eq('wod_id', wodId)
+  if (sectionId) q = q.eq('workout_section_id', sectionId)
+  else q = q.is('workout_section_id', null)
+  if (excludeId) q = q.neq('id', excludeId)
+  const { data, error } = await q
+  if (error || !Array.isArray(data)) return base
+  return monotonicLoggedAt({ base, siblingLoggedAts: data.map((r) => r.logged_at) })
+}
+
 function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
@@ -2168,17 +2182,7 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
   // RX/Intermediate/Beginner/OnRamp + Mixed Categories de dinainte de Layer
   // 2b, neschimbat, doar mutat intr-o functie reutilizabila.
   const buildBlocksForPrimary = (sectionLogs) => {
-    const dedupLogsGlobal = (arr) => {
-      const byMember = {}
-      // INC-09 - one canonical row per member = the LATEST submission
-      // (logIsMoreRecent: logged_at, id tie-break; never score). Deterministic
-      // regardless of the order the query returned rows in.
-      arr.forEach(log => {
-        if (logIsMoreRecent(log, byMember[log.member_id])) byMember[log.member_id] = log
-      })
-      return Object.values(byMember)
-    }
-    const logsUnicePerMembru = dedupLogsGlobal(sectionLogs)
+    const logsUnicePerMembru = dedupLatestPerMember(sectionLogs)
     // P10 - each historical result is classified / sorted / score-interpreted
     // against the prescription FROZEN onto its own log at save time
     // (resolveResultProvenance), never against the workout as it stands now.
@@ -2244,9 +2248,12 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
     // P10 - sort a section-linked historical result against the format frozen
     // on the log (format_snapshot), not the section as it stands now; fall back
     // to the current section format only when no log froze one.
-    const repAdd = sectionLogs.reduce((a, b) => (logIsMoreRecent(b, a) ? b : a), null)
+    // INC-09 (P9.5.2A LB blocker) - reduce to ONE latest row per member FIRST,
+    // exactly like the primary section; sortSectionLogs then only ORDERS those.
+    const latestPerMember = dedupLatestPerMember(sectionLogs)
+    const repAdd = latestPerMember.reduce((a, b) => (logIsMoreRecent(b, a) ? b : a), null)
     const repProv = repAdd ? resolveResultProvenance(repAdd) : null
-    const sorted = sortSectionLogs(sectionLogs, repProv?.formatId || section.format, repProv?.formatConfig ?? section.format_config)
+    const sorted = sortSectionLogs(latestPerMember, repProv?.formatId || section.format, repProv?.formatConfig ?? section.format_config)
     const filtered = genderTab === 'masculin' ? sorted.filter(l => l.profile?.gender === 'masculin')
       : genderTab === 'feminin' ? sorted.filter(l => l.profile?.gender === 'feminin')
       : sorted
@@ -9140,9 +9147,26 @@ function App() {
       const liniiPrefix = [...(editLogHeader ? [editLogHeader] : []), ...editLogMiscari]
       const newPrefix = liniiPrefix.join('\n')
       const noteFull = [newPrefix || null, wodNote.trim() || null].filter(Boolean).join('\n---\n')
+      // INC-09 hardening (P9.5.2A LB blocker) - an edit is the member's most
+      // recent action for this workout: its logged_at must sort at/after every
+      // prior submission for it so the leaderboard projects the edited row
+      // immediately. Only bumps forward past a later sibling; never rewrites
+      // any other row, never past `now`, never uses score. No sibling later ->
+      // logged_at untouched.
+      let editLoggedAt
+      const { data: curRow } = await supabase.from('wod_logs')
+        .select('logged_at, wod_id, workout_section_id, member_id').eq('id', editLogId).maybeSingle()
+      if (curRow?.wod_id) {
+        const mono = await resolveMonotonicLoggedAt(supabase, {
+          memberId: curRow.member_id, wodId: curRow.wod_id, sectionId: curRow.workout_section_id,
+          base: curRow.logged_at, excludeId: editLogId,
+        })
+        if (mono && mono !== curRow.logged_at) editLoggedAt = mono
+      }
       const { error } = await supabase.from('wod_logs').update({
         ...composeWodLogFields(),
         notes: noteFull || null,
+        ...(editLoggedAt ? { logged_at: editLoggedAt } : {}),
       }).eq('id', editLogId)
       if (error) { showToast(t.toastLogWodUpdateError); console.error(error) }
       else {
@@ -9343,6 +9367,15 @@ function App() {
       performedToSave = performedCommitted
     }
 
+    // INC-09 hardening - a re-log of this workout by this member must sort
+    // AFTER their prior submissions for it (logged_at is business-date + wall
+    // clock; a past workout re-logged earlier in the day would otherwise land
+    // before an existing later submission and lose the leaderboard's
+    // latest-log selection).
+    const baseLoggedAt = loggedAt || new Date().toISOString()
+    const monoLoggedAt = wodIdPtSalvare
+      ? await resolveMonotonicLoggedAt(supabase, { memberId: user.id, wodId: wodIdPtSalvare, sectionId: sectionIdV2, base: baseLoggedAt, excludeId: null })
+      : (loggedAt || null)
     const { error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
@@ -9351,7 +9384,7 @@ function App() {
       notes: noteFull || null,
       ...(prescriptionSnapshot ? { prescription_snapshot: prescriptionSnapshot } : {}),
       ...(performedToSave ? { performed_prescription: performedToSave } : {}),
-      ...(loggedAt ? { logged_at: loggedAt } : {}),
+      ...(monoLoggedAt ? { logged_at: monoLoggedAt } : {}),
       ...logFields,
     })
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
