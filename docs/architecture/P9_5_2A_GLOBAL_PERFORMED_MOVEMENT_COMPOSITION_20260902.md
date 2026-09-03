@@ -352,6 +352,40 @@ Leaderboard (`renderInstanceLine` leads with the reps token), and Sequential
 AMRAP score (`repTargetOf` reads the edited spec value → station target). Tests
 `src/p9_5_2aPerformedReps.test.js` (R1–R16). **Production smoke still owed.**
 
+### 7.6c LB blocker — INC-09 latest-log selection for edits / re-logs (commit `b02a3c2`)
+
+**Smoke failure:** after saving a newer edited/re-logged performed result, the
+leaderboard kept an older better-scored row.
+
+**Forensic** (member `97a4e88a`, wod `1858f4da` — Sequence AMRAP chipper,
+section `968dc186` = `metcon`/primary, `wod_date 2026-09-02`): 4 RX `wod_logs`,
+all `logged_at` business-date `2026-09-02` — `04:58` (ppv2), `04:59` (ppv2,
+161), `05:16` (ppv2), `07:54` (no pp, As Prescribed). The reducer picks `07:54`
+(max `logged_at`) — correct *for that data*. The bug bites the **next** save.
+
+Two defects break "latest submission wins" for a re-log / edit:
+
+1. **`wod_logs` has no `created_at`** — `logged_at` = business-date (Journal
+   day-grouping) + wall-clock. A re-log / edit of a **past** workout done
+   earlier in the day than an existing submission gets a **smaller**
+   `logged_at` → `logIsMoreRecent` keeps the old row. **Fix (write-time only):**
+   `monotonicLoggedAt({ base, siblingLoggedAts, now })` — the row being saved
+   gets `clamp(max(base, latestSibling + 1s), [base, now])`; no later sibling →
+   `base` unchanged. Wired into `saveWodLog` INSERT **and** edit UPDATE
+   (`resolveMonotonicLoggedAt` runs the sibling query). Never rewrites another
+   row, never consults score.
+
+2. **`buildBlocksForAdditionalSection` never ran the INC-09 reducer** — it
+   passed raw logs to `sortSectionLogs`, whose internal per-member dedup is
+   **score-first** (`compara`: finished → time → rounds → partial, `logged_at`
+   only a tie-break) → an additional scored section kept the member's **best**
+   result, not the latest. **Fix:** `dedupLatestPerMember()` before
+   `sortSectionLogs`, exactly like the primary metcon path.
+
+New pure module `src/leaderboardSelection.js` (`dedupLatestPerMember`,
+`monotonicLoggedAt`); tests `src/leaderboardSelection.test.js` (LB1–LB3, LB9,
+LB10 + monotonic edges). INC-09 `logIsMoreRecent` unchanged.
+
 ### 7.7 Known limitations (v1 of Option 2)
 
 - Result-card "not performed" line renders the EN suffix `— not performed`
