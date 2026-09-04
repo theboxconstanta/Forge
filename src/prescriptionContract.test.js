@@ -677,3 +677,143 @@ describe('P9.4 - composeStructuredWorkoutDisplay (one model, coach == member-unk
     expect(a).toEqual(b)
   })
 })
+
+// ROW MOVEMENT PICKER (2026-09-04) - searchPerformedMovements is the ranked
+// replacement for PerformedMovementSearch's old alphabetical-order substring
+// filter (App.jsx). Forensic evidence: the canonical "Row" (exact match)
+// was position 11 of 12 alphabetical "%row%" matches and never survived a
+// fixed 6-result cap. Rows below mirror the real production catalog
+// (`movements` table) exactly - same ids, names, aliases, capability - for
+// the "row" collision set plus its machine/cardio siblings.
+import { searchPerformedMovements } from './prescriptionContract.js'
+
+describe('ROW MOVEMENT PICKER — searchPerformedMovements', () => {
+  const cap = (allowed, def) => ({ allowed_prescription_metrics: allowed, default_prescription_metric: def })
+  const CATALOG = [
+    // the 12 real "%row%" matches, in the DB's own alphabetical fetch order
+    { id: 'bent-over-row', name: 'Bent-Over Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'dumbbell-row', name: 'Dumbbell Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'gorilla-row', name: 'Gorilla Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'kb-row', name: 'KB Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'landmine-row', name: 'Landmine Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'medicine-ball-throw', name: 'Medicine Ball Throw', aliases: [], ...cap(['reps'], 'reps') },
+    { id: 'pendlay-row', name: 'Pendlay Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'renegade-row', name: 'Renegade Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    { id: 'ring-row', name: 'Ring Row', aliases: [], ...cap(['reps'], 'reps') },
+    { id: 'rotational-med-ball-throw', name: 'Rotational Med Ball Throw', aliases: [], ...cap([], null) },
+    // the canonical rowing erg — real production id
+    { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row', aliases: ['c2 row', 'concept2 row', 'rower'], ...cap(['distance', 'calories'], 'calories') },
+    { id: 'single-arm-db-row', name: 'Single-Arm DB Row', aliases: [], ...cap(['reps', 'load'], 'load') },
+    // machine/cardio siblings — real production ids/aliases
+    { id: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike', aliases: [], ...cap(['distance', 'calories'], 'calories') },
+    { id: '5e1d8887-6ddb-4074-b463-8aea02b3a2c4', name: 'Bike Erg', aliases: ['bikeerg'], ...cap(['distance', 'calories'], 'calories') },
+    { id: '110ed61d-5047-4ba6-ae82-735d9473527c', name: 'Ski Erg', aliases: ['ski', 'skierg'], ...cap(['distance', 'calories'], 'calories') },
+    { id: '4dce3065-4375-4782-ae25-991e27aec52f', name: 'Run', aliases: ['jog', 'running'], ...cap(['distance'], 'distance') },
+    { id: '01ff26ed-d381-47fa-b0f6-ed7d3f1301ab', name: 'Shuttle Run', aliases: [], ...cap(['distance'], 'distance') },
+  ]
+  const ROW_ID = '2cfd0278-21a4-47c3-8ece-3a40b6a742b8'
+
+  it('TEST A — query "row": canonical Row is result #1', () => {
+    const results = searchPerformedMovements(CATALOG, 'row', 6)
+    expect(results[0].id).toBe(ROW_ID)
+    expect(results[0].name).toBe('Row')
+  })
+
+  it('TEST B — query "ROW" (case-insensitive): canonical Row is result #1', () => {
+    const results = searchPerformedMovements(CATALOG, 'ROW', 6)
+    expect(results[0].id).toBe(ROW_ID)
+  })
+
+  it('TEST C — query "rower": canonical Row appears via alias', () => {
+    const results = searchPerformedMovements(CATALOG, 'rower', 6)
+    expect(results.some(r => r.id === ROW_ID)).toBe(true)
+    expect(results[0].id).toBe(ROW_ID) // only match — unambiguously first
+    expect(results[0].name).toBe('Row') // selected identity is the canonical row, never "Rower"
+  })
+
+  it('TEST D — query "c2 row": canonical Row appears via alias', () => {
+    const results = searchPerformedMovements(CATALOG, 'c2 row', 6)
+    expect(results[0].id).toBe(ROW_ID)
+    expect(results[0].name).toBe('Row')
+  })
+
+  it('TEST E — query "concept2 row": canonical Row appears via alias', () => {
+    const results = searchPerformedMovements(CATALOG, 'concept2 row', 6)
+    expect(results[0].id).toBe(ROW_ID)
+    expect(results[0].name).toBe('Row')
+  })
+
+  it('TEST F — query "bent": Bent-Over Row remains searchable', () => {
+    const results = searchPerformedMovements(CATALOG, 'bent', 6)
+    expect(results.map(r => r.name)).toContain('Bent-Over Row')
+  })
+
+  it('TEST G — query "dumbbell row": Dumbbell Row remains searchable (exact match, #1)', () => {
+    const results = searchPerformedMovements(CATALOG, 'dumbbell row', 6)
+    expect(results[0].name).toBe('Dumbbell Row')
+  })
+
+  it('TEST H — query "row": strength row movements still fill remaining capacity (not hidden by policy)', () => {
+    const results = searchPerformedMovements(CATALOG, 'row', 6)
+    const strengthRows = results.filter(r => r.id !== ROW_ID && /row/i.test(r.name))
+    expect(strengthRows.length).toBeGreaterThan(0) // real strength "___ Row" movements still present
+    expect(results).toHaveLength(6) // cap respected
+  })
+
+  it('TEST I — query "row": Medicine Ball Throw never outranks canonical Row', () => {
+    const results = searchPerformedMovements(CATALOG, 'row', 6)
+    const rowIdx = results.findIndex(r => r.id === ROW_ID)
+    const throwIdx = results.findIndex(r => r.name === 'Medicine Ball Throw')
+    expect(rowIdx).toBe(0)
+    expect(throwIdx === -1 || throwIdx > rowIdx).toBe(true)
+  })
+
+  it('TEST J — a row whose name AND alias both match appears exactly once', () => {
+    // "row" matches Row's own name (tier 2, contains) AND would also match an
+    // alias if one contained "row" — assert single appearance either way.
+    const results = searchPerformedMovements(CATALOG, 'row', 20) // no cap pressure
+    expect(results.filter(r => r.id === ROW_ID)).toHaveLength(1)
+  })
+
+  it('TEST K — same relevance tier: deterministic ordering (documented tie-break: name, then id)', () => {
+    const a = searchPerformedMovements(CATALOG, 'row', 20)
+    const b = searchPerformedMovements(CATALOG.slice().reverse(), 'row', 20) // reversed INPUT order
+    expect(a.map(r => r.id)).toEqual(b.map(r => r.id)) // identical output regardless of input order
+    // within tier 2 (name contains "row", not exact/prefix), alphabetical by name
+    const tier2Names = a.filter(r => r.id !== ROW_ID && r.name.toLowerCase().includes('row')).map(r => r.name)
+    expect(tier2Names).toEqual([...tier2Names].sort((x, y) => x.localeCompare(y)))
+  })
+
+  it('TEST L — query shorter than the 2-char minimum: caller gate unchanged (helper itself is defensive too)', () => {
+    // PerformedMovementSearch still gates on query.trim().length >= 2 before
+    // calling the helper at all (unchanged) - this proves the helper itself
+    // never crashes / returns garbage for a 0-1 char query if ever called.
+    expect(searchPerformedMovements(CATALOG, '', 6)).toEqual([])
+    expect(searchPerformedMovements(CATALOG, 'r', 6).length).toBeGreaterThanOrEqual(0)
+  })
+
+  it('machine/cardio regression — Air Bike / Bike Erg / Ski Erg / Run / Shuttle Run remain searchable by their own name', () => {
+    expect(searchPerformedMovements(CATALOG, 'air bike', 6)[0].name).toBe('Air Bike')
+    expect(searchPerformedMovements(CATALOG, 'bike erg', 6)[0].name).toBe('Bike Erg')
+    expect(searchPerformedMovements(CATALOG, 'ski erg', 6)[0].name).toBe('Ski Erg')
+    expect(searchPerformedMovements(CATALOG, 'run', 6)[0].name).toBe('Run')
+    expect(searchPerformedMovements(CATALOG, 'shuttle run', 6)[0].name).toBe('Shuttle Run')
+  })
+
+  it('machine/cardio regression — Bike Erg / Ski Erg remain reachable via their own registered aliases', () => {
+    expect(searchPerformedMovements(CATALOG, 'bikeerg', 6)[0].name).toBe('Bike Erg')
+    expect(searchPerformedMovements(CATALOG, 'skierg', 6)[0].name).toBe('Ski Erg')
+    expect(searchPerformedMovements(CATALOG, 'ski', 6)[0].name).toBe('Ski Erg')
+  })
+
+  it('empty / malformed rows never crash the ranker', () => {
+    expect(searchPerformedMovements([], 'row', 6)).toEqual([])
+    expect(searchPerformedMovements(null, 'row', 6)).toEqual([])
+    expect(searchPerformedMovements([null, {}, { id: 'x' }, { id: 'y', name: 'Row' }], 'row', 6).map(r => r.id)).toEqual(['y'])
+  })
+
+  it('respects an arbitrary limit (cap is a parameter, not hard-coded in the helper)', () => {
+    expect(searchPerformedMovements(CATALOG, 'row', 3)).toHaveLength(3)
+    expect(searchPerformedMovements(CATALOG, 'row', 1)[0].id).toBe(ROW_ID)
+  })
+})

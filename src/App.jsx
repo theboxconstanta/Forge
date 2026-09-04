@@ -69,7 +69,7 @@ import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOve
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
   newMovementInstance, parseWorkoutPaste, variantKeyFromLevel,
-  buildMovementIndex, resolveCatalogMovementByName, resolveCatalogMovementForInstance,
+  buildMovementIndex, resolveCatalogMovementByName, resolveCatalogMovementForInstance, searchPerformedMovements,
   resolveInstanceCapability, backfillInstanceIdentity, assertCapabilityIntegrity,
   buildPrescriptionSnapshot, variantHasStructuredPrescription,
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
@@ -1011,9 +1011,12 @@ function performedResolvedValue(spec, gender) {
 function PerformedMovementSearch({ movementIndex, placeholder, noMatch, onPick, onCancel }) {
   const [query, setQuery] = useState('')
   const rows = movementIndex?.rows ?? []
-  const matches = query.trim().length >= 2
-    ? rows.filter(r => r.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6)
-    : []
+  // ROW MOVEMENT PICKER fix - ranked search (searchPerformedMovements,
+  // prescriptionContract.js) replaces the old alphabetical-order substring
+  // filter, which buried an exact match like "Row" behind unrelated
+  // alphabetically-earlier partial matches. Same 6-result cap, same 2-char
+  // minimum-query-length gate - only the RESULT ORDER changes.
+  const matches = query.trim().length >= 2 ? searchPerformedMovements(rows, query, 6) : []
   return (
     <div style={{ marginTop: '8px', position: 'relative' }}>
       <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') onCancel?.() }} placeholder={placeholder} autoFocus

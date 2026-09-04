@@ -152,6 +152,56 @@ describe('P9.5.2 — applyPerformedSubstitution', () => {
   })
 })
 
+// ROW MOVEMENT PICKER (2026-09-04) - substitution-contract regression, real
+// production identities. The forensic audit found the picker unable to
+// SURFACE "Row" (a search/ranking bug, fixed in searchPerformedMovements);
+// this protects the UNRELATED, already-correct applyPerformedSubstitution
+// contract the fix depends on — Air Bike -> Row keeps the athlete's calorie
+// value verbatim (both share allowed_prescription_metrics [distance,
+// calories]), never reinterprets it as reps/distance, and never touches the
+// programmed doc.
+describe('ROW MOVEMENT PICKER — Air Bike -> Row substitution regression', () => {
+  const airBikeDoc = () => ({
+    version: 1,
+    variants: { rx: { movements: [
+      { instanceId: 'mi_airbike00000000000001', name: 'Air Bike', canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c',
+        calories: { mode: 'universal', value: 15 } },
+    ] } },
+  })
+  // real catalog row (read-only forensic audit): id 2cfd0278-21a4-47c3-8ece-3a40b6a742b8
+  const rowCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })
+
+  it('15 Cal Air Bike -> Row keeps 15 calories verbatim, adopts Row identity, records substitutedFrom', () => {
+    const d = buildPerformedPrescriptionDraft({ doc: airBikeDoc(), variantKey: 'rx' })
+    const orig = d.movements[0]
+    const sub = applyPerformedSubstitution(orig, { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
+    expect(sub.instanceId).toBe(orig.instanceId) // stable instance
+    expect(sub.name).toBe('Row')
+    expect(sub.canonicalMovementId).toBe('2cfd0278-21a4-47c3-8ece-3a40b6a742b8')
+    expect(sub.calories).toEqual({ mode: 'universal', value: 15 }) // verbatim, not reinterpreted
+    expect(sub.substitutedFrom).toEqual({ canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike' })
+    // no metric invented
+    expect(sub.reps).toBeUndefined()
+    expect(sub.load).toBeUndefined()
+    expect(sub.distance).toBeUndefined()
+  })
+
+  it('the PROGRAMMED doc is never mutated by the substitution (§14 invariant)', () => {
+    const src = airBikeDoc()
+    const d = buildPerformedPrescriptionDraft({ doc: src, variantKey: 'rx' })
+    applyPerformedSubstitution(d.movements[0], { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
+    expect(src.variants.rx.movements[0].name).toBe('Air Bike')
+    expect(src.variants.rx.movements[0].calories).toEqual({ mode: 'universal', value: 15 })
+  })
+
+  it('the substitution reads as Modified against the programmed Air Bike (§15 classification untouched)', () => {
+    const programmedAirBike = airBikeDoc()
+    const d = buildPerformedPrescriptionDraft({ doc: programmedAirBike, variantKey: 'rx' })
+    d.movements[0] = applyPerformedSubstitution(d.movements[0], { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
+    expect(performedIsModified(d, programmedAirBike, 'rx', 'male')).toBe(true)
+  })
+})
+
 describe('P9.5.2 — repeated movements: no cross-contamination (§32)', () => {
   const twoRuns = () => ({
     version: 1,

@@ -179,6 +179,54 @@ export function resolveCatalogMovementByName(index, name) {
   return null
 }
 
+// ROW MOVEMENT PICKER (2026-09-04) - a ranked, multi-result FUZZY search over
+// catalog rows for the athlete-facing performed-movement search box (Change
+// movement / + Add movement, PerformedMovementSearch in App.jsx). Distinct
+// from resolveCatalogMovementByName above (an exact-key lookup used for
+// canonical-identity resolution during parsing) - this returns several
+// candidates for a dropdown, ranked by relevance instead of the fetch's
+// incidental alphabetical order. Forensic finding: a plain alphabetically-
+// ordered substring filter buried the canonical "Row" (exact match) behind 5
+// unrelated "___ Row" strength movements + a false-positive "...Throw" hit,
+// under history's fixed 6-result cap - never a missing-catalog-entry problem.
+//
+// Ranking tiers (lower = better; a row keeps its BEST tier across name and
+// every alias - never appears twice):
+//   0 exact canonical-name match       3 exact alias match
+//   1 canonical name starts with query 4 alias starts with query
+//   2 canonical name contains query    5 alias contains query
+// A canonical exact match is tier 0 and therefore always outranks every
+// alias-only or partial-name match, including compound names that merely
+// CONTAIN the query (e.g. "Medicine Ball Throw" contains "row" inside
+// "throw" - it can only ever land in tier 2/5, never above tier 0/1).
+//
+// Tie-break within a tier: canonical name (locale compare), then id - a
+// DETERMINISTIC rule independent of the rows' fetch order, not an accidental
+// reliance on Array.prototype.sort's stability or the DB's ORDER BY.
+//
+// Reuses normalizeMovementName (case-insensitive, whitespace/punctuation-
+// safe, deterministic) for both the query and every candidate string - no
+// new normalization, no fuzzy edit-distance, no dependency.
+export function searchPerformedMovements(rows, query, limit = 6) {
+  const q = normalizeMovementName(query)
+  if (!q) return []
+  const scored = []
+  for (const row of rows || []) {
+    if (!row || !row.name) continue
+    const name = normalizeMovementName(row.name)
+    let tier = name === q ? 0 : name.startsWith(q) ? 1 : name.includes(q) ? 2 : null
+    for (const alias of row.aliases || []) {
+      const a = normalizeMovementName(alias)
+      if (!a) continue
+      const aTier = a === q ? 3 : a.startsWith(q) ? 4 : a.includes(q) ? 5 : null
+      if (aTier !== null && (tier === null || aTier < tier)) tier = aTier
+    }
+    if (tier !== null) scored.push({ row, tier })
+  }
+  scored.sort((x, y) => x.tier - y.tier || x.row.name.localeCompare(y.row.name) || String(x.row.id).localeCompare(String(y.row.id)))
+  return scored.slice(0, limit).map((s) => s.row)
+}
+
 /** Identity-first resolution for a movement INSTANCE: a persisted
  * canonicalMovementId wins outright; the display name is only the fallback for
  * an instance that has never been resolved. Identity is never re-derived from
