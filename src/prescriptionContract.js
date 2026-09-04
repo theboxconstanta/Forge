@@ -983,12 +983,28 @@ export function addPerformedMovement(performedDoc, sourceInstanceId, targetRow, 
   if (inheritReps && srcEntry?.reps && (allowed.length === 0 || allowed.includes('reps'))) {
     added.reps = snapshotPrescriptionDoc(srcEntry.reps)
   }
+  // PERFORMED METRIC SWITCHING follow-up (2026-09-04) - distance+calories is
+  // the ONE mutually-exclusive "quantity" pair (owner contract, mirrors
+  // switchPerformedQuantityMetric's own single-metric invariant, §7 there): a
+  // fresh Add-movement entry for a distance+calories-capable row must start
+  // with ONLY the catalog default, never both - the athlete then explicitly
+  // switches if that default isn't what they actually did. Every OTHER
+  // multi-metric combo (reps+load, load+distance carries) is untouched: still
+  // seeds every allowed metric, exactly as before this follow-up. Falls back
+  // to the prior both-seeded behavior when the default is missing/invalid -
+  // resolveMovementCapability already nulls an invalid default (the
+  // established "don't guess" signal), so this never invents a pick between
+  // two valid-but-undefaulted options, and never checks a movement name.
+  const isDistanceCaloriesPair = allowed.includes('distance') && allowed.includes('calories')
+  const singleQuantityDefault = isDistanceCaloriesPair && (capability?.default === 'distance' || capability?.default === 'calories')
+    ? capability.default
+    : null
   for (const mk of PERFORMED_EDITABLE_METRICS) {
-    if (allowed.includes(mk)) {
-      added[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
-        : mk === 'distance' ? { mode: 'universal', value: null, unit: 'm' }
-        : { mode: 'universal', value: null }
-    }
+    if (!allowed.includes(mk)) continue
+    if (singleQuantityDefault && (mk === 'distance' || mk === 'calories') && mk !== singleQuantityDefault) continue
+    added[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
+      : mk === 'distance' ? { mode: 'universal', value: null, unit: 'm' }
+      : { mode: 'universal', value: null }
   }
   let lastIdx = -1
   movements.forEach((m, i) => { if ((m.sourceInstanceId ?? m.instanceId) === sourceInstanceId) lastIdx = i })

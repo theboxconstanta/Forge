@@ -393,40 +393,106 @@ describe('PERFORMED METRIC SWITCHING — exact reported workflow: Air Bike 21 Ca
   })
 })
 
+// PERFORMED METRIC SWITCHING FOLLOW-UP (2026-09-04) - owner review found the
+// Add-movement path seeded BOTH distance and calories simultaneously on a
+// fresh distance+calories-capable entry (addPerformedMovement seeded every
+// allowed metric, not just the default). For the mutually-exclusive
+// distance+calories pair specifically, exactly ONE quantity metric must exist
+// from the start - matching switchPerformedQuantityMetric's own single-metric
+// invariant. reps+load and load+distance are untouched: still seed every
+// allowed metric, exactly as always.
 describe('PERFORMED METRIC SWITCHING — Add movement path (same PerformedEditRow, same selector)', () => {
   const rowCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })
+  const airBikeCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })
+  // synthetic fixture (TEST C) - no real catalog row has default:'distance'
+  // today (forensic audit: all 8 distance+calories rows default to calories),
+  // but the contract must be symmetric, not Row/calories-specific.
+  const distanceDefaultCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'distance' })
+  const cleanJerkCapability = resolveMovementCapability({ allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' })
+  const carryCapability = resolveMovementCapability({ allowed_prescription_metrics: ['load', 'distance'], default_prescription_metric: 'load' })
+  const docWithSource = () => ({ version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [
+    { instanceId: 'mi_src', sourceInstanceId: 'mi_src', name: 'Air Bike', calories: { mode: 'universal', value: 21 } },
+  ] })
 
-  it('addPerformedMovement seeds a fresh Row entry (untouched, pre-existing behavior - not modified by this incident)', async () => {
+  it('TEST A — + Add Row: calories key exists, distance key absent, Calories active, Distance available', async () => {
     const { addPerformedMovement } = await import('./prescriptionContract.js')
-    const doc = { version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [
-      { instanceId: 'mi_src', sourceInstanceId: 'mi_src', name: 'Air Bike', calories: { mode: 'universal', value: 21 } },
-    ] }
-    const next = addPerformedMovement(doc, 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
-    const added = next.movements[1]
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability).movements[1]
     expect(added.name).toBe('Row')
-    // addPerformedMovement (unmodified) seeds EVERY allowed metric blank, not
-    // only the default - so a freshly-added Row starts with BOTH distance and
-    // calories present (both null). The selector below still correctly
-    // reports "Calories" as active (inst.calories checked first) and BOTH
-    // choices available; switching to either via switchPerformedQuantityMetric
-    // immediately collapses to exactly one, per its own contract (TEST A/B).
     expect(added.calories).toEqual({ mode: 'universal', value: null })
-    expect(added.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
-  })
-
-  it('the selector is eligible and reports Calories active for a freshly-added Row; switching Distance collapses to one metric', async () => {
-    const { addPerformedMovement } = await import('./prescriptionContract.js')
-    const doc = { version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [
-      { instanceId: 'mi_src', sourceInstanceId: 'mi_src', name: 'Air Bike', calories: { mode: 'universal', value: 21 } },
-    ] }
-    const added = addPerformedMovement(doc, 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability).movements[1]
+    expect('distance' in added).toBe(false) // absent, not merely falsy/null
     const eligible = rowCapability.allowed.includes('distance') && rowCapability.allowed.includes('calories')
     const activeMetric = added.calories ? 'calories' : added.distance ? 'distance' : null
     expect(eligible).toBe(true)
-    expect(activeMetric).toBe('calories')
+    expect(activeMetric).toBe('calories') // active
+    // distance remains AVAILABLE (the selector still offers it, per eligibility) even though not seeded
+  })
+
+  it('TEST B — + Add Air Bike: same default-calories behavior', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike' }, airBikeCapability).movements[1]
+    expect(added.calories).toEqual({ mode: 'universal', value: null })
+    expect('distance' in added).toBe(false)
+  })
+
+  it('TEST C — a distance+calories movement whose default is distance (synthetic fixture): distance only', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: 'synthetic-distance-default', name: 'Paddleboard' }, distanceDefaultCapability).movements[1]
+    expect(added.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+    expect('calories' in added).toBe(false)
+  })
+
+  it('TEST D — after fresh Row, switch Distance: calories removed, distance blank/m, no dual state', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability).movements[1]
     const switched = switchPerformedQuantityMetric(added, 'distance')
     expect(switched.calories).toBeUndefined()
+    expect('calories' in switched).toBe(false)
     expect(switched.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+  })
+
+  it('TEST E — switch back Calories: distance removed, calories blank', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability).movements[1]
+    const toDistance = switchPerformedQuantityMetric(added, 'distance')
+    const backToCalories = switchPerformedQuantityMetric(toDistance, 'calories')
+    expect(backToCalories.calories).toEqual({ mode: 'universal', value: null })
+    expect('distance' in backToCalories).toBe(false)
+  })
+
+  it('TEST F — Clean & Jerk (reps+load) Add-movement behavior unchanged: load seeded exactly as before', async () => {
+    // reps is workout STRUCTURE, not a PERFORMED_EDITABLE_METRICS entry - it
+    // is only ever inherited via inheritReps from a source with its own reps
+    // spec, unrelated to this follow-up and untouched by it. `load` is the
+    // one PERFORMED_EDITABLE_METRICS member Clean & Jerk allows, and it is
+    // seeded exactly as always (reps+load is explicitly out of scope).
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: 'cj-id', name: 'Clean & Jerk' }, cleanJerkCapability, { inheritReps: false }).movements[1]
+    expect(added.load).toEqual({ mode: 'universal', value: null, unit: 'kg' })
+    expect(added.reps).toBeUndefined()
+  })
+
+  it('TEST G — a load+distance carry Add-movement behavior unchanged: both seeded', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: 'carry-id', name: 'Farmers Carry' }, carryCapability).movements[1]
+    expect(added.load).toEqual({ mode: 'universal', value: null, unit: 'kg' })
+    expect(added.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+  })
+
+  it('TEST I — no distance+calories Add-movement entry ever begins with BOTH keys', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    for (const cap of [rowCapability, airBikeCapability, distanceDefaultCapability]) {
+      const added = addPerformedMovement(docWithSource(), 'mi_src', { id: 'x', name: 'X' }, cap).movements[1]
+      const bothPresent = ('distance' in added) && ('calories' in added)
+      expect(bothPresent).toBe(false)
+    }
+  })
+
+  it('default missing/invalid on a distance+calories row falls back to the prior both-seeded behavior (never invents a pick)', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const undefaulted = { allowed: ['distance', 'calories'], default: null, unknown: false } // resolveMovementCapability already nulls an invalid default
+    const added = addPerformedMovement(docWithSource(), 'mi_src', { id: 'x', name: 'X' }, undefaulted).movements[1]
+    expect(added.calories).toEqual({ mode: 'universal', value: null })
+    expect(added.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
   })
 })
 
