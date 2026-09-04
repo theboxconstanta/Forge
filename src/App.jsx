@@ -19,7 +19,7 @@ import {
   todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
-  formatFirstNameLastInitial,
+  formatFirstNameLastInitial, resolveMemberIdentity,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet } from './components'
 import { getT } from './translations'
@@ -2675,18 +2675,19 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
     if (postsData) {
       const ids = postsData.map(p => p.id)
       const postAuthorIds = [...new Set(postsData.map(p => p.member_id))]
-      // INC-01 - feed_posts/feed_comments.member_id has a real foreign key
-      // to `profiles`, never to `members` (PostgREST's embedded-join
-      // syntax can't resolve against members here at all - each author
-      // lookup is a separate, explicitly batched query instead), so
-      // `members` was never the architecturally correct table to read from
-      // in the first place; it also happened to be factually stale for 8
-      // real members (members.full_name empty while profiles.full_name has
-      // the real name - member_field_drift, unreconciled), which is what
-      // made this render "Membru" instead of their actual name.
-      const [authorsRes, reactRes, commRes] = await Promise.all([
+      // MEMBER IDENTITY READ ALIGNMENT - display identity resolves
+      // `members` (canonical) first, `profiles` as legacy fallback
+      // (resolveMemberIdentity). Both tables are batch-looked-up by the
+      // same author ids; feed_posts/feed_comments.member_id === profiles.id
+      // === members.id (shared PK). INC-01 had read `profiles` only, which
+      // hid the real name for every member whose name self-signup writes
+      // only to `members`.
+      const [authorProfRes, authorMemRes, reactRes, commRes] = await Promise.all([
         postAuthorIds.length > 0
           ? supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', postAuthorIds)
+          : Promise.resolve({ data: [] }),
+        postAuthorIds.length > 0
+          ? supabase.from('members').select('id, full_name, email, avatar_url').in('id', postAuthorIds)
           : Promise.resolve({ data: [] }),
         ids.length > 0
           ? supabase.from('feed_reactions').select('post_id, emoji, member_id').in('post_id', ids)
@@ -2695,8 +2696,15 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
           ? supabase.from('feed_comments').select('*').in('post_id', ids).order('created_at', { ascending: true })
           : Promise.resolve({ data: null }),
       ])
+      const authorProfById = {}
+      ;(authorProfRes.data || []).forEach(a => { authorProfById[a.id] = a })
+      const authorMemById = {}
+      ;(authorMemRes.data || []).forEach(a => { authorMemById[a.id] = a })
       const authorsMap = {}
-      ;(authorsRes.data || []).forEach(a => { authorsMap[a.id] = a })
+      postAuthorIds.forEach(id => {
+        if (!authorProfById[id] && !authorMemById[id]) return
+        authorsMap[id] = { id, ...resolveMemberIdentity(authorMemById[id], authorProfById[id]) }
+      })
       setPosts(postsData.map(p => ({ ...p, profiles: authorsMap[p.member_id] || null })))
 
       const reactData = reactRes.data
@@ -2719,8 +2727,19 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
         const commentAuthorIds = [...new Set(commData.map(c => c.member_id))]
         let commentAuthorsMap = {}
         if (commentAuthorIds.length > 0) {
-          const { data: commAuthorsData } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', commentAuthorIds)
-          if (commAuthorsData) commAuthorsData.forEach(a => { commentAuthorsMap[a.id] = a })
+          // MEMBER IDENTITY READ ALIGNMENT - `members` canonical, `profiles` fallback.
+          const [commProfRes, commMemRes] = await Promise.all([
+            supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', commentAuthorIds),
+            supabase.from('members').select('id, full_name, email, avatar_url').in('id', commentAuthorIds),
+          ])
+          const commProfById = {}
+          ;(commProfRes.data || []).forEach(a => { commProfById[a.id] = a })
+          const commMemById = {}
+          ;(commMemRes.data || []).forEach(a => { commMemById[a.id] = a })
+          commentAuthorIds.forEach(id => {
+            if (!commProfById[id] && !commMemById[id]) return
+            commentAuthorsMap[id] = { id, ...resolveMemberIdentity(commMemById[id], commProfById[id]) }
+          })
         }
         const cMap = {}
         commData.forEach(c => {
@@ -2735,8 +2754,26 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
 
   useEffect(() => {
     fetchAll(true)
-    supabase.from('profiles').select('id, full_name, email, avatar_url').order('full_name', { ascending: true })
-      .then(({ data }) => { if (data) setMembriComunitate(data) })
+    // MEMBER IDENTITY READ ALIGNMENT - the community strip resolves display
+    // identity `members` (canonical) first, `profiles` as legacy fallback.
+    // Row inclusion is unchanged: every profile in my gym (profiles RLS),
+    // union any member row RLS also exposes; sort is re-done client-side on
+    // the RESOLVED name so the order reflects what's actually displayed.
+    Promise.all([
+      supabase.from('profiles').select('id, full_name, email, avatar_url'),
+      supabase.from('members').select('id, full_name, email, avatar_url'),
+    ]).then(([profRes, memRes]) => {
+      const profById = {}
+      ;(profRes.data || []).forEach(p => { profById[p.id] = p })
+      const memById = {}
+      ;(memRes.data || []).forEach(m => { memById[m.id] = m })
+      const allIds = [...new Set([...Object.keys(profById), ...Object.keys(memById)])]
+      if (allIds.length === 0) return
+      const merged = allIds
+        .map(id => ({ id, ...resolveMemberIdentity(memById[id], profById[id]) }))
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+      setMembriComunitate(merged)
+    })
     const channel = supabase.channel('feed-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_posts' }, () => fetchAll(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_reactions' }, () => fetchAll(false))
@@ -3330,17 +3367,22 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const fetchClienti = async () => {
-    // Roster spans two Member Domain tables: memberships (status='active')
-    // is what makes a row "currently on this Gym's roster" - the direct
-    // equivalent of profiles.gym_id = my_gym_id() under RLS - while
-    // profiles supplies identity display fields. memberships is the
-    // driving query; profiles is a batched, deduplicated lookup against it.
-    // INC-01 - identity display fields (full_name/email/avatar_url/
-    // first_name/last_name/birth_date) come from `profiles`, not
-    // `members` - members.full_name was stale for 8 real members
-    // (member_field_drift, unreconciled), showing the wrong/missing name
-    // on this exact roster. gender stays from `members` deliberately -
-    // canonical source established at P0-02, untouched here.
+    // Roster spans Member Domain tables: memberships (status='active') is
+    // what makes a row "currently on this Gym's roster" - the direct
+    // equivalent of profiles.gym_id = my_gym_id() under RLS. memberships is
+    // the driving query; identity is a batched, deduplicated lookup against
+    // its member ids.
+    // MEMBER IDENTITY READ ALIGNMENT - identity display fields (full_name/
+    // email/avatar_url/first_name/last_name/birth_date) resolve `members`
+    // (canonical Source of Truth) first, `profiles` as legacy fallback
+    // (resolveMemberIdentity). INC-01 had read `profiles` only because
+    // members.full_name was then stale for 8 old members; that hid the
+    // real name for 11 members created after 2026-07-27 whose name
+    // onboarding writes ONLY to `members` ("No name" in this roster).
+    // gender stays from `members` deliberately - canonical since P0-02.
+    // Roster inclusion is unchanged: memberships (status='active') is the
+    // sole driver; a row still appears iff an identity row exists in
+    // EITHER table (in prod every roster member has both).
     const { data: membershipsData } = await supabase.from('memberships')
       .select('member_id, waiver_accepted, waiver_accepted_at')
       .eq('status', 'active')
@@ -3348,15 +3390,22 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const memberIds = [...new Set(membershipsData.map(m => m.member_id))]
     let membersMap = {}
     if (memberIds.length > 0) {
-      const [{ data: profilesData }, { data: genderRows }] = await Promise.all([
+      const [{ data: profilesData }, { data: memberRows }] = await Promise.all([
         supabase.from('profiles')
           .select('id, email, full_name, avatar_url, first_name, last_name, birth_date')
           .in('id', memberIds),
-        supabase.from('members').select('id, gender').in('id', memberIds),
+        supabase.from('members')
+          .select('id, email, full_name, avatar_url, first_name, last_name, birth_date, gender')
+          .in('id', memberIds),
       ])
-      const genderById = {}
-      if (genderRows) genderRows.forEach(g => { genderById[g.id] = g.gender })
-      if (profilesData) profilesData.forEach(m => { membersMap[m.id] = { ...m, gender: genderById[m.id] ?? null } })
+      const profById = {}
+      if (profilesData) profilesData.forEach(p => { profById[p.id] = p })
+      const memById = {}
+      if (memberRows) memberRows.forEach(m => { memById[m.id] = m })
+      memberIds.forEach(id => {
+        if (!profById[id] && !memById[id]) return
+        membersMap[id] = { id, ...resolveMemberIdentity(memById[id], profById[id]), gender: memById[id]?.gender ?? null }
+      })
     }
     const merged = membershipsData
       .map(ms => {
@@ -3406,9 +3455,18 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
     const memberIds = (bookData || []).map(b => b.member_id)
     if (memberIds.length === 0) { setRezervariClasa(prev => ({ ...prev, [classId]: [] })); return }
-    const { data: profsData } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', [...new Set(memberIds)])
+    // MEMBER IDENTITY READ ALIGNMENT - `members` canonical, `profiles` fallback.
+    const uniqMemberIds = [...new Set(memberIds)]
+    const [{ data: profsData }, { data: memsData }] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', uniqMemberIds),
+      supabase.from('members').select('id, full_name, email, avatar_url').in('id', uniqMemberIds),
+    ])
+    const profsById = {}
+    ;(profsData || []).forEach(p => { profsById[p.id] = p })
+    const memsById = {}
+    ;(memsData || []).forEach(m => { memsById[m.id] = m })
     const profsMap = {}
-    ;(profsData || []).forEach(p => { profsMap[p.id] = p })
+    uniqMemberIds.forEach(id => { profsMap[id] = resolveMemberIdentity(memsById[id], profsById[id]) })
     const bookingByMember = {}
     ;(bookData || []).forEach(b => { bookingByMember[b.member_id] = b })
     const rezultat = memberIds.map(mid => ({
@@ -8669,11 +8727,19 @@ function App() {
     const allIds = [...new Set(data.map(b => b.member_id))]
     let profilesMap = {}
     if (allIds.length > 0) {
-      // INC-01 - `profiles`, nu `members` (members.full_name era stale
-      // pt 8 membri reali cu drift nereconciliat, vezi member_field_drift -
-      // afisa "Membru" desi profiles.full_name avea numele real).
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', allIds)
-      if (profiles) profiles.forEach(p => { profilesMap[p.id] = p })
+      // MEMBER IDENTITY READ ALIGNMENT - display identity resolves `members`
+      // (canonical) first, `profiles` as legacy fallback. INC-01 read
+      // `profiles` only, hiding the real name for members whose name
+      // self-signup / onboarding writes ONLY to `members`.
+      const [{ data: profiles }, { data: mems }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', allIds),
+        supabase.from('members').select('id, full_name, email, avatar_url').in('id', allIds),
+      ])
+      const pById = {}
+      if (profiles) profiles.forEach(p => { pById[p.id] = p })
+      const mById = {}
+      if (mems) mems.forEach(m => { mById[m.id] = m })
+      allIds.forEach(id => { profilesMap[id] = resolveMemberIdentity(mById[id], pById[id]) })
     }
     const result = {}
     classIds.forEach(id => {
@@ -8741,19 +8807,31 @@ function App() {
     ]
     if (logs.length > 0) {
       const ids = [...new Set(logs.map(l => l.member_id))]
-      // INC-01 - full_name/email/avatar_url/weight_unit din `profiles`
-      // (members.full_name era stale pt 8 membri reali - member_field_drift
-      // nereconciliat, afisa "Membru"/emailul in loc de numele real).
-      // gender ramane din `members` deliberat - sursa canonica stabilita la
-      // P0-02, neatinsa aici.
-      const [{ data: profiles }, { data: genderRows }] = await Promise.all([
+      // MEMBER IDENTITY READ ALIGNMENT - full_name/email/avatar_url
+      // resolve `members` (canonical Source of Truth) first, `profiles` as
+      // legacy fallback (resolveMemberIdentity). INC-01 had read `profiles`
+      // only; that hid the real name (showing the email / "Anonymous") for
+      // members whose name is only in `members`. gender stays from
+      // `members` (canonical since P0-02); weight_unit stays profiles-first
+      // (a member preference, its established canonical source), unchanged.
+      const [{ data: profiles }, { data: memberRows }] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, avatar_url, weight_unit').in('id', ids),
-        supabase.from('members').select('id, gender').in('id', ids),
+        supabase.from('members').select('id, full_name, email, avatar_url, weight_unit, gender').in('id', ids),
       ])
-      const genderById = {}
-      if (genderRows) genderRows.forEach(g => { genderById[g.id] = g.gender })
+      const profById = {}
+      if (profiles) profiles.forEach(p => { profById[p.id] = p })
+      const memById = {}
+      if (memberRows) memberRows.forEach(m => { memById[m.id] = m })
       const map = {}
-      if (profiles) profiles.forEach(p => { map[p.id] = { ...p, gender: genderById[p.id] ?? null } })
+      ids.forEach(id => {
+        if (!profById[id] && !memById[id]) return
+        map[id] = {
+          id,
+          ...resolveMemberIdentity(memById[id], profById[id]),
+          gender: memById[id]?.gender ?? null,
+          weight_unit: profById[id]?.weight_unit ?? memById[id]?.weight_unit ?? null,
+        }
+      })
       setClasamentLogs(logs.map(l => ({ ...l, profile: map[l.member_id] })))
     } else {
       setClasamentLogs([])

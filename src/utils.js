@@ -299,6 +299,47 @@ export function formatPR(pr, preferredUnit) {
   return '—'
 }
 
+// MEMBER IDENTITY READ ALIGNMENT ("No name" incident) - the ONE precedence
+// rule for every surface that DISPLAYS a member's identity.
+//
+// Member Domain (migration 20260727100000_member_domain_identity_bridge_
+// retirement) makes `public.members` the CANONICAL identity Source of Truth;
+// `public.profiles` identity fields are LEGACY FALLBACK ONLY. INC-01 had
+// switched 6 display read sites members->profiles because members.full_name was
+// then stale for 8 old members - but that broke every member created after
+// 2026-07-27 whose name self-signup / onboarding writes ONLY to `members`
+// (11 real production members showed "No name" in Admin). The correct rule is
+// not "read profiles" but "members first, profiles as fallback":
+//
+//   members.<field>  ->  profiles.<field>  ->  null  (caller's final fallback)
+//
+// null / undefined / '' / whitespace-only ALL count as absent for the fallback
+// decision. Stored values are returned VERBATIM - this never trims, reorders,
+// re-capitalises or otherwise rewrites a name; only the presence TEST trims.
+//
+// Scope: DISPLAY IDENTITY only - full_name, first_name, last_name, avatar_url,
+// email, birth_date. Two fields are deliberately NOT resolved here and stay on
+// their own established canonical source, passed through by callers unchanged:
+//   - gender      -> canonically `members.gender` (P0-02), no profiles fallback
+//   - weight_unit -> a member PREFERENCE, historically canonical on `profiles`
+//                    (see fetchUserProfile) - not touched by this alignment
+export function resolveMemberIdentity(member, profile) {
+  const present = (v) => (typeof v === 'string' ? v.trim() !== '' : v != null)
+  const pick = (field) => {
+    if (present(member?.[field])) return member[field]
+    if (present(profile?.[field])) return profile[field]
+    return null
+  }
+  return {
+    full_name: pick('full_name'),
+    first_name: pick('first_name'),
+    last_name: pick('last_name'),
+    avatar_url: pick('avatar_url'),
+    email: pick('email'),
+    birth_date: pick('birth_date'),
+  }
+}
+
 export function getInitiale(name) {
   if (!name) return '??'
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()

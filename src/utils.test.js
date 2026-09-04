@@ -3,6 +3,7 @@ import {
   todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
+  resolveMemberIdentity,
 } from './utils'
 import { snapshotPrescriptionDoc } from './prescriptionContract.js'
 
@@ -711,5 +712,67 @@ describe('isInAttendanceGraceWindow', () => {
   it('gestioneaza corect o fereastra care trece de miezul noptii', () => {
     const now = new Date('2026-08-08T00:30:00')
     expect(isInAttendanceGraceWindow('2026-08-07', '23:00:00', now)).toBe(true)
+  })
+})
+
+describe('resolveMemberIdentity - MEMBER IDENTITY READ ALIGNMENT ("No name" incident)', () => {
+  // Owner decision: public.members = CANONICAL identity Source of Truth;
+  // public.profiles = LEGACY FALLBACK ONLY. Precedence everywhere member
+  // identity is displayed: members.<field> -> profiles.<field> -> null.
+
+  it('A - members.full_name wins over profiles (canonical source)', () => {
+    const r = resolveMemberIdentity({ full_name: 'Alexandra Marin' }, { full_name: 'stale old' })
+    expect(r.full_name).toBe('Alexandra Marin')
+  })
+
+  it('A - stale/EMPTY profiles must not hide a valid members identity (the regression)', () => {
+    // 11 real members created after 2026-07-27: name only in `members`
+    expect(resolveMemberIdentity({ full_name: 'Oana Firulescu' }, { full_name: null }).full_name).toBe('Oana Firulescu')
+    expect(resolveMemberIdentity({ full_name: 'Oana Firulescu' }, {}).full_name).toBe('Oana Firulescu')
+    expect(resolveMemberIdentity({ full_name: 'Oana Firulescu' }, null).full_name).toBe('Oana Firulescu')
+  })
+
+  it('B - legacy valid profiles identity still displays when members identity is absent', () => {
+    // the 8 old members INC-01 was about: name only in `profiles`
+    expect(resolveMemberIdentity({ full_name: null }, { full_name: 'Legacy Member' }).full_name).toBe('Legacy Member')
+    expect(resolveMemberIdentity({}, { full_name: 'Legacy Member' }).full_name).toBe('Legacy Member')
+    expect(resolveMemberIdentity(null, { full_name: 'Legacy Member' }).full_name).toBe('Legacy Member')
+  })
+
+  it('null / undefined / "" / whitespace-only ALL count as absent for the fallback decision', () => {
+    for (const empty of [null, undefined, '', '   ', '\t', '\n ']) {
+      expect(resolveMemberIdentity({ full_name: empty }, { full_name: 'Fallback' }).full_name).toBe('Fallback')
+    }
+  })
+
+  it('both absent -> null (caller applies its own final "No name" / "Anonymous" fallback)', () => {
+    expect(resolveMemberIdentity(null, null).full_name).toBeNull()
+    expect(resolveMemberIdentity({ full_name: '  ' }, { full_name: '' }).full_name).toBeNull()
+  })
+
+  it('does NOT rewrite stored values - diacritics, order, capitalisation, punctuation preserved verbatim', () => {
+    const r = resolveMemberIdentity({ full_name: '  Alina Chirilă  ' }, null)
+    expect(r.full_name).toBe('  Alina Chirilă  ') // returned exactly as stored (only the presence TEST trims)
+    expect(resolveMemberIdentity({ full_name: 'de la CRUZ, María-José' }, null).full_name).toBe('de la CRUZ, María-José')
+  })
+
+  it('resolves first_name / last_name / avatar_url / email / birth_date with the same precedence, field by field', () => {
+    const m = { first_name: 'Ana-Maria', last_name: null, avatar_url: null, email: 'a@x.com', birth_date: '1990-01-01' }
+    const p = { first_name: 'old', last_name: 'Anghel', avatar_url: 'https://cdn/p.png', email: 'old@x.com', birth_date: null }
+    const r = resolveMemberIdentity(m, p)
+    expect(r).toEqual({
+      full_name: null,
+      first_name: 'Ana-Maria',        // members
+      last_name: 'Anghel',            // profiles fallback (members empty)
+      avatar_url: 'https://cdn/p.png',// profiles fallback
+      email: 'a@x.com',               // members
+      birth_date: '1990-01-01',       // members
+    })
+  })
+
+  it('gender and weight_unit are NOT part of the resolved identity (kept on their own canonical source)', () => {
+    const r = resolveMemberIdentity({ full_name: 'X', gender: 'feminin', weight_unit: 'lbs' }, { gender: 'masculin', weight_unit: 'kg' })
+    expect(r.gender).toBeUndefined()
+    expect(r.weight_unit).toBeUndefined()
   })
 })
