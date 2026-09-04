@@ -369,6 +369,62 @@ export function formatWodDurata(durataStr) {
   return mins != null ? `${mins}:00` : durataStr
 }
 
+// CLASS COLOR - Home "Today schedule" class-card time block.
+//
+// classes.color is an Admin-chosen value (the New Class picker emits a hex
+// string from a fixed palette, or null). These pure helpers turn it into a
+// CSS-safe background + a readable foreground WITHOUT ever mutating or
+// normalising the stored value.
+
+export const CLASS_COLOR_DEFAULT_BG = '#111111'   // the historical hard-coded time-block background
+export const CLASS_COLOR_FG_LIGHT = '#FFFFFF'     // COLORS.text.inverse - light foreground
+export const CLASS_COLOR_FG_DARK = '#0E0E0E'      // COLORS.text.primary - dark foreground
+
+// Parse a #RGB / #RRGGBB hex string (case-insensitive, surrounding space
+// tolerated) to {r,g,b} 0-255. Anything else -> null (not a usable colour).
+export function parseHexColor(input) {
+  if (typeof input !== 'string') return null
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(input.trim())
+  if (!m) return null
+  let h = m[1]
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) }
+}
+
+// Effective time-block background: a valid stored hex verbatim, else the
+// historical default. null / undefined / '' / malformed / legacy -> '#111111'
+// (so the overwhelming majority of cards render exactly as before).
+export function resolveClassColor(color) {
+  return parseHexColor(color) ? color.trim() : CLASS_COLOR_DEFAULT_BG
+}
+
+// WCAG 2.x relative luminance of an {r,g,b}.
+function relLuminance({ r, g, b }) {
+  const lin = (c) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+// WCAG contrast ratio between two {r,g,b} (order-independent), 1..21.
+export function contrastRatio(a, b) {
+  const l1 = relLuminance(a)
+  const l2 = relLuminance(b)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}
+
+// Pick the more readable of the two approved FORGE foreground tokens for a
+// given background. General luminance/contrast rule - NO per-colour special
+// cases. A malformed background resolves to the default first, so it always
+// yields the same foreground the default time block uses today ('#FFFFFF').
+export function getReadableTextColor(background) {
+  const bg = parseHexColor(background) || parseHexColor(CLASS_COLOR_DEFAULT_BG)
+  const cLight = contrastRatio(bg, parseHexColor(CLASS_COLOR_FG_LIGHT))
+  const cDark = contrastRatio(bg, parseHexColor(CLASS_COLOR_FG_DARK))
+  return cDark > cLight ? CLASS_COLOR_FG_DARK : CLASS_COLOR_FG_LIGHT
+}
+
 // P0 UI refinement (WORKOUT_VARIANT_UI_REFINEMENT_REPORT.md) - canonical
 // color per scaling level, single source of truth for the dot AND the
 // Home accordion's own text/border color (VARIANTE_CONFIG.culoare in

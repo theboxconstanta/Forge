@@ -20,6 +20,7 @@ import {
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial, resolveMemberIdentity,
+  resolveClassColor, getReadableTextColor,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet } from './components'
 import { getT } from './translations'
@@ -10668,10 +10669,16 @@ function App() {
                     const nrRez = rezervariPerClasa[c.id]?.count || 0
                     const plin = !rezervat && nrRez >= c.max_spots
                     const peWaitlist = !rezervat && waitlistMea.includes(c.id)
+                    // CLASS COLOR - the Admin-chosen classes.color paints ONLY this
+                    // 48x48 time block. Invalid/null/legacy -> the historical
+                    // '#111111'; foreground auto-picked for contrast (no per-colour
+                    // special-casing). Card background/border/state all unchanged.
+                    const timeBlockBg = resolveClassColor(c.color)
+                    const timeBlockFg = getReadableTextColor(timeBlockBg)
                     return (
                       <div key={c.id} onClick={() => setClasaHomeSelectata(c.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#fff', border: rezervat ? '1.5px solid #B7E63A' : '1px solid #E5E7EB', borderRadius: '24px', padding: '18px', cursor: 'pointer' }}>
-                        <div style={{ background: '#111111', color: '#fff', borderRadius: '16px', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ background: timeBlockBg, color: timeBlockFg, borderRadius: '16px', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: '18px', letterSpacing: '-0.01em', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{c.start_time?.slice(0, 5)}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>

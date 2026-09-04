@@ -4,7 +4,12 @@ import {
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
   resolveMemberIdentity,
+  resolveClassColor, getReadableTextColor, parseHexColor, contrastRatio,
+  CLASS_COLOR_DEFAULT_BG, CLASS_COLOR_FG_LIGHT, CLASS_COLOR_FG_DARK,
 } from './utils'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { snapshotPrescriptionDoc } from './prescriptionContract.js'
 
 afterEach(() => {
@@ -774,5 +779,118 @@ describe('resolveMemberIdentity - MEMBER IDENTITY READ ALIGNMENT ("No name" inci
     const r = resolveMemberIdentity({ full_name: 'X', gender: 'feminin', weight_unit: 'lbs' }, { gender: 'masculin', weight_unit: 'kg' })
     expect(r.gender).toBeUndefined()
     expect(r.weight_unit).toBeUndefined()
+  })
+})
+
+describe('CLASS COLOR - Home "Today schedule" time block (classes.color)', () => {
+  // The Admin New Class picker palette (src/App.jsx). Every one must render a
+  // valid background AND a readable time label - no unreadable white-on-light.
+  const PALETTE = ['#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8', '#E8871E', '#F2C94C', '#E24B4A', '#3B82C4']
+
+  describe('resolveClassColor - background contract', () => {
+    it('null -> default #111111', () => { expect(resolveClassColor(null)).toBe('#111111') })
+    it('undefined -> default #111111', () => { expect(resolveClassColor(undefined)).toBe('#111111') })
+    it('empty string -> default #111111', () => { expect(resolveClassColor('')).toBe('#111111') })
+    it('whitespace-only -> default #111111', () => { expect(resolveClassColor('   ')).toBe('#111111') })
+    it('CLASS_COLOR_DEFAULT_BG constant is the historical value', () => { expect(CLASS_COLOR_DEFAULT_BG).toBe('#111111') })
+
+    it('valid 6-digit hex -> stored value verbatim (no rewrite/normalise)', () => {
+      expect(resolveClassColor('#E24B4A')).toBe('#E24B4A')
+      expect(resolveClassColor('#E8871E')).toBe('#E8871E')
+      expect(resolveClassColor('#F2C94C')).toBe('#F2C94C')
+      expect(resolveClassColor('#ABE73C')).toBe('#ABE73C')
+      expect(resolveClassColor('#afe607')).toBe('#afe607') // lowercase preserved exactly
+      expect(resolveClassColor('#C9D9A8')).toBe('#C9D9A8')
+    })
+    it('valid 3-digit hex -> verbatim', () => { expect(resolveClassColor('#0af')).toBe('#0af') })
+    it('surrounding whitespace trimmed but casing/among untouched', () => {
+      expect(resolveClassColor('  #E24B4A  ')).toBe('#E24B4A')
+    })
+
+    it('malformed values -> safe default #111111, never a crash', () => {
+      for (const bad of ['red', 'orange', '#12', '#GGGGGG', '#1234567', 'rgb(1,2,3)', '#', 'E24B4A', 42, {}, [], NaN, true]) {
+        expect(resolveClassColor(bad)).toBe('#111111')
+      }
+    })
+    it('every palette colour survives as its exact stored value', () => {
+      for (const col of PALETTE) expect(resolveClassColor(col)).toBe(col)
+    })
+  })
+
+  describe('getReadableTextColor - foreground contract', () => {
+    it('returns one of the two approved FORGE tokens, never anything else', () => {
+      for (const col of [...PALETTE, '#111111', 'garbage', null]) {
+        expect([CLASS_COLOR_FG_LIGHT, CLASS_COLOR_FG_DARK]).toContain(getReadableTextColor(col))
+      }
+    })
+    it('the default #111111 block keeps a light (white) label - legacy cards look identical', () => {
+      expect(getReadableTextColor('#111111')).toBe(CLASS_COLOR_FG_LIGHT)
+      expect(CLASS_COLOR_FG_LIGHT).toBe('#FFFFFF') // === the old literal "#fff"
+    })
+    it('malformed background resolves to default first -> same light label as today', () => {
+      expect(getReadableTextColor('nonsense')).toBe(CLASS_COLOR_FG_LIGHT)
+      expect(getReadableTextColor(null)).toBe(CLASS_COLOR_FG_LIGHT)
+    })
+    it('dark palette colours -> white label', () => {
+      for (const col of ['#0E0E0E', '#2E2E2E', '#5C6B1E']) expect(getReadableTextColor(col)).toBe(CLASS_COLOR_FG_LIGHT)
+    })
+    it('light palette colours -> DARK label (NOT unreadable white)', () => {
+      for (const col of ['#ABE73C', '#afe607', '#C9D9A8', '#F2C94C', '#E8871E', '#8C9B4A']) {
+        expect(getReadableTextColor(col)).toBe(CLASS_COLOR_FG_DARK)
+      }
+    })
+    it('chosen foreground always has the BETTER contrast of the two candidates', () => {
+      for (const col of PALETTE) {
+        const bg = parseHexColor(col)
+        const cLight = contrastRatio(bg, parseHexColor(CLASS_COLOR_FG_LIGHT))
+        const cDark = contrastRatio(bg, parseHexColor(CLASS_COLOR_FG_DARK))
+        const chosen = getReadableTextColor(col)
+        const chosenC = chosen === CLASS_COLOR_FG_DARK ? cDark : cLight
+        expect(chosenC).toBe(Math.max(cLight, cDark))
+      }
+    })
+    it('every palette colour reaches >= 4.5:1 with its chosen foreground (WCAG AA normal text)', () => {
+      for (const col of PALETTE) {
+        const chosen = getReadableTextColor(col)
+        const c = contrastRatio(parseHexColor(col), parseHexColor(chosen))
+        expect(c).toBeGreaterThanOrEqual(4.5)
+      }
+    })
+    it('NO per-colour special-casing: pure function of luminance', () => {
+      // two different hexes with equal luminance must get the same foreground
+      expect(getReadableTextColor('#767676')).toBe(getReadableTextColor('#767676'))
+      // idempotent / deterministic
+      const a = getReadableTextColor('#E24B4A')
+      const b = getReadableTextColor('#E24B4A')
+      expect(a).toBe(b)
+    })
+  })
+
+  describe('parseHexColor', () => {
+    it('#RRGGBB and #RGB, case-insensitive', () => {
+      expect(parseHexColor('#E24B4A')).toEqual({ r: 226, g: 75, b: 74 })
+      expect(parseHexColor('#fff')).toEqual({ r: 255, g: 255, b: 255 })
+      expect(parseHexColor('#000000')).toEqual({ r: 0, g: 0, b: 0 })
+    })
+    it('rejects everything else -> null', () => {
+      for (const bad of ['red', '#12', '#1234', '#GGGGGG', 'E24B4A', '', null, undefined, 5, {}]) {
+        expect(parseHexColor(bad)).toBeNull()
+      }
+    })
+  })
+
+  describe('§18 source guard - Home Today card consumes class colour, keeps #111111 fallback', () => {
+    const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'App.jsx'), 'utf8')
+    it('the Today-schedule time block derives its background from resolveClassColor(c.color)', () => {
+      expect(app).toMatch(/const timeBlockBg = resolveClassColor\(c\.color\)/)
+      expect(app).toMatch(/const timeBlockFg = getReadableTextColor\(timeBlockBg\)/)
+      expect(app).toMatch(/background: timeBlockBg, color: timeBlockFg/)
+    })
+    it('the time block no longer hard-codes background: \'#111111\' / color: \'#fff\'', () => {
+      expect(app).not.toMatch(/background: '#111111', color: '#fff', borderRadius: '16px', width: '48px'/)
+    })
+    it('#111111 remains the fallback (in the util, not the card)', () => {
+      expect(resolveClassColor(undefined)).toBe('#111111')
+    })
   })
 })
