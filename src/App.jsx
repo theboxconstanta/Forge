@@ -75,7 +75,7 @@ import {
   snapshotPrescriptionDoc, structuredVariantLoadStandard, structuredVariantHasLoad,
   resolveNumericInput, composeStructuredWorkoutDisplay,
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
-  performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, PERFORMED_EDITABLE_METRICS,
+  performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, switchPerformedQuantityMetric, PERFORMED_EDITABLE_METRICS,
   composePerformedResultLines, snapshotDisplayLines,
   performedCompositionGroups, performedEntriesForSource, performedStationInstances,
   addPerformedMovement, deletePerformedMovement, markSourceNotPerformed, restoreSourcePerformed,
@@ -1049,6 +1049,19 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
     ...(repsIsEditable ? ['reps'] : []),
     ...PERFORMED_EDITABLE_METRICS.filter(k => inst[k]),
   ]
+  // PERFORMED METRIC SWITCHING - capability-driven (never movement-name-driven):
+  // a Calories | Distance selector appears ONLY when THIS instance's own
+  // catalog capability (id-first, mirrors pickSubstitute's own
+  // resolveMovementCapability below) allows BOTH. Scope is deliberately just
+  // this one pair - reps+load (Clean & Jerk etc., both simultaneously
+  // meaningful) and load+distance carries (their own future decision) get no
+  // selector and are otherwise byte-identical to today. Active state comes
+  // from the INSTANCE itself (the athlete's current truth), never the
+  // catalog default - if the athlete already has calories, Calories is
+  // active, even though Row's own catalog default also happens to be calories.
+  const quantityCap = resolveInstanceCapability(movementIndex, inst)
+  const quantitySwitchEligible = quantityCap.allowed.includes('distance') && quantityCap.allowed.includes('calories')
+  const activeQuantityMetric = inst.calories ? 'calories' : inst.distance ? 'distance' : null
   const pickSubstitute = (row) => {
     onChange(applyPerformedSubstitution(inst, row, resolveMovementCapability(row)))
     setSubOpen(false)
@@ -1080,6 +1093,18 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
       {subOpen && (
         <PerformedMovementSearch movementIndex={movementIndex} placeholder={t.performedEditSubPlaceholder}
           noMatch={t.performedEditSubNoMatch} onPick={pickSubstitute} onCancel={() => setSubOpen(false)} />
+      )}
+
+      {quantitySwitchEligible && (
+        <span style={{ display: 'inline-flex', border: `1px solid ${COLORS.border}`, borderRadius: '7px', overflow: 'hidden', marginTop: '10px' }}>
+          {['calories', 'distance'].map((m) => (
+            <button key={m} onClick={() => onChange(switchPerformedQuantityMetric(inst, m))} aria-label={`${inst.name} performed metric ${m}`}
+              style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer',
+                background: activeQuantityMetric === m ? '#0E0E0E' : '#fff', color: activeQuantityMetric === m ? '#fff' : '#666' }}>
+              {t[`performedEditMetric_${m}`] || PERFORMED_METRIC_LABEL[m]}
+            </button>
+          ))}
+        </span>
       )}
 
       {presentMetrics.length > 0 && (

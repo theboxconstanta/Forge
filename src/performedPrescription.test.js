@@ -6,7 +6,10 @@ import {
   performedIsModified,
   applyPerformedSubstitution,
   setPerformedMetricValue,
+  switchPerformedQuantityMetric,
   resolveMovementCapability,
+  resolveMovementInstance,
+  composePerformedResultLines,
   PERFORMED_PRESCRIPTION_VERSION,
 } from './prescriptionContract.js'
 import { resultCompositionModified } from './workoutFormats.js'
@@ -232,5 +235,241 @@ describe('P9.5.2 / P9.5.6 — resultCompositionModified reads performed_prescrip
   it('a log with NULL performed_prescription is unaffected (As Prescribed when weight matches)', () => {
     const log = { weight_logged: '43', time_result: '10:00', performed_prescription: null }
     expect(resultCompositionModified(log, '43', ['Thruster'], ['Thruster'])).toBe(false)
+  })
+})
+
+// PERFORMED METRIC SWITCHING (2026-09-04) - Row/Air Bike/Bike Erg/Ski Erg (and
+// 4 more real catalog rows) allow BOTH distance and calories. The athlete-edit
+// UI only ever exposed whichever metric was already on the instance
+// (inherited from the programmed movement or a substitution); this adds the
+// switch between the two. Scope: distance<->calories ONLY - reps+load
+// (Clean & Jerk etc.) and load+distance carries are explicitly untouched.
+describe('PERFORMED METRIC SWITCHING — switchPerformedQuantityMetric', () => {
+  const rowCalories = () => ({
+    instanceId: 'mi_row0000000000000001', sourceInstanceId: 'mi_airbike00000000000001',
+    name: 'Row', canonicalMovementId: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8',
+    calories: { mode: 'universal', value: 21 },
+    substitutedFrom: { canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike' },
+  })
+
+  it('TEST A — Row calories 21 -> switch Distance: distance blank/m, calories key absent', () => {
+    const next = switchPerformedQuantityMetric(rowCalories(), 'distance')
+    expect(next.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+    expect(next.calories).toBeUndefined()
+    expect('calories' in next).toBe(false) // removed, not merely hidden/nulled
+  })
+
+  it('TEST B — Row distance 250m -> switch Calories: calories blank, distance key absent', () => {
+    const rowDistance = { ...rowCalories() }
+    delete rowDistance.calories
+    rowDistance.distance = { mode: 'universal', value: 250, unit: 'm' }
+    const next = switchPerformedQuantityMetric(rowDistance, 'calories')
+    expect(next.calories).toEqual({ mode: 'universal', value: null })
+    expect(next.distance).toBeUndefined()
+    expect('distance' in next).toBe(false)
+  })
+
+  it('TEST C — input instance is never mutated', () => {
+    const orig = rowCalories()
+    const snapshot = JSON.parse(JSON.stringify(orig))
+    switchPerformedQuantityMetric(orig, 'distance')
+    expect(orig).toEqual(snapshot)
+  })
+
+  it('TEST D — identity/provenance preserved: name, canonicalMovementId, instanceId, sourceInstanceId, substitutedFrom', () => {
+    const next = switchPerformedQuantityMetric(rowCalories(), 'distance')
+    expect(next.instanceId).toBe('mi_row0000000000000001')
+    expect(next.sourceInstanceId).toBe('mi_airbike00000000000001')
+    expect(next.name).toBe('Row')
+    expect(next.canonicalMovementId).toBe('2cfd0278-21a4-47c3-8ece-3a40b6a742b8')
+    expect(next.substitutedFrom).toEqual({ canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike' })
+  })
+
+  it('TEST E/F — no numeric carry-over, no conversion: 21 calories never becomes 21 meters', () => {
+    const next = switchPerformedQuantityMetric(rowCalories(), 'distance')
+    expect(next.distance.value).toBe(null) // NOT 21
+    expect(next.distance.value).not.toBe(21)
+  })
+
+  it('preserves reps and other unrelated fields verbatim across a switch', () => {
+    const withReps = { ...rowCalories(), reps: { mode: 'universal', value: 10 }, notPerformed: false }
+    const next = switchPerformedQuantityMetric(withReps, 'distance')
+    expect(next.reps).toEqual({ mode: 'universal', value: 10 })
+    expect(next.notPerformed).toBe(false)
+  })
+
+  it('an invalid target metric is a no-op (returns the instance unchanged)', () => {
+    const orig = rowCalories()
+    expect(switchPerformedQuantityMetric(orig, 'load')).toBe(orig)
+    expect(switchPerformedQuantityMetric(orig, 'reps')).toBe(orig)
+    expect(switchPerformedQuantityMetric(null, 'distance')).toBeNull()
+  })
+})
+
+describe('PERFORMED METRIC SWITCHING — capability matrix (drives the UI selector eligibility)', () => {
+  // eligibility === cap.allowed includes BOTH distance and calories - exactly
+  // what PerformedEditRow's quantitySwitchEligible computes via
+  // resolveInstanceCapability. Real catalog rows (forensic audit).
+  const eligible = (row) => {
+    const cap = resolveMovementCapability(row)
+    return cap.allowed.includes('distance') && cap.allowed.includes('calories')
+  }
+  it('Row — allowed [distance, calories] -> selector eligible', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })).toBe(true)
+  })
+  it('Air Bike — allowed [distance, calories] -> selector eligible', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })).toBe(true)
+  })
+  it('Bike Erg — allowed [distance, calories] -> selector eligible', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })).toBe(true)
+  })
+  it('Ski Erg — allowed [distance, calories] -> selector eligible', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })).toBe(true)
+  })
+  it('Run — allowed [distance] only -> NO selector', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance'], default_prescription_metric: 'distance' })).toBe(false)
+  })
+  it('Shuttle Run — allowed [distance] only -> NO selector', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance'], default_prescription_metric: 'distance' })).toBe(false)
+  })
+  it('Clean & Jerk — allowed [reps, load] -> NO distance/calories selector (out of scope)', () => {
+    expect(eligible({ allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' })).toBe(false)
+  })
+  it('a load+distance carry movement (e.g. Farmers Carry) -> NO selector in this incident (out of scope)', () => {
+    expect(eligible({ allowed_prescription_metrics: ['load', 'distance'], default_prescription_metric: 'load' })).toBe(false)
+  })
+})
+
+describe('PERFORMED METRIC SWITCHING — exact reported workflow: Air Bike 21 Cal -> Change Movement Row -> Distance -> 250', () => {
+  const airBikeDoc = () => ({
+    version: 1,
+    variants: { rx: { movements: [
+      { instanceId: 'mi_airbike00000000000001', name: 'Air Bike', canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c',
+        calories: { mode: 'universal', value: 21 } },
+    ] } },
+  })
+  const rowCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })
+
+  it('full workflow: substitute, verify initial state, switch, enter 250, verify final state + programmed untouched', () => {
+    const programmed = airBikeDoc()
+    const d = buildPerformedPrescriptionDraft({ doc: programmed, variantKey: 'rx' })
+
+    // Change movement: Air Bike -> Row
+    let inst = applyPerformedSubstitution(d.movements[0], { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
+    expect(inst.name).toBe('Row')
+    expect(inst.calories).toEqual({ mode: 'universal', value: 21 }) // initial state: Calories active (unchanged behavior, §9)
+    expect(inst.distance).toBeUndefined()
+
+    // Switch: Distance
+    inst = switchPerformedQuantityMetric(inst, 'distance')
+    expect(inst.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+    expect(inst.calories).toBeUndefined()
+
+    // Enter 250
+    inst = setPerformedMetricValue(inst, 'distance', 250, 'm')
+    expect(inst.distance).toEqual({ mode: 'universal', value: 250, unit: 'm' })
+    expect(inst.calories).toBeUndefined()
+    expect(inst.name).toBe('Row')
+    expect(inst.substitutedFrom).toEqual({ canonicalMovementId: '6fa1e269-3db4-4d52-b39d-242ffdcbf24c', name: 'Air Bike' })
+
+    // Final performed rendering
+    const resolved = resolveMovementInstance(inst, 'male')
+    expect(resolved.line).toBe('250 m Row')
+
+    // Programmed workout untouched throughout
+    expect(programmed.variants.rx.movements[0].name).toBe('Air Bike')
+    expect(programmed.variants.rx.movements[0].calories).toEqual({ mode: 'universal', value: 21 })
+
+    // Save validation: a clean distance-only Row passes
+    const finalDoc = { version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [{ ...inst, sourceInstanceId: 'mi_airbike00000000000001' }] }
+    expect(validatePerformedPrescription(finalDoc)).toEqual({ valid: true, errors: [] })
+
+    // Journal/result-card rendering (P9.5.5 shared engine) already supports it
+    const lines = composePerformedResultLines(finalDoc, 'male')
+    expect(lines).toEqual(['250 m Row'])
+
+    // Modified classification unaffected by which metric, only by composition
+    expect(performedIsModified({ ...d, movements: [inst] }, programmed, 'rx', 'male')).toBe(true)
+  })
+})
+
+describe('PERFORMED METRIC SWITCHING — Add movement path (same PerformedEditRow, same selector)', () => {
+  const rowCapability = resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })
+
+  it('addPerformedMovement seeds a fresh Row entry (untouched, pre-existing behavior - not modified by this incident)', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const doc = { version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [
+      { instanceId: 'mi_src', sourceInstanceId: 'mi_src', name: 'Air Bike', calories: { mode: 'universal', value: 21 } },
+    ] }
+    const next = addPerformedMovement(doc, 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability)
+    const added = next.movements[1]
+    expect(added.name).toBe('Row')
+    // addPerformedMovement (unmodified) seeds EVERY allowed metric blank, not
+    // only the default - so a freshly-added Row starts with BOTH distance and
+    // calories present (both null). The selector below still correctly
+    // reports "Calories" as active (inst.calories checked first) and BOTH
+    // choices available; switching to either via switchPerformedQuantityMetric
+    // immediately collapses to exactly one, per its own contract (TEST A/B).
+    expect(added.calories).toEqual({ mode: 'universal', value: null })
+    expect(added.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+  })
+
+  it('the selector is eligible and reports Calories active for a freshly-added Row; switching Distance collapses to one metric', async () => {
+    const { addPerformedMovement } = await import('./prescriptionContract.js')
+    const doc = { version: 2, variantKey: 'rx', sectionId: null, source: 'performed', movements: [
+      { instanceId: 'mi_src', sourceInstanceId: 'mi_src', name: 'Air Bike', calories: { mode: 'universal', value: 21 } },
+    ] }
+    const added = addPerformedMovement(doc, 'mi_src', { id: '2cfd0278-21a4-47c3-8ece-3a40b6a742b8', name: 'Row' }, rowCapability).movements[1]
+    const eligible = rowCapability.allowed.includes('distance') && rowCapability.allowed.includes('calories')
+    const activeMetric = added.calories ? 'calories' : added.distance ? 'distance' : null
+    expect(eligible).toBe(true)
+    expect(activeMetric).toBe('calories')
+    const switched = switchPerformedQuantityMetric(added, 'distance')
+    expect(switched.calories).toBeUndefined()
+    expect(switched.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+  })
+})
+
+describe('PERFORMED METRIC SWITCHING — UI source guard (capability-driven, not name-driven)', () => {
+  it('PerformedEditRow gates the selector on catalog capability via resolveInstanceCapability, never on movement name', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { fileURLToPath } = await import('node:url')
+    const { dirname, join } = await import('node:path')
+    const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'App.jsx'), 'utf8')
+    expect(app).toMatch(/const quantityCap = resolveInstanceCapability\(movementIndex, inst\)/)
+    expect(app).toMatch(/const quantitySwitchEligible = quantityCap\.allowed\.includes\('distance'\) && quantityCap\.allowed\.includes\('calories'\)/)
+    expect(app).toMatch(/const activeQuantityMetric = inst\.calories \? 'calories' : inst\.distance \? 'distance' : null/)
+    expect(app).toMatch(/onClick=\{\(\) => onChange\(switchPerformedQuantityMetric\(inst, m\)\)\}/)
+    // never a movement-name allowlist (e.g. inst.name === 'Row')
+    expect(app).not.toMatch(/inst\.name === ['"]Row['"]/)
+    // exactly one PerformedEditRow definition - the selector applies to both
+    // its existing call sites (Change movement substitution + Add movement)
+    expect((app.match(/function PerformedEditRow\(/g) || []).length).toBe(1)
+  })
+})
+
+// SCORE / LEADERBOARD INVARIANCE - the forensic audit read composeWodLogFieldsInner
+// (App.jsx) end to end: it derives result/time_result/weight_logged/sets/log_meta
+// exclusively from athlete-typed score-input state (wodTime, wodRoundsCompleted,
+// wodPartialReps, wodResult, wodWeightLogged, wodSets, wodChainedStages,
+// wodAdditionalReps, wodCompleted) and never reads performedDraft/
+// performedCommitted/performed_prescription. This incident adds no new score
+// path - guard that composeWodLogFieldsInner still never references performed
+// state, so a metric switch can never influence the score.
+describe('PERFORMED METRIC SWITCHING — score/leaderboard independence (source guard)', () => {
+  it('composeWodLogFieldsInner never reads performedDraft/performedCommitted', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { fileURLToPath } = await import('node:url')
+    const { dirname, join } = await import('node:path')
+    const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'App.jsx'), 'utf8')
+    const start = app.indexOf('const composeWodLogFieldsInner = () => {')
+    expect(start).toBeGreaterThan(0)
+    // isolate the function body up to its matching close (next top-level
+    // "const saveWodLog = async () => {" marks the end, unchanged since the
+    // forensic audit)
+    const end = app.indexOf('const saveWodLog = async () => {', start)
+    expect(end).toBeGreaterThan(start)
+    const body = app.slice(start, end)
+    expect(body).not.toMatch(/performedDraft|performedCommitted|performed_prescription/)
   })
 })

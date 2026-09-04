@@ -1072,6 +1072,42 @@ export function setPerformedMetricValue(instance, metric, value, unit) {
   return { ...instance, [metric]: nextSpec }
 }
 
+// PERFORMED METRIC SWITCHING (2026-09-04) - a movement whose catalog capability
+// allows BOTH distance and calories (Row, Air Bike, Bike Erg, Ski Erg, ... - 8
+// catalog rows, capability-derived, never a name allowlist) can be logged
+// either way; the athlete may have actually done "250 m Row" instead of the
+// substitution's inherited "21 Cal Row". Scope, per owner decision: ONLY the
+// distance<->calories pair. reps+load (both simultaneously meaningful, not
+// alternatives) and load+distance carries (their own future product decision)
+// are untouched by this helper and by its only caller.
+//
+// Mirrors the already-shipped Admin builder precedent (MovementRowPWA's
+// setQuantity, PMPE_QTY) for the performed side: `mode: 'universal'` (a single
+// athlete value), not `sex_specific` (the coach-authoring shape) —
+// setPerformedMetricValue above already established that convention here.
+//
+// Forensic finding this must not repeat: validatePerformedPrescription allows
+// distance AND calories present simultaneously, and renderInstanceLine's fixed
+// reps -> distance -> calories precedence would then silently HIDE calories.
+// So switching REMOVES the other metric's key entirely (not just nulls it) —
+// delete, not hide — and seeds the newly-chosen metric BLANK. The old numeric
+// value never carries across: 21 calories must never become 21 meters: there is
+// no conversion, and none is intended (calories and meters are not
+// commensurable). Pure — returns a new object; `instance` is never mutated;
+// every other field (instanceId, name, canonicalMovementId, sourceInstanceId,
+// substitutedFrom, reps, load, notPerformed, ...) survives untouched via the
+// shallow copy.
+export function switchPerformedQuantityMetric(instance, metric) {
+  if (!instance || (metric !== 'distance' && metric !== 'calories')) return instance
+  const other = metric === 'distance' ? 'calories' : 'distance'
+  const next = { ...instance }
+  delete next[other]
+  next[metric] = metric === 'distance'
+    ? { mode: 'universal', value: null, unit: 'm' }
+    : { mode: 'universal', value: null }
+  return next
+}
+
 /** P9.5.5 - the movement DISPLAY LINES for an ATHLETE RESULT card, projected
  * from a persisted `wod_logs.performed_prescription` overlay. Athlete-edited
  * metrics are stored `universal` (a single performed value); untouched metrics
