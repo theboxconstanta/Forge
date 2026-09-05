@@ -376,6 +376,7 @@ export const TRANSLATIONS = {
     // Jurnal (lista de log-uri)
     jurnalEmpty: 'Niciun antrenament logat încă',
     jurnalDeleteConfirm: 'Șterge?',
+    jurnalHasPhotoLabel: 'Are fotografie',
     jurnalNoteLabel: 'NOTE',
     jurnalResultLabel: 'REZULTAT',
     jurnalSetsCountLabel: (n) => `${n} seturi`,
@@ -1602,6 +1603,7 @@ export const TRANSLATIONS = {
     // Jurnal (lista de log-uri)
     jurnalEmpty: 'No workouts logged yet',
     jurnalDeleteConfirm: 'Delete?',
+    jurnalHasPhotoLabel: 'Has photo',
     jurnalNoteLabel: 'NOTES',
     jurnalResultLabel: 'RESULT',
     jurnalSetsCountLabel: (n) => `${n} sets`,

@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban, ChevronDown, ChevronRight,
+  Archive, Ban, ChevronDown, ChevronRight, Camera,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -90,6 +90,8 @@ import { scoreDefinitionFor } from './scoreDefinition'
 import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult, hasSequentialAmrapInput } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
 import { validatePhotoFile, attachWodLogPhoto } from './photoProcessing'
+import { extractWodLogMedia, getWodLogPhotoSignedUrl, resolveJustAttachedPhotoUrl } from './wodLogMedia'
+import PhotoResultCard from './PhotoResultCard'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
 // name part and the trailing "@ x" prescription part, for the right-aligned
@@ -6297,7 +6299,39 @@ function RecentBenchmarkProgressSection({ progress, onSelectBenchmark, t, lang }
   )
 }
 
-function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang }) {
+// PHOTO RESULT / SHARE CARD Phase 2 §9/§16 - mounted ONLY when a log's card
+// is open AND it has an attached photo (JurnalList computes both below).
+// Unmounting (card closed) forgets any signed URL, so reopening later
+// always requests a fresh one - never a persisted or reused URL. A log with
+// no photo never mounts this at all, never makes a Storage call (owner
+// §17 - no bulk signed-URL generation, no N+1 metadata query, the metadata
+// itself already arrived batched with the log list via fetchWodLogs' own
+// `wod_log_media(storage_path)` embed).
+function JurnalPhotoResult({ storagePath, ...cardProps }) {
+  const [photoUrl, setPhotoUrl] = useState(null)
+  const [unavailable, setUnavailable] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setPhotoUrl(null); setUnavailable(false)
+    getWodLogPhotoSignedUrl({ supabase, storagePath }).then(({ url }) => {
+      if (cancelled) return
+      if (url) setPhotoUrl(url); else setUnavailable(true)
+    })
+    return () => { cancelled = true }
+  }, [storagePath])
+  // A signed-URL fetch failure or an <img> load failure both resolve here -
+  // rendering nothing lets the plain, already-present detail block below
+  // this component stand in as the safe fallback (owner §15), never an
+  // empty/broken result surface.
+  if (unavailable) return null
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <PhotoResultCard photoUrl={photoUrl} onPhotoError={() => setUnavailable(true)} {...cardProps} />
+    </div>
+  )
+}
+
+function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym }) {
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6438,6 +6472,17 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                 : rezultatBucatiRaw
               const areRezultatFinal = areRezultat || (chainedTotalReps != null)
               const areDetaliiFinal = areDetalii || (chainedTotalReps != null)
+              // PHOTO RESULT / SHARE CARD Phase 2 §9/§17 - `wod_log_media` is
+              // batched with the log list itself (fetchWodLogs' own embed),
+              // never a separate per-row query; `extractWodLogMedia` never
+              // returns a signed URL, only whether an attachment exists and
+              // (once the card is opened) which Storage path to sign.
+              const photoMedia = extractWodLogMedia(w.wod_log_media)
+              // Same isRx check as NotRxdBadge/WorkoutSharePopup - resolved
+              // once here as plain text for the photo overlay (which draws
+              // its own pill, styled for a dark photo background).
+              const isRxVariantLog = String(w.variant_level ?? 'rx').toLowerCase().replace(/[_\s-]/g, '') === 'rx'
+              const notRxdLabelLog = resultModifiedLog ? (isRxVariantLog ? t.notRxdBadge : t.modifiedBadge) : null
               return (
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -6445,6 +6490,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
                       {resultModifiedLog && <NotRxdBadge t={t} compact variant={w.variant_level} />}
+                      {photoMedia && <Camera size={12} strokeWidth={2} color="#aaa" aria-label={t.jurnalHasPhotoLabel} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteWod && (
@@ -6484,6 +6530,16 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                   )}
                   {isOpen && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
+                      {photoMedia && (
+                        <JurnalPhotoResult
+                          storagePath={photoMedia.storagePath}
+                          gymName={gym?.name} gymColor={gym?.primaryColor}
+                          wodName={wodNume} variantLevel={w.variant_level || null}
+                          notRxdLabel={notRxdLabelLog}
+                          movements={cardMovementLines} resultText={areRezultatFinal ? rezultatBucati.join(' · ') : null}
+                          loggedAt={w.logged_at} lang={lang} t={t}
+                        />
+                      )}
                       {cardMovementLines.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {cardMovementLines.map((m, j) => (
@@ -6823,10 +6879,23 @@ function NotRxdBadge({ t, compact, variant }) {
 // facut + scorul + variantă + data/ora + un mesaj de felicitare, cu buton de
 // distribuire (Web Share API - pe mobil deschide sheet-ul nativ cu WhatsApp/
 // social media direct, fara integrare separata per platforma).
+// PHOTO RESULT / SHARE CARD Phase 2 - `photoState` ('none' | 'pending' |
+// 'ready' | 'unavailable') and `photoUrl` are appended to `data` by the
+// caller AFTER this same save (a photo, if picked, is only known/uploaded
+// once the WOD result itself already saved - Phase 1's save contract). The
+// photo-backed layout below is used ONLY for 'pending' (still uploading -
+// shows a skeleton in place of the photo, every other field already known)
+// and 'ready' (signed URL loaded) - 'none' (no photo picked) and
+// 'unavailable' (upload/signed-URL/image-load failure) always render the
+// ORIGINAL plain white card, byte-identical to before this phase (owner
+// §21 no-photo regression).
 function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl } = data
   const scoreParts = [result, timeResult].filter(Boolean)
+  const resultText = scoreParts.length > 0 ? scoreParts.join(' · ') : null
   const dataObj = new Date(loggedAt)
   const shareText = [
     gym.name,
@@ -6844,47 +6913,76 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
       await navigator.clipboard.writeText(shareText)
     }
   }
+  // Same isRx check as NotRxdBadge - the photo overlay needs the resolved
+  // LABEL TEXT, not the badge's own pill markup (the overlay draws its own
+  // pill styled for a dark photo background).
+  const isRxVariant = String(variantLevel ?? 'rx').toLowerCase().replace(/[_\s-]/g, '') === 'rx'
+  const notRxdLabel = resultModified ? (isRxVariant ? t.notRxdBadge : t.modifiedBadge) : null
+  const showPhotoCard = (photoState === 'pending' || photoState === 'ready') && !imgFailed
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', maxWidth: '360px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-        <button onClick={onClose} aria-label={t.shareCardCloseLabel}
-          style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0E0E0E', cursor: 'pointer' }}>
-          <X size={16} strokeWidth={2.5} />
-        </button>
-        <div style={{ background: '#0E0E0E', padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <img src="/forge.png" alt="Forge" style={{ height: '30px', width: '30px', borderRadius: '8px', objectFit: 'cover' }} />
-          <span style={{ color: '#fff', fontWeight: '600', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
-          <span style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3 }}>
-            <span style={{ color: '#888' }}> · </span><span style={{ color: gym.primaryColor }}>{gym.name}</span>
-          </span>
-        </div>
-        <div style={{ padding: '26px 24px', textAlign: 'center' }}>
-          {wodName && <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
-          {variantLevel && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
-              <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '600', lineHeight: 1.2 }}>
-                {variantLevel}
+        {showPhotoCard ? (
+          <>
+            <PhotoResultCard
+              photoUrl={photoState === 'ready' ? photoUrl : null}
+              onPhotoError={() => setImgFailed(true)}
+              gymName={gym.name} gymColor={gym.primaryColor}
+              wodName={wodName} variantLevel={variantLevel} variantColor={variantColor} variantBg={variantBg}
+              notRxdLabel={notRxdLabel}
+              movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
+              onClose={onClose}
+            />
+            <div style={{ padding: '16px 24px 22px', textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '14px' }}>{t.shareCardCongrats}</div>
+              <button onClick={handleShare}
+                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button onClick={onClose} aria-label={t.shareCardCloseLabel}
+              style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0E0E0E', cursor: 'pointer' }}>
+              <X size={16} strokeWidth={2.5} />
+            </button>
+            <div style={{ background: '#0E0E0E', padding: '20px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <img src="/forge.png" alt="Forge" style={{ height: '30px', width: '30px', borderRadius: '8px', objectFit: 'cover' }} />
+              <span style={{ color: '#fff', fontWeight: '600', fontSize: '16px', letterSpacing: '1px' }}>FORGE</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.3 }}>
+                <span style={{ color: '#888' }}> · </span><span style={{ color: gym.primaryColor }}>{gym.name}</span>
+              </span>
+            </div>
+            <div style={{ padding: '26px 24px', textAlign: 'center' }}>
+              {wodName && <div style={{ fontSize: '18px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '10px' }}>"{wodName}"</div>}
+              {variantLevel && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                  <div style={{ padding: '4px 14px', borderRadius: '20px', background: variantBg || '#f0f0f0', color: variantColor || '#0E0E0E', fontSize: '12px', fontWeight: '600', lineHeight: 1.2 }}>
+                    {variantLevel}
+                  </div>
+                  {resultModified && <NotRxdBadge t={t} variant={variantLevel} />}
+                </div>
+              )}
+              {movements && movements.length > 0 && (
+                <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+                  {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
+                </div>
+              )}
+              <div style={{ fontSize: '30px', fontWeight: '600', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
+                {scoreParts.length > 0 ? scoreParts.join(' · ') : '—'}
               </div>
-              {resultModified && <NotRxdBadge t={t} variant={variantLevel} />}
+              <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', marginBottom: '18px' }}>
+                {dataObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dataObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '22px' }}>{t.shareCardCongrats}</div>
+              <button onClick={handleShare}
+                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
+              </button>
             </div>
-          )}
-          {movements && movements.length > 0 && (
-            <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#666', textAlign: 'left', background: '#fafafa', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
-              {movements.map((m, i) => <div key={i} style={{ padding: '2px 0' }}>• {m}</div>)}
-            </div>
-          )}
-          <div style={{ fontSize: '30px', fontWeight: '600', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
-            {scoreParts.length > 0 ? scoreParts.join(' · ') : '—'}
-          </div>
-          <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', marginBottom: '18px' }}>
-            {dataObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dataObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
-          </div>
-          <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '22px' }}>{t.shareCardCongrats}</div>
-          <button onClick={handleShare}
-            style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -8532,7 +8630,12 @@ function App() {
   }
 
   const fetchWodLogs = async () => {
-    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')})`).eq('member_id', user.id).order('logged_at', { ascending: false })
+    // PHOTO RESULT / SHARE CARD Phase 2 §17 - `wod_log_media(storage_path)` is
+    // the ONE lightweight embedded relation the Journal needs to know
+    // hasPhoto (and, once expanded, which Storage path to sign) for every
+    // row in a single batched query - never a signed URL, never a second
+    // per-log query, never image bytes.
+    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')}), wod_log_media(storage_path)`).eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -9642,6 +9745,7 @@ function App() {
             ? t.jurnalTotalRepsLabel(logFields.log_meta.totalReps)
             : null
         setWorkoutSharePopup({
+          wodLogId: savedWodLogRow?.id || null,
           wodName: logWodZiData?.name || null,
           movements: shareMovementLines,
           variantLevel: varianta?.nivel || null,
@@ -9655,6 +9759,13 @@ function App() {
           // "did not finish" NEVER sets this. Same canonical rule as the
           // leaderboard bucket and the Jurnal badge.
           resultModified: resultCompositionModified({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements, activeLogFormatId, activeLogFormatConfig),
+          // PHOTO RESULT / SHARE CARD Phase 2 - 'pending' the instant a photo
+          // was picked (the upload/attach itself only starts further below,
+          // AFTER this popup is already showing - owner §7 race handling);
+          // 'none' when no photo was picked, which never changes again below,
+          // keeping this popup byte-identical to before this phase (owner §21).
+          photoState: wodPhotoFile ? 'pending' : 'none',
+          photoUrl: null,
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
@@ -9671,11 +9782,25 @@ function App() {
       // byte-identical to before this phase.
       if (wodPhotoFile && savedWodLogRow?.id) {
         const fileToUpload = wodPhotoFile
+        const uploadingForLogId = savedWodLogRow.id
         clearWodPhoto()
         setWodPhotoUploading(true)
-        const attachResult = await attachWodPhoto(fileToUpload, savedWodLogRow.id)
+        const attachResult = await attachWodPhoto(fileToUpload, uploadingForLogId)
         setWodPhotoUploading(false)
-        if (!attachResult.success) showToast(t.toastWodPhotoSaveFailed)
+        if (!attachResult.success) {
+          showToast(t.toastWodPhotoSaveFailed)
+          // PHOTO RESULT / SHARE CARD Phase 2 §8 - the popup for THIS save
+          // (guarded by wodLogId, in case a later save already replaced it)
+          // falls back to its plain, no-photo layout; the WOD result inside
+          // it is completely unaffected.
+          setWorkoutSharePopup(prev => (prev && prev.wodLogId === uploadingForLogId) ? { ...prev, photoState: 'unavailable' } : prev)
+        } else {
+          // Phase 1's attachWodLogPhoto only resolves { success }, not the
+          // path it generated internally - read the freshly written
+          // wod_log_media row back once to resolve a signed URL for it.
+          const { url } = await resolveJustAttachedPhotoUrl({ supabase, wodLogId: uploadingForLogId })
+          setWorkoutSharePopup(prev => (prev && prev.wodLogId === uploadingForLogId) ? { ...prev, photoState: url ? 'ready' : 'unavailable', photoUrl: url } : prev)
+        }
       } else {
         clearWodPhoto()
       }
@@ -11578,7 +11703,7 @@ function App() {
               </div>
             </div>
             <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
-            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang}
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang} gym={myGym}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
