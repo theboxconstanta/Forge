@@ -938,9 +938,13 @@ export function performedIsModified(performedDoc, programmedDoc, variantKey, gen
 /** Apply a whole-movement substitution to ONE performed instance. Keeps the
  * stable instanceId; adopts the target's canonical identity; records
  * `substitutedFrom` (the ORIGINAL identity, only on the FIRST substitution);
- * retains a load / distance / calorie spec only when the target movement's
- * capability still allows it (§16 / §17); never invents a metric the athlete
- * did not already have. `reps` (structure) always carries over unchanged.
+ * retains reps / a load / distance / calorie spec ONLY when the target
+ * movement's capability still allows that exact metric (§16 / §17, and the
+ * universal capability-intersection invariant - a metric outside the new
+ * movement's capability is cleared, never carried over incompatible, never
+ * invented, never converted). `capability.allowed.length === 0` (an unseeded/
+ * unknown catalog row) fails OPEN - every existing metric is preserved rather
+ * than guessed away, same convention resolveMovementCapability itself uses.
  * `capability` = resolveMovementCapability(targetRow). Pure. */
 export function applyPerformedSubstitution(instance, targetRow, capability) {
   const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
@@ -950,7 +954,7 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
     canonicalMovementId: targetRow?.id ?? null,
   }
   if (instance.sourceInstanceId != null) next.sourceInstanceId = instance.sourceInstanceId
-  if (instance.reps) next.reps = instance.reps
+  if (instance.reps && (allowed.length === 0 || allowed.includes('reps'))) next.reps = instance.reps
   for (const mk of PERFORMED_EDITABLE_METRICS) {
     if (instance[mk] && (allowed.length === 0 || allowed.includes(mk))) next[mk] = instance[mk]
   }
