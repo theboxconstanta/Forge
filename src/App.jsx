@@ -89,6 +89,7 @@ import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMov
 import { scoreDefinitionFor } from './scoreDefinition'
 import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult, hasSequentialAmrapInput } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
+import { validatePhotoFile, attachWodLogPhoto } from './photoProcessing'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
 // name part and the trailing "@ x" prescription part, for the right-aligned
@@ -7194,6 +7195,17 @@ function App() {
   const [wodTime, setWodTime] = useState('')
   const [wodNote, setWodNote] = useState('')
   const [wodSaving, setWodSaving] = useState(false)
+  // PHOTO RESULT / SHARE CARD Phase 1 - a purely OPTIONAL attachment (Phase 0
+  // forensic §3): none of this ever feeds composeWodLogFields, score
+  // derivation, or performed_prescription. `wodPhotoFile` is the raw picked/
+  // captured File (validated, not yet processed); `wodPhotoPreviewUrl` an
+  // object URL for the pre-save preview only (revoked on reset); saving with
+  // no photo selected leaves every one of these at its initial value and
+  // touches none of the code below that reads them - the no-photo save path
+  // is byte-identical to before this phase.
+  const [wodPhotoFile, setWodPhotoFile] = useState(null)
+  const [wodPhotoPreviewUrl, setWodPhotoPreviewUrl] = useState(null)
+  const [wodPhotoUploading, setWodPhotoUploading] = useState(false)
   const [workoutSharePopup, setWorkoutSharePopup] = useState(null)
   const [wodTip, setWodTip] = useState('AMRAP')
   const [wodFormatConfig, setWodFormatConfig] = useState({})
@@ -8372,6 +8384,46 @@ function App() {
     setAvatarUploading(false)
   }
 
+  // PHOTO RESULT / SHARE CARD Phase 1 - picking/taking a photo only ever
+  // updates LOCAL draft state (wodPhotoFile + a preview object URL); nothing
+  // is uploaded or persisted until saveWodLog's own photo-attach step runs,
+  // AFTER the WOD result itself has already saved successfully (owner
+  // save-contract, §"SAVE CONTRACT — APPROVED"). Mirrors uploadAvatar's own
+  // "validate with a clear message before any network call" pattern
+  // (validatePhotoFile), but never calls Storage here.
+  const pickWodPhoto = (file) => {
+    if (!file) return
+    const check = validatePhotoFile(file)
+    if (!check.valid) {
+      const reasonToast = check.reason === 'heic' ? t.toastWodPhotoHeicUnsupported
+        : check.reason === 'too-large' ? t.toastWodPhotoTooLarge
+        : t.toastWodPhotoWrongType
+      showToast(reasonToast)
+      return
+    }
+    setWodPhotoPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file) })
+    setWodPhotoFile(file)
+  }
+
+  const clearWodPhoto = () => {
+    setWodPhotoPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null })
+    setWodPhotoFile(null)
+  }
+
+  // PHOTO RESULT / SHARE CARD Phase 1 - thin wrapper over the testable,
+  // injectable attachWodLogPhoto (photoProcessing.js): supplies the REAL
+  // supabase client + this member's own gym/member ids. Called ONLY after
+  // the WOD result row already exists (savedWodLogId is real). Never throws
+  // to the caller - always resolves, success or failure, so a photo problem
+  // can never look like (or cause) a lost/corrupted WOD result (owner
+  // invariant: "PHOTO FAILURE must never lose/corrupt the WOD result").
+  // One row per wod_log_id is enforced at the DB level (UNIQUE constraint);
+  // `upsert: true` on the Storage write mirrors uploadAvatar's own replace
+  // semantics for the (rare) retry-after-partial-failure case.
+  const attachWodPhoto = (file, savedWodLogId) => attachWodLogPhoto({
+    supabase, file, gymId: userProfile.gym_id, memberId: user.id, wodLogId: savedWodLogId,
+  })
+
   const checkAdmin = async () => {
     const { data } = await supabase.from('admins').select('id').eq('id', user.id)
     setIsAdmin(data && data.length > 0)
@@ -9094,9 +9146,25 @@ function App() {
   const goTimer = () => { setPrevScreen(screen); setScreen('timer') }
 
   const stergeWodLog = async (id) => {
+    // PHOTO RESULT / SHARE CARD Phase 1 - ON DELETE CASCADE already removes
+    // the wod_log_media DB row the instant the wod_logs delete below
+    // succeeds; it cannot reach into Supabase Storage (Phase 0 forensic
+    // §11/§15 - disclosed, not hidden). Read the (possible) photo's path
+    // BEFORE deleting the log, delete the log FIRST (a result is never left
+    // half-deleted waiting on a photo cleanup step), then best-effort remove
+    // the now-orphaned Storage object - a failure here is logged only, never
+    // shown to the athlete, and never blocks/reverts the log deletion that
+    // already succeeded.
+    const { data: media } = await supabase.from('wod_log_media').select('storage_path').eq('wod_log_id', id).maybeSingle()
     const { error } = await supabase.from('wod_logs').delete().eq('id', id)
     if (error) { showToast(t.toastDeleteWorkoutError); console.error(error) }
-    else { showToast(t.toastWorkoutDeleted); await fetchWodLogs() }
+    else {
+      showToast(t.toastWorkoutDeleted); await fetchWodLogs()
+      if (media?.storage_path) {
+        const { error: rmErr } = await supabase.storage.from('wod-photos').remove([media.storage_path])
+        if (rmErr) console.error(rmErr)
+      }
+    }
   }
 
   const stergeSkillLog = async (id) => {
@@ -9508,7 +9576,14 @@ function App() {
     const monoLoggedAt = wodIdPtSalvare
       ? await resolveMonotonicLoggedAt(supabase, { memberId: user.id, wodId: wodIdPtSalvare, sectionId: sectionIdV2, base: baseLoggedAt, excludeId: null })
       : (loggedAt || null)
-    const { error } = await supabase.from('wod_logs').insert({
+    // PHOTO RESULT / SHARE CARD Phase 1 - .select('id').single() is the ONLY
+    // change to this insert's own shape (verified safe: no trigger on
+    // wod_logs keys off id being server- vs already-known; the SELECT RLS
+    // policy this depends on, gym_id = my_gym_id(), is already satisfied by
+    // the row we just inserted with our own gym_id). Needed ONLY so a
+    // photo, if one was picked, can be attached to the correct row afterward
+    // - the WOD result itself saves exactly as before either way.
+    const { data: savedWodLogRow, error } = await supabase.from('wod_logs').insert({
       member_id: user.id, gym_id: userProfile.gym_id, wod_id: wodIdPtSalvare,
       workout_section_id: sectionIdV2,
       variant_level: tipSalvat,
@@ -9518,7 +9593,7 @@ function App() {
       ...(performedToSave ? { performed_prescription: performedToSave } : {}),
       ...(monoLoggedAt ? { logged_at: monoLoggedAt } : {}),
       ...logFields,
-    })
+    }).select('id').single()
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
@@ -9587,6 +9662,23 @@ function App() {
       setVariantaAleasa(null); setWodMiscariCustom(null)
       setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
+      // PHOTO RESULT / SHARE CARD Phase 1 - runs ONLY after the WOD result
+      // above is already fully saved, the toast shown, and the screen/state
+      // already advanced. A photo failure here can only ever surface its OWN
+      // separate warning toast - it can never reopen, block, or undo
+      // anything that already happened (owner save contract). No photo
+      // selected -> this whole block is skipped, save behavior is
+      // byte-identical to before this phase.
+      if (wodPhotoFile && savedWodLogRow?.id) {
+        const fileToUpload = wodPhotoFile
+        clearWodPhoto()
+        setWodPhotoUploading(true)
+        const attachResult = await attachWodPhoto(fileToUpload, savedWodLogRow.id)
+        setWodPhotoUploading(false)
+        if (!attachResult.success) showToast(t.toastWodPhotoSaveFailed)
+      } else {
+        clearWodPhoto()
+      }
     }
     setWodSaving(false)
   }
@@ -11804,6 +11896,39 @@ function App() {
                   <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder}
                     style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.border}`, fontSize: '13px', background: '#fff', boxSizing: 'border-box' }} />
                 </div>
+
+                {/* PHOTO RESULT / SHARE CARD Phase 1 - fresh-save only (not
+                    editLogId - out of this phase's scope). Purely optional:
+                    no selection here changes nothing about saveWodLog's own
+                    behavior (verified in inc19PhotoResultPhase1.test.js and
+                    by inspection of the save-path edits above). */}
+                {!editLogId && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodPhotoLabel}</div>
+                    {wodPhotoPreviewUrl ? (
+                      <div style={{ position: 'relative', width: '96px', height: '96px' }}>
+                        <img src={wodPhotoPreviewUrl} alt="" style={{ width: '96px', height: '96px', borderRadius: '12px', objectFit: 'cover', display: 'block' }} />
+                        <button onClick={clearWodPhoto} aria-label={t.logWodPhotoRemove}
+                          style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '11px', border: 'none', background: '#0E0E0E', color: '#fff', fontSize: '12px', lineHeight: '22px', textAlign: 'center', cursor: 'pointer', padding: 0 }}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <label style={{ flex: 1, textAlign: 'center', padding: '12px', borderRadius: '12px', border: `1px dashed ${COLORS.border}`, fontSize: '13px', color: '#0E0E0E', cursor: 'pointer', background: '#fff' }}>
+                          {t.logWodTakePhoto}
+                          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                            onChange={(e) => { pickWodPhoto(e.target.files?.[0] || null); e.target.value = '' }} />
+                        </label>
+                        <label style={{ flex: 1, textAlign: 'center', padding: '12px', borderRadius: '12px', border: `1px dashed ${COLORS.border}`, fontSize: '13px', color: '#0E0E0E', cursor: 'pointer', background: '#fff' }}>
+                          {t.logWodUploadPhoto}
+                          <input type="file" accept="image/*" style={{ display: 'none' }}
+                            onChange={(e) => { pickWodPhoto(e.target.files?.[0] || null); e.target.value = '' }} />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button onClick={saveWodLog} disabled={wodSaving}
                   style={{ width: '100%', padding: '14px', marginTop: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: wodSaving ? 'not-allowed' : 'pointer', opacity: wodSaving ? 0.6 : 1 }}>

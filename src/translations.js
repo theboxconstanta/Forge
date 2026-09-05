@@ -530,6 +530,10 @@ export const TRANSLATIONS = {
     composerScoreNoteChainedTotalReps: 'Scor: suma repetărilor din toate etapele.',
     logWodNoteLabel: 'NOTE',
     logWodNotePlaceholder: 'Cum te-ai simțit?',
+    logWodPhotoLabel: 'POZĂ (opțional)',
+    logWodTakePhoto: '📷 Fă poză',
+    logWodUploadPhoto: '🖼️ Încarcă poză',
+    logWodPhotoRemove: 'Șterge poza',
     logWodSaving: 'Se salvează...',
     logWodSaveEdit: 'Salvează modificările',
     logWodSaveNew: 'Salvează WOD',
@@ -765,6 +769,10 @@ export const TRANSLATIONS = {
     toastAvatarUploadError: '❌ Eroare la upload!',
     toastAvatarTooLarge: '❌ Imaginea e prea mare (max 5MB) - alege una mai mică!',
     toastAvatarWrongType: '❌ Trebuie să fie o poză, nu un video sau alt tip de fișier!',
+    toastWodPhotoWrongType: '❌ Trebuie să fie o poză, nu un video sau alt tip de fișier!',
+    toastWodPhotoTooLarge: '❌ Imaginea e prea mare - alege una mai mică!',
+    toastWodPhotoHeicUnsupported: '❌ Acest format de poză (HEIC) nu este acceptat - schimbă formatul camerei sau alege altă poză!',
+    toastWodPhotoSaveFailed: '⚠️ Rezultatul a fost salvat, dar poza nu s-a putut încărca. Poți încerca din nou din Jurnal.',
     toastAvatarUpdated: '✓ Poză de profil actualizată!',
 
     // Timer
@@ -1739,6 +1747,10 @@ export const TRANSLATIONS = {
     composerScoreNoteChainedTotalReps: 'Score: total reps across all stages.',
     logWodNoteLabel: 'NOTES',
     logWodNotePlaceholder: 'How did you feel?',
+    logWodPhotoLabel: 'PHOTO (optional)',
+    logWodTakePhoto: '📷 Take Photo',
+    logWodUploadPhoto: '🖼️ Upload Photo',
+    logWodPhotoRemove: 'Remove photo',
     logWodSaving: 'Saving...',
     logWodSaveEdit: 'Save changes',
     logWodSaveNew: 'Save WOD',
@@ -1971,6 +1983,10 @@ export const TRANSLATIONS = {
     toastAvatarUploadError: '❌ Error uploading!',
     toastAvatarTooLarge: '❌ Image is too large (max 5MB) - pick a smaller one!',
     toastAvatarWrongType: "❌ It needs to be a photo, not a video or another file type!",
+    toastWodPhotoWrongType: "❌ It needs to be a photo, not a video or another file type!",
+    toastWodPhotoTooLarge: '❌ Image is too large - pick a smaller one!',
+    toastWodPhotoHeicUnsupported: "❌ This photo format (HEIC) isn't supported - change your camera format or pick a different photo!",
+    toastWodPhotoSaveFailed: "⚠️ Your result was saved, but the photo couldn't upload. You can try again from Journal.",
     toastAvatarUpdated: '✓ Profile picture updated!',
 
     // Timer
