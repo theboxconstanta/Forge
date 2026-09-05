@@ -93,6 +93,8 @@ import UniversalScoreInput from './UniversalScoreInput'
 import { validatePhotoFile, attachWodLogPhoto } from './photoProcessing'
 import { extractWodLogMedia, getWodLogPhotoSignedUrl, resolveJustAttachedPhotoUrl } from './wodLogMedia'
 import PhotoResultCard from './PhotoResultCard'
+import { buildShareFilename } from './photoResultCardExport.jsx'
+import { sharePhotoResultCardImage } from './photoResultCardShare'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
 // name part and the trailing "@ x" prescription part, for the right-aligned
@@ -6308,9 +6310,10 @@ function RecentBenchmarkProgressSection({ progress, onSelectBenchmark, t, lang }
 // §17 - no bulk signed-URL generation, no N+1 metadata query, the metadata
 // itself already arrived batched with the log list via fetchWodLogs' own
 // `wod_log_media(storage_path)` embed).
-function JurnalPhotoResult({ storagePath, ...cardProps }) {
+function JurnalPhotoResult({ storagePath, showToast, ...cardProps }) {
   const [photoUrl, setPhotoUrl] = useState(null)
   const [unavailable, setUnavailable] = useState(false)
+  const [sharePending, setSharePending] = useState(false)
   useEffect(() => {
     let cancelled = false
     setPhotoUrl(null); setUnavailable(false)
@@ -6325,14 +6328,41 @@ function JurnalPhotoResult({ storagePath, ...cardProps }) {
   // this component stand in as the safe fallback (owner §15), never an
   // empty/broken result surface.
   if (unavailable) return null
+  // PHOTO RESULT CARD Phase 3 §25 - Journal already has every canonical
+  // frozen field this needs (the SAME props already used to render the
+  // card itself, sourced from frozen provenance/section snapshots, never
+  // today's mutable workout - owner §26). Same shared export/share helper
+  // as the post-save popup - no second export implementation.
+  const journalTextFallback = async () => {
+    const text = [cardProps.gymName, cardProps.headline || cardProps.structureHeader?.primary, cardProps.movements?.join(', '), cardProps.resultText]
+      .filter(Boolean).join('\n')
+    if (navigator.share) { try { await navigator.share({ text }) } catch { /* userul a anulat share-ul */ } }
+    else if (navigator.clipboard) { await navigator.clipboard.writeText(text) }
+  }
+  const handleShare = async () => {
+    if (sharePending) return
+    setSharePending(true)
+    try {
+      const result = await sharePhotoResultCardImage({
+        cardProps: { ...cardProps, photoUrl },
+        filename: buildShareFilename(cardProps.loggedAt ? new Date(cardProps.loggedAt) : new Date()),
+        shareText: [cardProps.gymName, 'FORGE'].filter(Boolean).join(' · '),
+        onTextFallback: journalTextFallback,
+      })
+      if (result.outcome === 'downloaded') showToast?.(cardProps.t?.toastPhotoShareSavedInstead)
+      else if (result.outcome === 'download-failed' || result.outcome === 'render-failed') showToast?.(cardProps.t?.toastPhotoShareTextFallback)
+    } finally {
+      setSharePending(false)
+    }
+  }
   return (
     <div style={{ marginBottom: '12px' }}>
-      <PhotoResultCard photoUrl={photoUrl} onPhotoError={() => setUnavailable(true)} {...cardProps} />
+      <PhotoResultCard photoUrl={photoUrl} onPhotoError={() => setUnavailable(true)} {...cardProps} onShare={handleShare} sharePending={sharePending} />
     </div>
   )
 }
 
-function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym }) {
+function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym, showToast }) {
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6542,7 +6572,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                       {photoMedia && (
                         <JurnalPhotoResult
-                          storagePath={photoMedia.storagePath}
+                          storagePath={photoMedia.storagePath} showToast={showToast}
                           gymName={gym?.name} gymColor={gym?.primaryColor}
                           variantLevel={w.variant_level || null}
                           notRxdLabel={notRxdLabelLog}
@@ -6901,8 +6931,9 @@ function NotRxdBadge({ t, compact, variant }) {
 // 'unavailable' (upload/signed-URL/image-load failure) always render the
 // ORIGINAL plain white card, byte-identical to before this phase (owner
 // §21 no-photo regression).
-function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
+function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
   const [imgFailed, setImgFailed] = useState(false)
+  const [sharePending, setSharePending] = useState(false)
   useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
   const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader } = data
@@ -6918,11 +6949,39 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
     '',
     t.shareCardCongrats,
   ].filter(Boolean).join('\n')
-  const handleShare = async () => {
+  // PHOTO RESULT CARD Phase 3 - the ORIGINAL text-only share (unchanged)
+  // now serves only as the last-resort fallback (owner §14 tier C) when
+  // the photo card itself cannot be rendered into an image at all - never
+  // the primary path for a photo result any more.
+  const shareTextFallback = async () => {
     if (navigator.share) {
       try { await navigator.share({ text: shareText }) } catch { /* userul a anulat share-ul - nimic de facut */ }
     } else if (navigator.clipboard) {
       await navigator.clipboard.writeText(shareText)
+    }
+  }
+  const handleSharePhotoCard = async () => {
+    if (sharePending) return
+    setSharePending(true)
+    try {
+      const result = await sharePhotoResultCardImage({
+        cardProps: {
+          photoUrl: photoState === 'ready' ? photoUrl : null,
+          gymName: gym.name, gymColor: gym.primaryColor,
+          variantLevel, notRxdLabel,
+          structureHeader, headline: composeWorkoutHeadline(structureHeader, movements, t),
+          movements, resultText, loggedAt, lang, t,
+        },
+        filename: buildShareFilename(new Date(loggedAt)),
+        shareText: [gym.name, 'FORGE'].filter(Boolean).join(' · '),
+        onTextFallback: shareTextFallback,
+      })
+      if (result.outcome === 'downloaded') showToast(t.toastPhotoShareSavedInstead)
+      else if (result.outcome === 'download-failed' || result.outcome === 'render-failed') showToast(t.toastPhotoShareTextFallback)
+      // 'shared' and 'cancelled' need no toast - a completed native share
+      // is self-evident, and a user cancel is never an error (owner §16).
+    } finally {
+      setSharePending(false)
     }
   }
   // Same isRx check as NotRxdBadge - the photo overlay needs the resolved
@@ -6942,7 +7001,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
             variantLevel={variantLevel} notRxdLabel={notRxdLabel}
             structureHeader={structureHeader} headline={composeWorkoutHeadline(structureHeader, movements, t)}
             movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
-            onShare={handleShare}
+            onShare={handleSharePhotoCard} sharePending={sharePending}
             onClose={onClose}
           />
         ) : (
@@ -6980,7 +7039,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
                 {dataObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dataObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
               </div>
               <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '22px' }}>{t.shareCardCongrats}</div>
-              <button onClick={handleShare}
+              <button onClick={shareTextFallback}
                 style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
               </button>
@@ -10652,7 +10711,7 @@ function App() {
         </span>
       </div>
 
-      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={myGym} />
+      <WorkoutSharePopup data={workoutSharePopup} onClose={() => setWorkoutSharePopup(null)} t={t} lang={lang} gym={myGym} showToast={showToast} />
 
       {gymBlocked && !isPlatformAdmin && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -11712,7 +11771,7 @@ function App() {
               </div>
             </div>
             <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
-            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang} gym={myGym}
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang} gym={myGym} showToast={showToast}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')

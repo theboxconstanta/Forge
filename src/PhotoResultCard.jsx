@@ -33,6 +33,16 @@
 // (it never had one before). Per the owner's Phase 2.4 correction, Close
 // and Share are minimal floating icon buttons ("application chrome"), never
 // a large button baked into the card composition.
+//
+// PHOTO RESULT CARD Phase 3 - `exportMode` is the ONLY prop that changes
+// this component's own layout, and only to remove the `max-height: 80vh`
+// viewport-relative cap (photoResultCardExport.js renders an off-screen
+// instance at a FIXED 432x540 CSS-pixel size, so nothing here should ever
+// be clamped by the executing browser's actual window height - owner §7).
+// The export helper never passes onClose/onShare, so this same component,
+// with the same conditional rendering already in place, naturally excludes
+// all application chrome from the exported image (owner §4) - no separate
+// export-only markup branch exists.
 
 import { MapPin, Calendar, Clock, X, Share2 } from 'lucide-react'
 import { localeFor } from './utils'
@@ -44,8 +54,9 @@ export default function PhotoResultCard({
   structureHeader, // { primary, secondary, prescriptionLines } | null - resolveWorkoutStructureHeader (workoutFormats.js)
   headline, // string | null - composeWorkoutHeadline (workoutFormats.js), the top-of-card summary
   movements, resultText, loggedAt, lang, t,
-  onShare,
+  onShare, sharePending,
   onClose,
+  exportMode,
 }) {
   const dateObj = loggedAt ? new Date(loggedAt) : null
   const accent = gymColor || '#ABE73C'
@@ -56,9 +67,10 @@ export default function PhotoResultCard({
   // between them, not a collapse of the underlying axes.
   const statusText = notRxdLabel || variantLevel || null
   return (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E' }}>
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: exportMode ? 'none' : '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E' }}>
       {photoUrl ? (
-        <img src={photoUrl} alt="" onError={onPhotoError}
+        <img src={photoUrl} alt="" onError={onPhotoError} data-role="member-photo"
+          crossOrigin={exportMode ? 'anonymous' : undefined}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#1c1c1c' }} />
@@ -75,8 +87,8 @@ export default function PhotoResultCard({
           buttons, never redesigning the card to fit a large action. */}
       <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {onShare && (
-          <button onClick={onShare} aria-label={t.shareCardButton}
-            style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+          <button onClick={onShare} aria-label={t.shareCardButton} disabled={!!sharePending}
+            style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: sharePending ? 'default' : 'pointer', opacity: sharePending ? 0.55 : 1 }}>
             <Share2 size={13} strokeWidth={2.25} />
           </button>
         )}
@@ -171,7 +183,7 @@ export default function PhotoResultCard({
           {[resultText, statusText].filter(Boolean).join(' | ')}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <img src="/forge.png" alt="" style={{ height: '16px', width: '16px', borderRadius: '4px', objectFit: 'cover' }} />
+          <img src="/forge.png" alt="" data-role="forge-logo" style={{ height: '16px', width: '16px', borderRadius: '4px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '11px', letterSpacing: '1px' }}>FORGE</span>
         </div>
       </div>
