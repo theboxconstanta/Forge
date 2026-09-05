@@ -1004,17 +1004,27 @@ export function initializePerformedMetrics(capability) {
  * unknown catalog row) fails OPEN - every existing metric is preserved rather
  * than guessed away, same convention resolveMovementCapability itself uses.
  *
- * INC-15 follow-up (owner decision) - reconciliation has a second
- * responsibility: if the intersection above leaves NO performed metric at
- * all (reps included) - the two movements share nothing - the instance must
- * not end up with zero editable state. In that case (and only a KNOWN
- * capability - an unseeded/unknown target already kept everything above, so
- * this branch is never reached for it), initialize the new movement's own
- * valid metric controls via initializePerformedMetrics (the identical
- * fresh-movement seeding Add-movement already uses - one canonical
- * initialization model, not a second one), PLUS a blank `reps` when the new
- * capability counts reps - every seeded value is blank (`null`), never a
- * value carried over or converted from the incompatible old metric.
+ * INC-18 (owner decision, supersedes the INC-15 "zero-overlap only" rule) -
+ * reconciliation's second responsibility (initialize a target-capability
+ * metric that must be editable but isn't present yet) is NOT gated on the
+ * intersection being entirely empty - it applies PER METRIC GROUP,
+ * independently, regardless of how many other metrics survived:
+ *
+ *   reps, load  - independent, simultaneous-capable metrics. Each ends up
+ *                 present whenever the target capability counts it: the
+ *                 athlete's existing compatible value survives verbatim, or
+ *                 (only when genuinely absent) is initialized blank - so a
+ *                 partial-overlap substitution (e.g. reps-only -> reps+load)
+ *                 still gets its NEW required `load` control, not just a
+ *                 preserved `reps`.
+ *   distance,     the ONE mutually-exclusive quantity pair - NEVER both
+ *   calories      active at once (§ Row: Calories | Distance). Whichever the
+ *                 athlete already had survives verbatim if the target still
+ *                 allows it; the target's own canonical default is
+ *                 initialized (blank, via initializePerformedMetrics - the
+ *                 same single initialization model Add-movement shares) ONLY
+ *                 when NEITHER survives.
+ *
  * `capability` = resolveMovementCapability(targetRow). Pure. */
 export function applyPerformedSubstitution(instance, targetRow, capability) {
   const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
@@ -1024,15 +1034,29 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
     canonicalMovementId: targetRow?.id ?? null,
   }
   if (instance.sourceInstanceId != null) next.sourceInstanceId = instance.sourceInstanceId
-  if (instance.reps && (allowed.length === 0 || allowed.includes('reps'))) next.reps = instance.reps
-  for (const mk of PERFORMED_EDITABLE_METRICS) {
-    if (instance[mk] && (allowed.length === 0 || allowed.includes(mk))) next[mk] = instance[mk]
+
+  if (allowed.length === 0) {
+    // Unknown/unseeded target capability fails OPEN - preserve everything
+    // that existed, never seed, never guess.
+    if (instance.reps) next.reps = instance.reps
+    if (instance.load) next.load = instance.load
+    if (instance.distance) next.distance = instance.distance
+    if (instance.calories) next.calories = instance.calories
+  } else {
+    if (allowed.includes('reps')) next.reps = instance.reps ?? { mode: 'universal', value: null }
+    if (allowed.includes('load')) next.load = instance.load ?? { mode: 'universal', value: null, unit: 'kg' }
+    const survivor = (instance.distance && allowed.includes('distance')) ? 'distance'
+      : (instance.calories && allowed.includes('calories')) ? 'calories' : null
+    if (survivor) {
+      next[survivor] = instance[survivor]
+    } else {
+      Object.assign(next, initializePerformedMetrics({
+        allowed: allowed.filter((mk) => mk === 'distance' || mk === 'calories'),
+        default: capability.default,
+      }))
+    }
   }
-  const survivedAnyMetric = next.reps != null || PERFORMED_EDITABLE_METRICS.some((mk) => next[mk] != null)
-  if (!survivedAnyMetric && allowed.length > 0) {
-    Object.assign(next, initializePerformedMetrics(capability))
-    if (allowed.includes('reps')) next.reps = { mode: 'universal', value: null }
-  }
+
   next.substitutedFrom = instance.substitutedFrom ?? {
     canonicalMovementId: instance.canonicalMovementId ?? null,
     name: instance.name,
