@@ -935,6 +935,34 @@ export function performedIsModified(performedDoc, programmedDoc, variantKey, gen
   return !performedMatchesProgrammed(performedDoc, programmedDoc, variantKey, gender)
 }
 
+/** Seed blank canonical `load`/`distance`/`calories` specs for a capability -
+ * the SAME initialization a brand-new Add-movement entry gets. Only seeds a
+ * spec for a metric `capability.allowed` actually includes; for the ONE
+ * mutually-exclusive quantity pair (distance+calories) seeds ONLY
+ * `capability.default` (falls back to seeding both when the default is
+ * missing/invalid - never invents a pick between two undefaulted options,
+ * mirroring resolveMovementCapability's own "don't guess" convention). Never
+ * touches `reps` (structural/inherited, owned separately by each caller).
+ * Every seeded value is `null` - a valid, blank editing state, never a
+ * claimed performed value. Pure - single source of truth for both
+ * addPerformedMovement and applyPerformedSubstitution's zero-overlap case. */
+export function initializePerformedMetrics(capability) {
+  const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
+  const isDistanceCaloriesPair = allowed.includes('distance') && allowed.includes('calories')
+  const singleQuantityDefault = isDistanceCaloriesPair && (capability?.default === 'distance' || capability?.default === 'calories')
+    ? capability.default
+    : null
+  const seeded = {}
+  for (const mk of PERFORMED_EDITABLE_METRICS) {
+    if (!allowed.includes(mk)) continue
+    if (singleQuantityDefault && (mk === 'distance' || mk === 'calories') && mk !== singleQuantityDefault) continue
+    seeded[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
+      : mk === 'distance' ? { mode: 'universal', value: null, unit: 'm' }
+      : { mode: 'universal', value: null }
+  }
+  return seeded
+}
+
 /** Apply a whole-movement substitution to ONE performed instance. Keeps the
  * stable instanceId; adopts the target's canonical identity; records
  * `substitutedFrom` (the ORIGINAL identity, only on the FIRST substitution);
@@ -945,6 +973,18 @@ export function performedIsModified(performedDoc, programmedDoc, variantKey, gen
  * invented, never converted). `capability.allowed.length === 0` (an unseeded/
  * unknown catalog row) fails OPEN - every existing metric is preserved rather
  * than guessed away, same convention resolveMovementCapability itself uses.
+ *
+ * INC-15 follow-up (owner decision) - reconciliation has a second
+ * responsibility: if the intersection above leaves NO performed metric at
+ * all (reps included) - the two movements share nothing - the instance must
+ * not end up with zero editable state. In that case (and only a KNOWN
+ * capability - an unseeded/unknown target already kept everything above, so
+ * this branch is never reached for it), initialize the new movement's own
+ * valid metric controls via initializePerformedMetrics (the identical
+ * fresh-movement seeding Add-movement already uses - one canonical
+ * initialization model, not a second one), PLUS a blank `reps` when the new
+ * capability counts reps - every seeded value is blank (`null`), never a
+ * value carried over or converted from the incompatible old metric.
  * `capability` = resolveMovementCapability(targetRow). Pure. */
 export function applyPerformedSubstitution(instance, targetRow, capability) {
   const allowed = Array.isArray(capability?.allowed) ? capability.allowed : []
@@ -957,6 +997,11 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
   if (instance.reps && (allowed.length === 0 || allowed.includes('reps'))) next.reps = instance.reps
   for (const mk of PERFORMED_EDITABLE_METRICS) {
     if (instance[mk] && (allowed.length === 0 || allowed.includes(mk))) next[mk] = instance[mk]
+  }
+  const survivedAnyMetric = next.reps != null || PERFORMED_EDITABLE_METRICS.some((mk) => next[mk] != null)
+  if (!survivedAnyMetric && allowed.length > 0) {
+    Object.assign(next, initializePerformedMetrics(capability))
+    if (allowed.includes('reps')) next.reps = { mode: 'universal', value: null }
   }
   next.substitutedFrom = instance.substitutedFrom ?? {
     canonicalMovementId: instance.canonicalMovementId ?? null,
@@ -987,29 +1032,12 @@ export function addPerformedMovement(performedDoc, sourceInstanceId, targetRow, 
   if (inheritReps && srcEntry?.reps && (allowed.length === 0 || allowed.includes('reps'))) {
     added.reps = snapshotPrescriptionDoc(srcEntry.reps)
   }
-  // PERFORMED METRIC SWITCHING follow-up (2026-09-04) - distance+calories is
-  // the ONE mutually-exclusive "quantity" pair (owner contract, mirrors
-  // switchPerformedQuantityMetric's own single-metric invariant, §7 there): a
-  // fresh Add-movement entry for a distance+calories-capable row must start
-  // with ONLY the catalog default, never both - the athlete then explicitly
-  // switches if that default isn't what they actually did. Every OTHER
-  // multi-metric combo (reps+load, load+distance carries) is untouched: still
-  // seeds every allowed metric, exactly as before this follow-up. Falls back
-  // to the prior both-seeded behavior when the default is missing/invalid -
-  // resolveMovementCapability already nulls an invalid default (the
-  // established "don't guess" signal), so this never invents a pick between
-  // two valid-but-undefaulted options, and never checks a movement name.
-  const isDistanceCaloriesPair = allowed.includes('distance') && allowed.includes('calories')
-  const singleQuantityDefault = isDistanceCaloriesPair && (capability?.default === 'distance' || capability?.default === 'calories')
-    ? capability.default
-    : null
-  for (const mk of PERFORMED_EDITABLE_METRICS) {
-    if (!allowed.includes(mk)) continue
-    if (singleQuantityDefault && (mk === 'distance' || mk === 'calories') && mk !== singleQuantityDefault) continue
-    added[mk] = mk === 'load' ? { mode: 'universal', value: null, unit: 'kg' }
-      : mk === 'distance' ? { mode: 'universal', value: null, unit: 'm' }
-      : { mode: 'universal', value: null }
-  }
+  // PERFORMED METRIC SWITCHING follow-up (2026-09-04) / INC-15 - a fresh
+  // Add-movement entry seeds ONLY the target's valid metric controls, blank -
+  // initializePerformedMetrics is the ONE canonical initialization model
+  // (shared with applyPerformedSubstitution's zero-overlap case), including
+  // the distance+calories mutually-exclusive single-default rule.
+  Object.assign(added, initializePerformedMetrics(capability))
   let lastIdx = -1
   movements.forEach((m, i) => { if ((m.sourceInstanceId ?? m.instanceId) === sourceInstanceId) lastIdx = i })
   const next = movements.slice()

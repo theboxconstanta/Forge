@@ -45,8 +45,11 @@ describe('INC-15 - owner-named real-movement examples', () => {
     const next = applyPerformedSubstitution(instance, { id: 'cm-row', name: 'Row' }, capCalDist)
     expect(next.reps).toBeUndefined()
     expect(next.load).toBeUndefined()
-    expect(next.calories).toBeUndefined() // not invented - athlete never had it
-    expect(next.distance).toBeUndefined() // not invented - athlete never had it
+    // INC-15 follow-up: zero overlap -> initialize the new movement's own
+    // valid (blank) state instead of leaving no editable control at all.
+    // See inc16MovementSubstitutionInitialization.test.js for full coverage.
+    expect(next.calories).toEqual({ mode: 'universal', value: null })
+    expect(next.distance).toBeUndefined()
     expect(next.name).toBe('Row')
     expect(next.substitutedFrom).toEqual({ canonicalMovementId: 'cm-cj', name: 'Clean & Jerk' })
   })
@@ -73,25 +76,12 @@ describe('INC-15 - owner-named real-movement examples', () => {
     expect(next.distance).toEqual({ mode: 'universal', value: 250, unit: 'm' })
   })
 
-  it('Row (250 m) -> Clean & Jerk: distance removed; no reps/load invented from an incompatible prior metric', () => {
+  it('Row (250 m) -> Clean & Jerk: distance removed; zero overlap -> fresh blank reps+load controls initialized, no value carried/converted', () => {
     const instance = { instanceId: 'mi_1', name: 'Row', distance: { mode: 'universal', value: 250, unit: 'm' } }
     const next = applyPerformedSubstitution(instance, { id: 'cm-cj', name: 'Clean & Jerk' }, capRepsLoad)
     expect(next.distance).toBeUndefined()
-    // Per applyPerformedSubstitution's documented contract ("never invent a
-    // metric the athlete did not already have"), no fresh reps/load spec is
-    // seeded here either - the instance ends with zero quantity metrics.
-    // NOTE (flagged, not fixed here): PerformedEditRow only renders an input
-    // box for a metric already present on the instance (`presentMetrics =
-    // PERFORMED_EDITABLE_METRICS.filter(k => inst[k])`), so a substitution
-    // whose target capability shares NOTHING with the source's prior metrics
-    // currently leaves NO editable control visible at all - the athlete would
-    // need Delete + "+ Add movement" (which DOES seed a fresh blank metric)
-    // to enter a value for Clean & Jerk here. This is a separate, pre-existing
-    // UX question (Change Movement = preserve-compatible-only vs Add Movement
-    // = seed-fresh) that this incident's invariant does not resolve either
-    // way - reported, not silently decided.
-    expect(next.reps).toBeUndefined()
-    expect(next.load).toBeUndefined()
+    expect(next.reps).toEqual({ mode: 'universal', value: null })
+    expect(next.load).toEqual({ mode: 'universal', value: null, unit: 'kg' })
   })
 })
 
@@ -103,21 +93,21 @@ describe('INC-15 - future-proof: synthetic catalog fixtures, capability-driven n
   const movementA = resolveMovementCapability({ allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'reps' })
   const movementB = resolveMovementCapability({ allowed_prescription_metrics: ['calories', 'distance'], default_prescription_metric: 'calories' })
 
-  it('A (reps+load) -> B (calories+distance): both A-only metrics cleared, nothing invented', () => {
+  it('A (reps+load) -> B (calories+distance): both A-only metrics cleared, B fresh state initialized blank', () => {
     const instance = { instanceId: 'mi_x', name: 'Synthetic Movement A', reps: { mode: 'universal', value: 15 }, load: { mode: 'universal', value: 20, unit: 'kg' } }
     const next = applyPerformedSubstitution(instance, { id: 'synthetic-b', name: 'Synthetic Movement B' }, movementB)
     expect(next.reps).toBeUndefined()
     expect(next.load).toBeUndefined()
-    expect(next.calories).toBeUndefined()
+    expect(next.calories).toEqual({ mode: 'universal', value: null }) // movementB's own default
     expect(next.distance).toBeUndefined()
   })
 
-  it('B (calories+distance) -> A (reps+load): both B-only metrics cleared, nothing invented', () => {
+  it('B (calories+distance) -> A (reps+load): both B-only metrics cleared, A fresh state initialized blank', () => {
     const instance = { instanceId: 'mi_x', name: 'Synthetic Movement B', calories: { mode: 'universal', value: 30 } }
     const next = applyPerformedSubstitution(instance, { id: 'synthetic-a', name: 'Synthetic Movement A' }, movementA)
     expect(next.calories).toBeUndefined()
-    expect(next.reps).toBeUndefined()
-    expect(next.load).toBeUndefined()
+    expect(next.reps).toEqual({ mode: 'universal', value: null })
+    expect(next.load).toEqual({ mode: 'universal', value: null, unit: 'kg' }) // movementA's capability includes load too
   })
 
   it('a movement NEVER SEEN BEFORE (arbitrary id/name) still reconciles correctly from its capability alone - no editor/source change required for a new catalog entry', () => {
