@@ -9312,9 +9312,20 @@ function App() {
       // counts, blank does not (never numeric truthiness).
       const seqAmrapAreContiutSectiune = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
         && hasSequentialAmrapInput(wodPartialReps)
+      // INC-13 - a plain sequential For Time/Chipper/Ladder (NOT Sequence AMRAP)
+      // logs "Did not finish" the same way: per-movement partials in
+      // wodPartialReps, Time cleared to '' (TimeScoreBlock's capped toggle) -
+      // composeWodLogFieldsInner's `useReps && isSequential` branch already
+      // derives the frozen result from exactly this state. The legacy guard only
+      // recognized the Sequence-AMRAP subtype above, so a fully-logged capped
+      // For Time ("21/21, 21/21, 15/15, 15/15, 9/9, 1/9") was rejected as empty.
+      // Same shared helper, gated on Time being empty - once a real Time exists
+      // wodTime.trim() already satisfies areContiutSectiune and this is moot.
+      const seqPartialAreContiutSectiune = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
+        && !wodTime.trim() && hasSequentialAmrapInput(wodPartialReps)
       const areContiutSectiune = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim()
         || Object.keys(wodSets).length > 0 || wodCompleted || wodWeightLogged.trim() || chainedAreContiutSectiune
-        || seqAmrapAreContiutSectiune
+        || seqAmrapAreContiutSectiune || seqPartialAreContiutSectiune
       if (!areContiutSectiune) { showToast(t.toastFillResultOrTime); return }
       setWodSaving(true)
       const sectionHeaderLine = `${logTargetSection.format || ''}${logTargetSection.title ? ' — "' + logTargetSection.title + '"' : ''}`.trim()
@@ -9364,8 +9375,19 @@ function App() {
     // (never numeric truthiness - INC-11.1 §7).
     const seqAmrapAreContiut = isSequentialAmrap(activeLogFormatId, activeLogFormatConfig)
       && hasSequentialAmrapInput(wodPartialReps)
+    // INC-13 - a plain sequential For Time/Chipper/Ladder (NOT Sequence AMRAP)
+    // logs "Did not finish" the same way: per-movement partials in
+    // wodPartialReps, Time cleared to '' (TimeScoreBlock's capped toggle) -
+    // composeWodLogFieldsInner's `useReps && isSequential` branch already
+    // derives the frozen result from exactly this state. The legacy guard only
+    // recognized the Sequence-AMRAP subtype above, so a fully-logged capped
+    // For Time ("21/21, 21/21, 15/15, 15/15, 9/9, 1/9") was rejected as empty.
+    // Same shared helper, gated on Time being empty - once a real Time exists
+    // wodTime.trim() already satisfies areContiut and this is moot.
+    const seqPartialAreContiut = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
+      && !wodTime.trim() && hasSequentialAmrapInput(wodPartialReps)
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
-      || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut || seqAmrapAreContiut
+      || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut || seqAmrapAreContiut || seqPartialAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     // P9.5.8 / P9.5.8.1 - DEFENSIVE SAVE GUARD, ROLE-INDEPENDENT. A logged
