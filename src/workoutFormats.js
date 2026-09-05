@@ -1252,6 +1252,34 @@ export function resolveWorkoutStructureHeader(formatId, config, t, legacyDuratio
   }
 }
 
+// PHOTO RESULT CARD Phase 2.4 - the compact TOP-OF-CARD headline ("5 RFT:
+// 200m Run, 20 Air Squats, 20 Push-Ups, and 1 more"), a PRESENTATION-ONLY
+// truncated summary - never a second workout parser. Combines exactly two
+// already-canonical, already-resolved pieces the caller passes in:
+// `resolveWorkoutStructureHeader`'s own output (format/structure) and the
+// SAME performed-aware movement line list already shown lower on the card
+// (resolveResultMovementLines) - it reads neither wods nor wod_logs itself,
+// and never re-parses a movement string.
+//
+// No canonical "bare movement name" (without its reps/load) projection
+// exists anywhere in the codebase (audited: resultWorkoutLines.js exposes
+// only full display LINES) - inventing one here would BE the "second
+// parser" the owner explicitly prohibits, so this headline reuses the
+// movement lines EXACTLY as already resolved, reps/load included. This is
+// a disclosed, deliberate difference from the owner's illustrative mockup
+// text (which showed bare names) - see the Phase 2.4 report.
+export function composeWorkoutHeadline(structureHeader, movementLines, t, maxMovements = 3) {
+  if (!structureHeader) return null
+  const formatLabel = structureHeader.secondary ? `${structureHeader.primary} ${structureHeader.secondary}` : structureHeader.primary
+  const lines = movementLines || []
+  if (lines.length === 0) return formatLabel
+  const shown = lines.slice(0, maxMovements)
+  const remaining = lines.length - shown.length
+  const parts = [...shown]
+  if (remaining > 0) parts.push(t?.photoCardAndMore ? t.photoCardAndMore(remaining) : `and ${remaining} more`)
+  return `${formatLabel}: ${parts.join(', ')}`
+}
+
 // Eticheta scurta a formatului, cu numarul de runde/tinta inclus acolo unde
 // e conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time, "5RM"),
 // nu doar formatId urmat separat de un rand generic "Numar runde: 5"

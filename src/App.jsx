@@ -53,7 +53,7 @@ import {
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
-  resolveWorkoutStructureHeader,
+  resolveWorkoutStructureHeader, composeWorkoutHeadline,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -6547,6 +6547,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                           variantLevel={w.variant_level || null}
                           notRxdLabel={notRxdLabelLog}
                           structureHeader={structureHeaderLog}
+                          headline={structureHeaderLog ? composeWorkoutHeadline(structureHeaderLog, cardMovementLines, t) : null}
                           movements={cardMovementLines} resultText={areRezultatFinal ? rezultatBucati.join(' · ') : null}
                           loggedAt={w.logged_at} lang={lang} t={t}
                         />
@@ -6939,9 +6940,9 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
             onPhotoError={() => setImgFailed(true)}
             gymName={gym.name} gymColor={gym.primaryColor}
             variantLevel={variantLevel} notRxdLabel={notRxdLabel}
-            structureHeader={structureHeader}
+            structureHeader={structureHeader} headline={composeWorkoutHeadline(structureHeader, movements, t)}
             movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
-            congratsText={t.shareCardCongrats} onShare={handleShare} shareLabel={t.shareCardButton}
+            onShare={handleShare}
             onClose={onClose}
           />
         ) : (

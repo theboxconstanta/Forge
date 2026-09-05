@@ -8,27 +8,20 @@ const baseProps = {
   gymName: 'CrossFit Delta', gymColor: '#3355FF',
   variantLevel: 'RX', notRxdLabel: null,
   structureHeader: { primary: '5 RFT', secondary: null, prescriptionLines: [] },
-  movements: ['200 m Run', '20 Air Squats', '20 Push-Ups', '20 Lunges'],
-  resultText: '5 rounds complete · 12:00',
+  headline: '5 RFT: 200m Run, 20 Air Squats, 20 Push-Ups, and 1 more',
+  movements: ['200m Run', '20 Air Squats', '20 Push-Ups', '20 Lunges'],
+  resultText: '12:00',
   loggedAt: '2026-09-05T17:00:00.000Z',
   lang: 'en',
-  t: { shareCardCloseLabel: 'Close' },
+  t: { shareCardCloseLabel: 'Close', shareCardButton: 'Share' },
 }
 
-// The FORGE logo (§22) is always present in the header, so every test that
-// needs the actual PHOTO <img> must select it specifically, not just "the
-// first <img> in the DOM".
+// The FORGE logo (§26) always sits in the bottom bar, so any test needing
+// the actual PHOTO <img> must select it specifically.
 const getPhotoImg = (container) => [...container.querySelectorAll('img')].find(img => img.getAttribute('src') !== '/forge.png')
 
-describe('PhotoResultCard - owner Phase 2.2 final visual contract', () => {
-  it('renders a solid black header with the canonical FORGE logo asset and FORGE wordmark (§2/§22)', () => {
-    const { container } = render(<PhotoResultCard {...baseProps} />)
-    const logo = [...container.querySelectorAll('img')].find(img => img.getAttribute('src') === '/forge.png')
-    expect(logo).toBeTruthy()
-    expect(screen.getByText('FORGE')).toBeInTheDocument()
-  })
-
-  it('renders the photo as the full body hero image when a URL is given, with no distortion (object-fit: cover)', () => {
+describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () => {
+  it('renders the member\'s own photo as the full-body hero, no distortion (object-fit: cover) - §1/§5', () => {
     const { container } = render(<PhotoResultCard {...baseProps} />)
     const img = getPhotoImg(container)
     expect(img).toBeTruthy()
@@ -36,106 +29,133 @@ describe('PhotoResultCard - owner Phase 2.2 final visual contract', () => {
     expect(img.style.objectFit).toBe('cover')
   })
 
+  it('never applies a grayscale/desaturate filter - the original color photo remains visible under the scrim (§4/§29/§43)', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} />)
+    const img = getPhotoImg(container)
+    expect(img.style.filter).toBe('')
+    const html = container.innerHTML
+    expect(html).not.toMatch(/grayscale/i)
+    expect(html).not.toMatch(/saturate\(0/i)
+  })
+
   it('renders a skeleton placeholder, not a broken photo <img>, while photoUrl is null (still loading)', () => {
     const { container } = render(<PhotoResultCard {...baseProps} photoUrl={null} />)
     expect(getPhotoImg(container)).toBeUndefined()
   })
 
-  it('calls onPhotoError when the photo image fails to load - never crashes, never swallows the failure', () => {
+  it('calls onPhotoError when the photo image fails to load', () => {
     const onPhotoError = vi.fn()
     const { container } = render(<PhotoResultCard {...baseProps} onPhotoError={onPhotoError} />)
     fireEvent.error(getPhotoImg(container))
     expect(onPhotoError).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the dynamic gym name and never hardcodes a tenant name/color (§2/§3/§23 - synthetic tenant test)', () => {
-    const { rerender } = render(<PhotoResultCard {...baseProps} gymName="CrossFit Delta" gymColor="#3355FF" />)
-    expect(screen.getByText('CrossFit Delta')).toBeInTheDocument()
-    expect(screen.queryByText('CrossFit C15')).toBeNull()
-    expect(screen.queryByText('ThePACK')).toBeNull()
-    rerender(<PhotoResultCard {...baseProps} gymName="ThePACK" gymColor="#FF00AA" />)
-    expect(screen.getByText('ThePACK')).toBeInTheDocument()
-    expect(screen.queryByText('CrossFit Delta')).toBeNull()
-  })
-
-  it('uses gyms.primary_color (not a hardcoded lime) as the accent for the result and gym name', () => {
-    render(<PhotoResultCard {...baseProps} gymColor="#3355FF" />)
-    expect(screen.getByText('CrossFit Delta')).toHaveStyle({ color: '#3355FF' })
-    expect(screen.getByText('5 rounds complete · 12:00')).toHaveStyle({ color: '#3355FF' })
-  })
-
-  it('falls back to the existing lime accent when no gyms.primary_color is configured', () => {
-    render(<PhotoResultCard {...baseProps} gymColor={null} />)
-    expect(screen.getByText('5 rounds complete · 12:00')).toHaveStyle({ color: '#ABE73C' })
-  })
-
-  it('renders RX/variant status and a secondary Not RX\'d/Modified pill only when the caller supplies one (§6 - axes stay separate)', () => {
-    const { rerender } = render(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel={null} />)
-    expect(screen.getByText('RX')).toBeInTheDocument()
-    expect(screen.queryByText("Not RX'd")).toBeNull()
-    rerender(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel="Not RX'd" />)
-    expect(screen.getByText('RX')).toBeInTheDocument()
-    expect(screen.getByText("Not RX'd")).toBeInTheDocument()
-  })
-
-  it('renders the full workout structural header + prescription lines directly under RX, and the movement lines below that (§7/§10)', () => {
-    render(<PhotoResultCard {...baseProps}
-      structureHeader={{ primary: 'Intervals', secondary: '12:00', prescriptionLines: ['5 Rounds'] }}
-    />)
-    expect(screen.getByText('Intervals')).toBeInTheDocument()
-    expect(screen.getByText('12:00')).toBeInTheDocument()
-    expect(screen.getByText('5 Rounds')).toBeInTheDocument()
-    expect(screen.getByText('200 m Run')).toBeInTheDocument()
-    expect(screen.getByText('20 Air Squats')).toBeInTheDocument()
-  })
-
-  it('renders no structural header block when the caller passes null (e.g. a free-text log with no linked format)', () => {
-    const { container } = render(<PhotoResultCard {...baseProps} structureHeader={null} movements={[]} />)
-    expect(container.textContent).not.toContain('RFT')
-  })
-
-  it('never mutates the canonical result string - it is passed through verbatim, only styled via CSS (§13)', () => {
-    render(<PhotoResultCard {...baseProps} resultText="5 rounds complete · 12:00" />)
-    // exact original-case text node exists in the DOM; only the CSS
-    // text-transform (not asserted here, jsdom doesn't compute layout CSS)
-    // presents it uppercase on screen.
-    expect(screen.getByText('5 rounds complete · 12:00')).toBeInTheDocument()
-  })
-
-  it('renders white date/time under the result', () => {
+  it('renders no separate black header and no white footer - the card is one continuous element with a transparent-to-photo body (§3)', () => {
     const { container } = render(<PhotoResultCard {...baseProps} />)
-    const dateNode = [...container.querySelectorAll('div')].find(el => /09\/05\/2026/.test(el.textContent) && el.children.length === 0)
-    expect(dateNode).toBeTruthy()
-    expect(dateNode).toHaveStyle({ color: '#fff' })
+    const outer = container.firstChild
+    // the outer card itself is transparent-to-photo (#0E0E0E is only the
+    // pre-image fallback fill, painted UNDER the photo, never a separate
+    // solid header/footer block layered above it)
+    expect(outer.style.background).toBe('rgb(14, 14, 14)')
+    // no element carries a plain white background anywhere in the card
+    expect(container.innerHTML).not.toMatch(/background:\s*#fff/i)
+    expect(container.innerHTML).not.toMatch(/background:\s*white/i)
   })
 
-  it('renders the congratulations message only when supplied (post-save popup), never invented for Journal reuse', () => {
-    const { rerender } = render(<PhotoResultCard {...baseProps} congratsText={undefined} />)
-    expect(screen.queryByText(/nailed it/i)).toBeNull()
-    rerender(<PhotoResultCard {...baseProps} congratsText="Congratulations, you nailed it today! 💪" />)
-    expect(screen.getByText('Congratulations, you nailed it today! 💪')).toBeInTheDocument()
+  it('renders the top workout summary headline, left-aligned, uppercase presentation, only when supplied (§7/§8/§9)', () => {
+    const { rerender } = render(<PhotoResultCard {...baseProps} />)
+    const headlineNode = screen.getByText(baseProps.headline)
+    expect(headlineNode).toHaveStyle({ textTransform: 'uppercase', textAlign: '' })
+    rerender(<PhotoResultCard {...baseProps} headline={null} />)
+    expect(screen.queryByText(baseProps.headline)).toBeNull()
   })
 
-  it('renders a Share button inside the photo body, in the tenant accent color, only when onShare is supplied', () => {
-    const { rerender } = render(<PhotoResultCard {...baseProps} onShare={undefined} shareLabel="Share" />)
-    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
+  it('renders a thin divider below the summary (§10)', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} />)
+    const divider = [...container.querySelectorAll('div[aria-hidden="true"]')].find(d => d.style.height === '1px')
+    expect(divider).toBeTruthy()
+  })
+
+  it('renders the metadata row (gym/date/time) with icons, gym from gyms.name, never hardcoded (§11/§12/§37)', () => {
+    render(<PhotoResultCard {...baseProps} gymName="CrossFit Delta" />)
+    expect(screen.getByText('CrossFit Delta')).toBeInTheDocument()
+    expect(screen.getByText(/September 5, 2026/)).toBeInTheDocument()
+  })
+
+  it('renders the actual prescribed format large and in gyms.primary_color, never hardcoded lime (§14/§15/§29)', () => {
+    render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'AMRAP', secondary: '15:00', prescriptionLines: [] }} gymColor="#3355FF" resultText="132 reps" />)
+    expect(screen.getByText('AMRAP')).toHaveStyle({ color: '#3355FF' })
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+    expect(screen.getByText('132 reps')).toBeInTheDocument()
+  })
+
+  it('falls back to the existing lime accent only when no gyms.primary_color is configured', () => {
+    render(<PhotoResultCard {...baseProps} gymColor={null} />)
+    expect(screen.getByText('5 RFT')).toHaveStyle({ color: '#ABE73C' })
+  })
+
+  it('renders the score directly under the format, and RX/Not RX\'d as a small bordered badge beside it (§13/§16/§17)', () => {
+    const { rerender } = render(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel={null} resultText="12:00" />)
+    const badge = screen.getAllByText('RX').find(el => el.style.border)
+    expect(badge).toBeTruthy()
+    expect(screen.getByText('12:00')).toBeInTheDocument()
+    rerender(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel="Not RX'd" resultText="12:00" />)
+    // the compact score/status slot shows the MORE SPECIFIC fact (Modified/Not
+    // RX'd) rather than both - the underlying axes remain separate props.
+    expect(screen.getAllByText("Not RX'd").length).toBeGreaterThan(0)
+  })
+
+  it('renders the full performed workout below the result, white/bold/uppercase/left, never re-stating the format (§19/§21)', () => {
+    render(<PhotoResultCard {...baseProps} movements={['200m Run', '20 Air Squats']} />)
+    expect(screen.getByText('200m Run')).toHaveStyle({ textTransform: 'uppercase' })
+    expect(screen.getByText('20 Air Squats')).toBeInTheDocument()
+    // "5 RFT" appears exactly once (the central format), not duplicated above the movement list
+    expect(screen.getAllByText('5 RFT')).toHaveLength(1)
+  })
+
+  it('renders the bottom translucent bar with a result summary on the left and FORGE + logo on the right (§23/§24/§26)', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} />)
+    expect(screen.getByText('FORGE')).toBeInTheDocument()
+    const logo = [...container.querySelectorAll('img')].find(img => img.getAttribute('src') === '/forge.png')
+    expect(logo).toBeTruthy()
+    expect(container.textContent).toContain('12:00 | RX')
+  })
+
+  it('renders no workout ordinal element (no canonical per-log ordinal source exists - §25)', () => {
+    render(<PhotoResultCard {...baseProps} />)
+    expect(screen.queryByText(/wod$/i)).toBeNull()
+  })
+
+  it('renders no large Share button inside the card - Share, when present, is a minimal floating icon (§35)', () => {
     const onShare = vi.fn()
-    rerender(<PhotoResultCard {...baseProps} onShare={onShare} shareLabel="Share" gymColor="#3355FF" />)
+    render(<PhotoResultCard {...baseProps} onShare={onShare} />)
     const btn = screen.getByRole('button', { name: 'Share' })
-    expect(btn).toHaveStyle({ background: '#3355FF' })
     fireEvent.click(btn)
     expect(onShare).toHaveBeenCalledTimes(1)
+    expect(Number.parseInt(btn.style.width, 10)).toBeLessThan(40) // small icon button, not a full-width button
   })
 
-  it('renders no close button when onClose is not supplied (Journal inline use, no modal chrome)', () => {
-    render(<PhotoResultCard {...baseProps} onClose={undefined} onShare={undefined} />)
+  it('renders no share icon when onShare is not supplied (Journal reuse, §34)', () => {
+    render(<PhotoResultCard {...baseProps} onShare={undefined} onClose={undefined} />)
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('renders and wires a close button in the header when onClose IS supplied (post-save modal use)', () => {
+  it('renders a minimal close icon (application chrome), never a redesigned card, when onClose is supplied (§36)', () => {
     const onClose = vi.fn()
     render(<PhotoResultCard {...baseProps} onClose={onClose} onShare={undefined} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    const btn = screen.getByRole('button', { name: 'Close' })
+    fireEvent.click(btn)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('multi-tenant: gym name/accent change per tenant, FORGE stays FORGE, no tenant literal is hardcoded (§42)', () => {
+    const { rerender } = render(<PhotoResultCard {...baseProps} gymName="CrossFit Delta" gymColor="#3355FF" />)
+    expect(screen.getByText('CrossFit Delta')).toBeInTheDocument()
+    expect(screen.getByText('5 RFT')).toHaveStyle({ color: '#3355FF' })
+    rerender(<PhotoResultCard {...baseProps} gymName="ThePACK" gymColor="#FF7A00" />)
+    expect(screen.getByText('ThePACK')).toBeInTheDocument()
+    expect(screen.queryByText('CrossFit Delta')).toBeNull()
+    expect(screen.getByText('5 RFT')).toHaveStyle({ color: '#FF7A00' })
+    expect(screen.getByText('FORGE')).toBeInTheDocument()
   })
 })

@@ -1,17 +1,18 @@
-// PHOTO RESULT CARD — Phase 2.2 (owner final visual contract) §24 required
-// regression: the photo card's structural workout header comes from the
-// SAME canonical structure source the logging screen itself uses
-// (resolveWorkoutStructureHeader, a thin combinator over getWorkoutFormatDisplay
-// + formatMemberScheduleLines - workoutFormats.js), and its movement lines
-// come from the SAME canonical performed-aware projection Journal/leaderboard
-// already use (resolveResultMovementLines - resultWorkoutLines.js). Neither
-// is invented here, and neither is satisfied by hand-typed strings passed
-// straight into PhotoResultCard - every assertion below runs the REAL
-// resolver against a realistic log/config fixture.
+// PHOTO RESULT CARD — Phase 2.2/2.4 required regression: the photo card's
+// structural workout header AND top-of-card summary come from the SAME
+// canonical structure source the logging screen itself uses
+// (resolveWorkoutStructureHeader / composeWorkoutHeadline, thin combinators
+// over getWorkoutFormatDisplay + formatMemberScheduleLines -
+// workoutFormats.js), and its movement lines come from the SAME canonical
+// performed-aware projection Journal/leaderboard already use
+// (resolveResultMovementLines - resultWorkoutLines.js). Neither is invented
+// here, and neither is satisfied by hand-typed strings passed straight into
+// PhotoResultCard - every assertion below runs the REAL resolver against a
+// realistic log/config fixture.
 
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { resolveWorkoutStructureHeader, FORMAT_IDS } from './workoutFormats.js'
+import { resolveWorkoutStructureHeader, composeWorkoutHeadline, FORMAT_IDS } from './workoutFormats.js'
 import { resolveResultMovementLines } from './resultWorkoutLines.js'
 import { getT } from './translations.js'
 import PhotoResultCard from './PhotoResultCard.jsx'
@@ -152,4 +153,97 @@ describe('Owner §9/§23 oracle - performed substitution truth flows through to 
     expect(screen.getByText('20 Clean & Jerk @ 43 kg')).toBeInTheDocument()
     expect(screen.queryByText(/Air Squats/)).toBeNull()
   })
+})
+
+describe('composeWorkoutHeadline - top summary, presentation-only, never a second parser (owner §39/§40)', () => {
+  it('RFT oracle: headline combines the real structural header with the real movement lines, truncated deterministically', () => {
+    const structureHeader = resolveWorkoutStructureHeader('RFT', { rounds: 5 }, tEn)
+    const movements = ['200m Run', '20 Air Squats', '20 Push-Ups', '20 Lunges']
+    const headline = composeWorkoutHeadline(structureHeader, movements, tEn)
+    expect(headline).toBe('5 RFT: 200m Run, 20 Air Squats, 20 Push-Ups, and 1 more')
+  })
+
+  it('performed substitution flows into the headline too - Clean & Jerk, never Air Squats (owner §40 negative)', () => {
+    const log = {
+      variant_level: 'RX',
+      performed_prescription: performed('rx', [
+        { name: '200m Run', reps: null },
+        { name: 'Clean & Jerk', load: 43, reps: 20, substitutedFrom: 'Air Squats' },
+        { name: 'Push-Ups', reps: 20 },
+        { name: 'Lunges', reps: 20 },
+      ]),
+      prescription_snapshot: snap('rx', 'male', FIVE_ROUND_PROGRAMMED),
+    }
+    const structureHeader = resolveWorkoutStructureHeader('RFT', { rounds: 5 }, tEn)
+    const movements = resolveResultMovementLines(log)
+    const headline = composeWorkoutHeadline(structureHeader, movements, tEn)
+    expect(headline).toContain('Clean & Jerk')
+    expect(headline).not.toMatch(/Air Squats/)
+  })
+
+  it('no structural header (free-text log): returns null rather than an invented summary', () => {
+    expect(composeWorkoutHeadline(null, ['some movement'], tEn)).toBeNull()
+  })
+
+  it('a short workout (at or under the truncation count) never appends "and N more"', () => {
+    const structureHeader = resolveWorkoutStructureHeader('AMRAP', { durationSec: 720 }, tEn)
+    const headline = composeWorkoutHeadline(structureHeader, ['Pull-ups', 'Wall Balls'], tEn)
+    expect(headline).toBe('AMRAP 12:00: Pull-ups, Wall Balls')
+    expect(headline).not.toMatch(/more/i)
+  })
+})
+
+describe('Owner §41 format variety - the central format reflects each workout\'s ACTUAL prescribed format, end to end through the real PhotoResultCard', () => {
+  const cases = [
+    { formatId: 'RFT', config: { rounds: 5 }, expectPrimary: '5 RFT' },
+    { formatId: 'For Time', config: {}, expectPrimary: 'For Time' },
+    { formatId: 'AMRAP', config: { durationSec: 720 }, expectPrimary: 'AMRAP' },
+    { formatId: 'EMOM', config: { totalRounds: 12, intervalSec: 60 }, expectPrimary: 'EMOM' },
+    { formatId: 'Intervals', config: { roundCount: 5, stationMode: 'per-interval', workSec: 40, restSec: 20 }, expectPrimary: 'Intervals' },
+    { formatId: 'Ladder', config: {}, expectPrimary: 'Ladder' },
+  ]
+  for (const { formatId, config, expectPrimary } of cases) {
+    it(`${formatId}: central format shows the real resolved primary, never a hardcoded "5 RFT"`, () => {
+      const structureHeader = resolveWorkoutStructureHeader(formatId, config, tEn)
+      const { unmount } = render(
+        <PhotoResultCard
+          photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+          gymName="CrossFit Delta" gymColor="#ABE73C"
+          variantLevel="RX" notRxdLabel={null}
+          structureHeader={structureHeader} headline={null}
+          movements={[]} resultText="some result"
+          loggedAt="2026-09-05T17:00:00.000Z" lang="en" t={tEn}
+        />
+      )
+      expect(screen.getByText(expectPrimary)).toBeInTheDocument()
+      if (formatId !== 'RFT') expect(screen.queryByText('5 RFT')).toBeNull()
+      unmount()
+    })
+  }
+})
+
+describe('Owner §42 multi-tenant regression, end to end through the real resolvers and the real PhotoResultCard', () => {
+  const structureHeader = resolveWorkoutStructureHeader('RFT', { rounds: 5 }, tEn)
+  const tenants = [
+    { name: 'CrossFit Delta', color: '#3355FF' },
+    { name: 'ThePACK', color: '#FF7A00' },
+  ]
+  for (const tenant of tenants) {
+    it(`tenant "${tenant.name}": gym metadata and format accent both reflect this tenant's own gyms.name/gyms.primary_color`, () => {
+      const { unmount } = render(
+        <PhotoResultCard
+          photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+          gymName={tenant.name} gymColor={tenant.color}
+          variantLevel="RX" notRxdLabel={null}
+          structureHeader={structureHeader} headline={null}
+          movements={[]} resultText="12:00"
+          loggedAt="2026-09-05T17:00:00.000Z" lang="en" t={tEn}
+        />
+      )
+      expect(screen.getByText(tenant.name)).toBeInTheDocument()
+      expect(screen.getByText('5 RFT')).toHaveStyle({ color: tenant.color })
+      expect(screen.getByText('FORGE')).toBeInTheDocument()
+      unmount()
+    })
+  }
 })

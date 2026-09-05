@@ -1,155 +1,178 @@
-// PHOTO RESULT / SHARE CARD — Phase 2 / Phase 2.2 (owner final visual
-// contract): the shared photo-backed result presentation, reused by the
-// post-save share popup (WorkoutSharePopup) and the Journal's expanded log
-// card - Phase 2 forensic found these are two separate surfaces, so only
-// this actual card visual is shared, never the chrome around it.
+// PHOTO RESULT / SHARE CARD — Phase 2.4 (owner-approved pixel-faithful
+// visual contract): one continuous photo-backed result composition, no
+// separate header/footer chrome. Reused verbatim by the post-save share
+// popup (WorkoutSharePopup) and the Journal's expanded log card - only the
+// actual card visual is shared, never the surrounding modal/inline chrome.
 //
 // Pure presentation only: every piece of result truth (movements, score,
 // variant, Modified/Not RX'd label, workout structure) is computed by the
-// CALLER from the same canonical sources the plain Journal/leaderboard
-// cards and the logging screen's own WorkoutFormatHeader already use
-// (resolveResultMovementLines, resultCompositionModified,
-// resolveWorkoutStructureHeader, etc.) - this component never re-derives
-// any of it, never reads wod_logs/wods, never imports scoring/prescription/
-// workout-format code, never parses a result or movement string itself.
-// `resultText`/movement lines are presented in UPPERCASE via CSS
-// `textTransform` only - the actual strings passed in, and whatever they
-// came from, are never mutated (owner §13).
+// CALLER from already-canonical sources (resolveResultMovementLines,
+// resolveWorkoutStructureHeader, composeWorkoutHeadline, etc. -
+// workoutFormats.js / resultWorkoutLines.js) - this component never
+// re-derives any of it, never reads wod_logs/wods, never imports scoring/
+// prescription/workout-format code, never parses a result or movement
+// string itself. `resultText`/movement lines are presented in UPPERCASE via
+// CSS `textTransform` only - the actual strings passed in are never
+// mutated.
+//
+// The MEMBER'S OWN uploaded photo is the ONLY background this component
+// ever renders - there is no static/reference image, nothing bundled,
+// nothing baked into the stored JPEG. The dark treatment is a CSS overlay
+// only (a flat tint + a top/bottom gradient) - never `filter: grayscale`/
+// `saturate(0)`, so the athlete's original color photo always shows
+// through underneath.
 //
 // `photoUrl` null means "still loading" (renders a skeleton in the photo's
 // place while a signed-URL request is in flight) - the caller decides
 // whether to mount this component at all (only once a photo is known to
 // exist); an <img> load failure calls `onPhotoError` so the caller can fall
-// back to its own plain, no-photo layout (owner's safe-fallback contract -
-// this component itself never gives up on the photo, it only reports the
-// failure upward).
+// back to its own plain, no-photo layout.
 //
-// `congratsText` / `onShare` are OPTIONAL - only the post-save popup has a
-// "just saved" congratulations message and an existing Share action to
-// relocate into the card; the Journal reuses the exact same component
-// without either (owner §16 "preserve whatever current behavior exists" -
-// Journal never had a share button before this phase, so none is invented
-// for it here).
-//
-// Designed so a later Phase 3 could export this exact DOM node as a share
-// image (owner §26) - but this phase installs no export dependency and
-// adds no export/share-image button here.
+// `onShare` is OPTIONAL - only the post-save popup has an existing Share
+// action to preserve; Journal reuses the exact same component without it
+// (it never had one before). Per the owner's Phase 2.4 correction, Close
+// and Share are minimal floating icon buttons ("application chrome"), never
+// a large button baked into the card composition.
 
-import { localeFor, getReadableTextColor } from './utils'
+import { MapPin, Calendar, Clock, X, Share2 } from 'lucide-react'
+import { localeFor } from './utils'
 
 export default function PhotoResultCard({
   photoUrl, onPhotoError,
   gymName, gymColor,
   variantLevel, notRxdLabel,
-  structureHeader, // { primary, secondary, prescriptionLines } | null - see resolveWorkoutStructureHeader (workoutFormats.js)
+  structureHeader, // { primary, secondary, prescriptionLines } | null - resolveWorkoutStructureHeader (workoutFormats.js)
+  headline, // string | null - composeWorkoutHeadline (workoutFormats.js), the top-of-card summary
   movements, resultText, loggedAt, lang, t,
-  congratsText, onShare, shareLabel,
+  onShare,
   onClose,
 }) {
   const dateObj = loggedAt ? new Date(loggedAt) : null
   const accent = gymColor || '#ABE73C'
-  const shareTextColor = getReadableTextColor(accent)
+  // Owner §17/§24 - the compact "score | status" slot shows ONE status word:
+  // the more specific Modified/Not RX'd fact when it applies, otherwise the
+  // selected variant. Both facts remain available to the caller as separate
+  // props/axes - this is only how ONE particular compact display picks
+  // between them, not a collapse of the underlying axes.
+  const statusText = notRxdLabel || variantLevel || null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E' }}>
-      {/* HEADER - solid black bar, never part of the photo (owner §2/§4: only
-          the outer card has rounded corners, the header/photo seam is flush). */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: '#0E0E0E' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <img src="/forge.png" alt="" style={{ height: '20px', width: '20px', borderRadius: '5px', objectFit: 'cover' }} />
-          <span style={{ color: '#fff', fontWeight: '600', fontSize: '12px', letterSpacing: '1px' }}>FORGE</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 auto', justifyContent: 'flex-end' }}>
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E' }}>
+      {photoUrl ? (
+        <img src={photoUrl} alt="" onError={onPhotoError}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#1c1c1c' }} />
+      )}
+      {/* Dark scrim - CSS overlay only, never grayscale/desaturate (owner
+          §4/§29/§43): the member's original color photo always shows
+          through underneath. Stronger than the prior version per the
+          owner's explicit "significantly darker" correction. */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.42)' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.28) 40%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.82) 100%)' }} />
+
+      {/* Close/Share - application chrome, not part of the visual result
+          composition itself (owner §35/§36) - minimal floating icon
+          buttons, never redesigning the card to fit a large action. */}
+      <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {onShare && (
+          <button onClick={onShare} aria-label={t.shareCardButton}
+            style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+            <Share2 size={13} strokeWidth={2.25} />
+          </button>
+        )}
+        {onClose && (
+          <button onClick={onClose} aria-label={t.shareCardCloseLabel}
+            style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+            <X size={14} strokeWidth={2.25} />
+          </button>
+        )}
+      </div>
+
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '16px 38px 46px 14px', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+        {/* 1. TOP WORKOUT SUMMARY - condensed/bold/uppercase/white/left,
+            never centered (owner §7/§9). */}
+        {headline && (
+          <div style={{ fontSize: 'clamp(15px, 4.2vw, 19px)', fontWeight: '800', color: '#fff', lineHeight: 1.15, letterSpacing: '-0.01em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>
+            {headline}
+          </div>
+        )}
+
+        {/* 2. Thin divider (owner §10) */}
+        <div aria-hidden="true" style={{ height: '1px', background: 'rgba(255,255,255,0.35)', margin: '10px 0 8px', width: '90%' }} />
+
+        {/* 3. Metadata row - gym / date / time, existing lucide icons, never
+            emoji (owner §11/§12). */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
           {gymName && (
-            <span style={{ fontSize: '12px', fontWeight: '600', color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-              {gymName}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <MapPin size={11} strokeWidth={2.25} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gymName}</span>
             </span>
           )}
-          {onClose && (
-            <button onClick={onClose} aria-label={t.shareCardCloseLabel}
-              style={{ flexShrink: 0, background: 'none', border: 'none', color: '#fff', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '15px', lineHeight: 1, padding: 0 }}>
-              ✕
-            </button>
+          {dateObj && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <Calendar size={11} strokeWidth={2.25} />
+              {dateObj.toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+          )}
+          {dateObj && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <Clock size={11} strokeWidth={2.25} />
+              {dateObj.toLocaleTimeString(localeFor(lang), { hour: 'numeric', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+
+        {/* 4/5/6. Central block - pushed toward the lower-middle of the
+            photo regardless of how much content sits above it, leaving
+            deliberate breathing room (owner §17/§22/§33). */}
+        <div style={{ marginTop: 'auto' }}>
+          {structureHeader && (
+            <div style={{ marginBottom: structureHeader.prescriptionLines.length ? '2px' : '4px' }}>
+              <span style={{ fontSize: 'clamp(26px, 9vw, 38px)', fontWeight: '800', color: accent, lineHeight: 1, letterSpacing: '-0.02em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>
+                {structureHeader.primary}
+              </span>
+              {structureHeader.secondary && (
+                <span style={{ fontSize: 'clamp(14px, 4vw, 18px)', fontWeight: '800', color: accent, marginLeft: '8px', textTransform: 'uppercase' }}>
+                  {structureHeader.secondary}
+                </span>
+              )}
+            </div>
+          )}
+          {structureHeader?.prescriptionLines.map((l, i) => (
+            <div key={i} style={{ fontSize: '13px', fontWeight: '700', color: '#fff', textTransform: 'uppercase', marginBottom: '4px' }}>{l}</div>
+          ))}
+          {(resultText || statusText) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: movements?.length ? '10px' : '0' }}>
+              {resultText && (
+                <span style={{ fontSize: 'clamp(16px, 5vw, 21px)', fontWeight: '800', color: '#fff', lineHeight: 1.1, letterSpacing: '-0.01em', overflowWrap: 'anywhere' }}>
+                  {resultText}
+                </span>
+              )}
+              {statusText && (
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff', border: '1px solid rgba(255,255,255,0.55)', borderRadius: '4px', padding: '2px 7px', lineHeight: 1.2, textTransform: 'uppercase' }}>
+                  {statusText}
+                </span>
+              )}
+            </div>
+          )}
+          {movements && movements.length > 0 && (
+            <div style={{ fontSize: '12px', fontWeight: '700', lineHeight: 1.3, color: '#fff', textTransform: 'uppercase' }}>
+              {movements.map((m, i) => <div key={i} style={{ overflowWrap: 'anywhere' }}>{m}</div>)}
+            </div>
           )}
         </div>
       </div>
 
-      {/* PHOTO BODY - fills everything below the header, no white gap, no
-          separate white result section (owner §1/§4). Portrait-leaning
-          aspect ratio for a social-card feel, capped so it never forces
-          overflow on a short/small viewport (owner §18/§19). */}
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: '75vh', overflow: 'hidden', background: '#1c1c1c' }}>
-        {photoUrl ? (
-          <img src={photoUrl} alt="" onError={onPhotoError}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#1c1c1c' }} />
-        )}
-        {/* Dark scrim - presentation-only, never modifies the stored JPEG
-            (owner §5): a subtle overall tint plus a stronger gradient toward
-            the bottom, so white/tenant-color text stays legible over any
-            photo without making the athlete/photo unrecognizable. */}
-        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.82) 100%)' }} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '14px 16px 16px', textTransform: 'uppercase' }}>
-          {/* UPPER - RX/variant status + the full structural workout, left
-              aligned, compact (owner §6/§7/§10). */}
-          <div>
-            {(variantLevel || notRxdLabel) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                {variantLevel && (
-                  <span style={{ padding: '3px 11px', borderRadius: '20px', background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: '11px', fontWeight: '700', lineHeight: 1.2 }}>
-                    {variantLevel}
-                  </span>
-                )}
-                {notRxdLabel && (
-                  <span style={{ padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: '10px', fontWeight: '600', lineHeight: 1.2 }}>
-                    {notRxdLabel}
-                  </span>
-                )}
-              </div>
-            )}
-            {structureHeader && (
-              <div style={{ marginBottom: movements?.length ? '4px' : '0' }}>
-                <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff', lineHeight: 1.25 }}>{structureHeader.primary}</span>
-                {structureHeader.secondary && (
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: accent, marginLeft: '6px', lineHeight: 1.25 }}>{structureHeader.secondary}</span>
-                )}
-                {structureHeader.prescriptionLines.map((l, i) => (
-                  <div key={i} style={{ fontSize: '12px', fontWeight: '600', color: '#fff', lineHeight: 1.35, marginTop: '2px' }}>{l}</div>
-                ))}
-              </div>
-            )}
-            {movements && movements.length > 0 && (
-              <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.35, color: 'rgba(255,255,255,0.88)' }}>
-                {movements.map((m, i) => <div key={i} style={{ overflowWrap: 'anywhere' }}>{m}</div>)}
-              </div>
-            )}
-          </div>
-
-          {/* LOWER - pushed to the bottom of the photo body regardless of how
-              much (or little) workout content sits above it (owner §17). */}
-          <div style={{ marginTop: 'auto', textAlign: 'center' }}>
-            {resultText && (
-              <div style={{ fontSize: 'clamp(20px, 6vw, 28px)', fontWeight: '800', color: accent, lineHeight: 1.15, letterSpacing: '-0.01em', marginBottom: '6px', overflowWrap: 'anywhere' }}>
-                {resultText}
-              </div>
-            )}
-            {dateObj && (
-              <div style={{ fontSize: '11px', fontWeight: '600', color: '#fff', textTransform: 'none' }}>
-                {dateObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dateObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            )}
-            {congratsText && (
-              <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: '600', color: '#fff', textTransform: 'none' }}>
-                {congratsText}
-              </div>
-            )}
-            {onShare && (
-              <button onClick={onShare}
-                style={{ marginTop: '12px', width: '100%', padding: '12px 20px', background: accent, color: shareTextColor, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', lineHeight: 1, cursor: 'pointer', textTransform: 'none' }}>
-                {shareLabel}
-              </button>
-            )}
-          </div>
+      {/* Bottom translucent bar - overlays the photo, not a footer outside
+          it (owner §23/§26). */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '9px 12px', background: 'rgba(0,0,0,0.55)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {[resultText, statusText].filter(Boolean).join(' | ')}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <img src="/forge.png" alt="" style={{ height: '16px', width: '16px', borderRadius: '4px', objectFit: 'cover' }} />
+          <span style={{ color: '#fff', fontWeight: '700', fontSize: '11px', letterSpacing: '1px' }}>FORGE</span>
         </div>
       </div>
     </div>
