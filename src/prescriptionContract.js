@@ -896,6 +896,36 @@ export function performedStationInstances(performedDoc, programmedInstances) {
   return out
 }
 
+/** PERFORMED-AWARE PARTIAL RESULTS (owner scope, narrowed) - resolve the
+ * movement-text list a plain-sequential (For Time/Chipper/Ladder/Buy-In-
+ * Cash-Out - NOT Sequence AMRAP, which already has its own station-object
+ * resolution) Did-not-finish partial/capped round editor should read for ONE
+ * primary WOD log.
+ *
+ * Owner conditions, preserved by construction:
+ *   A. no performed override -> returns `programmedLines` UNCHANGED.
+ *   B. Finished -> irrelevant here; callers only ever consult this on a
+ *      branch already gated to the capped/Did-not-finish path, so a
+ *      Finished log never even calls this function.
+ *   C. a performed override exists -> returns the EFFECTIVE performed
+ *      composition instead (reuses performedStationInstances, the same
+ *      abstraction Sequence AMRAP / structured Intervals already trust, and
+ *      resolveMovementInstance/renderInstanceLine, the same generic
+ *      reps/load/distance/calories text renderer that already produces the
+ *      programmed lines) - never a movement-name branch.
+ *
+ * `performedDoc`/`programmedDoc`/`variantKey`/`gender` mirror
+ * performedIsModified's own signature exactly (same "is this actually
+ * different" check governs both). `programmedInstances` = the frozen
+ * variant's own movement list (only used for the not-performed clone).
+ * Pure. */
+export function resolveEffectivePartialMovements({ performedDoc, programmedDoc, variantKey, gender, programmedInstances, programmedLines }) {
+  const overridden = performedDoc?.version === 2 && performedIsModified(performedDoc, programmedDoc, variantKey, gender)
+  if (!overridden) return programmedLines
+  return performedStationInstances(performedDoc, programmedInstances)
+    .map((inst) => resolveMovementInstance(inst, gender).line)
+}
+
 /** True when the performed doc resolves — for THIS athlete — to exactly the
  * programmed variant. The caller stores NULL then (§22 / §24: identical ⇒
  * performed_prescription stays NULL). `notPerformed` NEVER matches (§25).

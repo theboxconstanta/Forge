@@ -77,7 +77,7 @@ import {
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, switchPerformedQuantityMetric, PERFORMED_EDITABLE_METRICS,
   composePerformedResultLines, snapshotDisplayLines,
-  performedCompositionGroups, performedEntriesForSource, performedStationInstances,
+  performedCompositionGroups, performedEntriesForSource, performedStationInstances, resolveEffectivePartialMovements,
   addPerformedMovement, deletePerformedMovement, markSourceNotPerformed, restoreSourcePerformed,
 } from './prescriptionContract'
 import { resolveResultProvenance } from './resultProvenance'
@@ -9212,7 +9212,12 @@ function App() {
     // per mission's own "do not invent artificial states".
     let rezultatFinal, completionState
     if (useReps && isSequential) {
-      rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, miscariPentruLog), miscariPentruLog)
+      // PERFORMED-AWARE PARTIAL RESULTS - effectivePartialMovements is
+      // miscariPentruLog UNCHANGED except when a performed override exists
+      // for a fresh, non-Sequence-AMRAP primary WOD log (see its own comment
+      // above) - the ONLY case this composition (and hence the frozen
+      // `result` and completion_state below) departs from today's behavior.
+      rezultatFinal = composePartialText(repsEfectiveSecvential(wodPartialReps, effectivePartialMovements), effectivePartialMovements)
       completionState = deriveDurationCompletionState(true)
     } else if (useReps) {
       // Ascending AMRAP: reps-urile partiale intra in runda CURENTA
@@ -10030,6 +10035,39 @@ function App() {
     : null
   const sequentialAmrapStations = (sequentialAmrapResolved && sequentialAmrapResolved.supported)
     ? sequentialAmrapResolved.stations : null
+  // PERFORMED-AWARE PARTIAL RESULTS (owner scope, narrowed) - the plain
+  // sequential (For Time/Chipper/Ladder/Buy-In-Cash-Out - NOT Sequence AMRAP,
+  // which already resolves its own performed-aware stations above) Did-not-
+  // finish partial/capped round list must reflect the athlete's ACTUAL
+  // performed composition once one exists, not the programmed prescription -
+  // otherwise the athlete is asked to report progress against a movement
+  // they explicitly said they didn't perform. Reuses the SAME
+  // performedStationInstances the Sequence-AMRAP/structured-Intervals paths
+  // already trust, rendered through the SAME resolveMovementInstance/
+  // renderInstanceLine pipeline that already produces structuredLogLines for
+  // the programmed case - capability-agnostic (reps/load/distance/calories),
+  // never movement-name-driven.
+  //
+  // Deliberately narrow (owner decision): falls back to miscariPentruLog
+  // UNCHANGED - preserving today's behavior byte-for-byte - whenever:
+  //   - no performed override exists (resolveEffectivePartialMovements's own
+  //     performedIsModified check: condition A, "no modification + Did not
+  //     finish"),
+  //   - the log is Finished (this array is never read on that branch: never
+  //     applies to condition B),
+  //   - this is an edit of an already-saved log (editLogId - editLogMiscari
+  //     is a frozen historical snapshot, out of scope here),
+  //   - this is an independently-scored additional section (logTargetSection
+  //     - unrelated to the primary WOD's performed_prescription), or
+  //   - the format is Sequence AMRAP (already correct, untouched).
+  // Does NOT touch miscariPentruLog itself, so notes/header text, the edit
+  // flow, and Chained/Skill paths are byte-identical to before this change.
+  const effectivePartialMovements = (!editLogId && !logTargetSection && !sequentialAmrapActive)
+    ? resolveEffectivePartialMovements({
+        performedDoc: performedCommitted, programmedDoc: activePrescriptionDoc, variantKey: frozenVariantKey,
+        gender: memberGenderKey, programmedInstances: frozenProgrammedInstances, programmedLines: miscariPentruLog,
+      })
+    : miscariPentruLog
   // P9.5.2A - structured Intervals per-cell performed composition. Maps each
   // PROGRAMMED station (by ordered index, rest excluded) to its
   // sourceInstanceId, then to the athlete's performed entries for that source.
@@ -11755,7 +11793,7 @@ function App() {
                 <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
-                  movements={miscariPentruLog} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
+                  movements={effectivePartialMovements} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
                   intervalComposition={intervalCompositionActive}
                   value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
                   onChange={dispatchScorePatch}
@@ -11876,7 +11914,7 @@ function App() {
             <FormatLogger
               formatId={activeLogFormatId}
               config={activeLogFormatConfig}
-              movements={miscariPentruLog}
+              movements={effectivePartialMovements}
               sequentialAmrapStations={sequentialAmrapStations}
               intervalComposition={intervalCompositionActive}
               prescribedWeight={prescribedWeightPentruLog}
