@@ -1225,6 +1225,33 @@ export function formatMemberSkillDetailLines(skillType, config, t) {
   return computeMemberDetailLines(skillType, config, t, false)
 }
 
+// PHOTO RESULT / SHARE CARD Phase 2.2 - the structural "prescription header"
+// for a photo-backed result card (owner §7/§8: "reuse the narrowest existing
+// canonical source... do NOT write a card-specific workout parser, do NOT
+// infer structure from result text"). This is a thin COMBINATOR of the two
+// canonical sources the logging screen itself already uses together
+// (App.jsx's WorkoutFormatHeader + the scheduleLines rendered right below it
+// - see the primary Log WOD screen) - zero new parsing/inference. `null`
+// formatId (a free-text log with no linked format) returns null - the
+// caller shows no structure block rather than leaking an unrelated
+// default-format's fields into it.
+//
+// Movement lines are DELIBERATELY NOT produced here - those come from a
+// separate, already-canonical projection (resolveResultMovementLines /
+// composePerformedResultLines) that is performed-aware; this function only
+// ever describes the FORMAT/STRUCTURE (e.g. "5 RFT", "AMRAP" + duration,
+// "5 Rounds"), never a specific movement or its performed substitution.
+export function resolveWorkoutStructureHeader(formatId, config, t, legacyDuration = null) {
+  if (!formatId) return null
+  const { primary, secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, config, legacyDuration, t)
+  const { prescriptionLines } = formatMemberScheduleLines(formatId, config, t)
+  return {
+    primary,
+    secondary: secondaryValue ? (secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue) : null,
+    prescriptionLines,
+  }
+}
+
 // Eticheta scurta a formatului, cu numarul de runde/tinta inclus acolo unde
 // e conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time, "5RM"),
 // nu doar formatId urmat separat de un rand generic "Numar runde: 5"

@@ -53,6 +53,7 @@ import {
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
+  resolveWorkoutStructureHeader,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -6483,6 +6484,15 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // its own pill, styled for a dark photo background).
               const isRxVariantLog = String(w.variant_level ?? 'rx').toLowerCase().replace(/[_\s-]/g, '') === 'rx'
               const notRxdLabelLog = resultModifiedLog ? (isRxVariantLog ? t.notRxdBadge : t.modifiedBadge) : null
+              // PHOTO RESULT / SHARE CARD Phase 2.2 - same frozen format/config
+              // this card already resolves for its own score text above
+              // (formatTipResolvat/formatConfigResolvat = wProv's frozen
+              // provenance, or the section snapshot) - never re-resolved
+              // differently for the photo card. Only computed when a photo
+              // actually exists (this log's card may never expand a photo at all).
+              const structureHeaderLog = photoMedia
+                ? resolveWorkoutStructureHeader(formatTipResolvat, formatConfigResolvat, t, (!esteSectiuneLegata && w.wods?.duration) ? formatWodDurata(w.wods.duration) : null)
+                : null
               return (
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -6534,8 +6544,9 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         <JurnalPhotoResult
                           storagePath={photoMedia.storagePath}
                           gymName={gym?.name} gymColor={gym?.primaryColor}
-                          wodName={wodNume} variantLevel={w.variant_level || null}
+                          variantLevel={w.variant_level || null}
                           notRxdLabel={notRxdLabelLog}
+                          structureHeader={structureHeaderLog}
                           movements={cardMovementLines} resultText={areRezultatFinal ? rezultatBucati.join(' · ') : null}
                           loggedAt={w.logged_at} lang={lang} t={t}
                         />
@@ -6893,7 +6904,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
   const [imgFailed, setImgFailed] = useState(false)
   useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const resultText = scoreParts.length > 0 ? scoreParts.join(' · ') : null
   const dataObj = new Date(loggedAt)
@@ -6923,24 +6934,16 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', overflow: 'hidden', maxWidth: '360px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         {showPhotoCard ? (
-          <>
-            <PhotoResultCard
-              photoUrl={photoState === 'ready' ? photoUrl : null}
-              onPhotoError={() => setImgFailed(true)}
-              gymName={gym.name} gymColor={gym.primaryColor}
-              wodName={wodName} variantLevel={variantLevel} variantColor={variantColor} variantBg={variantBg}
-              notRxdLabel={notRxdLabel}
-              movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
-              onClose={onClose}
-            />
-            <div style={{ padding: '16px 24px 22px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', marginBottom: '14px' }}>{t.shareCardCongrats}</div>
-              <button onClick={handleShare}
-                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Share2 size={16} strokeWidth={2.5} /> {t.shareCardButton}
-              </button>
-            </div>
-          </>
+          <PhotoResultCard
+            photoUrl={photoState === 'ready' ? photoUrl : null}
+            onPhotoError={() => setImgFailed(true)}
+            gymName={gym.name} gymColor={gym.primaryColor}
+            variantLevel={variantLevel} notRxdLabel={notRxdLabel}
+            structureHeader={structureHeader}
+            movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
+            congratsText={t.shareCardCongrats} onShare={handleShare} shareLabel={t.shareCardButton}
+            onClose={onClose}
+          />
         ) : (
           <>
             <button onClick={onClose} aria-label={t.shareCardCloseLabel}
@@ -9766,6 +9769,11 @@ function App() {
           // keeping this popup byte-identical to before this phase (owner §21).
           photoState: wodPhotoFile ? 'pending' : 'none',
           photoUrl: null,
+          // PHOTO RESULT / SHARE CARD Phase 2.2 - the SAME format/structure
+          // header + prescription lines already shown on this exact logging
+          // screen (WorkoutFormatHeader + scheduleLines, just above) - never
+          // a card-specific parser, never inferred from result text.
+          structureHeader: resolveWorkoutStructureHeader(activeLogFormatId, activeLogFormatConfig, t, formatWodDurata(logWodZiData?.duration)),
         })
       }
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
