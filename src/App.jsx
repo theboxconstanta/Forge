@@ -44,7 +44,7 @@ import { getAthletePerformanceSummary, formatTrendLabel } from './performanceAna
 import {
   getFormat, legacyHeaderTypeOf, estimateTotalDurationSec, composeFormatHeader,
   resolveIntervalStructure, intervalTimelineLines, isRestLine, intervalStationKey,
-  composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText, partialRepsOfLog,
+  composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText, partialRepsOfLog, repsEfectiveSecvential,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
   formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat, isSequentialAmrap,
@@ -9109,16 +9109,8 @@ function App() {
   // formatului activ (scored/sets/mixed/nft) - generalizarea vechiului
   // `isAmrapLog ? composeAmrapResult() : wodResult`.
   // Pentru secvente (For Time/Ladder - sequentialPartial in catalog):
-  // repetarile efective per miscare, cu fallback la numarul prescris
-  // (parsat din text, ex. "15 power snatches" -> 15) cand nu au fost
-  // atinse - consecvent cu ce arata SequentialPartialFields (o miscare
-  // netouched = presupusa terminata integral).
-  const repsEfectiveSecvential = (partialReps, movements) => movements.map((m, i) => {
-    const curent = (partialReps || [])[i]
-    if (curent != null && curent !== '') return curent
-    const prescrisMatch = m.match(/^(\d+)\s+/)
-    return prescrisMatch ? prescrisMatch[1] : ''
-  })
+  // repetarile efective per miscare - INC-14, vezi repsEfectiveSecvential
+  // (workoutFormats.js) pt semantica exacta blank-vs-target.
 
   // SCORING_MODEL_ARCHITECTURE_VNEXT.md sectiunea 8 - granita defensiva de
   // scriere: normalizeCompletionState ruleaza dupa ORICE ramura din functia

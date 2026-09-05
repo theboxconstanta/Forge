@@ -348,6 +348,43 @@ export function legacyHeaderTypeOf(headerLine) {
 
 // --- family: 'scored' -------------------------------------------------
 
+// INC-14 - UNIVERSAL PARTIAL RESULT INTEGRITY. For a plain sequential For
+// Time/Chipper/Ladder/Buy-In-Cash-Out (isSequentialFormat, NOT Sequence AMRAP
+// - that has its own station-object model in sequentialAmrap.js), derives the
+// EFFECTIVE per-movement reps from the athlete's raw partial-input array.
+//
+// A blank/untouched station must NEVER be read as completed work - it means
+// "not reached", never "assume they did all of it". Mirrors
+// autoCompleteSequentialProgress's own rule (INC-11 §15) on this plain-text
+// model: only a station STRICTLY BEFORE the furthest station the athlete
+// actually touched is inferred complete (reaching station N implies every
+// earlier one was necessarily cleared to reach it, per the sequential
+// contract); every station AT or AFTER the furthest touched index keeps its
+// raw value untouched - blank stays blank (omitted by composePartialText,
+// "not reached"), an explicit "0" stays "0" (INC-11.1 owner decision #3).
+//
+// Previously this backfilled EVERY blank station, regardless of position,
+// with its prescribed target parsed from the movement text - so "12" at
+// station 1 with every later station left blank silently became
+// "12/21/15/15/9/9" (the programmed workout), not the athlete's actual
+// 12-unit progress. Only the FIRST layer (this function) manufactured work;
+// composePartialText / partialRepsOfLog / sequentialProgressionDeparted
+// downstream were always correct once given a truthful effective array.
+export function repsEfectiveSecvential(partialReps, movements) {
+  const perf = movements.map((_, i) => {
+    const v = (partialReps || [])[i]
+    return v != null ? String(v) : ''
+  })
+  let furthest = -1
+  perf.forEach((v, i) => { if (v.trim() !== '') furthest = i })
+  return movements.map((m, i) => {
+    if (perf[i].trim() !== '') return perf[i]
+    if (i >= furthest) return ''
+    const prescrisMatch = m.match(/^(\d+)\s+/)
+    return prescrisMatch ? prescrisMatch[1] : ''
+  })
+}
+
 // Genereaza textul "3 runde + 5 Pull-ups, 10 Push-ups" dintr-un numar de
 // runde complete + reps partiale per miscare. Genericul din spatele lui
 // composeAmrapResult() din App.jsx.
