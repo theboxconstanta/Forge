@@ -1241,13 +1241,32 @@ export function formatMemberSkillDetailLines(skillType, config, t) {
 // composePerformedResultLines) that is performed-aware; this function only
 // ever describes the FORMAT/STRUCTURE (e.g. "5 RFT", "AMRAP" + duration,
 // "5 Rounds"), never a specific movement or its performed substitution.
+//
+// PHOTO RESULT CARD Phase 4 (owner universal presentation hierarchy) - the
+// single duration `getWorkoutFormatDisplay` resolves splits into two
+// DIFFERENT concepts, using the SAME canonical distinction that function
+// already encodes (`secondaryLabel` is set ONLY for the formats in
+// TIME_CAP_LABEL_FORMAT_IDS - For Time/RFT/Chipper/Ladder/Partner WOD -
+// never for AMRAP/EMOM/Intervals) - never a per-format branch invented
+// here:
+//   - `timeCap`  - a genuine cap on a separate for-time/rounds effort
+//     (owner's dedicated "TOP SECONDARY" slot - shown ONCE, on its own,
+//     never folded into the center format label).
+//   - `intrinsicDuration` - part of the format's OWN identity (AMRAP
+//     12:00 / EMOM 12:00 IS the workout, not a cap on something else) -
+//     stays combined with `primary` wherever the format itself is shown,
+//     and is never duplicated as a separate "time cap" fact.
+// A format with neither (e.g. RFT/Ladder/Chipper with no cap configured)
+// leaves both null - nothing invented.
 export function resolveWorkoutStructureHeader(formatId, config, t, legacyDuration = null) {
   if (!formatId) return null
   const { primary, secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(formatId, config, legacyDuration, t)
   const { prescriptionLines } = formatMemberScheduleLines(formatId, config, t)
+  const isTimeCap = !!secondaryLabel // getWorkoutFormatDisplay only ever sets secondaryLabel for TIME_CAP_LABEL_FORMAT_IDS
   return {
     primary,
-    secondary: secondaryValue ? (secondaryLabel ? `${secondaryLabel} ${secondaryValue}` : secondaryValue) : null,
+    timeCap: (isTimeCap && secondaryValue) ? `${secondaryLabel} ${secondaryValue}` : null,
+    intrinsicDuration: (!isTimeCap && secondaryValue) ? secondaryValue : null,
     prescriptionLines,
   }
 }
@@ -1268,9 +1287,15 @@ export function resolveWorkoutStructureHeader(formatId, config, t, legacyDuratio
 // movement lines EXACTLY as already resolved, reps/load included. This is
 // a disclosed, deliberate difference from the owner's illustrative mockup
 // text (which showed bare names) - see the Phase 2.4 report.
+//
+// PHOTO RESULT CARD Phase 4 - the headline uses ONLY `structureHeader.primary`,
+// never `timeCap`/`intrinsicDuration` - both already have their own
+// dedicated slot elsewhere on the card (TOP SECONDARY / the center format
+// label respectively), so folding either in here would duplicate it
+// (owner's universal "no piece of information duplicated" rule).
 export function composeWorkoutHeadline(structureHeader, movementLines, t, maxMovements = 3) {
   if (!structureHeader) return null
-  const formatLabel = structureHeader.secondary ? `${structureHeader.primary} ${structureHeader.secondary}` : structureHeader.primary
+  const formatLabel = structureHeader.primary
   const lines = movementLines || []
   if (lines.length === 0) return formatLabel
   const shown = lines.slice(0, maxMovements)

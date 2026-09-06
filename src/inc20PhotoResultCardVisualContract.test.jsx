@@ -64,22 +64,25 @@ describe('resolveWorkoutStructureHeader - structural header, never invented, nev
     expect(header.prescriptionLines).not.toContain('5 Rounds')
   })
 
-  it('AMRAP: primary + duration secondary, no invented round count', () => {
+  it('AMRAP: primary + an INTRINSIC duration (not a Time Cap), no invented round count', () => {
     const header = resolveWorkoutStructureHeader('AMRAP', { durationSec: 720 }, tEn)
     expect(header.primary).toBe('AMRAP')
-    expect(header.secondary).toBe('12:00')
+    expect(header.intrinsicDuration).toBe('12:00')
+    expect(header.timeCap).toBeNull()
   })
 
-  it('For Time with a time cap: primary + "Time cap" secondary, same label the logging screen itself shows', () => {
+  it('For Time with a time cap: primary + a genuine Time Cap (owner\'s dedicated slot), same label the logging screen itself shows', () => {
     const header = resolveWorkoutStructureHeader('For Time', { timeCapSec: 1200 }, tEn)
     expect(header.primary).toBe('For Time')
-    expect(header.secondary).toBe('Time cap 20:00')
+    expect(header.timeCap).toBe('Time cap 20:00')
+    expect(header.intrinsicDuration).toBeNull()
   })
 
-  it('EMOM: primary + computed total duration secondary', () => {
+  it('EMOM: primary + an INTRINSIC computed total duration (not a Time Cap)', () => {
     const header = resolveWorkoutStructureHeader('EMOM', { totalRounds: 12, intervalSec: 60 }, tEn)
     expect(header.primary).toBe('EMOM')
-    expect(header.secondary).toBe('12:00')
+    expect(header.intrinsicDuration).toBe('12:00')
+    expect(header.timeCap).toBeNull()
   })
 
   it('Chipper / sequential (Ladder): resolves without inventing a round count that does not exist on the format', () => {
@@ -188,19 +191,29 @@ describe('composeWorkoutHeadline - top summary, presentation-only, never a secon
   it('a short workout (at or under the truncation count) never appends "and N more"', () => {
     const structureHeader = resolveWorkoutStructureHeader('AMRAP', { durationSec: 720 }, tEn)
     const headline = composeWorkoutHeadline(structureHeader, ['Pull-ups', 'Wall Balls'], tEn)
-    expect(headline).toBe('AMRAP 12:00: Pull-ups, Wall Balls')
+    expect(headline).toBe('AMRAP: Pull-ups, Wall Balls')
     expect(headline).not.toMatch(/more/i)
+  })
+
+  it('owner Phase 4 - the headline NEVER repeats the intrinsic duration (AMRAP 12:00) or a Time Cap - both already own a dedicated slot elsewhere on the card', () => {
+    const amrap = resolveWorkoutStructureHeader('AMRAP', { durationSec: 720 }, tEn)
+    expect(composeWorkoutHeadline(amrap, ['Pull-ups'], tEn)).not.toMatch(/12:00/)
+    const forTimeCapped = resolveWorkoutStructureHeader('For Time', { timeCapSec: 600 }, tEn)
+    expect(composeWorkoutHeadline(forTimeCapped, ['Clean and Jerks'], tEn)).not.toMatch(/10:00|Time cap/i)
   })
 })
 
 describe('Owner §41 format variety - the central format reflects each workout\'s ACTUAL prescribed format, end to end through the real PhotoResultCard', () => {
   const cases = [
     { formatId: 'RFT', config: { rounds: 5 }, expectPrimary: '5 RFT' },
+    { formatId: 'RFT', config: { rounds: 5, timeCapSec: 900 }, expectPrimary: '5 RFT' },
     { formatId: 'For Time', config: {}, expectPrimary: 'For Time' },
+    { formatId: 'For Time', config: { timeCapSec: 600 }, expectPrimary: 'For Time' },
     { formatId: 'AMRAP', config: { durationSec: 720 }, expectPrimary: 'AMRAP' },
     { formatId: 'EMOM', config: { totalRounds: 12, intervalSec: 60 }, expectPrimary: 'EMOM' },
     { formatId: 'Intervals', config: { roundCount: 5, stationMode: 'per-interval', workSec: 40, restSec: 20 }, expectPrimary: 'Intervals' },
     { formatId: 'Ladder', config: {}, expectPrimary: 'Ladder' },
+    { formatId: 'Chipper', config: { timeCapSec: 1200 }, expectPrimary: 'Chipper' },
   ]
   for (const { formatId, config, expectPrimary } of cases) {
     it(`${formatId}: central format shows the real resolved primary, never a hardcoded "5 RFT"`, () => {
@@ -246,4 +259,99 @@ describe('Owner §42 multi-tenant regression, end to end through the real resolv
       unmount()
     })
   }
+})
+
+// PHOTO RESULT CARD Phase 4 - owner universal presentation hierarchy
+// correction. The bug: a genuine Time Cap (For Time/RFT/Chipper/Ladder/
+// Partner WOD) was being folded into BOTH the top headline AND the center
+// format label - a duplicated fact. The fix, structure/capability-driven
+// (never a per-format branch): resolveWorkoutStructureHeader now exposes
+// `timeCap` (a real cap - owner's dedicated TOP SECONDARY slot, shown once)
+// separately from `intrinsicDuration` (part of a format's own identity,
+// e.g. AMRAP/EMOM's own duration - stays combined with the format wherever
+// it's shown, never duplicated as a "cap" on something else). No format is
+// special-cased here - the split comes entirely from the SAME
+// TIME_CAP_LABEL_FORMAT_IDS distinction getWorkoutFormatDisplay already
+// encoded before this fix.
+describe('Owner Phase 4 - universal "no piece of information duplicated" hierarchy, across every representative structure', () => {
+  const cases = [
+    { label: 'For Time (no cap)', formatId: 'For Time', config: {} },
+    { label: 'For Time + Time Cap', formatId: 'For Time', config: { timeCapSec: 600 } },
+    { label: 'RFT (no cap)', formatId: 'RFT', config: { rounds: 5 } },
+    { label: 'RFT + Time Cap', formatId: 'RFT', config: { rounds: 5, timeCapSec: 900 } },
+    { label: 'AMRAP', formatId: 'AMRAP', config: { durationSec: 720 } },
+    { label: 'EMOM', formatId: 'EMOM', config: { totalRounds: 12, intervalSec: 60 } },
+    { label: 'Intervals (structured)', formatId: 'Intervals', config: { roundCount: 5, stationMode: 'per-interval', workSec: 40, restSec: 20 } },
+    { label: 'Ladder', formatId: 'Ladder', config: {} },
+    { label: 'Chipper / sequential + Time Cap', formatId: 'Chipper', config: { timeCapSec: 1200 } },
+  ]
+
+  for (const { label, formatId, config } of cases) {
+    it(`${label}: every duration/cap fact appears exactly once across headline + TOP SECONDARY + center format`, () => {
+      const structureHeader = resolveWorkoutStructureHeader(formatId, config, tEn)
+      const movements = ['Movement A', 'Movement B']
+      const headline = composeWorkoutHeadline(structureHeader, movements, tEn)
+      // Deliberately timestamped so no locale-formatted date/time string can
+      // coincidentally collide with a computed duration value below (e.g. a
+      // "5:00" duration vs a "5:00 PM" timestamp) - exact DOM TEXT NODE
+      // matching (queryAllByText), not substring counting over concatenated
+      // page text, is what actually proves "shown exactly once".
+      const { unmount } = render(
+        <PhotoResultCard
+          photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+          gymName="CrossFit Delta" gymColor="#ABE73C"
+          variantLevel="RX" notRxdLabel={null}
+          structureHeader={structureHeader} headline={headline}
+          movements={movements} resultText="some result"
+          loggedAt="2026-09-05T00:31:00.000Z" lang="en" t={tEn}
+        />
+      )
+      // Exactly one of the two duration concepts may be present for any
+      // given format (never both) - and whichever is present must appear
+      // in the DOM exactly once.
+      if (structureHeader.timeCap) {
+        expect(screen.getAllByText(structureHeader.timeCap)).toHaveLength(1)
+        expect(headline).not.toContain(structureHeader.timeCap)
+      }
+      if (structureHeader.intrinsicDuration) {
+        expect(screen.getAllByText(structureHeader.intrinsicDuration)).toHaveLength(1)
+        expect(headline).not.toContain(structureHeader.intrinsicDuration)
+      }
+      expect(structureHeader.timeCap && structureHeader.intrinsicDuration).toBeFalsy() // never both on the same format
+      unmount()
+    })
+  }
+})
+
+// The owner's own exact reproduction case: a descending-rep-scheme For Time
+// with a Time Cap, Clean & Jerk + Cal Air Bike, finished 7:00, RX.
+describe('Owner exact reproduction - For Time + Time Cap, descending scheme, Finished, RX', () => {
+  it('headline has no time cap, TOP SECONDARY shows it once, center shows the bare format, full workout and bottom bar are correct', () => {
+    const structureHeader = resolveWorkoutStructureHeader('For Time', { timeCapSec: 600 }, tEn)
+    const movements = ['21 Clean and Jerks @ 43 kg', '21 Cal Air Bike', '15 Clean & Jerk @ 43 kg', '15 Cal Air Bike', '9 Clean & Jerk @ 43 kg', '9 Cal Air Bike']
+    const headline = composeWorkoutHeadline(structureHeader, movements, tEn)
+
+    expect(structureHeader.primary).toBe('For Time')
+    expect(structureHeader.timeCap).toBe('Time cap 10:00')
+    expect(structureHeader.intrinsicDuration).toBeNull()
+    expect(headline).not.toMatch(/10:00|Time cap/i)
+
+    render(
+      <PhotoResultCard
+        photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+        gymName="CrossFit C15" gymColor="#ABE73C"
+        variantLevel="RX" notRxdLabel={null}
+        structureHeader={structureHeader} headline={headline}
+        movements={movements} resultText="7:00"
+        loggedAt="2026-09-06T09:03:00.000Z" lang="en" t={tEn}
+      />
+    )
+    expect(screen.getAllByText('Time cap 10:00')).toHaveLength(1)
+    expect(screen.getByText('For Time')).toBeInTheDocument()
+    expect(screen.getByText('21 Clean and Jerks @ 43 kg')).toBeInTheDocument()
+    expect(screen.getByText('9 Cal Air Bike')).toBeInTheDocument()
+    expect(screen.getAllByText('7:00').length).toBeGreaterThan(0)
+    expect(screen.getByText('CrossFit C15')).toBeInTheDocument()
+    expect(screen.getByText('FORGE')).toBeInTheDocument()
+  })
 })

@@ -7,7 +7,7 @@ const baseProps = {
   onPhotoError: () => {},
   gymName: 'CrossFit Delta', gymColor: '#3355FF',
   variantLevel: 'RX', notRxdLabel: null,
-  structureHeader: { primary: '5 RFT', secondary: null, prescriptionLines: [] },
+  structureHeader: { primary: '5 RFT', timeCap: null, intrinsicDuration: null, prescriptionLines: [] },
   headline: '5 RFT: 200m Run, 20 Air Squats, 20 Push-Ups, and 1 more',
   movements: ['200m Run', '20 Air Squats', '20 Push-Ups', '20 Lunges'],
   resultText: '12:00',
@@ -83,7 +83,7 @@ describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () 
   })
 
   it('renders the actual prescribed format large and in gyms.primary_color, never hardcoded lime (§14/§15/§29)', () => {
-    render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'AMRAP', secondary: '15:00', prescriptionLines: [] }} gymColor="#3355FF" resultText="132 reps" />)
+    render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'AMRAP', timeCap: null, intrinsicDuration: '15:00', prescriptionLines: [] }} gymColor="#3355FF" resultText="132 reps" />)
     expect(screen.getByText('AMRAP')).toHaveStyle({ color: '#3355FF' })
     expect(screen.getByText('15:00')).toBeInTheDocument()
     expect(screen.getByText('132 reps')).toBeInTheDocument()
@@ -92,6 +92,27 @@ describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () 
   it('falls back to the existing lime accent only when no gyms.primary_color is configured', () => {
     render(<PhotoResultCard {...baseProps} gymColor={null} />)
     expect(screen.getByText('5 RFT')).toHaveStyle({ color: '#ABE73C' })
+  })
+
+  it('owner universal hierarchy - a genuine Time Cap renders ONCE, in its own TOP SECONDARY slot, never folded into the center format label', () => {
+    render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'FOR TIME', timeCap: 'TIME CAP 10:00', intrinsicDuration: null, prescriptionLines: [] }} />)
+    expect(screen.getAllByText('TIME CAP 10:00')).toHaveLength(1)
+    expect(screen.getByText('FOR TIME')).toBeInTheDocument()
+  })
+
+  it('owner universal hierarchy - an intrinsic format duration (AMRAP/EMOM) stays combined with the format, never shown a second time as a Time Cap', () => {
+    render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'AMRAP', timeCap: null, intrinsicDuration: '12:00', prescriptionLines: [] }} resultText="132 reps" />)
+    expect(screen.getAllByText('12:00')).toHaveLength(1)
+    expect(screen.queryByText(/TIME CAP/i)).toBeNull()
+  })
+
+  it('the top headline never repeats the time cap or intrinsic duration - only the bare format + movement summary', () => {
+    render(<PhotoResultCard {...baseProps}
+      structureHeader={{ primary: 'FOR TIME', timeCap: 'TIME CAP 10:00', intrinsicDuration: null, prescriptionLines: [] }}
+      headline="FOR TIME: 21 Clean and Jerks, 21 Cal Air Bike, and 1 more"
+    />)
+    const headline = screen.getByText('FOR TIME: 21 Clean and Jerks, 21 Cal Air Bike, and 1 more')
+    expect(headline.textContent).not.toMatch(/TIME CAP/i)
   })
 
   it('renders the score directly under the format, and RX/Not RX\'d as a small bordered badge beside it (§13/§16/§17)', () => {

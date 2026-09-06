@@ -109,6 +109,18 @@ export default function PhotoResultCard({
           </div>
         )}
 
+        {/* 1b. TOP SECONDARY - a genuine Time Cap only (owner's universal
+            hierarchy: For Time/RFT/Chipper/Ladder/Partner WOD via
+            resolveWorkoutStructureHeader's own `timeCap` field). Never
+            shown for an intrinsic-duration format (AMRAP/EMOM/Intervals),
+            and never also repeated in the center format label below -
+            exactly one place on the card ever shows it. */}
+        {structureHeader?.timeCap && (
+          <div style={{ marginTop: '2px', fontSize: '12px', fontWeight: '700', color: '#fff', textTransform: 'uppercase' }}>
+            {structureHeader.timeCap}
+          </div>
+        )}
+
         {/* 2. Thin divider (owner §10) */}
         <div aria-hidden="true" style={{ height: '1px', background: 'rgba(255,255,255,0.35)', margin: '10px 0 8px', width: '90%' }} />
 
@@ -144,9 +156,9 @@ export default function PhotoResultCard({
               <span style={{ fontSize: 'clamp(26px, 9vw, 38px)', fontWeight: '800', color: accent, lineHeight: 1, letterSpacing: '-0.02em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>
                 {structureHeader.primary}
               </span>
-              {structureHeader.secondary && (
+              {structureHeader.intrinsicDuration && (
                 <span style={{ fontSize: 'clamp(14px, 4vw, 18px)', fontWeight: '800', color: accent, marginLeft: '8px', textTransform: 'uppercase' }}>
-                  {structureHeader.secondary}
+                  {structureHeader.intrinsicDuration}
                 </span>
               )}
             </div>

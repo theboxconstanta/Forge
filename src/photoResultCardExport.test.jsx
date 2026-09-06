@@ -43,7 +43,7 @@ const baseCardProps = {
   photoUrl: null, // no image event to wait for - keeps these tests fast/deterministic
   gymName: 'CrossFit Delta', gymColor: '#ABE73C',
   variantLevel: 'RX', notRxdLabel: null,
-  structureHeader: { primary: '5 RFT', secondary: null, prescriptionLines: [] },
+  structureHeader: { primary: '5 RFT', timeCap: null, intrinsicDuration: null, prescriptionLines: [] },
   headline: '5 RFT: 200m Run, 20 Air Squats',
   movements: ['200m Run', '20 Air Squats'],
   resultText: '12:00',
@@ -119,7 +119,7 @@ describe('Owner §32 truth regression - the export instance receives the SAME ca
     const getText = captureNodeText()
     await generatePhotoResultCardImage({
       ...baseCardProps,
-      structureHeader: { primary: '5 RFT', secondary: null, prescriptionLines: [] },
+      structureHeader: { primary: '5 RFT', timeCap: null, intrinsicDuration: null, prescriptionLines: [] },
       headline: '5 RFT: 200m Run, 20 Clean & Jerk @ 43 kg',
       movements: ['20 Clean & Jerk @ 43 kg', '20 Push-Ups'],
     })
