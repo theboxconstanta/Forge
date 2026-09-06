@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey, resolveStationUnitsByKey } from './workoutFormats'
 import { resolveSequentialAmrapStations } from './sequentialAmrap'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
@@ -277,9 +277,15 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
   )
 }
 
-function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition }) {
+function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition, prescriptionMovements }) {
   const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
-  const score = computeSetsScore(formatId, config, rowsByKey)
+  // EMOM MIXED-UNIT AGGREGATION SAFETY - resolved from the canonical
+  // PROGRAMMED instances (never the performed override - keeps the live
+  // preview consistent with the saved log's own prescription_snapshot,
+  // which stays programmed-provenance). null for every non-structured
+  // format/config (unchanged behavior).
+  const unitsByKey = resolveStationUnitsByKey(formatId, config, prescriptionMovements)
+  const score = computeSetsScore(formatId, config, rowsByKey, unitsByKey)
   const Row = getFormat(formatId).simpleReps ? SimpleRepsRow : SetsRows
 
   // INC-07 - structured per-interval Intervals: the score inputs are grouped by
@@ -404,14 +410,14 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations, intervalComposition }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations, intervalComposition, prescriptionMovements }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
 
   if (format.family === 'sets') {
     return <SetsFields formatId={formatId} config={config} movements={movements || []} sets={v.sets}
-      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} intervalComposition={intervalComposition} />
+      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} intervalComposition={intervalComposition} prescriptionMovements={prescriptionMovements} />
   }
 
   if (format.family === 'mixed') {

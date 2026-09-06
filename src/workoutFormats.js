@@ -1732,7 +1732,62 @@ export function isUnitHomogeneousAggregation(stationMetrics) {
   return metrics.every((m) => m === metrics[0])
 }
 
-export function computeSetsScore(formatId, config, rowsByKey) {
+// EMOM MIXED-UNIT AGGREGATION SAFETY - the scored quantity of ONE frozen
+// `prescription_snapshot` movement entry (buildPrescriptionSnapshot's shape,
+// prescriptionContract.js: `{name, reps?, load?, distance?, calories?, ...}`),
+// reused verbatim - NEVER re-derived from movement text/labels ("12 cal",
+// "Row", "Run"...) and never a live catalog lookup at scoring time (the
+// snapshot is already frozen per-log). `reps` wins even when `load` is also
+// present - a movement like "10 Clean & Jerks @ 43 kg" freezes BOTH fields
+// (buildPrescriptionSnapshot line ~1306-1307: reps is seeded alongside load
+// for exactly this shape), and the SCORED quantity is the reps, not the
+// load - load is performed-metric context, never the counted unit. null =
+// no resolvable metric on this entry, never assumed to be 'reps'.
+export function scoredMetricOf(snapshotMovement) {
+  if (!snapshotMovement) return null
+  if (snapshotMovement.reps) return 'reps'
+  if (snapshotMovement.calories) return 'calories'
+  if (snapshotMovement.distance) return 'distance'
+  if (snapshotMovement.load) return 'load'
+  return null
+}
+
+// EMOM MIXED-UNIT AGGREGATION SAFETY - maps every rowsByKey key a structured
+// EMOM's scoring touches to its canonical scored-quantity metric, resolved
+// ENTIRELY from the log's own frozen `prescription_snapshot.movements` - the
+// SAME shape resolveIntervalStructure already accepts for `movements` (a
+// snapshot movement object passes through its station filter unchanged,
+// since it already carries `.name`). Reuses resolveIntervalStructure/
+// emomStationKey/intervalStationKey verbatim - no parallel station-walking
+// logic, no second EMOM-specific movement/unit map. null when the
+// format/config isn't a structured interval (nothing to classify) - the
+// caller then omits the unitsByKey argument to computeSetsScore/
+// setsDisplayScore/setsScoreText entirely, so every non-structured format
+// (and a structured EMOM with no snapshot available) is completely
+// unaffected - the aggregation gate below only ever activates when this
+// resolves real, canonical per-station unit data.
+export function resolveStationUnitsByKey(formatId, config, prescriptionMovements) {
+  // REGRESSION BOUNDARY - deliberately scoped to EMOM's 'shared-interval'
+  // shape ONLY, never Intervals/Tabata's 'per-interval' (even though both are
+  // `iv.structured`). Intervals/Tabata's existing per-interval scoring is an
+  // explicit regression boundary for this incident - an existing structured
+  // Interval log with genuinely heterogeneous station movements (e.g. a Row
+  // + Burpees alternation) must keep scoring exactly as it always has, not
+  // silently start returning null the day this gate ships.
+  if (config?.stationMode !== 'shared-interval') return null
+  const iv = resolveIntervalStructure(formatId, config, prescriptionMovements)
+  if (!iv || !iv.structured || iv.stationCount === 0) return null
+  const keyFor = formatId === 'EMOM' ? emomStationKey : intervalStationKey
+  const out = {}
+  for (let r = 1; r <= iv.roundCount; r++) {
+    iv.stations.forEach((st, si) => {
+      out[keyFor(r, si + 1, st.name)] = scoredMetricOf(st)
+    })
+  }
+  return out
+}
+
+export function computeSetsScore(formatId, config, rowsByKey, unitsByKey) {
   const scoringMode = resolveSetsScoringMode(formatId, config)
   if (!scoringMode) return null
   // Total Weight: suma greutatilor logate pe fiecare runda (ex. Complex cu
@@ -1747,6 +1802,21 @@ export function computeSetsScore(formatId, config, rowsByKey) {
       .filter(n => !isNaN(n))
     if (weightValues.length === 0) return null
     return scoringMode === 'Total Weight' ? weightValues.reduce((a, b) => a + b, 0) : Math.max(...weightValues)
+  }
+  // EMOM MIXED-UNIT AGGREGATION SAFETY - unitsByKey (optional, only ever
+  // passed for a structured EMOM via resolveStationUnitsByKey) maps rowsByKey
+  // keys to their canonical scored quantity. A Total/Lowest Reps sum across
+  // rows that measure DIFFERENT quantities (e.g. "12 Cal Row" + "10 Burpees")
+  // is not a real number - abort to the existing null/no-score representation
+  // (setsDisplayScore's own maxWeightFromSets fallback, which a structured
+  // EMOM's reps-only rows never satisfy either, so this resolves to the
+  // ordinary "-" every surface already shows for an unscoreable log) rather
+  // than compute one. Every row with NO resolved unit (unitsByKey omitted, or
+  // a key the map doesn't cover) is trusted exactly as before - this can only
+  // ever narrow an existing sum to null, never invent a new one.
+  if (unitsByKey) {
+    const knownUnits = Object.keys(rowsByKey || {}).map((k) => unitsByKey[k]).filter(Boolean)
+    if (!isUnitHomogeneousAggregation(knownUnits)) return null
   }
   const repsValues = Object.values(rowsByKey || {})
     .flat()
@@ -1777,8 +1847,8 @@ export function maxWeightFromSets(rowsByKey) {
 // reale logate la "Build to Heavy/1RM", niciunul afisat/clasat pe
 // Leaderboard, pt ca acolo se citea doar time_result/result - ambele mereu
 // null la aceasta familie, rezultatul real fiind in sets).
-export function setsDisplayScore(formatId, config, rowsByKey) {
-  const configured = computeSetsScore(formatId, config, rowsByKey)
+export function setsDisplayScore(formatId, config, rowsByKey, unitsByKey) {
+  const configured = computeSetsScore(formatId, config, rowsByKey, unitsByKey)
   if (configured != null) return configured
   return maxWeightFromSets(rowsByKey)
 }
@@ -1812,8 +1882,8 @@ export function isWeightScoredSetsFormat(config, formatId) {
 // null when there is no derivable score (family:'sets' with neither a resolvable
 // scoringMode nor any logged weight - e.g. an empty Complex). `repsWord` keeps
 // i18n at the call site (t.clasamentRepsUnit); this module stays pure.
-export function setsScoreText(formatId, config, rowsByKey, weightUnit, repsWord = 'reps') {
-  const score = setsDisplayScore(formatId, config, rowsByKey)
+export function setsScoreText(formatId, config, rowsByKey, weightUnit, repsWord = 'reps', unitsByKey) {
+  const score = setsDisplayScore(formatId, config, rowsByKey, unitsByKey)
   if (score == null) return null
   const unit = isWeightScoredSetsFormat(config, formatId)
     ? (weightUnit === 'lbs' ? 'lbs' : 'kg')
@@ -1896,7 +1966,12 @@ export function sortSectionLogs(arr, formatId, formatConfig) {
   if (format?.family === 'sets') {
     const weightScored = isWeightScoredSetsFormat(formatConfig, formatId)
     const withScore = arr.map(log => {
-      const score = setsDisplayScore(formatId, formatConfig, log.sets)
+      // EMOM MIXED-UNIT AGGREGATION SAFETY - resolved from THIS log's own
+      // frozen prescription_snapshot (historical truth, never the current
+      // `wods` row) - null for every non-structured format/log, which
+      // computeSetsScore treats as "no unit info, trust the sum" (unchanged).
+      const unitsByKey = resolveStationUnitsByKey(formatId, formatConfig, log.prescription_snapshot?.movements)
+      const score = setsDisplayScore(formatId, formatConfig, log.sets, unitsByKey)
       const rankScore = (weightScored && score != null) ? toKgForRanking(score, log.profile?.weight_unit || 'kg') : score
       return { ...log, _setsScore: score, _setsRankScore: rankScore }
     })

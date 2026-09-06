@@ -136,7 +136,7 @@ describe('INC-06 · BUG 2 FIX — logger total label matches the canonical scori
 
 describe('INC-06 · BUG 3 FIX — Jurnal + Skill Jurnal use setsScoreText (no forced kg)', () => {
   it('App.jsx Jurnal WOD card derives the sets score via setsScoreText', () => {
-    expect(app).toMatch(/const wSetsText = wHasSets \? setsScoreText\(formatTipResolvat, formatConfigResolvat, w\.sets, weightUnit, t\.clasamentRepsUnit\)/)
+    expect(app).toMatch(/const wSetsText = wHasSets \? setsScoreText\(formatTipResolvat, formatConfigResolvat, w\.sets, weightUnit, t\.clasamentRepsUnit/)
     expect(app).not.toMatch(/\[`\$\{wSetsScore\}\$\{unitLabel\}`\]/)
   })
   it('App.jsx Skill Jurnal card derives the score via setsScoreText', () => {

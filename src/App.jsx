@@ -54,6 +54,7 @@ import {
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
   resolveWorkoutStructureHeader, composeWorkoutHeadline, resolveCompactResultText,
+  resolveStationUnitsByKey,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -6471,7 +6472,11 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // kg/lbs even to a rep-scored Intervals/Tabata total ("203kg"); the
               // leaderboard already gates the unit on isWeightScoredSetsFormat and
               // now Jurnal goes through the same shared helper.
-              const wSetsText = wHasSets ? setsScoreText(formatTipResolvat, formatConfigResolvat, w.sets, weightUnit, t.clasamentRepsUnit) : null
+              // EMOM MIXED-UNIT AGGREGATION SAFETY - resolved from this log's
+              // own frozen prescription_snapshot; null for every non-structured
+              // format/log (unchanged behavior).
+              const wUnitsByKey = wHasSets ? resolveStationUnitsByKey(formatTipResolvat, formatConfigResolvat, w.prescription_snapshot?.movements) : null
+              const wSetsText = wHasSets ? setsScoreText(formatTipResolvat, formatConfigResolvat, w.sets, weightUnit, t.clasamentRepsUnit, wUnitsByKey) : null
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -9816,8 +9821,14 @@ function App() {
         // such workout. Feed it the SAME canonical derived score the leaderboard
         // and the Jurnal card already show.
         const activeShareFmt = getFormat(activeLogFormatId)
+        // EMOM MIXED-UNIT AGGREGATION SAFETY - the SAME prescriptionSnapshot
+        // local var just built above (and about to be persisted verbatim) -
+        // no re-derivation, no live lookup.
+        const shareUnitsByKey = activeShareFmt?.family === 'sets'
+          ? resolveStationUnitsByKey(activeLogFormatId, activeLogFormatConfig, prescriptionSnapshot?.movements)
+          : null
         const derivedShareScore = activeShareFmt?.family === 'sets'
-          ? setsScoreText(activeLogFormatId, activeLogFormatConfig, logFields.sets, userProfile?.weight_unit, t.clasamentRepsUnit)
+          ? setsScoreText(activeLogFormatId, activeLogFormatConfig, logFields.sets, userProfile?.weight_unit, t.clasamentRepsUnit, shareUnitsByKey)
           : (activeShareFmt?.family === 'chained' && logFields.log_meta?.totalReps != null)
             ? t.jurnalTotalRepsLabel(logFields.log_meta.totalReps)
             : null
@@ -12259,6 +12270,7 @@ function App() {
               movements={effectivePartialMovements}
               sequentialAmrapStations={sequentialAmrapStations}
               intervalComposition={intervalCompositionActive}
+              prescriptionMovements={frozenProgrammedInstances}
               prescribedWeight={prescribedWeightPentruLog}
               rxStatus={liveRxStatus}
               value={{
