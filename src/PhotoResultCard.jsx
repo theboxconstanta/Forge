@@ -102,9 +102,12 @@ export default function PhotoResultCard({
 
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '16px 38px 46px 14px', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
         {/* 1. TOP WORKOUT SUMMARY - condensed/bold/uppercase/white/left,
-            never centered (owner §7/§9). */}
+            never centered (owner §7/§9). Context, not the hero element -
+            deliberately smaller than the central format/progression below
+            it (owner Phase 5 §2 correction: the prior size made this too
+            visually dominant). */}
         {headline && (
-          <div style={{ fontSize: 'clamp(15px, 4.2vw, 19px)', fontWeight: '800', color: '#fff', lineHeight: 1.15, letterSpacing: '-0.01em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>
+          <div style={{ fontSize: 'clamp(11px, 3vw, 13px)', fontWeight: '800', color: '#fff', lineHeight: 1.25, letterSpacing: '-0.005em', textTransform: 'uppercase', overflowWrap: 'anywhere' }}>
             {headline}
           </div>
         )}
@@ -166,22 +169,18 @@ export default function PhotoResultCard({
           {structureHeader?.prescriptionLines.map((l, i) => (
             <div key={i} style={{ fontSize: '13px', fontWeight: '700', color: '#fff', textTransform: 'uppercase', marginBottom: '4px' }}>{l}</div>
           ))}
-          {(resultText || statusText) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: movements?.length ? '10px' : '0' }}>
-              {resultText && (
-                <span style={{ fontSize: 'clamp(16px, 5vw, 21px)', fontWeight: '800', color: '#fff', lineHeight: 1.1, letterSpacing: '-0.01em', overflowWrap: 'anywhere' }}>
-                  {resultText}
-                </span>
-              )}
-              {statusText && (
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff', border: '1px solid rgba(255,255,255,0.55)', borderRadius: '4px', padding: '2px 7px', lineHeight: 1.2, textTransform: 'uppercase' }}>
-                  {statusText}
-                </span>
-              )}
-            </div>
-          )}
+          {/* Owner Phase 5 - CENTER answers "what did the athlete actually
+              do?" ONLY. This is the SAME resolveResultMovementLines output
+              Leaderboard's own expanded card renders as `cardMovementLines`
+              (App.jsx) - one canonical athlete-performance representation,
+              never a PhotoResultCard-specific reinterpretation. The
+              standalone score/status row and the separate full-workout
+              block that used to sit here are both REMOVED - score+status
+              now live exactly once, in the bottom bar only (owner §11/§13:
+              "status must appear once", "no piece of information
+              duplicated"). */}
           {movements && movements.length > 0 && (
-            <div style={{ fontSize: '12px', fontWeight: '700', lineHeight: 1.3, color: '#fff', textTransform: 'uppercase' }}>
+            <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '700', lineHeight: 1.35, color: '#fff', textTransform: 'uppercase' }}>
               {movements.map((m, i) => <div key={i} style={{ overflowWrap: 'anywhere' }}>{m}</div>)}
             </div>
           )}

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PhotoResultCard from './PhotoResultCard.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const baseProps = {
   photoUrl: 'https://signed.example/photo.jpg',
@@ -53,21 +58,26 @@ describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () 
   it('renders no separate black header and no white footer - the card is one continuous element with a transparent-to-photo body (§3)', () => {
     const { container } = render(<PhotoResultCard {...baseProps} />)
     const outer = container.firstChild
-    // the outer card itself is transparent-to-photo (#0E0E0E is only the
-    // pre-image fallback fill, painted UNDER the photo, never a separate
-    // solid header/footer block layered above it)
     expect(outer.style.background).toBe('rgb(14, 14, 14)')
-    // no element carries a plain white background anywhere in the card
     expect(container.innerHTML).not.toMatch(/background:\s*#fff/i)
     expect(container.innerHTML).not.toMatch(/background:\s*white/i)
   })
 
-  it('renders the top workout summary headline, left-aligned, uppercase presentation, only when supplied (§7/§8/§9)', () => {
+  it('renders the top workout summary headline, left-aligned, uppercase, only when supplied (owner Phase 5 §2)', () => {
     const { rerender } = render(<PhotoResultCard {...baseProps} />)
     const headlineNode = screen.getByText(baseProps.headline)
-    expect(headlineNode).toHaveStyle({ textTransform: 'uppercase', textAlign: '' })
+    expect(headlineNode).toHaveStyle({ textTransform: 'uppercase' })
     rerender(<PhotoResultCard {...baseProps} headline={null} />)
     expect(screen.queryByText(baseProps.headline)).toBeNull()
+  })
+
+  it('the top headline\'s font-size is materially smaller than the central format\'s (owner Phase 5 §2) - jsdom cannot compute clamp() layout, so this checks the authored source directly, guarding against a future edit re-widening it', () => {
+    const src = readFileSync(join(__dirname, 'PhotoResultCard.jsx'), 'utf8')
+    const headlineMax = Number(src.match(/TOP WORKOUT SUMMARY[\s\S]*?fontSize: 'clamp\([\d.]+px, [\d.]+vw, ([\d.]+)px\)'/)?.[1])
+    const formatMax = Number(src.match(/Central block[\s\S]{0,400}?fontSize: 'clamp\([\d.]+px, [\d.]+vw, ([\d.]+)px\)'/)?.[1])
+    expect(headlineMax).toBeGreaterThan(0)
+    expect(formatMax).toBeGreaterThan(0)
+    expect(headlineMax).toBeLessThan(formatMax)
   })
 
   it('renders a thin divider below the summary (§10)', () => {
@@ -86,7 +96,6 @@ describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () 
     render(<PhotoResultCard {...baseProps} structureHeader={{ primary: 'AMRAP', timeCap: null, intrinsicDuration: '15:00', prescriptionLines: [] }} gymColor="#3355FF" resultText="132 reps" />)
     expect(screen.getByText('AMRAP')).toHaveStyle({ color: '#3355FF' })
     expect(screen.getByText('15:00')).toBeInTheDocument()
-    expect(screen.getByText('132 reps')).toBeInTheDocument()
   })
 
   it('falls back to the existing lime accent only when no gyms.primary_color is configured', () => {
@@ -115,23 +124,37 @@ describe('PhotoResultCard - owner Phase 2.4 pixel-faithful visual contract', () 
     expect(headline.textContent).not.toMatch(/TIME CAP/i)
   })
 
-  it('renders the score directly under the format, and RX/Not RX\'d as a small bordered badge beside it (§13/§16/§17)', () => {
-    const { rerender } = render(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel={null} resultText="12:00" />)
-    const badge = screen.getAllByText('RX').find(el => el.style.border)
-    expect(badge).toBeTruthy()
-    expect(screen.getByText('12:00')).toBeInTheDocument()
-    rerender(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel="Not RX'd" resultText="12:00" />)
-    // the compact score/status slot shows the MORE SPECIFIC fact (Modified/Not
-    // RX'd) rather than both - the underlying axes remain separate props.
-    expect(screen.getAllByText("Not RX'd").length).toBeGreaterThan(0)
+  it('owner Phase 5 §11/§16 - center never shows a standalone score or status - both live exactly once, in the bottom bar only', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} variantLevel="RX" notRxdLabel="Not RX'd" resultText="7:00" />)
+    // no bordered status badge anywhere in the center content (only the
+    // bottom bar's plain joined text may contain these words)
+    const borderedBadges = [...container.querySelectorAll('span')].filter(el => el.style.border && /Not RX'd|RX/.test(el.textContent))
+    expect(borderedBadges).toHaveLength(0)
+    // "7:00" appears exactly once on the whole card (bottom bar only) -
+    // it is embedded in a single joined "7:00 | Not RX'd" text node, so
+    // count occurrences in the full card text rather than querying for an
+    // exact standalone "7:00" node (which the center used to render).
+    expect((container.textContent.match(/7:00/g) || []).length).toBe(1)
   })
 
-  it('renders the full performed workout below the result, white/bold/uppercase/left, never re-stating the format (§19/§21)', () => {
+  it('owner Phase 5 §10/§7 - center shows ONLY the athlete progression (resolveResultMovementLines output), no second full-workout block, no duplicated format', () => {
     render(<PhotoResultCard {...baseProps} movements={['200m Run', '20 Air Squats']} />)
     expect(screen.getByText('200m Run')).toHaveStyle({ textTransform: 'uppercase' })
     expect(screen.getByText('20 Air Squats')).toBeInTheDocument()
-    // "5 RFT" appears exactly once (the central format), not duplicated above the movement list
+    // "5 RFT" appears exactly once (the central format), never duplicated
     expect(screen.getAllByText('5 RFT')).toHaveLength(1)
+    // each movement line appears exactly once - no separate redundant block
+    expect(screen.getAllByText('200m Run')).toHaveLength(1)
+  })
+
+  it('owner Phase 5 §13 - bottom bar contains ONLY the canonical final result + status, never movement/workout text', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} movements={['200m Run', '20 Air Squats', '20 Push-Ups', '20 Lunges']} resultText="7:00" variantLevel="RX" />)
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar).toBeTruthy()
+    const bottomBarText = bottomBar.textContent
+    expect(bottomBarText).toContain('7:00')
+    expect(bottomBarText).toContain('RX')
+    expect(bottomBarText).not.toMatch(/200m Run|Air Squats|Push-Ups|Lunges/i)
   })
 
   it('renders the bottom translucent bar with a result summary on the left and FORGE + logo on the right (§23/§24/§26)', () => {

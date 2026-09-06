@@ -336,7 +336,7 @@ describe('Owner exact reproduction - For Time + Time Cap, descending scheme, Fin
     expect(structureHeader.intrinsicDuration).toBeNull()
     expect(headline).not.toMatch(/10:00|Time cap/i)
 
-    render(
+    const { container } = render(
       <PhotoResultCard
         photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
         gymName="CrossFit C15" gymColor="#ABE73C"
@@ -350,8 +350,133 @@ describe('Owner exact reproduction - For Time + Time Cap, descending scheme, Fin
     expect(screen.getByText('For Time')).toBeInTheDocument()
     expect(screen.getByText('21 Clean and Jerks @ 43 kg')).toBeInTheDocument()
     expect(screen.getByText('9 Cal Air Bike')).toBeInTheDocument()
-    expect(screen.getAllByText('7:00').length).toBeGreaterThan(0)
+    // owner Phase 5 §11/§16 - the final result (7:00) lives exactly once,
+    // in the bottom bar's joined "7:00 | RX" text - never a standalone
+    // central occurrence any more.
+    expect((container.textContent.match(/7:00/g) || []).length).toBe(1)
+    expect(container.textContent).toContain('7:00')
+    expect(container.textContent).toContain('RX')
     expect(screen.getByText('CrossFit C15')).toBeInTheDocument()
     expect(screen.getByText('FORGE')).toBeInTheDocument()
+  })
+})
+
+// PHOTO RESULT CARD Phase 5 (owner final information hierarchy) - the full
+// §23 OWNER ORACLE regression (A-P). Athlete progression is
+// resolveResultMovementLines(log) - the SAME resolver Leaderboard's own
+// expanded card renders as `cardMovementLines` (App.jsx line ~2496) - fed
+// with a performed_prescription overlay that only lists the movements
+// actually reached (21/21, 21/21, a partial 10, PLUS one substitution),
+// which is how the already-closed Universal Partial Result Integrity /
+// Performed Movement Capability Completion invariants naturally produce
+// "later unperformed stations do not appear" - no fraction ("10/15")
+// annotation is synthesized, since no canonical resolver anywhere in the
+// codebase produces that shape (audited: resultWorkoutLines.js only ever
+// exposes full display lines) - inventing one would be exactly the "second
+// interpretation/parallel business logic" the owner prohibits.
+describe('Owner §23 ORACLE - For Time + Time Cap, Finished 7:00, RX, partial-progression athlete truth with a substitution', () => {
+  const structureHeader = resolveWorkoutStructureHeader('For Time', { timeCapSec: 600 }, tEn)
+  // Programmed: 21 Clean and Jerks, 21 Cal Air Bike, 15 Wall Balls, 15 Cal Air
+  // Bike, 9 Clean & Jerk, 9 Cal Air Bike (6 stations). Performed: finished the
+  // first 2 stations as programmed, substituted Wall Balls -> Clean & Jerk
+  // @ 43 kg on station 3 and only reached 10 of it, and never reached
+  // stations 4-6 at all (simply absent from the performed overlay - owner
+  // §7 "do not show later unperformed stations").
+  const log = {
+    variant_level: 'RX',
+    performed_prescription: performed('rx', [
+      { name: 'Clean and Jerks', load: 43, reps: 21 },
+      { name: 'Cal Air Bike', reps: 21 },
+      { name: 'Clean & Jerk', load: 43, reps: 10, substitutedFrom: 'Wall Balls' },
+    ]),
+    prescription_snapshot: snap('rx', 'male', [
+      { name: 'Clean and Jerks', line: '21 Clean and Jerks @ 43 kg', load: 43, reps: 21 },
+      { name: 'Cal Air Bike', line: '21 Cal Air Bike', reps: 21 },
+      { name: 'Wall Balls', line: '15 Wall Balls', reps: 15 },
+      { name: 'Cal Air Bike', line: '15 Cal Air Bike', reps: 15 },
+      { name: 'Clean & Jerk', line: '9 Clean & Jerk @ 43 kg', load: 43, reps: 9 },
+      { name: 'Cal Air Bike', line: '9 Cal Air Bike', reps: 9 },
+    ]),
+  }
+  const movements = resolveResultMovementLines(log)
+  const headline = composeWorkoutHeadline(structureHeader, movements, tEn)
+
+  it('resolver sanity: athlete progression contains only the reached stations, with the substitution, never the programmed Wall Balls or any later station', () => {
+    expect(movements).toEqual(['21 Clean and Jerks @ 43 kg', '21 Cal Air Bike', '10 Clean & Jerk @ 43 kg'])
+    expect(movements.join(' ')).not.toMatch(/Wall Balls/)
+  })
+
+  it('A/B/C/D/E/F/G/H/I/J/K/L/M/N - full card assertions against the real rendered PhotoResultCard', () => {
+    const { container } = render(
+      <PhotoResultCard
+        photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+        gymName="CrossFit C15" gymColor="#ABE73C"
+        variantLevel="RX" notRxdLabel={null}
+        structureHeader={structureHeader} headline={headline}
+        movements={movements} resultText="7:00"
+        loggedAt="2026-09-06T09:29:00.000Z" lang="en" t={tEn}
+      />
+    )
+    const text = container.textContent
+
+    // A. top compact prescribed summary exists exactly once
+    expect(screen.getAllByText(headline)).toHaveLength(1)
+
+    // C. TIME CAP appears exactly once
+    expect(screen.getAllByText('Time cap 10:00')).toHaveLength(1)
+
+    // D. Time Cap sits under the top summary, before the metadata (gym name)
+    const headlineIdx = text.indexOf(headline)
+    const timeCapIdx = text.indexOf('Time cap 10:00')
+    const gymIdx = text.indexOf('CrossFit C15')
+    expect(headlineIdx).toBeGreaterThanOrEqual(0)
+    expect(headlineIdx).toBeLessThan(timeCapIdx)
+    expect(timeCapIdx).toBeLessThan(gymIdx)
+
+    // E. central format "For Time" appears exactly once
+    expect(screen.getAllByText('For Time')).toHaveLength(1)
+
+    // F. central athlete progression contains the reached-station lines,
+    // including the substitution
+    expect(screen.getByText('21 Clean and Jerks @ 43 kg')).toBeInTheDocument()
+    expect(screen.getByText('21 Cal Air Bike')).toBeInTheDocument()
+    expect(screen.getByText('10 Clean & Jerk @ 43 kg')).toBeInTheDocument()
+
+    // G. later unperformed stations (the full programmed 15/15/9/9 stations,
+    // and the pre-substitution "Wall Balls") are absent everywhere on the card
+    expect(text).not.toMatch(/Wall Balls/)
+    expect(text).not.toMatch(/15 Cal Air Bike|15 Wall Balls|9 Clean & Jerk|9 Cal Air Bike/)
+
+    // H. no standalone central RX badge (bordered span) - RX only appears
+    // inside the bottom bar's joined text
+    const borderedRx = [...container.querySelectorAll('span')].filter(el => el.style.border && /RX/.test(el.textContent))
+    expect(borderedRx).toHaveLength(0)
+
+    // I. no standalone central "7:00" - it appears exactly once, in the
+    // bottom bar
+    expect((text.match(/7:00/g) || []).length).toBe(1)
+
+    // J. no redundant full prescribed workout block anywhere (the programmed
+    // stations beyond what was performed never appear at all - already
+    // covered by G; this asserts the count of rendered movement lines
+    // equals the performed-truth count, never the 6-station programmed count)
+    expect(container.querySelectorAll('div[style*="overflow-wrap: anywhere"]').length).toBeLessThanOrEqual(movements.length + 1) // +1 tolerance for the headline's own wrap style if present
+
+    // K. bottom bar contains no movement/workout text
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar.textContent).not.toMatch(/Clean and Jerks|Cal Air Bike|Clean & Jerk/)
+
+    // L. bottom canonical result contains 7:00 and RX
+    expect(bottomBar.textContent).toContain('7:00')
+    expect(bottomBar.textContent).toContain('RX')
+
+    // M. FORGE remains present
+    expect(screen.getByText('FORGE')).toBeInTheDocument()
+
+    // N. the performed substitution renders performed truth (Clean & Jerk),
+    // never the programmed movement it replaced (Wall Balls) - already
+    // asserted above via G/F, restated here as the substitution-specific check
+    expect(text).toContain('Clean & Jerk')
+    expect(text).not.toContain('Wall Balls')
   })
 })

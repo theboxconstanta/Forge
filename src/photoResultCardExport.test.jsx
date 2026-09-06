@@ -136,4 +136,24 @@ describe('Owner §32 truth regression - the export instance receives the SAME ca
     expect(text).toContain('ThePACK')
     expect(text).not.toContain('CrossFit Delta')
   })
+
+  // Owner Phase 5 §21/§26 P - the exported artifact must naturally inherit
+  // the corrected hierarchy (no export-specific content, no second
+  // renderer): a genuine Time Cap appears once, the athlete progression
+  // (not a redundant full prescribed list) appears once, and no standalone
+  // central score/status is exported.
+  it('the exported node reflects the corrected hierarchy: Time Cap once, athlete progression once, no standalone central score/status', async () => {
+    const getText = captureNodeText()
+    await generatePhotoResultCardImage({
+      ...baseCardProps,
+      structureHeader: { primary: 'For Time', timeCap: 'Time cap 10:00', intrinsicDuration: null, prescriptionLines: [] },
+      headline: 'For Time: 21 Clean and Jerks @ 43 kg, 21 Cal Air Bike, and 1 more',
+      movements: ['21 Clean and Jerks @ 43 kg', '21 Cal Air Bike', '10 Clean & Jerk @ 43 kg'],
+      resultText: '7:00', variantLevel: 'RX', notRxdLabel: null,
+    })
+    const text = getText()
+    expect((text.match(/Time cap 10:00/g) || []).length).toBe(1)
+    expect((text.match(/7:00/g) || []).length).toBe(1)
+    expect(text).toContain('10 Clean & Jerk @ 43 kg')
+  })
 })
