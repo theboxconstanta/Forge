@@ -1305,6 +1305,42 @@ export function composeWorkoutHeadline(structureHeader, movementLines, t, maxMov
   return `${formatLabel}: ${parts.join(', ')}`
 }
 
+// PHOTO RESULT CARD Phase 6 (owner bottom-bar final polish) - the bottom
+// bar's compact final result must NEVER be the verbose composed
+// per-movement partial-progress sentence a capped/DNF SEQUENTIAL
+// (chipper-style) result stores as its own `result` field
+// (composePartialText's own output, joined with ", " - see
+// composeFortimeOrAmrapFields). Leaderboard's own compact score column
+// (App.jsx's Clasament render) has this EXACT same characteristic today -
+// no existing canonical compact summary exists for that one case - so
+// rather than inventing a new parser to manufacture one, this resolves to
+// `null` for it (owner §6 - "do not fall back to a long movement/
+// progression sentence... omit... according to the safest existing
+// semantics"), and the caller then shows status alone.
+//
+// Every other branch mirrors Leaderboard's own compact score precedence
+// (App.jsx's `result` variable in the Clasament render) verbatim - this is
+// a NEW shared helper, not a replacement of that inline computation, so
+// Leaderboard's own already-correct output is completely unaffected by
+// this extraction.
+export function resolveCompactResultText({ formatId, formatConfig, result, timeResult, t }) {
+  if (timeResult) return timeResult
+  if (!result) return null
+  // INC-11 - Sequence AMRAP already has a canonical compact summary
+  // (Total Reps, same read as the sort/Leaderboard) - reuse it verbatim.
+  if (isSequentialAmrap(formatId, formatConfig)) {
+    return `${partialRepsOfLog({ result }, true)} ${t?.clasamentRepsUnit || 'reps'}`
+  }
+  // A plain sequential/chipper-style format (For Time without Repeated
+  // Rounds, Chipper, Ladder, Partner WOD, etc.) with no time_result stores
+  // its raw `result` as a composed per-movement partial-progress sentence
+  // when capped/DNF - no safe compact summary exists for it anywhere in
+  // FORGE today (Leaderboard shows the same raw text in this exact case) -
+  // so the bottom bar omits the score entirely rather than rendering it.
+  if (isSequentialFormat(formatId, formatConfig)) return null
+  return result
+}
+
 // Eticheta scurta a formatului, cu numarul de runde/tinta inclus acolo unde
 // e conventie consacrata in CrossFit (ex. "5 RFT" - Rounds For Time, "5RM"),
 // nu doar formatId urmat separat de un rand generic "Numar runde: 5"

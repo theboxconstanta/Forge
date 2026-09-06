@@ -188,14 +188,21 @@ export default function PhotoResultCard({
       </div>
 
       {/* Bottom translucent bar - overlays the photo, not a footer outside
-          it (owner §23/§26). */}
+          it (owner §23/§26). Owner Phase 6 final polish: FORGE moved to the
+          left (application/product branding, secondary), the athlete's
+          compact final result + status moved to the right (primary
+          information in this bar, right-aligned). `resultText` here is
+          ALREADY guaranteed compact by the caller (resolveCompactResultText,
+          workoutFormats.js) - this component itself never inspects or
+          truncates it, it only lays out whatever compact string (or null)
+          it is given next to `statusText`. */}
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '9px 12px', background: 'rgba(0,0,0,0.55)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {[resultText, statusText].filter(Boolean).join(' | ')}
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <img src="/forge.png" alt="" data-role="forge-logo" style={{ height: '16px', width: '16px', borderRadius: '4px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '11px', letterSpacing: '1px' }}>FORGE</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+          {[resultText, statusText].filter(Boolean).join(' | ')}
         </div>
       </div>
     </div>

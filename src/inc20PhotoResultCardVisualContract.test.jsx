@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { resolveWorkoutStructureHeader, composeWorkoutHeadline, FORMAT_IDS } from './workoutFormats.js'
+import { resolveWorkoutStructureHeader, composeWorkoutHeadline, resolveCompactResultText, FORMAT_IDS } from './workoutFormats.js'
 import { resolveResultMovementLines } from './resultWorkoutLines.js'
 import { getT } from './translations.js'
 import PhotoResultCard from './PhotoResultCard.jsx'
@@ -478,5 +478,125 @@ describe('Owner §23 ORACLE - For Time + Time Cap, Finished 7:00, RX, partial-pr
     // asserted above via G/F, restated here as the substitution-specific check
     expect(text).toContain('Clean & Jerk')
     expect(text).not.toContain('Wall Balls')
+  })
+})
+
+// PHOTO RESULT CARD Phase 6 (owner bottom-bar final polish) - resolveCompactResultText
+describe('resolveCompactResultText - the bottom bar\'s compact score, never the verbose composed partial-progress sentence (owner §6)', () => {
+  it('a finished result (time_result present) always wins, regardless of format', () => {
+    expect(resolveCompactResultText({ formatId: 'For Time', formatConfig: {}, result: null, timeResult: '7:00', t: tEn })).toBe('7:00')
+    expect(resolveCompactResultText({ formatId: 'RFT', formatConfig: { rounds: 5 }, result: null, timeResult: '12:00', t: tEn })).toBe('12:00')
+  })
+
+  it('Sequence AMRAP reuses the exact canonical Total Reps summary (same as Leaderboard/sort), not the raw per-movement text', () => {
+    const result = '15/15 Pull-ups, 15/15 Wall Balls, 6/15 Burpees'
+    expect(resolveCompactResultText({ formatId: 'AMRAP', formatConfig: { structure: 'Sequence' }, result, timeResult: null, t: tEn }))
+      .toBe(`${15 + 15 + 6} ${tEn.clasamentRepsUnit}`)
+  })
+
+  it('owner §6 CRITICAL - a plain sequential/chipper format (For Time, non-repeated-rounds) with a verbose composed partial result and no time_result resolves to null - never renders the verbose sentence', () => {
+    const verbose = '21/21 Clean and jerks @ 43 kg, 21/21 Cal Air Bike, 10/15 Clean & Jerk @ 43 kg'
+    expect(resolveCompactResultText({ formatId: 'For Time', formatConfig: {}, result: verbose, timeResult: null, t: tEn })).toBeNull()
+    expect(resolveCompactResultText({ formatId: 'Chipper', formatConfig: { timeCapSec: 1200 }, result: verbose, timeResult: null, t: tEn })).toBeNull()
+    expect(resolveCompactResultText({ formatId: 'Ladder', formatConfig: {}, result: verbose, timeResult: null, t: tEn })).toBeNull()
+  })
+
+  it('a non-sequential format with an already-compact result (e.g. RFT capped "3 runde + 12") passes it through unchanged - never invents a different summary', () => {
+    expect(resolveCompactResultText({ formatId: 'RFT', formatConfig: { rounds: 5, structure: 'Repeated Rounds' }, result: '3 runde + 12', timeResult: null, t: tEn })).toBe('3 runde + 12')
+  })
+
+  it('no result and no time_result at all resolves to null, never a fabricated placeholder', () => {
+    expect(resolveCompactResultText({ formatId: 'For Time', formatConfig: {}, result: null, timeResult: null, t: tEn })).toBeNull()
+  })
+
+  it('never throws for any registered format id with an empty/verbose result (format safety)', () => {
+    const verbose = '21/21 Clean and jerks @ 43 kg, 10/15 Clean & Jerk @ 43 kg'
+    FORMAT_IDS.forEach(id => expect(() => resolveCompactResultText({ formatId: id, formatConfig: {}, result: verbose, timeResult: null, t: tEn })).not.toThrow())
+  })
+})
+
+describe('PhotoResultCard bottom bar - owner Phase 6 final layout: FORGE left, compact result + status right', () => {
+  const baseProps = {
+    photoUrl: 'https://signed.example/photo.jpg', onPhotoError: () => {},
+    gymName: 'CrossFit C15', gymColor: '#ABE73C',
+    variantLevel: 'RX', notRxdLabel: null,
+    structureHeader: { primary: 'For Time', timeCap: 'Time cap 10:00', intrinsicDuration: null, prescriptionLines: [] },
+    headline: 'For Time: 21 Clean and Jerks @ 43 kg, 21 Cal Air Bike, and 1 more',
+    movements: ['21 Clean and Jerks @ 43 kg', '21 Cal Air Bike', '10 Clean & Jerk @ 43 kg'],
+    resultText: '7:00',
+    loggedAt: '2026-09-06T09:29:00.000Z', lang: 'en', t: tEn,
+  }
+
+  it('A/B - FORGE sits in the left group, the compact result + status sit in the right group, in that DOM order', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} />)
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar).toBeTruthy()
+    const [leftGroup, rightGroup] = [...bottomBar.children]
+    expect(leftGroup.textContent).toContain('FORGE')
+    expect(rightGroup.textContent).toContain('7:00')
+    expect(rightGroup.textContent).toContain('RX')
+  })
+
+  it('C - the canonical status renders alongside the compact result', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} notRxdLabel="Not RX'd" />)
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar.textContent).toContain("Not RX'd")
+  })
+
+  it('D/E/F - no movement name, no progression fraction, no long composed partial result ever renders inside the bottom bar', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} resultText={null} />) // owner §6 omission case
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar.textContent).not.toMatch(/Clean and Jerks|Cal Air Bike|Clean & Jerk/)
+    expect(bottomBar.textContent).not.toMatch(/\d+\/\d+/) // no "21/21" or "10/15" style fraction
+    // only status remains when the compact result is unavailable (owner §6 fallback)
+    expect(bottomBar.textContent).toContain('RX')
+  })
+
+  it('G/H/I - center athlete progression, top summary, and Time Cap are all unaffected by this change', () => {
+    render(<PhotoResultCard {...baseProps} />)
+    expect(screen.getByText('21 Clean and Jerks @ 43 kg')).toBeInTheDocument()
+    expect(screen.getByText(baseProps.headline)).toBeInTheDocument()
+    expect(screen.getByText('Time cap 10:00')).toBeInTheDocument()
+  })
+})
+
+// Owner §16 - explicit reproduction of the case that previously caused the
+// bottom bar to show a long composed progression string, verified end to
+// end through the REAL resolvers + the REAL PhotoResultCard: the verbose
+// text remains available for CENTER's athlete-progression use (via
+// resolveResultMovementLines, unaffected), but resolveCompactResultText
+// keeps it out of the bottom bar entirely.
+describe('Owner §16 - verbose partial result regression, end to end', () => {
+  it('a capped/DNF plain sequential For Time: center still gets full athlete-progression truth, bottom bar gets no result text at all (status only)', () => {
+    const structureHeader = resolveWorkoutStructureHeader('For Time', { timeCapSec: 600 }, tEn)
+    const verboseResult = '21/21 Clean and jerks @ 43 kg, 21/21 Cal Air Bike, 10/15 Clean & Jerk @ 43 kg'
+    // This IS the verbose canonical `result` string composePartialText
+    // produces for a capped/DNF sequential log - resolveCompactResultText
+    // is the ONLY thing standing between it and the bottom bar.
+    const compactResult = resolveCompactResultText({ formatId: 'For Time', formatConfig: { timeCapSec: 600 }, result: verboseResult, timeResult: null, t: tEn })
+    expect(compactResult).toBeNull()
+
+    const movements = ['21 Clean and Jerks @ 43 kg', '21 Cal Air Bike', '10 Clean & Jerk @ 43 kg'] // athlete progression, unaffected
+    const { container } = render(
+      <PhotoResultCard
+        photoUrl="https://signed.example/photo.jpg" onPhotoError={() => {}}
+        gymName="CrossFit C15" gymColor="#ABE73C"
+        variantLevel="RX" notRxdLabel={null}
+        structureHeader={structureHeader} headline={composeWorkoutHeadline(structureHeader, movements, tEn)}
+        movements={movements} resultText={compactResult}
+        loggedAt="2026-09-06T09:29:00.000Z" lang="en" t={tEn}
+      />
+    )
+    // center still shows the full athlete progression
+    expect(screen.getByText('21 Clean and Jerks @ 43 kg')).toBeInTheDocument()
+    expect(screen.getByText('10 Clean & Jerk @ 43 kg')).toBeInTheDocument()
+    // the verbose composed sentence never appears ANYWHERE on the card as
+    // a single joined string (it was never passed in as such)
+    expect(container.textContent).not.toContain(verboseResult)
+    // bottom bar shows only status, no fraction, no movement text
+    const bottomBar = [...container.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar.textContent).toContain('RX')
+    expect(bottomBar.textContent).not.toMatch(/\d+\/\d+/)
+    expect(bottomBar.textContent).not.toMatch(/Clean and Jerks|Cal Air Bike/)
   })
 })

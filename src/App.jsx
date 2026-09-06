@@ -53,7 +53,7 @@ import {
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
-  resolveWorkoutStructureHeader, composeWorkoutHeadline,
+  resolveWorkoutStructureHeader, composeWorkoutHeadline, resolveCompactResultText,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -6523,6 +6523,20 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               const structureHeaderLog = photoMedia
                 ? resolveWorkoutStructureHeader(formatTipResolvat, formatConfigResolvat, t, (!esteSectiuneLegata && w.wods?.duration) ? formatWodDurata(w.wods.duration) : null)
                 : null
+              // PHOTO RESULT CARD Phase 6 (owner bottom-bar final polish) -
+              // mirrors the SAME precedence rezultatBucati above already
+              // uses (sets score -> chained total -> Sequence AMRAP total ->
+              // ascending total), only the FINAL fallback differs:
+              // resolveCompactResultText omits the verbose composed
+              // partial-progress sentence a capped/DNF sequential result
+              // would otherwise produce (owner §6), instead of the raw
+              // rezultatBucatiRaw text used everywhere else in Journal.
+              const photoCardResultText = photoMedia
+                ? (wSetsText ?? (chainedTotalReps != null ? t.jurnalTotalRepsLabel(chainedTotalReps)
+                  : sequentialAmrapTotal != null ? t.jurnalTotalRepsLabel(sequentialAmrapTotal)
+                  : ascendingTotalReps != null ? t.jurnalTotalRepsLabel(ascendingTotalReps)
+                  : resolveCompactResultText({ formatId: formatTipResolvat, formatConfig: formatConfigResolvat, result: w.result, timeResult: w.time_result, t })))
+                : null
               return (
                 <div onClick={() => { toggleClosed(logKey); setConfirmDelete(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #0E0E0E', cursor: 'pointer', position: 'relative' }}>
@@ -6578,7 +6592,7 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                           notRxdLabel={notRxdLabelLog}
                           structureHeader={structureHeaderLog}
                           headline={structureHeaderLog ? composeWorkoutHeadline(structureHeaderLog, cardMovementLines, t) : null}
-                          movements={cardMovementLines} resultText={areRezultatFinal ? rezultatBucati.join(' · ') : null}
+                          movements={cardMovementLines} resultText={photoCardResultText}
                           loggedAt={w.logged_at} lang={lang} t={t}
                         />
                       )}
@@ -6936,7 +6950,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
   const [sharePending, setSharePending] = useState(false)
   useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader, compactResult } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const resultText = scoreParts.length > 0 ? scoreParts.join(' · ') : null
   const dataObj = new Date(loggedAt)
@@ -6970,7 +6984,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
           gymName: gym.name, gymColor: gym.primaryColor,
           variantLevel, notRxdLabel,
           structureHeader, headline: composeWorkoutHeadline(structureHeader, movements, t),
-          movements, resultText, loggedAt, lang, t,
+          movements, resultText: compactResult, loggedAt, lang, t,
         },
         filename: buildShareFilename(new Date(loggedAt)),
         shareText: [gym.name, 'FORGE'].filter(Boolean).join(' · '),
@@ -7000,7 +7014,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
             gymName={gym.name} gymColor={gym.primaryColor}
             variantLevel={variantLevel} notRxdLabel={notRxdLabel}
             structureHeader={structureHeader} headline={composeWorkoutHeadline(structureHeader, movements, t)}
-            movements={movements} resultText={resultText} loggedAt={loggedAt} lang={lang} t={t}
+            movements={movements} resultText={compactResult} loggedAt={loggedAt} lang={lang} t={t}
             onShare={handleSharePhotoCard} sharePending={sharePending}
             onClose={onClose}
           />
@@ -9815,6 +9829,16 @@ function App() {
           variantColor: varianta?.culoare || null,
           variantBg: varianta?.bg || null,
           result: derivedShareScore ?? logFields.result, timeResult: logFields.time_result,
+          // PHOTO RESULT CARD Phase 6 (owner bottom-bar final polish) - the
+          // photo card's bottom bar reads THIS field, never `result`/
+          // `timeResult` above (those two stay exactly as before, still
+          // feeding the UNCHANGED plain no-photo layout's own score line -
+          // owner "freeze everything above the bottom bar" / no-photo
+          // regression). resolveCompactResultText omits the verbose
+          // composed partial-progress sentence a capped/DNF sequential
+          // result would otherwise produce, rather than inventing a parser
+          // to shorten it.
+          compactResult: derivedShareScore ?? resolveCompactResultText({ formatId: activeLogFormatId, formatConfig: activeLogFormatConfig, result: logFields.result, timeResult: logFields.time_result, t }),
           loggedAt: new Date().toISOString(),
           // P9.5.6 - AXIS B only: did the athlete change the SELECTED variant's
           // prescription? (weight below the selected variant's standard, movement

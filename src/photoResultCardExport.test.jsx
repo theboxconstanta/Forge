@@ -156,4 +156,22 @@ describe('Owner §32 truth regression - the export instance receives the SAME ca
     expect((text.match(/7:00/g) || []).length).toBe(1)
     expect(text).toContain('10 Clean & Jerk @ 43 kg')
   })
+
+  // Owner Phase 6 §13/§18/J - the bottom-bar layout swap (FORGE left,
+  // compact result+status right) must reach the exported artifact with no
+  // export-specific positioning.
+  it('the exported node has FORGE in the bottom bar\'s left group and the compact result+status in the right group', async () => {
+    let capturedNode = null
+    toJpeg.mockImplementationOnce(async (node) => { capturedNode = node; return TINY_JPEG_DATA_URL })
+    await generatePhotoResultCardImage({
+      ...baseCardProps,
+      resultText: '7:00', variantLevel: 'RX', notRxdLabel: null,
+    })
+    const bottomBar = [...capturedNode.querySelectorAll('div')].find(d => d.style.background === 'rgba(0, 0, 0, 0.55)')
+    expect(bottomBar).toBeTruthy()
+    const [leftGroup, rightGroup] = [...bottomBar.children]
+    expect(leftGroup.textContent).toContain('FORGE')
+    expect(rightGroup.textContent).toContain('7:00')
+    expect(rightGroup.textContent).toContain('RX')
+  })
 })
