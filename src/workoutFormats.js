@@ -1539,6 +1539,66 @@ export function emomStationKey(minuteIndex, stationIndex, stationName) {
   return `Min ${minuteIndex} · ${stationIndex}. ${stationName}`
 }
 
+// EMOM MINUTE-PATTERN AUTHORING - a THIRD, additive EMOM structural mode,
+// distinct from both legacy flat/cycling (single value per minute) and
+// 'shared-interval' (ALL movements repeat every single interval - INC-07
+// era, `970b26f`+). Real coach intent for a movement list like:
+//   10 Push-ups
+//   10 Air Squats
+//   10 Pull-ups
+// is usually "MIN 1 = Push-ups, MIN 2 = Air Squats, MIN 3 = Pull-ups, then
+// repeat the 3-minute pattern" - NOT "all three every minute". Rather than
+// overload 'shared-interval' with a second, incompatible meaning (explicit
+// owner instruction), this is a distinct `stationMode:'minute-pattern'`.
+//
+// Storage: reuses the EXISTING flat RX `instances` array unchanged (same
+// per-movement editing/reorder/substitution/capability machinery as every
+// other format - no second competing workout model) - each instance
+// additionally carries `patternMinute` (0-based index into the pattern,
+// set by the Coach Builder's minute-grouped editor). Grouping into minutes
+// is a pure DERIVED view over that flat array, not a second stored shape.
+//
+// `resolveEmomTimeline(formatId, config, movements)` expands the pattern
+// cyclically across `config.totalRounds` real minutes (modulo
+// patternLength), stopping exactly at totalRounds - never a stray extra
+// partial-pattern minute (owner §8). null for anything that is not a
+// minute-pattern EMOM (formatId !== 'EMOM' or stationMode !== that value) -
+// callers then fall through to resolveIntervalStructure/legacy flat
+// unaffected, so this is fully additive.
+export function isMinutePatternEmom(config) {
+  return !!config && config.stationMode === 'minute-pattern'
+}
+
+export function resolveEmomTimeline(formatId, config, movements) {
+  if (formatId !== 'EMOM' || !isMinutePatternEmom(config)) return null
+  const cfg = config || {}
+  const totalRounds = parseInt(cfg.totalRounds) || 0
+  const list = (Array.isArray(movements) ? movements : [])
+    .map((m) => (typeof m === 'string' ? { name: m } : m))
+    .filter((m) => m && typeof m.name === 'string' && m.name.trim() && !isRestLine(m.name))
+  const byMinute = new Map()
+  list.forEach((m) => {
+    const idx = Number.isInteger(m.patternMinute) ? m.patternMinute : 0
+    if (!byMinute.has(idx)) byMinute.set(idx, [])
+    byMinute.get(idx).push(m)
+  })
+  const patternLength = byMinute.size === 0 ? 0 : Math.max(...byMinute.keys()) + 1
+  const effectiveMinutes = []
+  if (patternLength > 0 && totalRounds > 0) {
+    for (let minute = 1; minute <= totalRounds; minute++) {
+      const patternIndex = (minute - 1) % patternLength
+      effectiveMinutes.push({ minute, patternIndex, movements: byMinute.get(patternIndex) || [] })
+    }
+  }
+  return {
+    structured: true,
+    patternLength,
+    totalRounds,
+    effectiveMinutes,
+    scoreMode: resolveSetsScoringMode(formatId, cfg),
+  }
+}
+
 // INC-07 - the ONE structured-interval display timeline: interleaves each
 // station's work interval with its rest, so Home / Coach Preview show
 //   0:40  Handstand Push-up
@@ -1577,6 +1637,20 @@ export function defaultRowsForFormat(formatId, config, movements) {
   const rowsOf = (n) => Array.from({ length: Math.max(1, n || 1) }, emptyRow)
 
   if (formatId === 'EMOM') {
+    // EMOM MINUTE-PATTERN AUTHORING - movements are assigned to SPECIFIC
+    // minutes (patternMinute) and the pattern cycles across totalRounds;
+    // ONE row per movement per EFFECTIVE minute, never every movement every
+    // minute. Checked BEFORE 'shared-interval' - gated strictly on the NEW
+    // stationMode, so an existing shared-interval or legacy EMOM (no
+    // instance ever carries patternMinute) is completely unaffected.
+    const timeline = resolveEmomTimeline(formatId, config, movements)
+    if (timeline && timeline.structured && timeline.effectiveMinutes.length > 0) {
+      const out = {}
+      timeline.effectiveMinutes.forEach(({ minute, movements: minuteMovements }) => {
+        minuteMovements.forEach((m, si) => { out[emomStationKey(minute, si + 1, m.name)] = [emptyRow()] })
+      })
+      return out
+    }
     // EMOM STRUCTURED RESULT INTEGRITY - multiple movements sharing ONE
     // interval (stationMode:'shared-interval'): roundCount × stationCount
     // rows, round-major, ONE input per movement per minute. Gated strictly
@@ -1776,6 +1850,19 @@ export function scoredMetricOf(snapshotMovement) {
 // unaffected - the aggregation gate below only ever activates when this
 // resolves real, canonical per-station unit data.
 export function resolveStationUnitsByKey(formatId, config, prescriptionMovements) {
+  // EMOM MINUTE-PATTERN AUTHORING - a minute-pattern EMOM's rowsByKey keys
+  // (emomStationKey per effective minute) get their units classified from
+  // the SAME canonical scoredMetricOf, walking resolveEmomTimeline's
+  // effective minutes instead of resolveIntervalStructure's stations.
+  if (isMinutePatternEmom(config)) {
+    const timeline = resolveEmomTimeline(formatId, config, prescriptionMovements)
+    if (!timeline || !timeline.structured || timeline.effectiveMinutes.length === 0) return null
+    const out = {}
+    timeline.effectiveMinutes.forEach(({ minute, movements }) => {
+      movements.forEach((m, si) => { out[emomStationKey(minute, si + 1, m.name)] = scoredMetricOf(m) })
+    })
+    return out
+  }
   // REGRESSION BOUNDARY - deliberately scoped to EMOM's 'shared-interval'
   // shape ONLY, never Intervals/Tabata's 'per-interval' (even though both are
   // `iv.structured`). Intervals/Tabata's existing per-interval scoring is an
