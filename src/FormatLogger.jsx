@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey } from './workoutFormats'
 import { resolveSequentialAmrapStations } from './sequentialAmrap'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
@@ -290,6 +290,12 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   // logger.
   const iv = resolveIntervalStructure(formatId, config, movements)
   if (iv && iv.structured && iv.stationCount > 0) {
+    // EMOM STRUCTURED RESULT INTEGRITY - EMOM's own structured rows use its
+    // pre-existing "Min N" convention, never Intervals/Tabata's "Rundă N" -
+    // must match defaultRowsForFormat's key exactly, or a fresh log's rows
+    // would never line up with the ones this grid reads/writes into.
+    const stationKeyFor = formatId === 'EMOM' ? emomStationKey : intervalStationKey
+    const roundLabelFor = (r) => formatId === 'EMOM' ? `Min ${r}` : (t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `Rundă ${r}`)
     const setStationReps = (key, row, value) => onChange({ ...rowsByKey, [key]: [{ ...row, reps: value }] })
     // P9.5.2A - a (round, station) cell whose PROGRAMMED movement the athlete
     // split / changed / marked not-performed renders one reps input per
@@ -321,10 +327,10 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
           return (
             <div key={r} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: r < iv.roundCount ? '1px solid #f0f0f0' : 'none' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
-                {(t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `Rundă ${r}`).toUpperCase()}
+                {roundLabelFor(r).toUpperCase()}
               </div>
               {iv.stations.map((st, si) => {
-                const key = intervalStationKey(r, si + 1, st.name)
+                const key = stationKeyFor(r, si + 1, st.name)
                 const entries = cellEntriesFor(si)
                 if (entries && entries.some((e) => e.notPerformed)) {
                   return (
@@ -346,7 +352,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
                             <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{ent.name}</div>
                             <input type="number" inputMode="numeric" value={row.reps || ''}
                               onChange={e => writeComposedCell(key, entries, ent.instanceId, e.target.value)}
-                              aria-label={`${ent.name} ${t?.logIntervalRoundLabel ? t.logIntervalRoundLabel(r) : `round ${r}`} reps`}
+                              aria-label={`${ent.name} ${roundLabelFor(r)} reps`}
                               placeholder={t?.skillLogRepsPlaceholder || 'reps'}
                               style={{ width: '84px', flexShrink: 0, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
                           </div>

@@ -350,17 +350,38 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   // coach did not re-author) is left exactly as-is - legacy flat.
   const primaryFormatConfig = (() => {
     const c = primary.formatConfig || {}
-    if (primary.format !== 'Intervals' || c.roundCount == null || !(Number(c.roundCount) > 0)) return c
-    const rxSv = primary.variants?.rx || {}
-    const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
-    const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
-    const roundCount = Number(c.roundCount)
-    return {
-      ...c,
-      stationMode: 'per-interval',
-      restPlacement: c.restPlacement || 'after-each-station',
-      rounds: stationCount > 0 ? roundCount * stationCount : roundCount,
+    if (primary.format === 'Intervals') {
+      if (c.roundCount == null || !(Number(c.roundCount) > 0)) return c
+      const rxSv = primary.variants?.rx || {}
+      const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
+      const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
+      const roundCount = Number(c.roundCount)
+      return {
+        ...c,
+        stationMode: 'per-interval',
+        restPlacement: c.restPlacement || 'after-each-station',
+        rounds: stationCount > 0 ? roundCount * stationCount : roundCount,
+      }
     }
+    // EMOM STRUCTURED RESULT INTEGRITY - a coach-authored EMOM with 2+ real
+    // (non-rest) RX movements and NO cycling `intervals` list has no other
+    // legitimate reading in EMOM's own schema than "all these movements
+    // happen every interval" (the `intervals` field already owns "one
+    // movement, rotating"; a single/no movement stays the untouched legacy
+    // flat "Min N" reading). Mirrors Intervals' own roundCount->stationMode
+    // derivation above - stamped at save time, never inferred at read time,
+    // so an EXISTING already-saved WOD only upgrades when the coach next
+    // saves it, and the one historical FROZEN log (sum=73) is untouched
+    // either way (defaultRowsForFormat only ever seeds a NEW empty log).
+    if (primary.format === 'EMOM' && !(Array.isArray(c.intervals) && c.intervals.length > 0)) {
+      const rxSv = primary.variants?.rx || {}
+      const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
+      const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
+      if (stationCount >= 2) {
+        return { ...c, stationMode: 'shared-interval', roundCount: Number(c.totalRounds) || 0 }
+      }
+    }
+    return c
   })()
 
   const autoDurationSec = AUTO_DURATION_FORMAT_IDS.includes(primary.format)
