@@ -46,7 +46,7 @@ import {
   resolveIntervalStructure, intervalTimelineLines, isRestLine, intervalStationKey,
   composeAmrapResult, parseAmrapResult, composePartialText, parsePartialText, partialRepsOfLog, repsEfectiveSecvential,
   normalizeSetsRows, computeSetsPrCandidates, describeFormatConfig, formatMemberScheduleLines, formatMemberSkillDetailLines, getWorkoutFormatDisplay, AUTO_DURATION_FORMAT_IDS,
-  formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica,
+  formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica, emomPositionWord,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat, isSequentialAmrap,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
   isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
@@ -1474,8 +1474,12 @@ function MovementRowListPWA({ instances, onChange, catalog }) {
 // the local minimum minute-block count; an added-but-never-populated
 // minute has no backing instance and simply disappears on save (nothing
 // invalid is ever persisted - owner §31).
-export function EmomMinutePatternEditor({ instances, onChange, catalog }) {
+export function EmomMinutePatternEditor({ instances, onChange, catalog, intervalSec }) {
   const [minMinuteCount, setMinMinuteCount] = useState(1)
+  // EVERY-N-MINUTES ARBITRARY INTERVAL DURATION - "MIN"/"INTERVAL" is decided
+  // once here from the section's own intervalSec, never per-block (every
+  // position in a single EMOM shares one interval duration).
+  const positionWord = emomPositionWord(intervalSec)
   const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
   const capabilityForInstance = (inst) => catalog?.capabilityForInstance?.(inst) ?? capabilityFor(inst?.name)
   const catalogRowFor = (name) => catalog?.lookupForParse?.(name) ?? null
@@ -1528,11 +1532,11 @@ export function EmomMinutePatternEditor({ instances, onChange, catalog }) {
         return (
           <div key={minuteIdx} style={{ border: '1px solid #e0e0e0', borderRadius: '10px', padding: '10px', marginBottom: '10px', background: '#fafafa' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.03em', color: '#0E0E0E' }}>MIN {minuteIdx + 1}</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.03em', color: '#0E0E0E' }}>{positionWord} {minuteIdx + 1}</div>
               <div style={{ display: 'flex', gap: '4px' }}>
-                <button style={pmpeIconBtn} disabled={minuteIdx === 0} onClick={() => moveMinute(minuteIdx, -1)} aria-label={`Move MIN ${minuteIdx + 1} up`}>↑</button>
-                <button style={pmpeIconBtn} disabled={minuteIdx === minuteCount - 1} onClick={() => moveMinute(minuteIdx, 1)} aria-label={`Move MIN ${minuteIdx + 1} down`}>↓</button>
-                {minuteCount > 1 && <button style={pmpeIconBtn} onClick={() => removeMinute(minuteIdx)} aria-label={`Remove MIN ${minuteIdx + 1}`}>✕</button>}
+                <button style={pmpeIconBtn} disabled={minuteIdx === 0} onClick={() => moveMinute(minuteIdx, -1)} aria-label={`Move ${positionWord} ${minuteIdx + 1} up`}>↑</button>
+                <button style={pmpeIconBtn} disabled={minuteIdx === minuteCount - 1} onClick={() => moveMinute(minuteIdx, 1)} aria-label={`Move ${positionWord} ${minuteIdx + 1} down`}>↓</button>
+                {minuteCount > 1 && <button style={pmpeIconBtn} onClick={() => removeMinute(minuteIdx)} aria-label={`Remove ${positionWord} ${minuteIdx + 1}`}>✕</button>}
               </div>
             </div>
             {abs.map((absIdx, localIdx) => (
@@ -1542,7 +1546,7 @@ export function EmomMinutePatternEditor({ instances, onChange, catalog }) {
                 isFirst={localIdx === 0} isLast={localIdx === abs.length - 1}
                 capabilityFor={capabilityFor} capabilityForInstance={capabilityForInstance} catalogRowFor={catalogRowFor} suggestions={suggestions} />
             ))}
-            {abs.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movement in this minute yet.</div>}
+            {abs.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movement in this {positionWord === 'MIN' ? 'minute' : 'interval'} yet.</div>}
             <button onClick={() => addMovementToMinute(minuteIdx)} style={{ marginTop: '2px', padding: '6px 10px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '11px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add movement</button>
           </div>
         )
@@ -1579,6 +1583,7 @@ function VariantEditorBody({ v, sv, section, updateVariant, movementCatalog, t }
           instances={sv.instances || []}
           onChange={(instances) => updateVariant(v.key, { instances })}
           catalog={movementCatalog}
+          intervalSec={section.formatConfig?.intervalSec}
         />
       ) : (
         <MovementRowListPWA
@@ -7013,7 +7018,7 @@ function ScoredSectionHomeCard({ section, log, isOpen, onToggle, onLogClick, t }
       {isOpen && (
         <>
           {describeFormatConfig(section.format, section.formatConfig, t) && (
-            <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '8px' }}>{section.format} — {describeFormatConfig(section.format, section.formatConfig, t)}</div>
+            <div style={{ fontSize: '11px', fontWeight: '500', lineHeight: 1.35, color: '#888', marginTop: '8px' }}>{formatTypeLabel(section.format, section.formatConfig)} — {describeFormatConfig(section.format, section.formatConfig, t)}</div>
           )}
           <div style={{ marginTop: '10px' }}>
             {movements.map((m, mi) => (

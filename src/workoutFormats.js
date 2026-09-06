@@ -1361,6 +1361,14 @@ function computeFormatPrimaryLabel(formatId, config) {
   if (formatId === 'RFT' && cfg.rounds) return { label: `${cfg.rounds} RFT`, consumedKeys: new Set(['rounds']) }
   if (formatId === 'For Time' && cfg.rounds && cfg.structure === 'Repeated Rounds') return { label: `${cfg.rounds} For Time`, consumedKeys: new Set(['rounds']) }
   if (formatId === 'Build to Heavy/1RM' && cfg.targetLabel) return { label: cfg.targetLabel, consumedKeys: new Set(['targetLabel']) }
+  // EVERY-N-MINUTES ARBITRARY INTERVAL DURATION - EMOM/E1:30MOM/E2MOM/... are
+  // one canonical family named from intervalSec (owner spec), not separate
+  // format ids. intervalSec is folded into primary exactly like RFT folds in
+  // rounds, so the generic field line below never repeats it a second time.
+  if (formatId === 'EMOM') {
+    const label = emomFamilyLabel(cfg.intervalSec)
+    return label === 'EMOM' ? { label, consumedKeys: new Set() } : { label, consumedKeys: new Set(['intervalSec']) }
+  }
   return { label: formatId, consumedKeys: new Set() }
 }
 
@@ -1537,6 +1545,37 @@ export function intervalStationKey(roundIndex, stationIndex, stationName) {
 // scoring path, only a parallel LABEL for EMOM's own structured rows.
 export function emomStationKey(minuteIndex, stationIndex, stationName) {
   return `Min ${minuteIndex} · ${stationIndex}. ${stationName}`
+}
+
+// EVERY-N-MINUTES ARBITRARY INTERVAL DURATION - intervalSec (already the sole
+// canonical field, already a 'duration' input with minute+second precision,
+// already read generically by resolveIntervalStructure/resolveEmomTimeline
+// with no whole-minute assumption anywhere in the scoring/structure layer)
+// only lacked a DISPLAY-layer name and a terminology switch for its pattern
+// positions once an interval no longer spans exactly one minute. These two
+// pure helpers are the single source of truth for both - never re-derive
+// "is this a whole minute" from a formatted string elsewhere.
+export function isWholeMinuteInterval(intervalSec) {
+  return (parseInt(intervalSec) || 60) === 60
+}
+
+// "MIN 1"/"MIN 2" only reads naturally when a position IS one minute long;
+// once it can be 1:30/2:00/2:30/etc., "INTERVAL 1"/"INTERVAL 2" is the
+// duration-neutral term (owner spec) - same intervalSec drives both this and
+// emomFamilyLabel below, so the two can never disagree for a given config.
+export function emomPositionWord(intervalSec) {
+  return isWholeMinuteInterval(intervalSec) ? 'MIN' : 'INTERVAL'
+}
+
+// 60s -> 'EMOM' (unchanged); otherwise 'E{m}MOM' or 'E{m}:{ss}MOM' - derived
+// arithmetically from intervalSec, never string-parsed and never a second
+// format id (EMOM/E1:30MOM/E2MOM/... are one canonical family - owner spec).
+export function emomFamilyLabel(intervalSec) {
+  if (isWholeMinuteInterval(intervalSec)) return 'EMOM'
+  const sec = parseInt(intervalSec)
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return s === 0 ? `E${m}MOM` : `E${m}:${String(s).padStart(2, '0')}MOM`
 }
 
 // EMOM MINUTE-PATTERN AUTHORING - a THIRD, additive EMOM structural mode,
