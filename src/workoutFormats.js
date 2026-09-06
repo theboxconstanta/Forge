@@ -1428,8 +1428,14 @@ export function isRestLine(text) {
 // movements are decorative. NEVER reinterpreted (INC-07 audit §J proved other
 // production Intervals workouts use the identical legacy schema for
 // structurally different concepts). `15 ÷ 3 = 5` is not applied to anything.
+// EMOM STRUCTURED RESULT INTEGRITY - 'shared-interval' is a SECOND structured
+// stationMode, additive to INC-07's 'per-interval'. Never set by
+// Intervals/Tabata - both branches stay mutually exclusive so this can never
+// change their existing behavior.
 export function isStructuredInterval(config) {
-  return !!config && config.stationMode === 'per-interval' && Number(config.roundCount) > 0
+  if (!config) return false
+  if (config.stationMode === 'shared-interval') return Number(config.roundCount ?? config.totalRounds) > 0
+  return config.stationMode === 'per-interval' && Number(config.roundCount) > 0
 }
 
 export function resolveIntervalStructure(formatId, config, movements) {
@@ -1438,6 +1444,38 @@ export function resolveIntervalStructure(formatId, config, movements) {
   const cfg = config || {}
   const workSec = Number(cfg.workSec) || 0
   const restSec = Number(cfg.restSec) || 0
+
+  // EMOM STRUCTURED RESULT INTEGRITY - 'shared-interval': N movements all
+  // fit INSIDE one undivided interval (e.g. 3 movements within the same
+  // 1:00 minute), never sequential per-station timed slots like
+  // 'per-interval' below. A self-contained early branch so the existing
+  // 'per-interval' code (Intervals/Tabata's regression boundary) is never
+  // touched or reused for a formula it was not designed for -
+  // totalDurationSec here is roundCount × ONE shared intervalSec, not
+  // roundCount × stationCount × (work+rest).
+  if (cfg.stationMode === 'shared-interval') {
+    const roundCount = parseInt(cfg.roundCount ?? cfg.totalRounds) || 0
+    const stations = (Array.isArray(movements) ? movements : [])
+      .map((m) => (typeof m === 'string' ? { name: m } : m))
+      .filter((m) => {
+        const name = m && typeof m.name === 'string' ? m.name.trim() : ''
+        return name && !isRestLine(name)
+      })
+    const stationCount = stations.length
+    const sharedIntervalSec = Number(cfg.intervalSec) || 0
+    return {
+      structured: true,
+      roundCount,
+      stationCount,
+      stations,
+      scoreableIntervalCount: roundCount * stationCount,
+      workSec: sharedIntervalSec || null,
+      restSec: null,
+      restPlacement: null,
+      totalDurationSec: roundCount && sharedIntervalSec ? roundCount * sharedIntervalSec : null,
+      scoreMode: resolveSetsScoringMode(formatId, cfg),
+    }
+  }
 
   if (!isStructuredInterval(cfg)) {
     const n = parseInt(cfg.rounds) || (formatId === 'Tabata' ? 8 : 0)
@@ -1491,6 +1529,16 @@ export function intervalStationKey(roundIndex, stationIndex, stationName) {
   return `Rundă ${roundIndex} · ${stationIndex}. ${stationName}`
 }
 
+// EMOM STRUCTURED RESULT INTEGRITY - same round-major shape as
+// intervalStationKey, labeled "Min" (EMOM's own pre-existing convention,
+// e.g. legacy "Min 1".."Min 12") instead of "Rundă" (Intervals/Tabata's).
+// A label-only difference: computeSetsScore/setsDisplayScore read
+// rowsByKey generically regardless of key text, so this is not a parallel
+// scoring path, only a parallel LABEL for EMOM's own structured rows.
+export function emomStationKey(minuteIndex, stationIndex, stationName) {
+  return `Min ${minuteIndex} · ${stationIndex}. ${stationName}`
+}
+
 // INC-07 - the ONE structured-interval display timeline: interleaves each
 // station's work interval with its rest, so Home / Coach Preview show
 //   0:40  Handstand Push-up
@@ -1529,6 +1577,23 @@ export function defaultRowsForFormat(formatId, config, movements) {
   const rowsOf = (n) => Array.from({ length: Math.max(1, n || 1) }, emptyRow)
 
   if (formatId === 'EMOM') {
+    // EMOM STRUCTURED RESULT INTEGRITY - multiple movements sharing ONE
+    // interval (stationMode:'shared-interval'): roundCount × stationCount
+    // rows, round-major, ONE input per movement per minute. Gated strictly
+    // on the NEW stationMode - a legacy/unconfigured EMOM (every EMOM
+    // authored before this) never sets it, so it always falls through to
+    // the untouched flat branch below (the one real historical log,
+    // "Min 1".."Min 10", must keep generating exactly as before).
+    const iv = resolveIntervalStructure(formatId, config, movements)
+    if (iv && iv.structured && iv.stationCount > 0) {
+      const out = {}
+      for (let r = 1; r <= iv.roundCount; r++) {
+        iv.stations.forEach((st, si) => {
+          out[emomStationKey(r, si + 1, st.name)] = [emptyRow()]
+        })
+      }
+      return out
+    }
     const n = parseInt(config?.totalRounds) || 1
     const customIntervals = Array.isArray(config?.intervals) && config.intervals.length > 0 ? config.intervals : null
     const out = {}
@@ -1648,6 +1713,25 @@ export function resolveSetsScoringMode(formatId, config) {
 // mai mica valoare dintre randuri cu reps completat; Complex: Max Weight/
 // Total Weight, vezi mai jos). Intoarce null daca nu exista randuri cu date
 // valide (reps sau greutate, dupa caz) sau formatul nu are scoringMode.
+// EMOM STRUCTURED RESULT INTEGRITY - Oracle D. A shared-interval EMOM whose
+// stations measure DIFFERENT quantities (real live example: "Calorie Row
+// 12 cal" + "10 Burpee") must never have those raw numbers summed into one
+// meaningless total - reps and calories are not additive. `stationMetrics`
+// is the CALLER-resolved quantity metric per station (the same canonical
+// reps/distance/calories resolution the performed-movement-composition
+// editor already uses for cardio movements, e.g.
+// `resolveMovementCapability` in prescriptionContract.js - never
+// re-derived or guessed here from movement text). Returns true only when
+// every station shares the SAME metric, i.e. a Total/Lowest Reps sum over
+// `rowsByKey` is actually meaningful. Pure - does not touch
+// computeSetsScore; the wiring layer calls this BEFORE trusting a
+// structured EMOM's aggregate score.
+export function isUnitHomogeneousAggregation(stationMetrics) {
+  const metrics = (Array.isArray(stationMetrics) ? stationMetrics : []).filter(Boolean)
+  if (metrics.length === 0) return true
+  return metrics.every((m) => m === metrics[0])
+}
+
 export function computeSetsScore(formatId, config, rowsByKey) {
   const scoringMode = resolveSetsScoringMode(formatId, config)
   if (!scoringMode) return null
