@@ -1456,6 +1456,102 @@ function MovementRowListPWA({ instances, onChange, catalog }) {
   )
 }
 
+// EMOM MINUTE-PATTERN AUTHORING - the Coach Builder's EMOM-specific
+// movement editor: movements are grouped into "MIN 1", "MIN 2"... blocks
+// instead of one flat list, matching the real coach intent behind a
+// movement list like "10 Push-ups / 10 Air Squats / 10 Pull-ups" (usually
+// ONE per minute, cycling - not all three every minute). Storage is
+// UNCHANGED - still the same flat RX `instances` array every other format
+// uses (MovementRowPWA/capability/substitution machinery reused verbatim,
+// row-for-row) - only a new `patternMinute` field on each instance groups
+// them for display. A legacy instance with no patternMinute (an existing
+// shared-interval or flat EMOM being reopened for the first time under
+// this editor) defaults into MIN 1 - editing/resaving without moving it
+// anywhere preserves that WOD's original "all movements together" meaning
+// exactly (a 1-minute pattern with every movement in it).
+//
+// "+ Add minute" never auto-creates a movement (owner §4) - it only grows
+// the local minimum minute-block count; an added-but-never-populated
+// minute has no backing instance and simply disappears on save (nothing
+// invalid is ever persisted - owner §31).
+function EmomMinutePatternEditor({ instances, onChange, catalog }) {
+  const [minMinuteCount, setMinMinuteCount] = useState(1)
+  const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
+  const capabilityForInstance = (inst) => catalog?.capabilityForInstance?.(inst) ?? capabilityFor(inst?.name)
+  const catalogRowFor = (name) => catalog?.lookupForParse?.(name) ?? null
+  const suggestions = (text) => catalog?.suggestions?.(text) ?? []
+
+  const minuteOf = (inst) => (Number.isInteger(inst.patternMinute) ? inst.patternMinute : 0)
+  const derivedLength = instances.length === 0 ? 1 : Math.max(...instances.map(minuteOf)) + 1
+  const minuteCount = Math.max(derivedLength, minMinuteCount)
+
+  const groupAbsIndices = (minuteIdx) => instances.map((inst, i) => ({ inst, i })).filter(({ inst }) => minuteOf(inst) === minuteIdx).map(({ i }) => i)
+
+  const replaceAt = (i, next) => onChange(instances.map((m, j) => (j === i ? next : m)))
+  const removeAt = (i) => onChange(instances.filter((_, j) => j !== i))
+  const dupAt = (i) => { const c = JSON.parse(JSON.stringify(instances[i])); c.instanceId = newMovementInstance().instanceId; const n = [...instances]; n.splice(i + 1, 0, c); onChange(n) }
+  const moveWithinMinute = (minuteIdx, localIndex, dir) => {
+    const abs = groupAbsIndices(minuteIdx)
+    const otherLocal = localIndex + dir
+    if (otherLocal < 0 || otherLocal >= abs.length) return
+    const a = abs[localIndex], b = abs[otherLocal]
+    const next = [...instances]
+    ;[next[a], next[b]] = [next[b], next[a]]
+    onChange(next)
+  }
+  const addMovementToMinute = (minuteIdx) => {
+    const draft = newMovementInstance()
+    draft.patternMinute = minuteIdx
+    onChange([...instances, draft])
+  }
+  const addMinute = () => setMinMinuteCount(minuteCount + 1)
+  const moveMinute = (minuteIdx, dir) => {
+    const otherIdx = minuteIdx + dir
+    if (otherIdx < 0 || otherIdx >= minuteCount) return
+    onChange(instances.map((inst) => {
+      const m = minuteOf(inst)
+      if (m === minuteIdx) return { ...inst, patternMinute: otherIdx }
+      if (m === otherIdx) return { ...inst, patternMinute: minuteIdx }
+      return inst
+    }))
+  }
+  const removeMinute = (minuteIdx) => {
+    onChange(instances.filter((inst) => minuteOf(inst) !== minuteIdx)
+      .map((inst) => (minuteOf(inst) > minuteIdx ? { ...inst, patternMinute: minuteOf(inst) - 1 } : inst)))
+    setMinMinuteCount((n) => Math.max(1, n - 1))
+  }
+
+  return (
+    <div>
+      {Array.from({ length: minuteCount }, (_, minuteIdx) => {
+        const abs = groupAbsIndices(minuteIdx)
+        return (
+          <div key={minuteIdx} style={{ border: '1px solid #e0e0e0', borderRadius: '10px', padding: '10px', marginBottom: '10px', background: '#fafafa' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.03em', color: '#0E0E0E' }}>MIN {minuteIdx + 1}</div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button style={pmpeIconBtn} disabled={minuteIdx === 0} onClick={() => moveMinute(minuteIdx, -1)} aria-label={`Move MIN ${minuteIdx + 1} up`}>↑</button>
+                <button style={pmpeIconBtn} disabled={minuteIdx === minuteCount - 1} onClick={() => moveMinute(minuteIdx, 1)} aria-label={`Move MIN ${minuteIdx + 1} down`}>↓</button>
+                {minuteCount > 1 && <button style={pmpeIconBtn} onClick={() => removeMinute(minuteIdx)} aria-label={`Remove MIN ${minuteIdx + 1}`}>✕</button>}
+              </div>
+            </div>
+            {abs.map((absIdx, localIdx) => (
+              <MovementRowPWA key={instances[absIdx].instanceId} instance={instances[absIdx]}
+                onChange={(n) => replaceAt(absIdx, n)} onRemove={() => removeAt(absIdx)} onDuplicate={() => dupAt(absIdx)}
+                onMoveUp={() => moveWithinMinute(minuteIdx, localIdx, -1)} onMoveDown={() => moveWithinMinute(minuteIdx, localIdx, 1)}
+                isFirst={localIdx === 0} isLast={localIdx === abs.length - 1}
+                capabilityFor={capabilityFor} capabilityForInstance={capabilityForInstance} catalogRowFor={catalogRowFor} suggestions={suggestions} />
+            ))}
+            {abs.length === 0 && <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>No movement in this minute yet.</div>}
+            <button onClick={() => addMovementToMinute(minuteIdx)} style={{ marginTop: '2px', padding: '6px 10px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '11px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add movement</button>
+          </div>
+        )
+      })}
+      <button onClick={addMinute} style={{ padding: '8px 12px', border: '1px dashed #ccc', borderRadius: '8px', background: '#fff', fontSize: '12px', fontWeight: 600, color: '#666', cursor: 'pointer' }}>+ Add minute</button>
+    </div>
+  )
+}
+
 // Rendering for a single scaling variant's editable body (weight/movements/
 // quick-add/paste/notes) - factored out of the old VARIANT_LEVELS.map stack
 // so PrimarySectionBody can render exactly one active tab's variant instead
@@ -1469,15 +1565,28 @@ function VariantEditorBody({ v, sv, section, updateVariant, movementCatalog, t }
   // authoring stays first-class via the row list's "Paste workout". Legacy
   // `movements`/`weight`/`quickAdd`/`paste` fields are regenerated from
   // `instances` at save (legacyPayloadFromSections) and not shown here.
-  void section
+  // EMOM MINUTE-PATTERN AUTHORING - EMOM's flat movement list means
+  // something structurally different from every other format (usually ONE
+  // movement per minute, cycling - not all of them every minute), so it
+  // gets its own minute-grouped editor here instead of the generic flat
+  // MovementRowListPWA. Same underlying `instances` array/onChange
+  // contract either way - only the grouping UI differs.
   return (
     <div style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
       <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-      <MovementRowListPWA
-        instances={sv.instances || []}
-        onChange={(instances) => updateVariant(v.key, { instances })}
-        catalog={movementCatalog}
-      />
+      {section.format === 'EMOM' ? (
+        <EmomMinutePatternEditor
+          instances={sv.instances || []}
+          onChange={(instances) => updateVariant(v.key, { instances })}
+          catalog={movementCatalog}
+        />
+      ) : (
+        <MovementRowListPWA
+          instances={sv.instances || []}
+          onChange={(instances) => updateVariant(v.key, { instances })}
+          catalog={movementCatalog}
+        />
+      )}
       <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
         placeholder={t.adminWodNotesPlaceholder}

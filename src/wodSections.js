@@ -373,6 +373,22 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
     // so an EXISTING already-saved WOD only upgrades when the coach next
     // saves it, and the one historical FROZEN log (sum=73) is untouched
     // either way (defaultRowsForFormat only ever seeds a NEW empty log).
+    // EMOM MINUTE-PATTERN AUTHORING - the Coach Builder's minute-grouped
+    // editor (EmomMinutePatternEditor) tags every RX instance it creates
+    // with a `patternMinute` field. Its presence on ANY RX instance is an
+    // unambiguous, EXPLICIT authoring signal (never inferred from movement
+    // count/order) that this WOD was authored/edited via that editor -
+    // checked BEFORE the older 2+-movements-no-intervals shared-interval
+    // rule below, so a WOD touched by the new editor always gets the new
+    // representation, while an EMOM never opened in it (or edited only via
+    // an older client / AI regenerate) keeps falling through to the
+    // existing shared-interval / legacy rules untouched.
+    if (primary.format === 'EMOM') {
+      const rxInstances = primary.variants?.rx?.instances || []
+      if (rxInstances.some((m) => Number.isInteger(m?.patternMinute))) {
+        return { ...c, stationMode: 'minute-pattern' }
+      }
+    }
     if (primary.format === 'EMOM' && !(Array.isArray(c.intervals) && c.intervals.length > 0)) {
       const rxSv = primary.variants?.rx || {}
       const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))

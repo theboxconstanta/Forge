@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey, resolveStationUnitsByKey } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey, resolveStationUnitsByKey, resolveEmomTimeline } from './workoutFormats'
 import { resolveSequentialAmrapStations } from './sequentialAmrap'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
@@ -278,7 +278,15 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
 }
 
 function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition, prescriptionMovements }) {
-  const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, movements)
+  // EMOM MINUTE-PATTERN AUTHORING - for a brand-new/empty log (the only
+  // case this ever runs - an existing log's `sets` is used as-is above),
+  // `movements` and `prescriptionMovements` describe the identical
+  // untouched programmed list, so preferring the instance-shaped
+  // `prescriptionMovements` (when available) lets a fresh minute-pattern
+  // EMOM seed rows grouped by the CORRECT minute instead of collapsing
+  // into one (patternMinute lives only on the instance shape, never on
+  // plain display-line strings).
+  const rowsByKey = Object.keys(sets || {}).length > 0 ? sets : defaultRowsForFormat(formatId, config, prescriptionMovements || movements)
   // EMOM MIXED-UNIT AGGREGATION SAFETY - resolved from the canonical
   // PROGRAMMED instances (never the performed override - keeps the live
   // preview consistent with the saved log's own prescription_snapshot,
@@ -287,6 +295,49 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   const unitsByKey = resolveStationUnitsByKey(formatId, config, prescriptionMovements)
   const score = computeSetsScore(formatId, config, rowsByKey, unitsByKey)
   const Row = getFormat(formatId).simpleReps ? SimpleRepsRow : SetsRows
+
+  // EMOM MINUTE-PATTERN AUTHORING - movements are assigned to SPECIFIC
+  // minutes (patternMinute) and the pattern cycles across the EMOM's total
+  // duration; render ONE block per EFFECTIVE minute with only THAT
+  // minute's movement(s), never every movement every minute. Resolved from
+  // `prescriptionMovements` (the canonical RX instance array, carrying
+  // patternMinute) - never `movements` (already-reduced display-line
+  // strings by the time they reach the logger, with no minute metadata
+  // left to group by). Checked BEFORE the shared-interval branch below -
+  // the two stationMode values are mutually exclusive.
+  const timeline = resolveEmomTimeline(formatId, config, prescriptionMovements)
+  if (timeline && timeline.structured && timeline.effectiveMinutes.length > 0) {
+    const setMinuteReps = (key, row, value) => onChange({ ...rowsByKey, [key]: [{ ...row, reps: value }] })
+    return (
+      <>
+        {timeline.effectiveMinutes.map(({ minute, movements: minuteMovements }, mi) => (
+          <div key={minute} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: mi < timeline.effectiveMinutes.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
+              {`MIN ${minute}`}
+            </div>
+            {minuteMovements.map((mv, si) => {
+              const key = emomStationKey(minute, si + 1, mv.name)
+              const row = (rowsByKey[key] && rowsByKey[key][0]) || { reps: '', weight: '', completed: false }
+              return (
+                <div key={key} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{mv.name}</div>
+                  <input type="number" inputMode="numeric" value={row.reps || ''}
+                    onChange={e => setMinuteReps(key, row, e.target.value)}
+                    placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+                    style={{ width: '84px', flexShrink: 0, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        {score != null && (
+          <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+            {setsScoreLabel(resolveSetsScoringMode(formatId, config), t)}: {score}
+          </div>
+        )}
+      </>
+    )
+  }
 
   // INC-07 - structured per-interval Intervals: the score inputs are grouped by
   // SEMANTIC round (roundCount groups), each holding exactly one reps input per

@@ -266,7 +266,16 @@ export function generateVariantInstancesFromRx(rxInstances, overrides, lookupCan
         calories: resolveSpec(inst.calories, null),
       })
       const parsed = parsePastedMovementLine(scaleMovementLine(line, tier, overrides), { lookupCanonical })
-      if (parsed) return parsed.instance
+      if (parsed) {
+        // EMOM MINUTE-PATTERN AUTHORING - the text round-trip above rebuilds
+        // a fresh instance from the rendered line and has no way to recover
+        // which minute this movement belongs to. Carry it over explicitly so
+        // Generate Variants doesn't silently collapse a minute-pattern
+        // EMOM's non-RX tiers into one minute - a no-op for every other
+        // format/instance, which never sets this field.
+        if (Number.isInteger(inst.patternMinute)) parsed.instance.patternMinute = inst.patternMinute
+        return parsed.instance
+      }
       const copy = JSON.parse(JSON.stringify(inst))
       copy.instanceId = newInstanceId()
       return copy
