@@ -1474,7 +1474,7 @@ function MovementRowListPWA({ instances, onChange, catalog }) {
 // the local minimum minute-block count; an added-but-never-populated
 // minute has no backing instance and simply disappears on save (nothing
 // invalid is ever persisted - owner §31).
-function EmomMinutePatternEditor({ instances, onChange, catalog }) {
+export function EmomMinutePatternEditor({ instances, onChange, catalog }) {
   const [minMinuteCount, setMinMinuteCount] = useState(1)
   const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
   const capabilityForInstance = (inst) => catalog?.capabilityForInstance?.(inst) ?? capabilityFor(inst?.name)
