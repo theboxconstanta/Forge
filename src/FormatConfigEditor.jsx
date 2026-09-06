@@ -4,8 +4,8 @@
 // Componenta prezentationala, fara Supabase - parintele face JSON.stringify
 // pe `config` la salvare (in wods.format_config / wods.skill_format_config /
 // custom_hero_wods.format_config).
-import { useState } from 'react'
-import { FORMAT_IDS, getFormat } from './workoutFormats'
+import { useState, useEffect } from 'react'
+import { FORMAT_IDS, getFormat, resolveEmomScoringOptions } from './workoutFormats'
 import { miscareSugestii, looksLikeMovementLine } from './movements'
 import { MovementSuggestions } from './components'
 
@@ -263,7 +263,58 @@ function IntervalListField({ label, value, onChange, placeholder }) {
   return <MovementListField label={label} value={value} onChange={onChange} placeholder={placeholder} />
 }
 
-export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, t }) {
+// EMOM AUTHORING + CANONICAL SCORING INTEGRITY - EMOM's own "Scoring"
+// control. Unlike Tabata/Intervals (always homogeneous simpleReps, the
+// generic SelectField above is safe as-is and stays untouched for them),
+// EMOM's movements can measure genuinely different canonical quantities
+// (reps/calories/distance) - offering every scoringMode unconditionally
+// would let a coach pick "Total Reps" for "12 Cal Row + 10 Burpees" and
+// silently get 22. `movementInstances` is the RX variant's canonical
+// structured instances (same shape prescription_snapshot freezes) -
+// resolveEmomScoringOptions classifies them via the SAME canonical
+// resolver the shipped result-integrity gate uses, never movement-name
+// parsing.
+//
+// Smart default (owner §4): a coach should not have to discover a hidden
+// technical field - the moment the movements resolve to a single safe
+// option (a homogeneous reps-only or calories-only EMOM with no scoring
+// chosen yet), it is pre-selected AND ACTUALLY PERSISTED (setField fires
+// once), not just shown cosmetically like the generic SelectField's
+// options[0] fallback (the exact historical bug class this incident's
+// root cause traced back to). The choice stays a real, visible, editable
+// selection - never hidden.
+//
+// Movement-change invalidation (owner §8): if the coach later edits the
+// movements so the previously-chosen mode is no longer offered (e.g. a
+// reps station becomes a calorie station under a Total Reps selection),
+// the stale selection is cleared to null (renders as "Choose scoring...",
+// i.e. effectively No Score) rather than silently kept - the coach must
+// explicitly re-choose, never save an internally inconsistent workout.
+function EmomScoringField({ label, value, onChange, movementInstances, t }) {
+  const options = resolveEmomScoringOptions(movementInstances)
+  const optionsKey = options.join('|')
+
+  useEffect(() => {
+    if (value != null && !options.includes(value)) { onChange(null); return }
+    // resolveEmomScoringOptions always orders a safe aggregate mode (Total
+    // Reps / Total Calories) FIRST when one exists - suggesting it covers
+    // both the single- and multi-movement reps case, and calories.
+    if (value == null && (options[0] === 'Total Reps' || options[0] === 'Total Calories')) onChange(options[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsKey])
+
+  return (
+    <div style={fieldWrapStyle}>
+      <div style={labelStyle}>{label}</div>
+      <select value={value || ''} onChange={e => onChange(e.target.value || null)} style={inputStyle}>
+        <option value="" disabled>{t?.fmtScoringChoosePlaceholder || 'Choose scoring...'}</option>
+        {options.map(o => <option key={o} value={o}>{t?.[`fmtScoringOption${o.replace(/\s+/g, '')}`] || o}</option>)}
+      </select>
+    </div>
+  )
+}
+
+export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, movementInstances, t }) {
   const options = formatOptions || FORMAT_IDS
   const format = getFormat(formatId)
   const cfg = config || {}
@@ -292,6 +343,13 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <NumberField key={key} label={label}
             value={cfg[key] ?? (key === 'roundCount' ? cfg.rounds : undefined) ?? field.default ?? null}
             onChange={v => setField(key, v)} />
+        )
+        // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - EMOM's own
+        // scoringMode field needs unit-aware option filtering; every other
+        // format's `type:'select'` field (Tabata/Intervals'/Complex's own
+        // scoringMode included) keeps the generic SelectField unchanged.
+        if (field.type === 'select' && key === 'scoringMode' && formatId === 'EMOM') return (
+          <EmomScoringField key={key} label={label} value={cfg[key] ?? null} movementInstances={movementInstances} onChange={v => setField(key, v)} t={t} />
         )
         if (field.type === 'select') return (
           <SelectField key={key} label={label} value={cfg[key] ?? field.default ?? null} options={field.options} onChange={v => setField(key, v)} />

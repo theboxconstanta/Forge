@@ -1561,7 +1561,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
     <div>
       <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
         config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })}
-        excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
+        excludeConfigKeys={['durationSec', 'timeCapSec']} movementInstances={section.variants?.rx?.instances} t={t} />
       {AUTO_DURATION_FORMAT_IDS.includes(section.format) ? (
         <div style={{ marginBottom: '10px' }}>
           <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
