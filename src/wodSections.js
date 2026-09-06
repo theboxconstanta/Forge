@@ -342,6 +342,25 @@ export const legacySlotAssignmentAfterSave = (sections) => {
 const stripBlankEmomInstances = (formatId, instances) =>
   formatId === 'EMOM' ? (instances || []).filter((inst) => typeof inst?.name === 'string' && inst.name.trim() !== '') : (instances || [])
 
+// EMOM MINUTE-PATTERN PRODUCTION LOGGER REGRESSION - defensive persistence
+// hardening (NOT the reported symptom's root cause - see the forensic
+// report). resolveEmomTimeline already defaults ANY instance missing
+// patternMinute to minute 0 at READ time (verified correct against the
+// exact live production data), so this changes no runtime behavior - it
+// only makes the WRITTEN data self-describing: an instance authored/
+// carried over before the minute-pattern editor existed (e.g. an EMOM's
+// very first movement, added back when only a flat/shared-interval editor
+// existed) can persist with no patternMinute field at all. Explicitly
+// stamping it at save time removes that ambiguity for any OTHER future
+// reader of movement_prescriptions that might not know the same "missing
+// = 0" convention. Scoped to EMOM's minute-pattern shape only - a non-EMOM
+// instance, or an EMOM instance with an explicit patternMinute already, is
+// returned completely unchanged.
+const normalizeEmomPatternMinute = (formatId, stationMode, instances) =>
+  (formatId === 'EMOM' && stationMode === 'minute-pattern')
+    ? (instances || []).map((inst) => (Number.isInteger(inst?.patternMinute) ? inst : { ...inst, patternMinute: 0 }))
+    : (instances || [])
+
 export const legacyPayloadFromSections = (sections, opts = {}) => {
   // P9.3 - at save time, fill in canonicalMovementId for any structured
   // instance that resolved deterministically but was never persisted (e.g. a
@@ -442,7 +461,7 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   for (const v of VARIANTE_WEIGHT_BASE) {
     const sv = primary.variants?.[v.key] || { instances: [], movements: [], weight: { male: '', female: '' }, note: '' }
     const rawInstances = movementIndex ? backfillInstanceIdentity(sv.instances || [], movementIndex) : (sv.instances || [])
-    const instances = stripBlankEmomInstances(primary.format, rawInstances)
+    const instances = normalizeEmomPatternMinute(primary.format, primaryFormatConfig.stationMode, stripBlankEmomInstances(primary.format, rawInstances))
     if (instances.length > 0) {
       prescriptions.variants[v.key] = { movements: instances }
       const art = buildLegacyArtifactsForVariant(instances)
