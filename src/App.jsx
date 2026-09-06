@@ -54,7 +54,7 @@ import {
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
   resolveWorkoutStructureHeader, composeWorkoutHeadline, resolveCompactResultText,
-  resolveStationUnitsByKey,
+  resolveStationUnitsByKey, setsScoreUnitSuffix,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -2460,9 +2460,19 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       // (deja folosit in sortSectionLogs pt clasare), dar nu
                       // era aplicat aici, la afisare (Clasament arata gresit
                       // "606kg" in loc de "606 reps").
-                      const setsWeightScored = effFormat?.family === 'sets' ? isWeightScoredSetsFormat(effFormatConfig, effFormatId) : false
+                      // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - unit
+                      // resolved through the SAME canonical helper
+                      // setsScoreText uses (Journal/Share/Photo), not a
+                      // second inline weight/reps ternary - a calorie-
+                      // scored EMOM ("Total Calories") must never show
+                      // "kg" or "reps" here just because this badge builds
+                      // its string separately from setsScoreText. Spacing
+                      // preserved exactly as before (no space before kg/lbs,
+                      // a space before reps/cal) - cosmetic-only, unrelated
+                      // to this incident, not touched.
+                      const setsScoreUnit = effFormat?.family === 'sets' ? setsScoreUnitSuffix(effFormatConfig, effFormatId, log.profile?.weight_unit, t.clasamentRepsUnit) : null
                       const result = effFormat?.family === 'sets'
-                        ? (log._setsScore != null ? `${log._setsScore}${setsWeightScored ? ((log.profile?.weight_unit || 'kg') === 'lbs' ? 'lbs' : 'kg') : ` ${t.clasamentRepsUnit}`}` : '—')
+                        ? (log._setsScore != null ? `${log._setsScore}${(setsScoreUnit === 'kg' || setsScoreUnit === 'lbs') ? setsScoreUnit : ` ${setsScoreUnit}`}` : '—')
                         : effFormat?.family === 'chained'
                         ? (log.log_meta?.totalReps != null ? `${log.log_meta.totalReps} reps` : '—')
                         // INC-11 - Sequence AMRAP: canonical Total Reps, same read

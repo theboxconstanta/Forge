@@ -1704,6 +1704,15 @@ export function defaultRowsForFormat(formatId, config, movements) {
 // fara camp nou in schema, fara UI nou.
 export function resolveSetsScoringMode(formatId, config) {
   if (formatId === 'Death By') return 'Total Reps'
+  // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - an EXPLICIT coach choice
+  // of "No Score" (e.g. a quality/skill EMOM) must resolve identically to
+  // absent scoringMode - the SAME safe "no competitive scalar" behavior
+  // Complex/Weightlifting-without-scoringMode already has (descriptive
+  // "N sets" only, no ranking implied). The literal string is still
+  // persisted verbatim in format_config for the builder to reload
+  // correctly (see resolveEmomScoringOptions/the builder) - only the
+  // SCORING read normalizes it, never the saved config itself.
+  if (config?.scoringMode === 'No Score') return null
   const schemaDefault = formatId ? getFormat(formatId)?.config?.scoringMode?.default : null
   return config?.scoringMode || schemaDefault || null
 }
@@ -1787,6 +1796,44 @@ export function resolveStationUnitsByKey(formatId, config, prescriptionMovements
   return out
 }
 
+// EMOM AUTHORING + CANONICAL SCORING INTEGRITY - the scoring modes FORGE can
+// SAFELY offer a coach authoring/editing an EMOM with these RX movement
+// instances (buildPrescriptionSnapshot/newMovementInstance shape - the same
+// canonical resolution as scoredMetricOf/resolveStationUnitsByKey, never
+// movement-name parsing). 'No Score' is always offered - a coach must be
+// able to intentionally leave a quality/skill EMOM unscored.
+//
+//   homogeneous reps, single movement per interval  -> Total Reps, Lowest Reps
+//   homogeneous reps, 2+ movements per interval      -> Total Reps only
+//     (Lowest Reps is well-defined for a classic single-movement EMOM - the
+//     worst MINUTE - but ambiguous for a shared-interval multi-station EMOM,
+//     where "the lowest single value" could mean the worst station-instance
+//     out of many per minute, a materially different statistic. Rather than
+//     invent a semantics for that, it is never offered here - owner §13.)
+//   homogeneous calories                             -> Total Calories
+//     (calories carry no sub-unit to normalize, unlike distance - safe.)
+//   homogeneous distance, load-only, or genuinely
+//   mixed units                                      -> No Score only
+//     (distance would require cross-unit m/km/ft/mi normalization FORGE
+//     does not canonically support today - owner §16, OWNER DECISION
+//     REQUIRED, never faked with an unsafe implicit conversion.)
+export function resolveEmomScoringOptions(movementInstances) {
+  const list = Array.isArray(movementInstances) ? movementInstances : []
+  const stationCount = list.filter((m) => m && typeof m.name === 'string' && m.name.trim() && !isRestLine(m.name)).length
+  const metrics = list.map((m) => scoredMetricOf(m)).filter(Boolean)
+  const distinct = [...new Set(metrics)]
+  const homogeneous = distinct.length === 1 ? distinct[0] : null
+  const options = []
+  if (homogeneous === 'reps') {
+    options.push('Total Reps')
+    if (stationCount <= 1) options.push('Lowest Reps')
+  } else if (homogeneous === 'calories') {
+    options.push('Total Calories')
+  }
+  options.push('No Score')
+  return options
+}
+
 export function computeSetsScore(formatId, config, rowsByKey, unitsByKey) {
   const scoringMode = resolveSetsScoringMode(formatId, config)
   if (!scoringMode) return null
@@ -1823,7 +1870,15 @@ export function computeSetsScore(formatId, config, rowsByKey, unitsByKey) {
     .map(r => parseInt(r?.reps))
     .filter(n => !isNaN(n))
   if (repsValues.length === 0) return null
-  if (scoringMode === 'Total Reps') return repsValues.reduce((a, b) => a + b, 0)
+  // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - 'Total Calories' is the
+  // SAME sum-of-logged-values arithmetic as 'Total Reps' (a calorie EMOM's
+  // structured rows carry their number in the identical `reps` input field -
+  // only the coach-facing label and the display unit differ, resolved by
+  // setsScoreText/isWeightScoredSetsFormat below). No new aggregation
+  // algorithm; a homogeneous-calories mixed-unit fixture already summed
+  // correctly under 'Total Reps' before the builder could express calories
+  // explicitly - this only lets it be LABELED correctly.
+  if (scoringMode === 'Total Reps' || scoringMode === 'Total Calories') return repsValues.reduce((a, b) => a + b, 0)
   return Math.min(...repsValues)
 }
 
@@ -1872,11 +1927,27 @@ export function isWeightScoredSetsFormat(config, formatId) {
   return !scoringMode || scoringMode === 'Total Weight' || scoringMode === 'Max Weight'
 }
 
+// EMOM AUTHORING + CANONICAL SCORING INTEGRITY - THE single unit suffix for
+// a family:'sets' derived score, so a calorie-scored EMOM ("Total Calories")
+// never gets mislabeled "reps" on ANY surface. Every call site (setsScoreText
+// below, and the Leaderboard result badge) resolves the suffix through this
+// one function - never its own inline weight/reps ternary - so a new
+// scoringMode value only ever needs to be taught here once. Byte-identical
+// to the previous inline ternary for every scoringMode that existed before
+// this incident (Total Calories is new).
+export function setsScoreUnitSuffix(config, formatId, weightUnit, repsWord = 'reps') {
+  if (resolveSetsScoringMode(formatId, config) === 'Total Calories') return 'cal'
+  return isWeightScoredSetsFormat(config, formatId)
+    ? (weightUnit === 'lbs' ? 'lbs' : 'kg')
+    : repsWord
+}
+
 // INC-06 - the ONE canonical display string for a family:'sets' log's derived
 // score, so every athlete-result surface (Clasament card, Jurnal card, Skill
 // Jurnal card, share card) shows the SAME value with the SAME unit. Wraps the
-// existing setsDisplayScore (value) + isWeightScoredSetsFormat (unit gate):
+// existing setsDisplayScore (value) + setsScoreUnitSuffix (unit gate):
 //   rep-scored  (Tabata/Intervals 'Total Reps'|'Lowest Reps', Death By)  -> "203 reps"
+//   calorie-scored (EMOM 'Total Calories')                              -> "21 cal"
 //   weight-scored (Complex 'Total/Max Weight'; Weightlifting/Strength/Build-to-
 //                  Heavy/Superset fallback = maxWeightFromSets)          -> "142 kg"
 // null when there is no derivable score (family:'sets' with neither a resolvable
@@ -1885,10 +1956,7 @@ export function isWeightScoredSetsFormat(config, formatId) {
 export function setsScoreText(formatId, config, rowsByKey, weightUnit, repsWord = 'reps', unitsByKey) {
   const score = setsDisplayScore(formatId, config, rowsByKey, unitsByKey)
   if (score == null) return null
-  const unit = isWeightScoredSetsFormat(config, formatId)
-    ? (weightUnit === 'lbs' ? 'lbs' : 'kg')
-    : repsWord
-  return `${score} ${unit}`
+  return `${score} ${setsScoreUnitSuffix(config, formatId, weightUnit, repsWord)}`
 }
 
 // INC-06 - the label for the derived family:'sets' total (logger's "score" box),
