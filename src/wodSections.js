@@ -317,6 +317,31 @@ export const legacySlotAssignmentAfterSave = (sections) => {
   return map
 }
 
+// EMOM MINUTE-PATTERN EMPTY MOVEMENT REGRESSION - the minute-grouped
+// editor's "+ Add movement" (like the generic MovementRowListPWA's own
+// "+ Add movement" every other format already has) writes a draft
+// instance ({name:'', ...}) into `instances` THE MOMENT the button is
+// clicked, before the coach has typed anything - the exact same
+// eager-creation pattern every format's movement list already uses. For
+// every other format, an abandoned blank row is a rare, deliberate-mistake
+// case the coach is expected to notice and remove before saving. EMOM's
+// minute-pattern editor makes an abandoned blank row far more likely (a
+// coach clicking "+ Add minute" then "+ Add movement" to scaffold a slot,
+// intending to fill it in, can easily click Create WOD before typing a
+// name) - the owner's explicit product decision is that an untouched
+// blank EMOM movement must be silently dropped rather than block save.
+//
+// SCOPED TO EMOM ONLY (owner explicit instruction) - the canonical
+// structural validator (validateMovementPrescriptions) keeps rejecting a
+// blank name for every other format exactly as before; this never touches
+// that function or its behavior for Intervals/Tabata/Complex/etc. A named
+// EMOM movement that is otherwise incomplete (e.g. missing a metric value)
+// still fails validatePrescriptionsForPublish's completeness check
+// unchanged - only a movement with NO name at all is treated as "never
+// authored," not as invalid authored data.
+const stripBlankEmomInstances = (formatId, instances) =>
+  formatId === 'EMOM' ? (instances || []).filter((inst) => typeof inst?.name === 'string' && inst.name.trim() !== '') : (instances || [])
+
 export const legacyPayloadFromSections = (sections, opts = {}) => {
   // P9.3 - at save time, fill in canonicalMovementId for any structured
   // instance that resolved deterministically but was never persisted (e.g. a
@@ -416,7 +441,8 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   const prescriptions = emptyPrescriptions()
   for (const v of VARIANTE_WEIGHT_BASE) {
     const sv = primary.variants?.[v.key] || { instances: [], movements: [], weight: { male: '', female: '' }, note: '' }
-    const instances = movementIndex ? backfillInstanceIdentity(sv.instances || [], movementIndex) : (sv.instances || [])
+    const rawInstances = movementIndex ? backfillInstanceIdentity(sv.instances || [], movementIndex) : (sv.instances || [])
+    const instances = stripBlankEmomInstances(primary.format, rawInstances)
     if (instances.length > 0) {
       prescriptions.variants[v.key] = { movements: instances }
       const art = buildLegacyArtifactsForVariant(instances)
@@ -531,7 +557,13 @@ export const validatePrescriptionCompleteness = (sections) => {
   if (!primary) return []
   const doc = emptyPrescriptions()
   for (const v of VARIANTE_WEIGHT_BASE) {
-    const inst = primary.variants?.[v.key]?.instances || []
+    // EMOM MINUTE-PATTERN EMPTY MOVEMENT REGRESSION - this is the exact
+    // gate that produced "variants.rx (mi_...): needs a non-empty name"
+    // for an untouched blank draft the minute-pattern editor's own
+    // "+ Add movement" had already written into `instances`. Stripped
+    // BEFORE validateMovementPrescriptions ever sees it - scoped to EMOM
+    // only, every other format's real "must have a name" rule is untouched.
+    const inst = stripBlankEmomInstances(primary.format, primary.variants?.[v.key]?.instances)
     if (inst.length > 0) doc.variants[v.key] = { movements: inst }
   }
   if (Object.keys(doc.variants).length === 0) return []
