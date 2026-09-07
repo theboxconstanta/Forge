@@ -1674,6 +1674,19 @@ export function defaultRowsForFormat(formatId, config, movements) {
   if (fmt.family !== 'sets') return {}
   const emptyRow = () => ({ weight: '', reps: '', distance: '', completed: false })
   const rowsOf = (n) => Array.from({ length: Math.max(1, n || 1) }, emptyRow)
+  // STRENGTH SETS LOGGER OBJECT LABEL REGRESSION - `movements` here can now
+  // be EITHER plain display-line strings OR the canonical RX instance array
+  // (prescriptionMovements, e.g. {instanceId, name, canonicalMovementId,
+  // reps, load, ...} - since UniversalScoreInput started forwarding
+  // prescriptionMovements to every SETS-family format, not just EMOM). Any
+  // branch below that keys `out` by a movement identity for row grouping
+  // (rowMode:'movement': Strength Sets, Weightlifting, Build to Heavy/1RM,
+  // ...) must read the NAME, never use the raw entry as an object key
+  // (JS silently coerces an object key to "[object Object]"). Same
+  // typeof-string-vs-object normalization already used by
+  // resolveIntervalStructure/resolveEmomTimeline for the identical reason -
+  // reused here, not reinvented.
+  const movementNameOf = (m) => (typeof m === 'string' ? m : (m?.name ?? ''))
 
   if (formatId === 'EMOM') {
     // EMOM MINUTE-PATTERN AUTHORING - movements are assigned to SPECIFIC
@@ -1751,7 +1764,7 @@ export function defaultRowsForFormat(formatId, config, movements) {
     const scheme = Array.isArray(config?.setsScheme) && config.setsScheme.length > 0 ? config.setsScheme : [null]
     const movs = (movements && movements.length > 0) ? movements : ['']
     const out = {}
-    movs.forEach(m => { out[m] = scheme.map(targetReps => ({ ...emptyRow(), targetReps: targetReps ?? null })) })
+    movs.forEach(m => { out[movementNameOf(m)] = scheme.map(targetReps => ({ ...emptyRow(), targetReps: targetReps ?? null })) })
     return out
   }
   // Superset: mișcările alternante sunt configurate explicit de admin in
@@ -1774,7 +1787,7 @@ export function defaultRowsForFormat(formatId, config, movements) {
   const targetSets = parseInt(config?.targetSets) || 0
   const movs = (movements && movements.length > 0) ? movements : ['']
   const out = {}
-  movs.forEach(m => { out[m] = targetSets ? rowsOf(targetSets) : [] })
+  movs.forEach(m => { out[movementNameOf(m)] = targetSets ? rowsOf(targetSets) : [] })
   return out
 }
 
