@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterValidRecentPrEvents, sortRecentPrEvents } from './recentPrEvents'
+import { filterValidRecentPrEvents, sortRecentPrEvents, newPrEventsForSource } from './recentPrEvents'
 
 // Member Performance, Phase 6 (Performance Overview) - Recent PRs
 // validity filter. Mandatory: Caveat A (Phase 5) - legacy semantically-
@@ -76,6 +76,47 @@ describe('filterValidRecentPrEvents', () => {
       new Map(), skillLogsById,
     )
     expect(result).toHaveLength(1)
+  })
+})
+
+// CANONICAL STRENGTH RESULT INTELLIGENCE, Phase D (sections 15-16) - inline
+// "NEW PR" surfacing at save confirmation + Journal. Keys the ALREADY
+// validated ledger (filterValidRecentPrEvents' own output - never a raw
+// unfiltered prEvents array) by ONE specific source log's id, exactly as
+// the ledger records provenance.
+describe('newPrEventsForSource', () => {
+  it('finds a wod_logs-sourced event by wodLogId', () => {
+    const result = newPrEventsForSource([prEvent({ source_wod_log_id: 'w1' })], { wodLogId: 'w1' })
+    expect(result).toHaveLength(1)
+  })
+
+  it('finds a skill_logs-sourced event by skillLogId', () => {
+    const result = newPrEventsForSource([prEvent({ source_wod_log_id: null, source_skill_log_id: 's1' })], { skillLogId: 's1' })
+    expect(result).toHaveLength(1)
+  })
+
+  it('returns [] for a log with no matching event (the overwhelming majority of saves)', () => {
+    const result = newPrEventsForSource([prEvent({ source_wod_log_id: 'w1' })], { wodLogId: 'w2' })
+    expect(result).toEqual([])
+  })
+
+  it('never cross-matches a wodLogId lookup against a source_skill_log_id event, or vice versa', () => {
+    expect(newPrEventsForSource([prEvent({ source_wod_log_id: null, source_skill_log_id: 's1' })], { wodLogId: 's1' })).toEqual([])
+    expect(newPrEventsForSource([prEvent({ source_wod_log_id: 'w1' })], { skillLogId: 'w1' })).toEqual([])
+  })
+
+  it('reconciliation: an event no longer present in the already-validated list (voided/reconciled by a downward edit, or its source deleted) is simply absent - the badge disappears automatically, no separate invalidation needed', () => {
+    // Simulates the caller passing filterValidRecentPrEvents's output AFTER
+    // the source's sets changed downward - void_stale_pr_events already
+    // voided the row server-side, so a re-fetch excludes it entirely before
+    // it ever reaches this function.
+    const result = newPrEventsForSource([], { wodLogId: 'w1' })
+    expect(result).toEqual([])
+  })
+
+  it('handles an empty/undefined validEvents list without throwing', () => {
+    expect(newPrEventsForSource(undefined, { wodLogId: 'w1' })).toEqual([])
+    expect(newPrEventsForSource(null, { wodLogId: 'w1' })).toEqual([])
   })
 })
 

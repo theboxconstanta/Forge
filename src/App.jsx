@@ -36,7 +36,7 @@ import {
 import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution'
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay, buildCurrentBenchmarkBests, buildRecentBenchmarkProgress } from './benchmarkHistory'
 import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel, deriveCurrentMovementBests, normalizeKey as normalizeMovementKey, movementHistoryIdentity, movementGroupDisplayName } from './movementHistory'
-import { filterValidRecentPrEvents, sortRecentPrEvents } from './recentPrEvents'
+import { filterValidRecentPrEvents, sortRecentPrEvents, newPrEventsForSource } from './recentPrEvents'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -6516,7 +6516,7 @@ function JurnalPhotoResult({ storagePath, showToast, ...cardProps }) {
   )
 }
 
-export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym, showToast }) {
+export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, validRecentPrEvents, t, lang, gym, showToast }) {
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6646,6 +6646,16 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
               const wVolumeLoad = wVolumeEligible
                 ? computeVolumeLoad(w.sets, resolveMovementLoadCapabilityByKey(w.prescription_snapshot?.movements), weightUnit)
                 : null
+              // CANONICAL STRENGTH RESULT INTELLIGENCE Phase D (sections
+              // 15-16) - inline "NEW PR" surfacing, keyed by THIS log's own
+              // id against the already-validated pr_events ledger (never
+              // re-detected client-side - recentPrEvents.js's
+              // newPrEventsForSource). Edit/delete reconciliation is
+              // automatic: a downward edit or deletion voids/removes the
+              // underlying pr_events row server-side, the next prEvents
+              // refetch drops it from validRecentPrEvents, and this badge
+              // disappears on the next render - no separate cache.
+              const wNewPrEvents = newPrEventsForSource(validRecentPrEvents, { wodLogId: w.id })
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -6718,6 +6728,11 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                     <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {wodNume ? `"${wodNume}" | ${w.variant_level || 'WOD'}` : (w.variant_level || 'WOD')}
                       {resultModifiedLog && <NotRxdBadge t={t} compact variant={w.variant_level} />}
+                      {wNewPrEvents.length > 0 && (
+                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.03em', color: '#fff', background: '#0E0E0E', borderRadius: '5px', padding: '2px 6px' }}>
+                          {t?.strengthNewPrLabel || 'NEW PR'}
+                        </span>
+                      )}
                       {photoMedia && <Camera size={12} strokeWidth={2} color="#aaa" aria-label={t.jurnalHasPhotoLabel} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -6795,6 +6810,18 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                           ))}
                         </div>
                       )}
+                      {wNewPrEvents.length > 0 && (
+                        <div style={{ marginBottom: (wVolumeLoad?.byMovement.length > 0 || (noteLog && noteLog.trim())) ? '10px' : '0', fontSize: '13px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px' }}>
+                          {wNewPrEvents.map((e) => (
+                            <div key={e.id}>
+                              {(t?.strengthNewPrLabel || 'NEW PR')} — {e.movement}{e.rep_scheme ? ` ${e.rep_scheme}RM` : ''}: {e.score_value}{e.score_unit}
+                              {!e.is_first_recorded && e.improvement_value != null && (
+                                <span style={{ color: '#4c8c3c' }}> (+{e.improvement_value}{e.score_unit})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {wVolumeLoad && wVolumeLoad.byMovement.length > 0 && (
                         <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', fontSize: '12px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E' }}>
                           {wVolumeLoad.byMovement.map((m) => (
@@ -6841,6 +6868,10 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
               const skillFormatConfigActual = esteSlot2 ? sl.wods?.skill2_format_config : sl.wods?.skill_format_config
               // INC-06 - same canonical score string as the Jurnal WOD card / leaderboard
               const skillScorText = hasSets ? setsScoreText(skillFormatId, skillFormatConfigActual, sl.sets, weightUnit, t.clasamentRepsUnit) : null
+              // CANONICAL STRENGTH RESULT INTELLIGENCE Phase D - same inline
+              // "NEW PR" wiring as the wod_log card above, keyed by THIS
+              // skill log's own id (source_skill_log_id).
+              const slNewPrEvents = newPrEventsForSource(validRecentPrEvents, { skillLogId: sl.id })
               const parti = []
               if (hasSets) {
                 Object.entries(sl.sets).forEach(([miscare, seturi]) => {
@@ -6858,7 +6889,14 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                 <div key={sl.id} onClick={() => { toggleClosed(skillKey); setConfirmDeleteSkill(null) }}
                   style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '4px solid #ABE73C', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E' }}>{esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3, color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {esteSlot2 ? t.homeWodSkill2Title : t.jurnalSkillTitle}{skillTitleName ? ` · ${skillTitleName}` : ''}
+                      {slNewPrEvents.length > 0 && (
+                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.03em', color: '#fff', background: '#0E0E0E', borderRadius: '5px', padding: '2px 6px' }}>
+                          {t?.strengthNewPrLabel || 'NEW PR'}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {onDeleteSkill && (
                         confirmDeleteSkill === skillKey ? (
@@ -6892,6 +6930,18 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                         <div style={{ marginBottom: '12px' }}>
                           <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{skillScorText}</div>
+                        </div>
+                      )}
+                      {slNewPrEvents.length > 0 && (
+                        <div style={{ marginBottom: '10px', fontSize: '13px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px' }}>
+                          {slNewPrEvents.map((e) => (
+                            <div key={e.id}>
+                              {(t?.strengthNewPrLabel || 'NEW PR')} — {e.movement}{e.rep_scheme ? ` ${e.rep_scheme}RM` : ''}: {e.score_value}{e.score_unit}
+                              {!e.is_first_recorded && e.improvement_value != null && (
+                                <span style={{ color: '#4c8c3c' }}> (+{e.improvement_value}{e.score_unit})</span>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                       {hasSets ? (
@@ -7133,7 +7183,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
   const [sharePending, setSharePending] = useState(false)
   useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader, compactResult } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader, compactResult, newPrEvents } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const resultText = scoreParts.length > 0 ? scoreParts.join(' · ') : null
   const dataObj = new Date(loggedAt)
@@ -7232,6 +7282,24 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
               <div style={{ fontSize: '30px', fontWeight: '600', color: '#0E0E0E', margin: '6px 0 4px', lineHeight: 1.2 }}>
                 {scoreParts.length > 0 ? scoreParts.join(' · ') : '—'}
               </div>
+              {/* CANONICAL STRENGTH RESULT INTELLIGENCE Phase D - inline "NEW
+                  PR" at save confirmation (section 15/16), reusing the SAME
+                  pr_events row(s) the caller already read back by this exact
+                  log's own source_wod_log_id - never re-detected here.
+                  Plain-card layout only, per "do not reopen CLOSED Photo
+                  Result layout work" - the photo card above is untouched. */}
+              {newPrEvents && newPrEvents.length > 0 && (
+                <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E', textAlign: 'left', background: '#F5FBEA', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+                  {newPrEvents.map((e) => (
+                    <div key={e.id}>
+                      {(t?.strengthNewPrLabel || 'NEW PR')} — {e.movement}{e.rep_scheme ? ` ${e.rep_scheme}RM` : ''}: {e.score_value}{e.score_unit}
+                      {!e.is_first_recorded && e.improvement_value != null && (
+                        <span style={{ color: '#4c8c3c' }}> (+{e.improvement_value}{e.score_unit})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', marginBottom: '18px' }}>
                 {dataObj.toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })} · {dataObj.toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
               </div>
@@ -7294,6 +7362,18 @@ function App() {
   const [wodLogs, setWodLogs] = useState([])
   const [skillLogs, setSkillLogs] = useState([])
   const [prEvents, setPrEvents] = useState([])
+  // CANONICAL STRENGTH RESULT INTELLIGENCE - the SAME filterValidRecentPrEvents
+  // validation (voided_at + source-existence + re-run resolveComparisonIdentity
+  // against the source's OWN frozen format_snapshot/format_config_snapshot,
+  // recentPrEvents.js) Performance Overview's Recent PRs section already uses,
+  // memoized once so both that section AND the inline "NEW PR" surfacing below
+  // (save confirmation + Journal) read the exact same validated ledger view -
+  // never a second, independently-maintained validity check.
+  const validRecentPrEvents = useMemo(() => {
+    const wodLogsById = new Map(wodLogs.map(w => [w.id, w]))
+    const skillLogsById = new Map(skillLogs.map(s => [s.id, s]))
+    return filterValidRecentPrEvents(prEvents, wodLogsById, skillLogsById)
+  }, [prEvents, wodLogs, skillLogs])
   // Results Phase 2 Slice 4 - Universal Workout Progression. Keyed by
   // performance_identity_id (see JurnalList's own "vs data trecuta" note),
   // fetched once per session and re-fetched on the same wod_logs realtime
@@ -9960,6 +10040,18 @@ function App() {
     if (error) { showToast(t.toastLogWodInsertError); console.error(error) }
     else {
       showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
+      // CANONICAL STRENGTH RESULT INTELLIGENCE Phase D - inline "NEW PR" at
+      // save confirmation (section 15/16's other required minimum surface,
+      // alongside Journal). evaluate_movement_prs already ran synchronously
+      // as an AFTER INSERT trigger by the time the insert above resolved -
+      // this reads that SAME authoritative ledger row back by its own
+      // source_wod_log_id, never re-detecting a PR client-side. A save that
+      // isn't RM-eligible (the overwhelming majority) simply gets []; no
+      // extra round trip cost for those beyond this one cheap filtered
+      // select.
+      const { data: justCreatedPrEvents } = savedWodLogRow?.id
+        ? await supabase.from('pr_events').select('*').eq('source_wod_log_id', savedWodLogRow.id).is('voided_at', null)
+        : { data: null }
       // Pop-up-ul de felicitare (cu numele si scorul WOD-ului oficial al
       // zilei) are sens doar cand membrul chiar a logat acea varianta
       // oficiala (RX/Intermediate/Beginner/OnRamp) - nu si la o logare
@@ -10012,6 +10104,7 @@ function App() {
             : null
         setWorkoutSharePopup({
           wodLogId: savedWodLogRow?.id || null,
+          newPrEvents: justCreatedPrEvents || [],
           wodName: logWodZiData?.name || null,
           movements: shareMovementLines,
           variantLevel: varianta?.nivel || null,
@@ -11994,7 +12087,7 @@ function App() {
               </div>
             </div>
             <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
-            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} t={t} lang={lang} gym={myGym} showToast={showToast}
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} validRecentPrEvents={validRecentPrEvents} t={t} lang={lang} gym={myGym} showToast={showToast}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
@@ -12704,10 +12797,10 @@ function App() {
         // Faza 6 - Recent PRs, singurul loc care citeste pr_events; filtrat
         // prin recentPrEvents.js (voided_at + re-validare de identitate fata
         // de Sursa reala - exclude cele 5 evenimente Weightlifting invalide
-        // cunoscute din Faza 5, fara sa le hardcodeze ID-urile).
-        const wodLogsById = new Map(wodLogs.map(w => [w.id, w]))
-        const skillLogsById = new Map(skillLogs.map(s => [s.id, s]))
-        const recentPrs = sortRecentPrEvents(filterValidRecentPrEvents(prEvents, wodLogsById, skillLogsById))
+        // cunoscute din Faza 5, fara sa le hardcodeze ID-urile). CANONICAL
+        // STRENGTH RESULT INTELLIGENCE - reuseste memo-ul validRecentPrEvents
+        // de mai sus (aceeasi validare, acum si sursa inline "NEW PR"-ului).
+        const recentPrs = sortRecentPrEvents(validRecentPrEvents)
         return (
           <div style={{ padding: '0 20px' }}>
             <CurrentBestsSection

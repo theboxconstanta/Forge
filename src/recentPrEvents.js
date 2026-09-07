@@ -53,6 +53,25 @@ export function filterValidRecentPrEvents(prEvents, wodLogsById, skillLogsById) 
   })
 }
 
+// CANONICAL STRENGTH RESULT INTELLIGENCE, Phase D - inline "NEW PR"
+// surfacing (save confirmation + Journal), sections 15-16. Takes the
+// ALREADY-validated list `filterValidRecentPrEvents` produced (never
+// re-detects/re-derives a PR client-side) and picks the events sourced from
+// ONE specific Result - keyed by source_wod_log_id/source_skill_log_id
+// exactly as the ledger itself records provenance, never by movement name
+// or timestamp proximity. Edit/delete reconciliation needs no special
+// handling here: a downward edit or deletion voids/removes the underlying
+// pr_events row server-side (void_stale_pr_events / the BEFORE DELETE
+// triggers), so the next prEvents refetch (already wired for every save/
+// delete in App.jsx) naturally drops it from `validEvents` and this
+// function returns nothing for that source - no separate cache to
+// invalidate, no stale "NEW PR" badge left behind.
+export function newPrEventsForSource(validEvents, { wodLogId, skillLogId }) {
+  return (validEvents || []).filter((event) =>
+    (wodLogId && event.source_wod_log_id === wodLogId) || (skillLogId && event.source_skill_log_id === skillLogId)
+  )
+}
+
 // Newest athletic occurrence first (mission §17/§66) - `occurred_at` is
 // the source Result's own `logged_at` (Slice 3's own design), never the
 // ledger row's insertion timestamp, so a backdated Result correctly
