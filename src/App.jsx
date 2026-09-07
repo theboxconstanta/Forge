@@ -2303,7 +2303,7 @@ async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, 
   return monotonicLoggedAt({ base, siblingLoggedAts: data.map((r) => r.logged_at) })
 }
 
-function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
+export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
@@ -2642,6 +2642,25 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                       const cardKey = log.id || i
                       const isExpanded = expandedLogId === cardKey
                       const { miscariAfisate, noteLog, wHasSets, wSetsParti, intervalResult, rezultatBucati: rezultatBucatiRaw, areRezultat, areDetalii } = parseWodLogDetails(log, t, effFormat?.simpleReps)
+                      // CANONICAL STRENGTH RESULT INTELLIGENCE - Leaderboard
+                      // gap fix (owner live report, commit 248dca3 shipped
+                      // without this surface): the SAME canonical
+                      // computeVolumeLoad/resolveMovementLoadCapabilityByKey
+                      // helper (workoutFormats.js, Phase A) FormatLogger/
+                      // JurnalList already use - Total Weight Lifted is a
+                      // derived SECONDARY metric here too, never the primary
+                      // score (`result`, unchanged above) and never a
+                      // ranking input (sortSectionLogs is untouched). Reads
+                      // THIS log's own frozen prescription_snapshot (never
+                      // live prescription state) and the log poster's OWN
+                      // weight_unit (log.profile?.weight_unit) - the same
+                      // per-poster-unit convention setsScoreUnitSuffix
+                      // already uses on this exact card just above, not a
+                      // new convention introduced here.
+                      const wVolumeEligible = wHasSets && effFormat?.rowMode === 'movement' && effFormatId !== 'Build to Heavy/1RM'
+                      const wVolumeLoad = wVolumeEligible
+                        ? computeVolumeLoad(log.sets, resolveMovementLoadCapabilityByKey(log.prescription_snapshot?.movements), log.profile?.weight_unit || 'kg')
+                        : null
                       // P9.5.7 - a RESULT card shows WHAT THE ATHLETE ACTUALLY DID
                       // (performed overlay -> frozen resolved selected-variant
                       // snapshot -> frozen notes text -> frozen movement names).
@@ -2765,11 +2784,20 @@ function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, on
                                   depinde de scoringMode-ul rezolvat (Total/Minim/Maxim), nu
                                   hardcodata 'TOTAL' pt orice scor. */}
                               {showSetsScoreAtEnd && (
-                                <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                                <div style={{ marginBottom: (wVolumeLoad?.byMovement.length > 0 || (noteLog && noteLog.trim())) ? '10px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                                   <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     {t.clasamentSetsScoreLabel[resolveSetsScoringMode(effFormatId, effFormatConfig)] || t.jurnalResultLabel}
                                   </div>
                                   <div style={{ fontSize: '16px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{result}</div>
+                                </div>
+                              )}
+                              {wVolumeLoad && wVolumeLoad.byMovement.length > 0 && (
+                                <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', fontSize: '12px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E' }}>
+                                  {wVolumeLoad.byMovement.map((m) => (
+                                    <div key={m.movementIdentity}>
+                                      {(t?.strengthTotalWeightLiftedLabel || 'Total Weight Lifted')}{wVolumeLoad.byMovement.length > 1 ? ` (${m.movementName})` : ''}: {m.totalWeight}{wVolumeLoad.weightUnit}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                               {noteLog && noteLog.trim() && (
