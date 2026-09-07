@@ -101,6 +101,14 @@ const FORMAT_CONFIG_TRANSLATORS = {
     : { rounds: c.rounds, workSec: c.workSeconds, restSec: c.restSeconds }),
   'Weightlifting': () => ({}),
   'Complex': (c) => ({ rounds: c.rounds }),
+  // STRENGTH SETS GENERATION - the AI's flat per-set reps list
+  // (formatConfig.setsScheme, transform.ts) maps 1:1 onto the catalog's own
+  // setsScheme field (workoutFormats.js - same shape, one number per set).
+  // Absent/empty (the model couldn't resolve a clear scheme) intentionally
+  // translates to nothing here - missingRequiredConfigFields already flags
+  // Strength Sets.setsScheme as required, so an unresolved scheme correctly
+  // lands the section in "needs review" instead of a silently-guessed one.
+  'Strength Sets': (c) => (Array.isArray(c.setsScheme) && c.setsScheme.length > 0 ? { setsScheme: c.setsScheme } : {}),
   'AMRAP with Buy-In': (c) => ({ totalDurationSec: min2sec(c.timeCapMinutes) }),
   'Not For Time': () => ({}),
   // Spre deosebire de restul traducatoarelor, `stages` NU vine dintr-un

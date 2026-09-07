@@ -137,6 +137,14 @@ const FORMAT_CONFIG_DEF = {
     restSeconds: { type: ['number', 'null'] },
     startReps: { type: ['number', 'null'] },
     incrementReps: { type: ['number', 'null'] },
+    // STRENGTH SETS GENERATION - the flat per-set rep target list (2x5,
+    // 3x4, 2x3 -> [5,5,4,4,4,3,3], same "one number per set, length = set
+    // count" shape workoutFormats.js's Strength Sets.config.setsScheme
+    // already uses). Array GOL (not null - same strict-mode constraint as
+    // `stages` below: type:['array','null'] combined with `items` fails
+    // Structured Outputs validation) for any format other than "Strength
+    // Sets".
+    setsScheme: { type: 'array', items: { type: 'number' } },
     // Array GOL (nu null - Structured Outputs strict mode nu accepta
     // type:['array','null'] combinat cu `items`, gasit direct la deploy,
     // eroare "invalid_json_schema") pt orice format in afara de 'Chained
@@ -147,7 +155,7 @@ const FORMAT_CONFIG_DEF = {
   },
   required: [
     'timeCapMinutes', 'rounds', 'roundCount', 'stationMode', 'structure', 'intervalSeconds', 'workSeconds',
-    'restSeconds', 'startReps', 'incrementReps', 'stages',
+    'restSeconds', 'startReps', 'incrementReps', 'setsScheme', 'stages',
   ],
 }
 

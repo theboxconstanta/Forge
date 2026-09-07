@@ -85,6 +85,14 @@ function toFormatConfig(fc: any) {
     restSeconds: fc?.restSeconds ?? null,
     startReps: fc?.startReps ?? null,
     incrementReps: fc?.incrementReps ?? null,
+    // STRENGTH SETS GENERATION - flat per-set reps list (2x5,3x4,2x3 ->
+    // [5,5,4,4,4,3,3]), passed through verbatim. Only non-negative finite
+    // numbers survive - a malformed/hallucinated entry is dropped rather
+    // than reaching the client as something that would fail
+    // workoutFormats.js's repsSchemeList shape.
+    setsScheme: Array.isArray(fc?.setsScheme)
+      ? fc.setsScheme.filter((n: any) => typeof n === "number" && Number.isFinite(n) && n > 0)
+      : [],
     stages: Array.isArray(fc?.stages) ? fc.stages.map(toStage) : [],
   };
 }
