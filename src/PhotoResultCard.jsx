@@ -54,6 +54,20 @@ export default function PhotoResultCard({
   structureHeader, // { primary, secondary, prescriptionLines } | null - resolveWorkoutStructureHeader (workoutFormats.js)
   headline, // string | null - composeWorkoutHeadline (workoutFormats.js), the top-of-card summary
   movements, resultText, loggedAt, lang, t,
+  // CANONICAL STRENGTH RESULT INTELLIGENCE Phase F - two OPTIONAL, already-
+  // computed-by-the-caller facts (never derived here - same "pure
+  // presentation" contract as every other prop on this component).
+  // `volumeText` - a compact pre-formatted string (e.g. "1,966kg total",
+  // WorkoutSharePopup/JurnalList's own computeVolumeLoad-derived value) or
+  // null when this Result isn't volume-eligible / nothing was logged.
+  // `isNewPr` - boolean, true only when the caller found a valid,
+  // source-linked pr_events row for this exact log (never inferred here
+  // from resultText/load - explicit-RM-intent gating happens entirely in
+  // the caller, via the authoritative ledger). When both happen to be
+  // true (not possible under today's eligibility - Build to Heavy/1RM is
+  // never volume-eligible - but not assumed to stay that way forever), the
+  // PR line takes priority in this single compact secondary slot.
+  volumeText, isNewPr,
   onShare, sharePending,
   onClose,
   exportMode,
@@ -201,8 +215,21 @@ export default function PhotoResultCard({
           <img src="/forge.png" alt="" data-role="forge-logo" style={{ height: '16px', width: '16px', borderRadius: '4px', objectFit: 'cover' }} />
           <span style={{ color: '#fff', fontWeight: '700', fontSize: '11px', letterSpacing: '1px' }}>FORGE</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
-          {[resultText, statusText].filter(Boolean).join(' | ')}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+            {[resultText, statusText].filter(Boolean).join(' | ')}
+          </div>
+          {/* CANONICAL STRENGTH RESULT INTELLIGENCE Phase F - a single
+              compact secondary line, never replacing the primary result/
+              status line above it (owner "preserve the current bottom-right
+              primary result", "compact secondary value without changing
+              the established visual hierarchy"). PR takes priority over
+              volume in this one slot when both happen to be present. */}
+          {(isNewPr || volumeText) && (
+            <div style={{ fontSize: '10px', fontWeight: '700', color: accent, textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+              {isNewPr ? `🏆 ${t?.strengthNewPrLabel || 'NEW P.R.'}` : volumeText}
+            </div>
+          )}
         </div>
       </div>
     </div>

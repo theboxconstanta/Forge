@@ -27,6 +27,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { Clasament, JurnalList } from './App.jsx'
 import { getT } from './translations.js'
+import { buildMovementIndex } from './prescriptionContract.js'
 
 afterEach(cleanup)
 
@@ -77,10 +78,11 @@ function makeLog(overrides = {}) {
 
 const wodZiData = { type: 'Strength Sets', format_config: { setsScheme: [5, 6, 4, 4, 4, 3, 3] }, duration: null, name: null }
 
-function renderLeaderboard(logs) {
+function renderLeaderboard(logs, movementIndex) {
   return render(
     <Clasament entries={undefined} logs={logs} sections={[]} aggregateDefinition={null} loading={false}
-      wodZiData={wodZiData} onRefresh={() => {}} selectedDate="2026-09-08" onDateChange={() => {}} t={t} lang="en" />
+      wodZiData={wodZiData} onRefresh={() => {}} selectedDate="2026-09-08" onDateChange={() => {}}
+      movementIndex={movementIndex} t={t} lang="en" />
   )
 }
 
@@ -172,5 +174,69 @@ describe('Cross-surface parity - Journal and Leaderboard agree on the IDENTICAL 
         validRecentPrEvents={[]} gender="male" weightUnit={log.profile.weight_unit} t={t} lang="en" />
     )
     expect(screen.getByText(/Total Weight Lifted: 1875kg/)).toBeInTheDocument()
+  })
+})
+
+// LIVE ACCEPTANCE FAILURE REGRESSION (this ticket) - the REAL production
+// root cause: a Strength Sets Snatch log whose FROZEN prescription_snapshot
+// instance carries `reps: {value: null}` and NO `.load` key at all (the
+// coach removed the prescribed Load, "each athlete picks their own
+// weight" - a legitimate, common Strength Sets pattern, confirmed via a
+// live, read-only DB query). Reproduces the exact owner-reported numbers:
+// max 77kg, volume 1966kg (5@65, 5@65, 4@70, 4@70, 4@75, 3@75, 3@77).
+describe('LIVE BUG REGRESSION - real production instance shape (Load field removed, no `.load` key)', () => {
+  const catalog = [
+    { id: 'cm-snatch-live', name: 'Snatch', allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' },
+  ]
+  const movementIndex = buildMovementIndex(catalog)
+  // The exact frozen shape confirmed live - reps only, canonicalMovementId
+  // present, no `.load` key.
+  const snatchNoLoadInst = { instanceId: 'mi_live', name: 'Snatch', canonicalMovementId: 'cm-snatch-live', reps: { value: null } }
+  const liveSets = { Snatch: [row('5', '65'), row('5', '65'), row('4', '70'), row('4', '70'), row('4', '75'), row('3', '75'), row('3', '77')] }
+  const liveLog = () => makeLog({
+    id: 'wlog-live-1',
+    sets: liveSets,
+    format_config_snapshot: { setsScheme: [5, 5, 4, 4, 4, 3, 3] },
+    prescription_snapshot: { movements: [snatchNoLoadInst] },
+    result: '77kg', // setsScoreText's own Max-weight-scored primary score for this scheme
+  })
+
+  it('WITHOUT movementIndex (pre-fix call), Total Weight Lifted stays absent - reproduces the exact live failure', () => {
+    renderLeaderboard([liveLog()], undefined)
+    expandFirstCard()
+    expect(screen.queryByText(/Total Weight Lifted/)).not.toBeInTheDocument()
+  })
+
+  it('WITH movementIndex (the fix), the Leaderboard shows the primary 77kg unchanged AND Total Weight Lifted: 1966kg', () => {
+    renderLeaderboard([liveLog()], movementIndex)
+    expect(screen.getByText('77kg')).toBeInTheDocument()
+    expandFirstCard()
+    expect(screen.getByText(/Total Weight Lifted: 1966kg/)).toBeInTheDocument()
+    expect(screen.getAllByText('77kg').length).toBeGreaterThan(0) // primary score unchanged, never replaced by 1966
+  })
+
+  it('Journal and Leaderboard agree on this exact live-shaped log too', () => {
+    const log = liveLog()
+    cleanup()
+    renderLeaderboard([log], movementIndex)
+    expandFirstCard()
+    expect(screen.getByText(/Total Weight Lifted: 1966kg/)).toBeInTheDocument()
+    cleanup()
+    render(
+      <JurnalList entries={[{ key: log.id, wodLog: log, skillLogsArr: [] }]}
+        validRecentPrEvents={[]} movementIndex={movementIndex} gender="male" weightUnit={log.profile.weight_unit} t={t} lang="en" />
+    )
+    expect(screen.getByText(/Total Weight Lifted: 1966kg/)).toBeInTheDocument()
+  })
+
+  it('an ordinary Strength Sets log (this exact live workout) never shows NEW PR, regardless of how heavy the top set was', () => {
+    // No pr_events row exists for this source - PR gating is explicit-intent
+    // only (server-side eligibility, Build to Heavy/1RM's targetLabel), an
+    // ordinary Strength Sets save can never produce one.
+    render(
+      <JurnalList entries={[{ key: liveLog().id, wodLog: liveLog(), skillLogsArr: [] }]}
+        validRecentPrEvents={[]} movementIndex={movementIndex} gender="male" weightUnit="kg" t={t} lang="en" />
+    )
+    expect(screen.queryByText('NEW PR')).not.toBeInTheDocument()
   })
 })

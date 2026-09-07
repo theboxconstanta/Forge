@@ -20,6 +20,7 @@
 import { convertWeight, secToTime } from './utils'
 import { resolveAthleteGenderKey } from './rxEngine'
 import { classifyRxStatus } from './rxEngine'
+import { resolveMovementCapability } from './prescriptionContract'
 
 // Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
 // FormatConfigEditor peste campul de text liber - nu limiteaza ce se poate
@@ -1946,21 +1947,48 @@ export function resolveStationUnitsByKey(formatId, config, prescriptionMovements
 // labels, not movements). A rowsByKey row for these formats is already keyed
 // by the plain movement NAME (movementNameOf, defaultRowsForFormat) - no
 // station-index wrapping like EMOM/Intervals needs, so this is a flat
-// name -> capability map, resolved ONCE from the same canonical RX instance
-// array (prescriptionMovements) every other capability-aware helper in this
-// file already reads - never a live catalog lookup, never a movement-name
-// heuristic. `isLoadCapable` is true only when the EFFECTIVE (post-
-// substitution) instance itself carries a `.load` spec - the exact same
-// signal EmomEntryFields (FormatLogger.jsx) already uses to decide whether
-// to render a load input at all, reused here for the identical reason: the
-// instance's own shape already IS its capability.
-export function resolveMovementLoadCapabilityByKey(prescriptionMovements) {
+// name -> capability map, resolved from the same canonical RX instance array
+// (prescriptionMovements) every other capability-aware helper in this file
+// already reads.
+//
+// LIVE PRODUCTION BUG (owner report, real saved Strength Sets Snatch log):
+// `isLoadCapable: !!m.load` (the original signal here) conflates two
+// DIFFERENT facts - "does this instance currently carry a PRESCRIBED load
+// value" vs "can this movement conceptually take a load at all". A coach can
+// legitimately remove ONLY a load-capable movement's Load field while
+// keeping Reps (strengthSetsOptionalLoad fix, pre-dates this initiative -
+// "each athlete picks their own weight", the common case for Strength Sets)
+// - the frozen prescription_snapshot instance then has NO `.load` key even
+// though the movement (e.g. Snatch) is genuinely load-capable, and the
+// athlete's actually-performed rows carry real weight values regardless (the
+// logger's own weight input is never gated on whether load was prescribed).
+// The old signal silently excluded every such movement from volume - not a
+// rare edge case, the NORMAL Strength Sets authoring pattern.
+//
+// FIX: when a `movementIndex` (buildMovementIndex(gymMovements) -
+// prescriptionContract.js, the SAME index PerformedMovementPickerEdit
+// already uses, canonical-id keyed, never a live re-fetch performed here)
+// is supplied, resolve REAL catalog capability via the instance's own
+// `canonicalMovementId` (resolveMovementCapability - the exact function the
+// Coach Builder's own Load-field-removal gate already uses) - this
+// correctly keeps a bodyweight-only movement (Air Squat, catalog capability
+// never includes 'load') excluded regardless of any stray weight value
+// (oracle F/G, unchanged), while correctly INCLUDING a load-capable
+// movement whose load was simply never prescribed. `movementIndex` is
+// OPTIONAL - when absent (a caller with no catalog available, or a pure
+// unit test), falls back to the original `!!m.load` instance-shape signal,
+// byte-identical to before - never a live catalog lookup performed BY this
+// function itself, never a movement-name heuristic either way.
+export function resolveMovementLoadCapabilityByKey(prescriptionMovements, movementIndex) {
   const out = {}
   ;(Array.isArray(prescriptionMovements) ? prescriptionMovements : []).forEach((m) => {
     if (typeof m === 'string') return // a plain display-line string carries no capability signal at all - leave unresolved (caller treats as not load-capable, never guesses)
     const name = movementNameOf(m)
     if (!name) return
-    out[name] = { isLoadCapable: !!m.load, movementId: m.canonicalMovementId || null }
+    const movementId = m.canonicalMovementId || null
+    const catalogRow = movementId && movementIndex?.byId ? movementIndex.byId.get(movementId) : null
+    const isLoadCapable = catalogRow ? resolveMovementCapability(catalogRow).allowed.includes('load') : !!m.load
+    out[name] = { isLoadCapable, movementId }
   })
   return out
 }

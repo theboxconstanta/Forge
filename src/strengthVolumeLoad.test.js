@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { computeVolumeLoad, resolveMovementLoadCapabilityByKey } from './workoutFormats.js'
+import { buildMovementIndex } from './prescriptionContract.js'
 
 const row = (reps, weight, extra = {}) => ({ completed: false, distance: '', targetReps: null, reps, weight, ...extra })
 
@@ -140,5 +141,60 @@ describe('REGRESSION - a movement absent from loadCapabilityByKey (legacy log, n
     const result = computeVolumeLoad({ Snatch: [row('5', '40')] }, {}, 'kg')
     expect(result.byMovement).toHaveLength(0)
     expect(result.totalWeight).toBe(0)
+  })
+})
+
+// LIVE PRODUCTION BUG (owner report) - a real saved Strength Sets Snatch log
+// had `sets` keyed by "snatch" (lowercase) with real performed weight in
+// every row, but its FROZEN prescription_snapshot instance carried ONLY
+// `reps: {value: null}` - no `.load` key at all (confirmed via a live,
+// read-only DB query: the coach removed the Load field, a legitimate,
+// common Strength Sets authoring choice - "each athlete picks their own
+// weight" - already supported by the pre-existing strengthSetsOptionalLoad
+// fix). The original resolver's `isLoadCapable: !!m.load` signal treated
+// "no load PRESCRIBED" as "not load CAPABLE" and silently excluded Snatch
+// from volume entirely - the metric was correctly computed as zero
+// candidates, not a rendering/wiring bug. This is the actual root cause of
+// the Leaderboard live-acceptance failure.
+describe('LIVE BUG REGRESSION - a load-capable movement whose prescribed Load was removed (real production shape) still contributes volume when a catalog movementIndex is supplied', () => {
+  // Real catalog shape (movements table) - Snatch allows both reps and load;
+  // Air Squat allows only reps (never load, at the catalog level).
+  const catalog = [
+    { id: 'cm-snatch', name: 'Snatch', allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' },
+    { id: 'cm-as', name: 'Air Squat', allowed_prescription_metrics: ['reps'], default_prescription_metric: 'reps' },
+  ]
+  const movementIndex = buildMovementIndex(catalog)
+  // The EXACT frozen instance shape confirmed live - reps only, no `.load`
+  // key, load deliberately removed by the coach.
+  const snatchNoLoadInst = { instanceId: 'mi_sn', name: 'snatch', canonicalMovementId: 'cm-snatch', reps: { value: null } }
+  const airSquatInst2 = { instanceId: 'mi_as2', name: 'Air Squat', canonicalMovementId: 'cm-as', reps: { value: null } }
+
+  it('WITHOUT a movementIndex (old/legacy call sites, or a pure unit test), falls back to the original !!m.load signal - Snatch is (incorrectly, but unchanged) excluded', () => {
+    const cap = resolveMovementLoadCapabilityByKey([snatchNoLoadInst])
+    expect(cap.snatch.isLoadCapable).toBe(false)
+  })
+
+  it('WITH a movementIndex, Snatch resolves to genuinely load-capable via its catalog row (canonicalMovementId lookup, never movement-name parsing) even though `.load` is absent from the instance', () => {
+    const cap = resolveMovementLoadCapabilityByKey([snatchNoLoadInst], movementIndex)
+    expect(cap.snatch).toEqual({ isLoadCapable: true, movementId: 'cm-snatch' })
+  })
+
+  it('Air Squat stays correctly excluded even WITH a movementIndex - bodyweight-only at the catalog level, not just "unprescribed"', () => {
+    const cap = resolveMovementLoadCapabilityByKey([airSquatInst2], movementIndex)
+    expect(cap['Air Squat']).toEqual({ isLoadCapable: false, movementId: 'cm-as' })
+  })
+
+  it('the EXACT owner-reported live rows (Strength Sets, Snatch: 5@65,5@65,4@70,4@70,4@75,3@75,3@77) now correctly sum to 1966kg', () => {
+    const cap = resolveMovementLoadCapabilityByKey([snatchNoLoadInst], movementIndex)
+    const rowsByKey = { snatch: [row('5', '65'), row('5', '65'), row('4', '70'), row('4', '70'), row('4', '75'), row('3', '75'), row('3', '77')] }
+    const result = computeVolumeLoad(rowsByKey, cap, 'kg')
+    expect(result.totalWeight).toBe(1966)
+    expect(result.byMovement).toHaveLength(1)
+  })
+
+  it('a movementIndex with no entry for this canonicalMovementId (movement deleted/never seeded) falls back to the instance-shape signal, never crashes', () => {
+    const emptyIndex = buildMovementIndex([])
+    const cap = resolveMovementLoadCapabilityByKey([snatchNoLoadInst], emptyIndex)
+    expect(cap.snatch.isLoadCapable).toBe(false) // falls back to !!m.load = false, same as no-movementIndex case
   })
 })

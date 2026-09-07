@@ -2303,7 +2303,7 @@ async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, 
   return monotonicLoggedAt({ base, siblingLoggedAts: data.map((r) => r.logged_at) })
 }
 
-export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, t, lang }) {
+export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, movementIndex, t, lang }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
@@ -2659,7 +2659,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                       // new convention introduced here.
                       const wVolumeEligible = wHasSets && effFormat?.rowMode === 'movement' && effFormatId !== 'Build to Heavy/1RM'
                       const wVolumeLoad = wVolumeEligible
-                        ? computeVolumeLoad(log.sets, resolveMovementLoadCapabilityByKey(log.prescription_snapshot?.movements), log.profile?.weight_unit || 'kg')
+                        ? computeVolumeLoad(log.sets, resolveMovementLoadCapabilityByKey(log.prescription_snapshot?.movements, movementIndex), log.profile?.weight_unit || 'kg')
                         : null
                       // P9.5.7 - a RESULT card shows WHAT THE ATHLETE ACTUALLY DID
                       // (performed overlay -> frozen resolved selected-variant
@@ -6544,7 +6544,7 @@ function JurnalPhotoResult({ storagePath, showToast, ...cardProps }) {
   )
 }
 
-export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, validRecentPrEvents, t, lang, gym, showToast }) {
+export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, validRecentPrEvents, movementIndex, t, lang, gym, showToast }) {
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6672,7 +6672,7 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
               // a new limitation introduced here.
               const wVolumeEligible = wHasSets && getFormat(formatTipResolvat)?.rowMode === 'movement' && formatTipResolvat !== 'Build to Heavy/1RM'
               const wVolumeLoad = wVolumeEligible
-                ? computeVolumeLoad(w.sets, resolveMovementLoadCapabilityByKey(w.prescription_snapshot?.movements), weightUnit)
+                ? computeVolumeLoad(w.sets, resolveMovementLoadCapabilityByKey(w.prescription_snapshot?.movements, movementIndex), weightUnit)
                 : null
               // CANONICAL STRENGTH RESULT INTELLIGENCE Phase D (sections
               // 15-16) - inline "NEW PR" surfacing, keyed by THIS log's own
@@ -6684,6 +6684,14 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
               // refetch drops it from validRecentPrEvents, and this badge
               // disappears on the next render - no separate cache.
               const wNewPrEvents = newPrEventsForSource(validRecentPrEvents, { wodLogId: w.id })
+              // CANONICAL STRENGTH RESULT INTELLIGENCE Part D/Phase F - same
+              // two facts, compact-formatted for JurnalPhotoResult's Photo
+              // Result card (mirrors WorkoutSharePopup's own
+              // photoVolumeText/isNewPr computation exactly).
+              const wIsNewPr = wNewPrEvents.length > 0
+              const wPhotoVolumeText = (wVolumeLoad && wVolumeLoad.byMovement.length > 0)
+                ? `${wVolumeLoad.totalWeight.toLocaleString(localeFor(lang))}${wVolumeLoad.weightUnit} ${t?.strengthTotalWeightLiftedCompactSuffix || 'total'}`
+                : null
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -6810,6 +6818,7 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                           structureHeader={structureHeaderLog}
                           headline={structureHeaderLog ? composeWorkoutHeadline(structureHeaderLog, cardMovementLines, t) : null}
                           movements={cardMovementLines} resultText={photoCardResultText}
+                          volumeText={wPhotoVolumeText} isNewPr={wIsNewPr}
                           loggedAt={w.logged_at} lang={lang} t={t}
                         />
                       )}
@@ -7211,10 +7220,18 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
   const [sharePending, setSharePending] = useState(false)
   useEffect(() => { setImgFailed(false) }, [data?.wodLogId])
   if (!data) return null
-  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader, compactResult, newPrEvents } = data
+  const { wodName, movements, variantLevel, variantColor, variantBg, result, timeResult, loggedAt, resultModified, photoState, photoUrl, structureHeader, compactResult, newPrEvents, volumeLoad } = data
   const scoreParts = [result, timeResult].filter(Boolean)
   const resultText = scoreParts.length > 0 ? scoreParts.join(' · ') : null
   const dataObj = new Date(loggedAt)
+  // CANONICAL STRENGTH RESULT INTELLIGENCE Part D - the same two facts
+  // (never conflated with the primary score above) drive BOTH the plain
+  // layout's own block below AND PhotoResultCard's compact secondary line -
+  // one computation, two renderings of the identical already-derived data.
+  const isNewPr = !!(newPrEvents && newPrEvents.length > 0)
+  const photoVolumeText = (volumeLoad && volumeLoad.byMovement.length > 0)
+    ? `${volumeLoad.totalWeight.toLocaleString(localeFor(lang))}${volumeLoad.weightUnit} ${t?.strengthTotalWeightLiftedCompactSuffix || 'total'}`
+    : null
   const shareText = [
     gym.name,
     wodName ? `"${wodName}"` : null,
@@ -7246,6 +7263,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
           variantLevel, notRxdLabel,
           structureHeader, headline: composeWorkoutHeadline(structureHeader, movements, t),
           movements, resultText: compactResult, loggedAt, lang, t,
+          volumeText: photoVolumeText, isNewPr,
         },
         filename: buildShareFilename(new Date(loggedAt)),
         shareText: [gym.name, 'FORGE'].filter(Boolean).join(' · '),
@@ -7276,6 +7294,7 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
             variantLevel={variantLevel} notRxdLabel={notRxdLabel}
             structureHeader={structureHeader} headline={composeWorkoutHeadline(structureHeader, movements, t)}
             movements={movements} resultText={compactResult} loggedAt={loggedAt} lang={lang} t={t}
+            volumeText={photoVolumeText} isNewPr={isNewPr}
             onShare={handleSharePhotoCard} sharePending={sharePending}
             onClose={onClose}
           />
@@ -7324,6 +7343,15 @@ function WorkoutSharePopup({ data, onClose, t, lang, gym, showToast }) {
                       {!e.is_first_recorded && e.improvement_value != null && (
                         <span style={{ color: '#4c8c3c' }}> (+{e.improvement_value}{e.score_unit})</span>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {volumeLoad && volumeLoad.byMovement.length > 0 && (
+                <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E', textAlign: 'left', marginBottom: '14px' }}>
+                  {volumeLoad.byMovement.map((m) => (
+                    <div key={m.movementIdentity}>
+                      {(t?.strengthTotalWeightLiftedLabel || 'Total Weight Lifted')}{volumeLoad.byMovement.length > 1 ? ` (${m.movementName})` : ''}: {m.totalWeight}{volumeLoad.weightUnit}
                     </div>
                   ))}
                 </div>
@@ -7818,19 +7846,36 @@ function App() {
   // (null, userProfile inca nefetch-uit atunci).
   const myGymIdRef = useRef(null)
   useEffect(() => { myGymIdRef.current = userProfile?.gym_id ?? null }, [userProfile])
-  // P9.5.2 - load the gym movement catalog the first time the athlete opens a
-  // Log WOD / Log Skill screen (the focused Edit mode's substitution picker
-  // needs canonical rows + ids). One fetch, best-effort. Declared HERE, after
+  // P9.5.2 - load the gym movement catalog (the focused Edit mode's
+  // substitution picker needs canonical rows + ids). One fetch, best-effort,
+  // memoized (memberGymMovements.length > 0 guard). Declared HERE, after
   // `userProfile`, so its dependency array never reads a binding in the
   // temporal dead zone (INC-P9.5.2-01).
+  //
+  // CANONICAL STRENGTH RESULT INTELLIGENCE - live bug fix: this catalog
+  // (via memberMovementIndex below) is now also the REQUIRED capability
+  // source for Total Weight Lifted's `resolveMovementLoadCapabilityByKey`
+  // on the Leaderboard/Journal/save-confirmation/Photo Result surfaces - a
+  // real production Strength Sets Snatch log had its Load field removed by
+  // the coach (a legitimate "each athlete picks their own weight" choice),
+  // leaving the frozen prescription_snapshot instance with no `.load` key
+  // even though Snatch is genuinely load-capable; only a real catalog
+  // lookup (never the instance's own possibly-load-free shape) can tell the
+  // two apart from a bodyweight-only movement. Previously gated to only the
+  // Log WOD/Log Skill screens (the catalog's original, narrower purpose) -
+  // widened here to fetch as soon as gym_id is known, so it is already
+  // available the first time a member opens the Leaderboard or Journal,
+  // never dependent on navigation history. Still one fetch, still
+  // best-effort, still silently no-ops on failure (capability resolution
+  // simply falls back to the pre-existing instance-shape signal).
   useEffect(() => {
-    if ((screen !== 'logWOD' && screen !== 'logSkill') || !userProfile?.gym_id || memberGymMovements.length > 0) return
+    if (!userProfile?.gym_id || memberGymMovements.length > 0) return
     let cancelled = false
     fetchMovementsForGym(userProfile.gym_id)
       .then(rows => { if (!cancelled) setMemberGymMovements(rows || []) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [screen, userProfile?.gym_id, memberGymMovements.length])
+  }, [userProfile?.gym_id, memberGymMovements.length])
   const [showOnboarding, setShowOnboarding] = useState(false)
   // Citit de fetchUserProfile insusi (apelat repetat acum - polling 5s,
   // onVisible, subscriptii, broadcast - vezi cele patru efecte care il
@@ -10130,9 +10175,22 @@ function App() {
           : (activeShareFmt?.family === 'chained' && logFields.log_meta?.totalReps != null)
             ? t.jurnalTotalRepsLabel(logFields.log_meta.totalReps)
             : null
+        // CANONICAL STRENGTH RESULT INTELLIGENCE - Total Weight Lifted at
+        // save confirmation (Part D - "must agree" across all 4 surfaces).
+        // Same canonical helper, same eligibility (rowMode:'movement',
+        // never Build to Heavy/1RM), same `prescriptionSnapshot.movements`
+        // just built above (not yet re-fetched from the DB) +
+        // `memberMovementIndex` (the live-bug fix - real catalog capability
+        // via canonicalMovementId, not just whether THIS instance happens
+        // to carry a `.load` spec).
+        const shareVolumeEligible = activeShareFmt?.rowMode === 'movement' && activeLogFormatId !== 'Build to Heavy/1RM'
+        const shareVolumeLoad = shareVolumeEligible
+          ? computeVolumeLoad(logFields.sets, resolveMovementLoadCapabilityByKey(prescriptionSnapshot?.movements, memberMovementIndex), userProfile?.weight_unit || 'kg')
+          : null
         setWorkoutSharePopup({
           wodLogId: savedWodLogRow?.id || null,
           newPrEvents: justCreatedPrEvents || [],
+          volumeLoad: shareVolumeLoad,
           wodName: logWodZiData?.name || null,
           movements: shareMovementLines,
           variantLevel: varianta?.nivel || null,
@@ -12115,7 +12173,7 @@ function App() {
               </div>
             </div>
             <div onTouchStart={onJurnalTouchStart} onTouchEnd={onJurnalTouchEnd}>
-            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} validRecentPrEvents={validRecentPrEvents} t={t} lang={lang} gym={myGym} showToast={showToast}
+            <JurnalList entries={jurnalEntriesForDate} onDeleteWod={stergeWodLog} onDeleteSkill={stergeSkillLog} gender={userProfile?.gender} weightUnit={userProfile?.weight_unit} progressionByIdentity={progressionByIdentity} validRecentPrEvents={validRecentPrEvents} movementIndex={memberMovementIndex} t={t} lang={lang} gym={myGym} showToast={showToast}
               onEditWod={(log) => {
                 const parts = (log.notes || '').split('\n---\n')
                 const prefix = parts.length > 1 ? parts[0] : (parts[0] || '')
@@ -12580,6 +12638,7 @@ function App() {
               sequentialAmrapStations={sequentialAmrapStations}
               intervalComposition={intervalCompositionActive}
               prescriptionMovements={frozenProgrammedInstances}
+              movementIndex={memberMovementIndex}
               prescribedWeight={prescribedWeightPentruLog}
               rxStatus={liveRxStatus}
               value={{
@@ -13330,7 +13389,7 @@ function App() {
       })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} t={t} lang={lang} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 

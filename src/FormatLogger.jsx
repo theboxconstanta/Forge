@@ -406,7 +406,7 @@ function EmomCell({ cellKey, programmedInst, compositionEntries, rowsByKey, onCh
   )
 }
 
-function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition, prescriptionMovements }) {
+function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition, prescriptionMovements, movementIndex }) {
   // EMOM MINUTE-PATTERN AUTHORING - for a brand-new/empty log (the only
   // case this ever runs - an existing log's `sets` is used as-is above),
   // `movements` and `prescriptionMovements` describe the identical
@@ -603,7 +603,7 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   // never applies).
   const volumeEligible = getFormat(formatId)?.rowMode === 'movement' && formatId !== 'Build to Heavy/1RM'
   const volumeLoad = volumeEligible
-    ? computeVolumeLoad(rowsByKey, resolveMovementLoadCapabilityByKey(prescriptionMovements), weightUnit)
+    ? computeVolumeLoad(rowsByKey, resolveMovementLoadCapabilityByKey(prescriptionMovements, movementIndex), weightUnit)
     : null
 
   return (
@@ -635,14 +635,14 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   )
 }
 
-export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations, intervalComposition, prescriptionMovements }) {
+export default function FormatLogger({ formatId, config, movements, value, onChange, weightUnit, t, prescribedWeight, rxStatus, sequentialAmrapStations, intervalComposition, prescriptionMovements, movementIndex }) {
   const format = getFormat(formatId)
   const v = value || {}
   const patch = (p) => onChange({ ...v, ...p })
 
   if (format.family === 'sets') {
     return <SetsFields formatId={formatId} config={config} movements={movements || []} sets={v.sets}
-      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} intervalComposition={intervalComposition} prescriptionMovements={prescriptionMovements} />
+      onChange={sets => patch({ sets })} weightUnit={weightUnit} t={t} intervalComposition={intervalComposition} prescriptionMovements={prescriptionMovements} movementIndex={movementIndex} />
   }
 
   if (format.family === 'mixed') {
