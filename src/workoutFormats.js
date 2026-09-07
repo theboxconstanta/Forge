@@ -1669,24 +1669,28 @@ export function intervalTimelineLines(formatId, config, stationDisplayLines) {
 // "Min 1".."Min 12"; Tabata cu rounds:8 -> "Rundă 1".."Rundă 8"; Strength Sets
 // cu targetSets:5 -> 5 randuri goale per miscare din `movements`.
 // INC-07 - structured Intervals -> roundCount × stationCount rows, round-major.
+// STRENGTH SETS LOGGER OBJECT LABEL REGRESSION - `movements`/
+// `prescriptionMovements` throughout this module can be EITHER plain
+// display-line strings OR the canonical RX instance array ({instanceId,
+// name, canonicalMovementId, reps, load, ...} - since UniversalScoreInput
+// forwards prescriptionMovements to every SETS-family format, not just
+// EMOM). Any caller that keys data by a movement's identity (row grouping,
+// capability lookup, ...) must read the NAME, never use the raw entry as an
+// object key (JS silently coerces an object key to "[object Object]"). Same
+// typeof-string-vs-object normalization already used by
+// resolveIntervalStructure/resolveEmomTimeline for the identical reason -
+// ONE shared helper, module-level so every caller (defaultRowsForFormat,
+// resolveMovementLoadCapabilityByKey below, ...) reuses it instead of
+// reimplementing the same ternary.
+export function movementNameOf(m) {
+  return typeof m === 'string' ? m : (m?.name ?? '')
+}
+
 export function defaultRowsForFormat(formatId, config, movements) {
   const fmt = getFormat(formatId)
   if (fmt.family !== 'sets') return {}
   const emptyRow = () => ({ weight: '', reps: '', distance: '', completed: false })
   const rowsOf = (n) => Array.from({ length: Math.max(1, n || 1) }, emptyRow)
-  // STRENGTH SETS LOGGER OBJECT LABEL REGRESSION - `movements` here can now
-  // be EITHER plain display-line strings OR the canonical RX instance array
-  // (prescriptionMovements, e.g. {instanceId, name, canonicalMovementId,
-  // reps, load, ...} - since UniversalScoreInput started forwarding
-  // prescriptionMovements to every SETS-family format, not just EMOM). Any
-  // branch below that keys `out` by a movement identity for row grouping
-  // (rowMode:'movement': Strength Sets, Weightlifting, Build to Heavy/1RM,
-  // ...) must read the NAME, never use the raw entry as an object key
-  // (JS silently coerces an object key to "[object Object]"). Same
-  // typeof-string-vs-object normalization already used by
-  // resolveIntervalStructure/resolveEmomTimeline for the identical reason -
-  // reused here, not reinvented.
-  const movementNameOf = (m) => (typeof m === 'string' ? m : (m?.name ?? ''))
 
   if (formatId === 'EMOM') {
     // EMOM MINUTE-PATTERN AUTHORING - movements are assigned to SPECIFIC
@@ -1933,6 +1937,113 @@ export function resolveStationUnitsByKey(formatId, config, prescriptionMovements
     })
   }
   return out
+}
+
+// STRENGTH VOLUME LOAD - the movement-keyed twin of resolveStationUnitsByKey
+// above, for rowMode:'movement' formats (Strength Sets, Weightlifting,
+// Superset - never Build to Heavy/1RM, an explicit RM test, not a training-
+// volume session; never Complex, rowMode:'round', its `sets` keys are round
+// labels, not movements). A rowsByKey row for these formats is already keyed
+// by the plain movement NAME (movementNameOf, defaultRowsForFormat) - no
+// station-index wrapping like EMOM/Intervals needs, so this is a flat
+// name -> capability map, resolved ONCE from the same canonical RX instance
+// array (prescriptionMovements) every other capability-aware helper in this
+// file already reads - never a live catalog lookup, never a movement-name
+// heuristic. `isLoadCapable` is true only when the EFFECTIVE (post-
+// substitution) instance itself carries a `.load` spec - the exact same
+// signal EmomEntryFields (FormatLogger.jsx) already uses to decide whether
+// to render a load input at all, reused here for the identical reason: the
+// instance's own shape already IS its capability.
+export function resolveMovementLoadCapabilityByKey(prescriptionMovements) {
+  const out = {}
+  ;(Array.isArray(prescriptionMovements) ? prescriptionMovements : []).forEach((m) => {
+    if (typeof m === 'string') return // a plain display-line string carries no capability signal at all - leave unresolved (caller treats as not load-capable, never guesses)
+    const name = movementNameOf(m)
+    if (!name) return
+    out[name] = { isLoadCapable: !!m.load, movementId: m.canonicalMovementId || null }
+  })
+  return out
+}
+
+// STRENGTH VOLUME LOAD - Total Weight Lifted = Σ(actual performed reps ×
+// actual performed load), the owner's own literal formula. Pure - reads only
+// the rowsByKey ACTUALLY entered (the member's real performed evidence,
+// never `targetReps`/any programmed value - defaultRowsForFormat's
+// `targetReps` is deliberately never read here). `loadCapabilityByKey`
+// (resolveMovementLoadCapabilityByKey above) is REQUIRED, not optional and
+// defaulted to "everything counts" - a movement absent from the map (e.g. a
+// legacy log with no prescriptionMovements available) contributes nothing,
+// fails closed, never assumes bodyweight-lifted-something.
+//
+// Per row: blank reps or blank load -> excluded entirely (no evidence, not
+// even a zero-contribution row). Explicit "0" -> a real, included row
+// contributing literally 0 (0 reps x load = 0 either way, but it counts as
+// evidence - shows up in contributingRows, distinct from a row that was
+// never touched). Different loads across sets are already handled correctly
+// by construction (each row's own weight, summed independently) - no special
+// case needed for the owner's own worked example.
+//
+// UNIT SAFETY - `row.weight` numbers carry no per-row unit column anywhere in
+// this codebase (confirmed: the evaluate_movement_prs trigger's own comment
+// makes the identical observation) - every row in ONE log is implicitly in
+// that log's OWN frozen weight_unit context, never the athlete's CURRENT
+// profile preference. This function does not guess or convert - it takes
+// `weightUnit` as an explicit, caller-supplied label (the caller's
+// responsibility to source from the log's own frozen context, e.g.
+// prescription_snapshot / the member's weight_unit AT LOG TIME, never a live
+// re-read of a possibly-since-changed profile setting) and echoes it back
+// verbatim on the result, never silently assuming 'kg'. Cross-log
+// aggregation (a FUTURE lifetime-volume feature, not this phase) would need
+// to convertWeight() each log's own total to one canonical unit BEFORE
+// summing across logs - out of scope here, a single log's own rows are
+// already unit-consistent by construction, so no conversion happens within
+// this function.
+//
+// Returns { totalWeight, weightUnit, byMovement: [{ movementIdentity,
+// movementName, totalWeight, contributingRows }] } - byMovement is the
+// canonical truth; totalWeight at the top level is a convenience SUM of
+// byMovement's own totals, never computed independently (so the two can
+// never silently disagree). `movementIdentity` is `id:<uuid>` /
+// `text:<normalizedName>` - movementHistoryIdentity's own tagged-union
+// convention (prescriptionContract.js is EMOM/PWA-side; this mirrors the
+// exact same shape movementHistory.js already established for PR/Movement-
+// History identity, so a future consumer joining volume load against that
+// same identity space needs no second convention).
+export function computeVolumeLoad(rowsByKey, loadCapabilityByKey, weightUnit) {
+  const unit = weightUnit === 'lbs' ? 'lbs' : 'kg'
+  const byMovement = []
+  Object.entries(rowsByKey || {}).forEach(([movementName, rows]) => {
+    const cap = loadCapabilityByKey?.[movementName]
+    if (!cap || !cap.isLoadCapable) return
+    let totalWeight = 0
+    const contributingRows = []
+    ;(rows || []).forEach((row, idx) => {
+      const reps = row?.reps === '' || row?.reps == null ? null : Number(row.reps)
+      const weight = row?.weight === '' || row?.weight == null ? null : Number(row.weight)
+      if (reps === null || weight === null || !Number.isFinite(reps) || !Number.isFinite(weight)) return
+      const rowWeight = reps * weight
+      totalWeight += rowWeight
+      contributingRows.push({ rowIndex: idx, reps, weight, contribution: rowWeight })
+    })
+    if (contributingRows.length === 0) return // nothing actually logged for this movement - omit it entirely, never a fabricated 0-weight movement entry
+    byMovement.push({
+      movementIdentity: cap.movementId ? `id:${cap.movementId}` : `text:${normalizeMovementKeyForVolume(movementName)}`,
+      movementName,
+      totalWeight,
+      contributingRows,
+    })
+  })
+  const totalWeight = byMovement.reduce((sum, m) => sum + m.totalWeight, 0)
+  return { totalWeight, weightUnit: unit, byMovement }
+}
+
+// Same normalization convention as movementHistory.js's normalizeKey -
+// grouping-only, never a display transform, deliberately re-declared here
+// (workoutFormats.js has no existing dependency on movementHistory.js and
+// this module must stay import-free of it - a one-line pure function, not
+// worth a cross-module coupling for).
+function normalizeMovementKeyForVolume(text) {
+  return String(text || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - the scoring modes FORGE can
