@@ -7,6 +7,7 @@ import { resolveSequentialAmrapStations } from './sequentialAmrap'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
 import { secToTime } from './utils'
+import { PERFORMED_EDITABLE_METRICS } from './prescriptionContract'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
 const smallLabelStyle = { fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }
@@ -277,6 +278,134 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
   )
 }
 
+// EMOM PERFORMED LOGGER PARITY - capability-driven per-entry score fields,
+// reused across EMOM's shared-interval (INC-01) and minute-pattern (INC-04)
+// station rendering. An entry's rendered fields come from the EFFECTIVE
+// instance's OWN metric specs (`.reps`/`.load`/`.distance`/`.calories`),
+// never a live catalog lookup and never a movement-name guess: the shape is
+// already the capability, seeded once by prescriptionContract.js's
+// newMovementInstance/applyPerformedSubstitution/addPerformedMovement/
+// switchPerformedQuantityMetric - the SAME helpers the whole-workout
+// PerformedEditPanel (App.jsx) already uses for Change Movement/+Add
+// movement/Mark not performed. Calories reuse the row's existing `reps`
+// field (EMOM AUTHORING + CANONICAL SCORING INTEGRITY - "a calorie EMOM's
+// structured rows carry their number in the identical reps input field");
+// `distance` is a new, additive row field (never summed into a score - no
+// canonical Total Distance exists - captured only for accurate performed
+// evidence).
+function emomEntryMetrics(inst) {
+  return [
+    ...(inst?.reps ? ['reps'] : []),
+    ...PERFORMED_EDITABLE_METRICS.filter((k) => inst?.[k]),
+  ]
+}
+
+function emomMetricUnit(inst, metric) {
+  if (metric === 'load') return inst?.load?.unit || 'kg'
+  if (metric === 'distance') return inst?.distance?.unit || 'm'
+  if (metric === 'calories') return 'cal'
+  return null
+}
+
+const emomFieldStyle = { width: '64px', flexShrink: 0, padding: '8px 10px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }
+
+function EmomEntryFields({ inst, row, onChangeMetric, t }) {
+  const metrics = emomEntryMetrics(inst)
+  // Capability unknown/unseeded (resolveMovementCapability "fails open") -
+  // preserve the pre-existing bare reps input rather than rendering nothing,
+  // so a movement this repo has never capability-tagged still logs.
+  if (metrics.length === 0) {
+    return (
+      <input type="number" inputMode="numeric" value={row?.reps || ''}
+        onChange={e => onChangeMetric('reps', e.target.value)}
+        aria-label={`${inst?.name || ''} reps`}
+        placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+        style={{ ...emomFieldStyle, width: '84px' }} />
+    )
+  }
+  return (
+    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+      {metrics.map((metric) => {
+        const rowField = metric === 'calories' ? 'reps' : metric === 'load' ? 'weight' : metric
+        const unit = emomMetricUnit(inst, metric)
+        const metricLabel = t?.[`performedEditMetric_${metric}`] || metric
+        return (
+          <div key={metric} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <input type="number" inputMode="numeric" value={row?.[rowField] || ''}
+              onChange={e => onChangeMetric(rowField, e.target.value)}
+              aria-label={`${inst?.name || ''} ${metricLabel}`}
+              placeholder={unit || metricLabel}
+              style={emomFieldStyle} />
+            {metrics.length > 1 && <span style={{ fontSize: '9px', color: '#aaa', lineHeight: 1 }}>{unit || metricLabel}</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const EMOM_EMPTY_ROW = { reps: '', weight: '', distance: '', completed: false }
+
+// One (round-or-minute, station) cell: resolves to N effective entries (the
+// plain programmed instance by default, or the athlete's performed
+// composition - Change Movement / +Add movement / Mark not performed -
+// grouped by the PROGRAMMED station's own instanceId, same granularity the
+// whole-workout PerformedEditPanel already edits at). The outer `cellKey`
+// always uses the PROGRAMMED station's identity (emomStationKey/
+// intervalStationKey with the programmed name) so station identity survives
+// a substitution on save/reopen (§8) - a composed entry's OWN reps/load/
+// distance/calories live in a `pm`-tagged sub-row, mirroring the existing
+// P9.5.2A structured-Intervals convention exactly (writeComposedCell below).
+function EmomCell({ cellKey, programmedInst, compositionEntries, rowsByKey, onChange, t }) {
+  const cellRows = rowsByKey[cellKey] || []
+  if (compositionEntries && compositionEntries.some((e) => e.notPerformed)) {
+    return (
+      <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ fontSize: '13px', color: '#9A9A9A', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontStyle: 'italic' }}>{programmedInst?.name}</div>
+        <span style={{ fontSize: '12px', color: '#9A9A9A', flexShrink: 0 }}>{t?.performedNotPerformedShort || 'not performed'}</span>
+      </div>
+    )
+  }
+  const isComposed = !!(compositionEntries && compositionEntries.length > 0)
+  const entries = isComposed ? compositionEntries : (programmedInst ? [programmedInst] : [])
+  return (
+    <>
+      {entries.map((inst, ei) => {
+        const row = isComposed
+          ? (cellRows.find((x) => x.pm?.instanceId === inst.instanceId) || EMOM_EMPTY_ROW)
+          : (cellRows[0] || EMOM_EMPTY_ROW)
+        const writeRow = (nextRow) => {
+          if (isComposed) {
+            const next = entries.map((e2) => {
+              const prevRow = cellRows.find((x) => x.pm?.instanceId === e2.instanceId) || EMOM_EMPTY_ROW
+              const r = e2.instanceId === inst.instanceId ? nextRow : prevRow
+              return { ...r, pm: { instanceId: e2.instanceId, sourceInstanceId: e2.sourceInstanceId ?? programmedInst?.instanceId ?? null, name: e2.name, canonicalMovementId: e2.canonicalMovementId ?? null } }
+            })
+            onChange({ ...rowsByKey, [cellKey]: next })
+          } else {
+            onChange({ ...rowsByKey, [cellKey]: [nextRow] })
+          }
+        }
+        // Reps target is always `mode:'universal'` on a movement instance
+        // (newMovementInstance never seeds a sex-specific reps spec) - safe
+        // to read directly with no gender resolution, unlike load (sex-
+        // specific there) which stays in the read-only prescription lines
+        // already shown above the score section (structuredDisplay).
+        const targetReps = inst?.reps?.mode === 'universal' && inst.reps.value != null ? inst.reps.value : null
+        return (
+          <div key={inst.instanceId || ei} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+              {inst.name}
+              {targetReps != null && <span style={{ fontSize: '11px', color: '#aaa' }}> / {targetReps}</span>}
+            </div>
+            <EmomEntryFields inst={inst} row={row} onChangeMetric={(field, value) => writeRow({ ...row, [field]: value })} t={t} />
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t, intervalComposition, prescriptionMovements }) {
   // EMOM MINUTE-PATTERN AUTHORING - for a brand-new/empty log (the only
   // case this ever runs - an existing log's `sets` is used as-is above),
@@ -307,11 +436,16 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   // the two stationMode values are mutually exclusive.
   const timeline = resolveEmomTimeline(formatId, config, prescriptionMovements)
   if (timeline && timeline.structured && timeline.effectiveMinutes.length > 0) {
-    const setMinuteReps = (key, row, value) => onChange({ ...rowsByKey, [key]: [{ ...row, reps: value }] })
     // EVERY-N-MINUTES ARBITRARY INTERVAL DURATION - "MIN N" only reads
     // naturally when a position IS one minute (intervalSec===60); otherwise
     // "INTERVAL N" (owner spec) - same canonical intervalSec, single helper.
     const positionWord = emomPositionWord(config?.intervalSec)
+    // EMOM PERFORMED LOGGER PARITY - the SAME intervalComposition the
+    // shared-interval branch below already consumes (P9.5.2A, built once in
+    // App.jsx from performedCommitted, keyed by the PROGRAMMED instance's
+    // own instanceId regardless of stationMode) now also drives minute-
+    // pattern's cells: Change Movement/+Add movement/Mark not performed on a
+    // pattern position take effect here identically.
     return (
       <>
         {timeline.effectiveMinutes.map(({ minute, movements: minuteMovements }, mi) => (
@@ -319,19 +453,11 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
             <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E', marginBottom: '10px' }}>
               {`${positionWord} ${minute}`}
             </div>
-            {minuteMovements.map((mv, si) => {
-              const key = emomStationKey(minute, si + 1, mv.name)
-              const row = (rowsByKey[key] && rowsByKey[key][0]) || { reps: '', weight: '', completed: false }
-              return (
-                <div key={key} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{mv.name}</div>
-                  <input type="number" inputMode="numeric" value={row.reps || ''}
-                    onChange={e => setMinuteReps(key, row, e.target.value)}
-                    placeholder={t?.skillLogRepsPlaceholder || 'reps'}
-                    style={{ width: '84px', flexShrink: 0, padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-                </div>
-              )
-            })}
+            {minuteMovements.map((mv, si) => (
+              <EmomCell key={emomStationKey(minute, si + 1, mv.name)} cellKey={emomStationKey(minute, si + 1, mv.name)}
+                programmedInst={mv} compositionEntries={intervalComposition?.bySource?.[mv.instanceId] || null}
+                rowsByKey={rowsByKey} onChange={onChange} t={t} />
+            ))}
           </div>
         ))}
         {score != null && (
@@ -349,13 +475,19 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
   // an input. Round groups stack vertically - usable on the narrowest phones,
   // no matrix, no icons. Same white/typography language as the rest of the
   // logger.
-  const iv = resolveIntervalStructure(formatId, config, movements)
+  const iv = resolveIntervalStructure(formatId, config, prescriptionMovements || movements)
   if (iv && iv.structured && iv.stationCount > 0) {
     // EMOM STRUCTURED RESULT INTEGRITY - EMOM's own structured rows use its
     // pre-existing "Min N" convention, never Intervals/Tabata's "Rundă N" -
     // must match defaultRowsForFormat's key exactly, or a fresh log's rows
     // would never line up with the ones this grid reads/writes into.
     const stationKeyFor = formatId === 'EMOM' ? emomStationKey : intervalStationKey
+    // EMOM PERFORMED LOGGER PARITY - capability-driven fields (reps/load/
+    // calories/distance) are scoped to EMOM only (owner scope). Intervals/
+    // Tabata's OWN structured rendering (below, unchanged) stays the
+    // existing bare-reps-only UI - a deliberate, separate product surface,
+    // never touched by this incident.
+    const isEmom = formatId === 'EMOM'
     // EVERY-N-MINUTES ARBITRARY INTERVAL DURATION - same "MIN"/"INTERVAL"
     // switch as the minute-pattern branch above, applied here to EMOM's
     // OTHER structural mode (shared-interval, INC-01) - both share the same
@@ -398,6 +530,13 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
               </div>
               {iv.stations.map((st, si) => {
                 const key = stationKeyFor(r, si + 1, st.name)
+                if (isEmom) {
+                  const compositionEntries = (st.instanceId && intervalComposition?.bySource?.[st.instanceId]) || cellEntriesFor(si)
+                  return (
+                    <EmomCell key={key} cellKey={key} programmedInst={st} compositionEntries={compositionEntries}
+                      rowsByKey={rowsByKey} onChange={onChange} t={t} />
+                  )
+                }
                 const entries = cellEntriesFor(si)
                 if (entries && entries.some((e) => e.notPerformed)) {
                   return (

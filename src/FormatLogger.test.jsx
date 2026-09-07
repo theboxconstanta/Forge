@@ -20,7 +20,7 @@ describe('FormatLogger - family sets (EMOM)', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     const patch = onChange.mock.calls[0][0]
     expect(patch.sets['Min 1'][0].reps).toBe('12')
-    expect(patch.sets['Min 2']).toEqual([{ weight: '', reps: '', completed: false }])
+    expect(patch.sets['Min 2']).toEqual([{ weight: '', reps: '', distance: '', completed: false }])
   })
 
   it('adaugă un rând nou fără să șteargă rândurile existente ale altei chei', () => {
@@ -57,7 +57,7 @@ describe('FormatLogger - Tabata (simpleReps: un singur input de reps per rundă)
     fireEvent.change(repsInputs[0], { target: { value: '15' } })
     const patch = onChange.mock.calls[0][0]
     expect(patch.sets['Rundă 1'][0].reps).toBe('15')
-    expect(patch.sets['Rundă 2']).toEqual([{ weight: '', reps: '', completed: false }])
+    expect(patch.sets['Rundă 2']).toEqual([{ weight: '', reps: '', distance: '', completed: false }])
   })
 })
 

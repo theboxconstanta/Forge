@@ -10530,9 +10530,19 @@ function App() {
           if (g.notPerformed) {
             bySource[g.sourceInstanceId] = [{ notPerformed: true, sourceInstanceId: g.sourceInstanceId, name: stationInsts.find((s) => s.instanceId === g.sourceInstanceId)?.name || g.entries[0]?.name || 'Movement' }]
           } else {
+            // EMOM PERFORMED LOGGER PARITY - carries each entry's OWN metric
+            // specs (reps/load/distance/calories) through, not just identity -
+            // FormatLogger's capability-driven cells (EMOM only) read these
+            // directly (no live catalog lookup) to decide which fields to
+            // render for a Changed/Added movement. Intervals/Tabata's own
+            // bare-reps rendering never reads these extra keys - unaffected.
             bySource[g.sourceInstanceId] = g.entries.filter((e) => e.notPerformed !== true).map((e) => ({
               instanceId: e.instanceId, sourceInstanceId: g.sourceInstanceId,
               name: e.name, canonicalMovementId: e.canonicalMovementId ?? null,
+              ...(e.reps ? { reps: e.reps } : {}),
+              ...(e.load ? { load: e.load } : {}),
+              ...(e.distance ? { distance: e.distance } : {}),
+              ...(e.calories ? { calories: e.calories } : {}),
             }))
           }
         }
@@ -12238,7 +12248,7 @@ function App() {
                 <UniversalScoreInput
                   def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
                   movements={effectivePartialMovements} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
-                  intervalComposition={intervalCompositionActive}
+                  intervalComposition={intervalCompositionActive} prescriptionMovements={frozenProgrammedInstances}
                   value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
                   onChange={dispatchScorePatch}
                   weightUnit={userProfile?.weight_unit || 'kg'} t={t} />

@@ -1672,7 +1672,7 @@ export function intervalTimelineLines(formatId, config, stationDisplayLines) {
 export function defaultRowsForFormat(formatId, config, movements) {
   const fmt = getFormat(formatId)
   if (fmt.family !== 'sets') return {}
-  const emptyRow = () => ({ weight: '', reps: '', completed: false })
+  const emptyRow = () => ({ weight: '', reps: '', distance: '', completed: false })
   const rowsOf = (n) => Array.from({ length: Math.max(1, n || 1) }, emptyRow)
 
   if (formatId === 'EMOM') {

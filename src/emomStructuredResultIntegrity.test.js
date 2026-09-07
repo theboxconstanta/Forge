@@ -120,7 +120,7 @@ describe('defaultRowsForFormat("EMOM", ...) - structured rows additive, legacy f
     expect(keys[1]).toBe('Min 1 · 2. 10 Air Squats')
     expect(keys[2]).toBe('Min 1 · 3. 10 Pull-ups')
     expect(keys[29]).toBe('Min 10 · 3. 10 Pull-ups')
-    Object.values(rows).forEach(r => expect(r).toEqual([{ weight: '', reps: '', completed: false }]))
+    Object.values(rows).forEach(r => expect(r).toEqual([{ weight: '', reps: '', distance: '', completed: false }]))
   })
 })
 
