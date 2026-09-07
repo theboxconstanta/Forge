@@ -108,6 +108,92 @@ describe('generatePhotoResultCardImage - off-screen render + rasterize (owner §
   })
 })
 
+// EXPORT-LOST-PHOTO REGRESSION - real root cause (confirmed against the
+// installed html-to-image source, node_modules/html-to-image/lib/
+// dataurl.js's resourceToDataURL): `cacheBust: true` appends `(?|&) +
+// Date.now()` to EVERY external resource URL html-to-image embeds,
+// including the card's own background <img src>. A Supabase Storage
+// SIGNED URL's validity depends entirely on its `token` query parameter
+// being exactly what was issued - an appended, unexpected extra query
+// parameter corrupts that request. A failed embed in that library is
+// NEVER a thrown error the caller sees - resourceToDataURL's own catch
+// silently substitutes `options.imagePlaceholder || ''` (empty), so
+// toJpeg still resolves a "successful" JPEG with the photo simply
+// missing. FIX: fetch the photo ourselves (the exact, unmodified signed
+// URL, never html-to-image's own cache-bust-corrupted fetch) and hand
+// the export instance a `data:` URL instead - html-to-image's own
+// isDataUrl() checks (embed-images.js) skip network fetching entirely
+// for an <img> whose src is already a data: URL, making the corrupted-
+// query-string failure mode structurally impossible. Independently
+// verified against a REAL browser + a REAL cross-origin photo (see the
+// incident report for the exact pixel-sampling evidence) - these tests
+// prove the same contract at the unit level, with fetch/FileReader
+// exercised for real (not mocked away) so a regression in the actual
+// fetch-to-data-URL conversion would fail them too.
+describe('EXPORT-LOST-PHOTO REGRESSION - photo is fetched and embedded as a data: URL, never html-to-image\'s own cache-busted network fetch', () => {
+  const PHOTO_URL = 'https://storage.example.supabase.co/object/sign/wod-photos/g1/m1/w1/photo.jpg?token=abc123.def456.ghi789'
+  // A tiny real 1x1 JPEG (same bytes as TINY_JPEG_BASE64 above) served as
+  // the mocked fetch response body - exercises the REAL blob -> FileReader
+  // -> data: URL path, not just a mocked passthrough.
+  function tinyJpegBlob() {
+    const binary = atob(TINY_JPEG_BASE64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: 'image/jpeg' })
+  }
+
+  it('fetches the EXACT signed photoUrl (no cache-bust query param appended by this module) and passes a data: URL - never the network URL - into the rendered/rasterized node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(tinyJpegBlob(), { status: 200 }))
+    let capturedImgSrc = null
+    toJpeg.mockImplementationOnce(async (node) => {
+      capturedImgSrc = node.querySelector('img[data-role="member-photo"]')?.src
+      return TINY_JPEG_DATA_URL
+    })
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeInstanceOf(Blob)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledWith(PHOTO_URL) // the EXACT signed URL, byte-identical, no appended query param
+    // NOT the https:// signed URL - html-to-image never touches the network
+    // for it. (jsdom's Blob/FileReader interop doesn't reliably preserve
+    // the exact MIME type through readAsDataURL - a documented jsdom
+    // limitation, unrelated to this fix - so this asserts the data: scheme
+    // itself, the property that actually matters here; real photo-content
+    // fidelity through a REAL FileReader is verified against an actual
+    // browser, see the incident report's pixel-sampling evidence.)
+    expect(capturedImgSrc).toMatch(/^data:/)
+    expect(capturedImgSrc).not.toMatch(/^https:/)
+    fetchSpy.mockRestore()
+  })
+
+  it('a photo fetch failure (expired/invalid signed URL, network error) is an explicit export failure - never a silent photo-less "success"', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 403 }))
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeNull()
+    expect(result.error).toBeInstanceOf(Error)
+    expect(result.error.message).toMatch(/could not embed photo for export/)
+    expect(toJpeg).not.toHaveBeenCalled() // never even attempts to rasterize without the photo it was asked to embed
+    expect(document.body.querySelector('div[aria-hidden="true"]')).toBeNull() // no dangling export container either
+    fetchSpy.mockRestore()
+  })
+
+  it('a network-level fetch rejection (offline, DNS failure) is also an explicit export failure', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeNull()
+    expect(result.error).toBeInstanceOf(Error)
+    expect(toJpeg).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
+  it('a no-photo workout (photoUrl null) never calls fetch at all - existing no-photo behavior unchanged', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const result = await generatePhotoResultCardImage(baseCardProps) // baseCardProps.photoUrl is null
+    expect(result.blob).toBeInstanceOf(Blob)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+})
+
 describe('Owner §32 truth regression - the export instance receives the SAME canonical props verbatim, never an export-specific derivation', () => {
   const captureNodeText = () => {
     let captured = null

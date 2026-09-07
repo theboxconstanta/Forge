@@ -53,6 +53,50 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mime })
 }
 
+// EXPORT-LOST-PHOTO REGRESSION - root cause found in html-to-image's own
+// installed source (node_modules/html-to-image/lib/dataurl.js,
+// resourceToDataURL): given `cacheBust: true` (this module's own toJpeg
+// call, below - needed so a NEWER photo never rasterizes from a stale
+// cached one), html-to-image appends `(?|&) + Date.now()` to EVERY
+// external resource URL it embeds, including the card's own background
+// <img src={photoUrl}>, before fetching it itself. A Supabase Storage
+// SIGNED URL's validity rests entirely on its `token` query parameter
+// being exactly what was issued - appending an extra, unexpected query
+// parameter corrupts that signed request. Worse, a failed embed in that
+// library is NOT a thrown error the caller ever sees: resourceToDataURL's
+// own catch swallows it and substitutes `options.imagePlaceholder || ''`
+// (an EMPTY string) - so toJpeg still resolves a "successful" JPEG, just
+// with the photo silently missing. Confirmed structurally (not assumed):
+// isDataUrl(...) checks throughout embed-images.js SKIP this fetch+
+// cache-bust path entirely for an <img> whose `src` is ALREADY a `data:`
+// URL - html-to-image reuses it directly, no network request at all.
+//
+// FIX: fetch the photo ourselves, exactly once, using the EXACT signed
+// URL the caller's own already-visible preview `<img>` used (never
+// html-to-image's own internal, cache-bust-corrupted fetch), and hand the
+// export instance a `data:` URL instead of the network URL - this makes
+// the corrupted-query-string failure mode structurally impossible (there
+// is no longer a network fetch of the signed URL for html-to-image to
+// touch) and is also the "narrowest client-side embedding strategy" the
+// mission asked for (no storage/CORS policy change, no public bucket, no
+// second permanent copy - the data: URL exists only in memory for this
+// one export call). Throws on any failure (network error, non-2xx,
+// expired/invalid signed URL, blob-read failure) - the caller must treat
+// that as an explicit export failure, never silently proceed without the
+// photo (owner invariant - "a photo-fetch/embed failure must not
+// masquerade as successful export").
+async function fetchPhotoAsDataUrl(photoUrl) {
+  const res = await fetch(photoUrl)
+  if (!res.ok) throw new Error(`photo fetch failed: HTTP ${res.status}`)
+  const blob = await res.blob()
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error('photo blob read failed'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 // Embedding every @font-face this page can see (owner §20 - fonts must be
 // embedded, never skipped, so the export never falls back to a generic
 // system font) is the same fixed cost on every single share otherwise -
@@ -78,6 +122,21 @@ function getSessionFontEmbedCSS(node) {
  * are ignored - the export instance never renders application chrome
  * (owner §4), regardless of what the visible card currently has wired. */
 export async function generatePhotoResultCardImage(cardProps) {
+  // EXPORT-LOST-PHOTO REGRESSION - resolve the photo to a `data:` URL
+  // BEFORE any DOM work, using the EXACT signed URL the caller's own
+  // preview already used (see fetchPhotoAsDataUrl's own header comment
+  // for the full root-cause trace). A photo that was expected but cannot
+  // be embedded is an explicit export failure, returned here immediately
+  // - never a silently photo-less "success" (owner invariant).
+  let resolvedPhotoUrl = cardProps.photoUrl || null
+  if (cardProps.photoUrl) {
+    try {
+      resolvedPhotoUrl = await fetchPhotoAsDataUrl(cardProps.photoUrl)
+    } catch (error) {
+      console.error(error)
+      return { blob: null, error: new Error(`could not embed photo for export: ${error.message}`) }
+    }
+  }
   const container = document.createElement('div')
   container.style.position = 'fixed'
   container.style.top = '0'
@@ -92,6 +151,7 @@ export async function generatePhotoResultCardImage(cardProps) {
       root.render(
         <PhotoResultCard
           {...cardProps}
+          photoUrl={resolvedPhotoUrl}
           exportMode
           onClose={undefined}
           onShare={undefined}
@@ -101,14 +161,16 @@ export async function generatePhotoResultCardImage(cardProps) {
       // React's createRoot commit happens asynchronously relative to this
       // call - wait for the instance to actually mount before checking
       // anything about its photo <img>, or a fast (no-photo) path here
-      // could race ahead of the very first commit.
+      // could race ahead of the very first commit. The photo <img> src is
+      // now a `data:` URL (resolved above) - this settles near-instantly,
+      // kept as defense-in-depth rather than the primary readiness gate.
       const start = Date.now()
       const check = () => {
         if (!container.firstElementChild) {
           if (Date.now() - start > IMAGE_READY_TIMEOUT_MS) { resolve(); return }
           requestAnimationFrame(check); return
         }
-        if (!cardProps.photoUrl) { resolve(); return } // no photo to wait for
+        if (!resolvedPhotoUrl) { resolve(); return } // no photo to wait for
         const img = container.querySelector('img[data-role="member-photo"]')
         if (img?.complete) { resolve(); return }
         if (Date.now() - start > IMAGE_READY_TIMEOUT_MS) { resolve(); return }
