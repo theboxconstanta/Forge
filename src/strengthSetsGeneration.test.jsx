@@ -190,3 +190,79 @@ describe('J - other workout formats/parser behavior remain regression-safe', () 
     expect(section.formatConfig.setsScheme).toBeUndefined()
   })
 })
+
+// ===========================================================================
+// STRENGTH SETS GENERATION RELEASE + OPTIONAL LOAD REVIEW FLAG
+//
+// deriveReviewFlags' `missing_weight` check (weightRelevant && !anyWeighted)
+// previously fired for ANY prEligible/scoreType:'Weight' section with no
+// movement carrying a load - including a complete, valid Strength Sets
+// prescription where the coach deliberately left load unspecified (the
+// exact optional-programmed-load contract INC-10/11 already made VALID and
+// save-able). Fix: the exemption is scoped to `format === 'Strength Sets'`
+// only, and only for the fully-absent case - a movement whose load spec is
+// PRESENT but missing one side (weightMale set, weightFemale null) still
+// counts as "weighted" here (m.weight is truthy either way - transform.ts's
+// toWeightSpec never returns a spec unless at least one side is set), so
+// that half-filled case was NEVER caught by this advisory flag anyway; it
+// is, unchanged, still caught by the real blocking gate
+// (validatePrescriptionsForPublish, via validatePrescriptionCompleteness).
+// ===========================================================================
+describe('REVIEW FLAG - missing_weight no longer fires for a legitimate load-absent Strength Sets section', () => {
+  it('Snatch 2x5/3x4/2x3, load absent -> no missing_weight warning', () => {
+    const section = snatchAiSection()
+    const analysis = { sections: [section], sourceText: '' }
+    const flags = deriveReviewFlags(analysis)
+    expect(flags.some((f) => f.reason === 'missing_weight')).toBe(false)
+  })
+
+  it('an explicit, complete load -> still no warning (unaffected, was already fine)', () => {
+    const withLoad = snatchAiSection()
+    withLoad.movements[0].weight = { male: 43, female: 30, unit: 'kg' }
+    const analysis = { sections: [withLoad], sourceText: '' }
+    const flags = deriveReviewFlags(analysis)
+    expect(flags.some((f) => f.reason === 'missing_weight')).toBe(false)
+  })
+
+  it('present-but-incomplete load (male set, female missing) was NEVER caught by missing_weight (m.weight is truthy either way, unchanged by this fix) - the REAL half-filled-load block remains validatePrescriptionsForPublish (see strengthSetsOptionalLoad.test.jsx), untouched here', () => {
+    const halfLoad = snatchAiSection()
+    halfLoad.movements[0].weight = { male: 43, female: null, unit: 'kg' }
+    const analysis = { sections: [halfLoad], sourceText: '' }
+    const flags = deriveReviewFlags(analysis)
+    expect(flags.some((f) => f.reason === 'missing_weight')).toBe(false)
+  })
+
+  it('other formats retain their existing missing_weight behavior (Complex, weight-relevant, load-absent -> still flagged)', () => {
+    const complex = {
+      type: 'strength', title: 'Complex', description: null, format: 'Complex',
+      formatConfig: {
+        timeCapMinutes: null, rounds: 5, roundCount: null, stationMode: null, structure: null,
+        intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        setsScheme: [], stages: [],
+      },
+      movements: [{ name: 'Clean', canonicalName: 'Clean', reps: 1, weight: null, distance: null, calories: null, equipment: [], notes: null }],
+      equipment: [], scalingVersions: [], loggingMode: 'required', scoreType: 'Weight',
+      durationMinutes: null, benchmarkMetadata: { name: null, isBenchmark: false, isHero: false }, metadata: {},
+    }
+    const analysis = { sections: [complex], sourceText: '' }
+    const flags = deriveReviewFlags(analysis)
+    expect(flags.some((f) => f.reason === 'missing_weight')).toBe(true)
+  })
+
+  it('other formats retain their existing missing_weight behavior (Build to Heavy/1RM, load-absent -> still flagged)', () => {
+    const bth = {
+      type: 'strength', title: 'Build to Heavy', description: null, format: 'Build to Heavy/1RM',
+      formatConfig: {
+        timeCapMinutes: null, rounds: null, roundCount: null, stationMode: null, structure: null,
+        intervalSeconds: null, workSeconds: null, restSeconds: null, startReps: null, incrementReps: null,
+        setsScheme: [], stages: [],
+      },
+      movements: [{ name: 'Back Squat', canonicalName: 'Back Squat', reps: 1, weight: null, distance: null, calories: null, equipment: [], notes: null }],
+      equipment: [], scalingVersions: [], loggingMode: 'required', scoreType: 'Weight',
+      durationMinutes: null, benchmarkMetadata: { name: null, isBenchmark: false, isHero: false }, metadata: {},
+    }
+    const analysis = { sections: [bth], sourceText: '' }
+    const flags = deriveReviewFlags(analysis)
+    expect(flags.some((f) => f.reason === 'missing_weight')).toBe(true)
+  })
+})

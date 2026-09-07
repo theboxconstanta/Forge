@@ -483,7 +483,22 @@ export function deriveReviewFlags(analysis) {
 
       const weightRelevant = s.scoreType === 'Weight' || getFormat(s.format)?.prEligible
       const anyWeighted = (s.movements || []).some(m => m.weight)
-      if (weightRelevant && !anyWeighted) push(i, 'missing_weight', null)
+      // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - a Strength Sets section with
+      // NO fixed load anywhere is a legitimate, complete "athlete selects
+      // their own weight" result (the same contract already enforced at save
+      // time - prescriptionContract.js/wodSections.js, INC "optional
+      // programmed load"), not an omission worth flagging. A movement that
+      // DOES carry a load spec but leaves one side blank (weightMale set,
+      // weightFemale missing) still reaches this branch as "weighted" (m.weight
+      // is truthy either way, per transform.ts's toWeightSpec) and is caught,
+      // unchanged, by the real publish-time completeness gate
+      // (validatePrescriptionsForPublish) - this flag is a coach-facing
+      // ADVISORY signal only, never the blocking check, and the exemption is
+      // scoped to Strength Sets specifically (the format this contract was
+      // built for), not a blanket weightRelevant/prEligible change - Complex/
+      // Build to Heavy/1RM/Max Effort still get flagged when weight-blank,
+      // since a missing target weight IS meaningfully incomplete there.
+      if (weightRelevant && !anyWeighted && s.format !== 'Strength Sets') push(i, 'missing_weight', null)
       const rxW = pickVariantWeight(s.movements)
       if (rxW.conflicting) push(i, 'needs_review', 'conflicting weights across movements')
     }
