@@ -1377,7 +1377,22 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
         )}
         {quantityMetric && <PmpeMetricEditor label={quantityMetric === 'reps' ? 'Reps' : quantityMetric === 'distance' ? 'Distance' : 'Calories'} metric={quantityMetric} spec={instance[quantityMetric]} defaultMode={quantityMetric === 'calories' ? 'sex_specific' : 'universal'} onChange={s => patch({ [quantityMetric]: s })} />}
         {active.has('load') ? (
-          <PmpeMetricEditor label="Load" metric="load" spec={instance.load} defaultMode="sex_specific" onChange={s => patch({ load: s })} onRemove={cap.default !== 'load' ? () => { const n = { ...instance }; delete n.load; onChange(n) } : undefined} />
+          // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - "remove" was previously
+          // hidden whenever load was the movement's own catalog default (e.g.
+          // Snatch, Clean & Jerk, Back Squat), leaving no way to express "no
+          // fixed load - athlete selects" for exactly the lifts this matters
+          // most for: the auto-seeded {male:null,female:null} spec stayed
+          // PRESENT (a "coach started but never finished" characteristic -
+          // validatePrescriptionsForPublish's deliberate save gate), blocking
+          // save with "<name> (rx): load is missing." forever. Safe to allow
+          // removal whenever `reps` is (or will remain) present - the
+          // instance still carries real prescription structure (the set/rep
+          // scheme) with nothing left blank/incomplete. Only a movement whose
+          // capability is load-ONLY (no reps at all) keeps the original guard,
+          // since removing its one and only metric would leave zero
+          // prescription content.
+          <PmpeMetricEditor label="Load" metric="load" spec={instance.load} defaultMode="sex_specific" onChange={s => patch({ load: s })}
+            onRemove={(cap.default !== 'load' || !!instance.reps) ? () => { const n = { ...instance }; delete n.load; onChange(n) } : undefined} />
         ) : cap.allowed.includes('load') ? (
           <button style={pmpeLink} onClick={() => patch({ load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } })}>+ Load</button>
         ) : null}
@@ -1398,7 +1413,7 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
   )
 }
 
-function MovementRowListPWA({ instances, onChange, catalog }) {
+export function MovementRowListPWA({ instances, onChange, catalog }) {
   const capabilityFor = (name) => catalog?.capabilityFor?.(name) ?? { allowed: [], default: null, unknown: true }
   // P9.3 - id-first capability: a movement keeps its controls across name edits.
   const capabilityForInstance = (inst) => catalog?.capabilityForInstance?.(inst) ?? capabilityFor(inst?.name)
