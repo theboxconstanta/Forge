@@ -6492,10 +6492,19 @@ function RecentBenchmarkProgressSection({ progress, onSelectBenchmark, t, lang }
 // §17 - no bulk signed-URL generation, no N+1 metadata query, the metadata
 // itself already arrived batched with the log list via fetchWodLogs' own
 // `wod_log_media(storage_path)` embed).
-function JurnalPhotoResult({ storagePath, showToast, ...cardProps }) {
+function JurnalPhotoResult({ storagePath, showToast, onAvailabilityChange, ...cardProps }) {
   const [photoUrl, setPhotoUrl] = useState(null)
   const [unavailable, setUnavailable] = useState(false)
   const [sharePending, setSharePending] = useState(false)
+  // JOURNAL PHOTO RESULT DUPLICATION FIX - `onAvailabilityChange` reports
+  // this exact log's photo readiness up to JurnalList, which uses it to
+  // suppress the plain movement-list/REZULTAT blocks ONLY while a photo
+  // actually renders for THIS log (never a static photoMedia-presence
+  // check - a signed-URL fetch failure or <img> load failure must still
+  // fall back to the plain blocks, never leave the card empty). Declared
+  // as an effect (not called inline during render) so a rapid re-render
+  // never fires it twice for the same resolved state.
+  useEffect(() => { onAvailabilityChange?.(!unavailable) }, [unavailable])
   useEffect(() => {
     let cancelled = false
     setPhotoUrl(null); setUnavailable(false)
@@ -6552,6 +6561,22 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
   const toggleClosed = (key) => setClosedKeys(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next })
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [confirmDeleteSkill, setConfirmDeleteSkill] = useState(null)
+  // JOURNAL PHOTO RESULT DUPLICATION FIX - keys of logs whose photo is
+  // CONFIRMED unavailable (signed-URL fetch failure or <img> load
+  // failure), reported by each JurnalPhotoResult instance via
+  // onAvailabilityChange. A log's own movement-list/REZULTAT blocks are
+  // suppressed (photoRenderable below) ONLY while its photo has neither
+  // failed nor been ruled out - never a static "photoMedia exists" check,
+  // so a genuine photo failure still falls back to the plain blocks
+  // instead of leaving the card looking empty.
+  const [photoUnavailableIds, setPhotoUnavailableIds] = useState(() => new Set())
+  const setPhotoAvailability = (id, available) => setPhotoUnavailableIds(prev => {
+    const shouldBeUnavailable = !available
+    if (prev.has(id) === shouldBeUnavailable) return prev // already correct - no state churn
+    const next = new Set(prev)
+    shouldBeUnavailable ? next.add(id) : next.delete(id)
+    return next
+  })
   if (entries.length === 0) return (
     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
       <div style={{ fontSize: '36px', marginBottom: '10px' }}>📓</div>
@@ -6729,6 +6754,15 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
               // returns a signed URL, only whether an attachment exists and
               // (once the card is opened) which Storage path to sign.
               const photoMedia = extractWodLogMedia(w.wod_log_media)
+              // JOURNAL PHOTO RESULT DUPLICATION FIX - true whenever this
+              // log's photo has NOT been confirmed unavailable (default,
+              // covering both "still loading" and "loaded fine" - only a
+              // reported failure flips it false). Gates the plain movement-
+              // list/REZULTAT blocks below (redundant once the glossy photo
+              // card already shows the same movements + primary result) -
+              // never based on photoMedia's mere existence alone, so a real
+              // photo failure still falls back to those blocks correctly.
+              const photoRenderable = !!photoMedia && !photoUnavailableIds.has(w.id)
               // Same isRx check as NotRxdBadge/WorkoutSharePopup - resolved
               // once here as plain text for the photo overlay (which draws
               // its own pill, styled for a dark photo background).
@@ -6812,6 +6846,7 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                       {photoMedia && (
                         <JurnalPhotoResult
                           storagePath={photoMedia.storagePath} showToast={showToast}
+                          onAvailabilityChange={(available) => setPhotoAvailability(w.id, available)}
                           gymName={gym?.name} gymColor={gym?.primaryColor}
                           variantLevel={w.variant_level || null}
                           notRxdLabel={notRxdLabelLog}
@@ -6822,14 +6857,26 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                           loggedAt={w.logged_at} lang={lang} t={t}
                         />
                       )}
-                      {cardMovementLines.length > 0 && (
+                      {/* JOURNAL PHOTO RESULT DUPLICATION FIX - the movement
+                          list + primary REZULTAT are already shown inside the
+                          photo card above (its own `movements`/`resultText`
+                          props, same source) whenever the photo actually
+                          renders - repeating them here would be the exact
+                          "result appears duplicated" the owner reported.
+                          Shown only when there is no photo, or the photo
+                          failed (photoRenderable false) - the fallback the
+                          original design always intended but never actually
+                          gated on. wHasSets/notes/NEW PR/Volume below stay
+                          unconditional - none of those are shown inside the
+                          (deliberately compact) photo card at all. */}
+                      {!photoRenderable && cardMovementLines.length > 0 && (
                         <div style={{ marginBottom: (wHasSets || areRezultatFinal || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {cardMovementLines.map((m, j) => (
                             <div key={j} style={{ fontSize: '13px', lineHeight: 1.5, color: '#555', padding: '2px 0' }}>• {wHasSets ? stripWeightSuffix(m) : m}</div>
                           ))}
                         </div>
                       )}
-                      {areRezultatFinal && (
+                      {!photoRenderable && areRezultatFinal && (
                         <div style={{ marginTop: '4px', marginBottom: (wHasSets || (noteLog && noteLog.trim())) ? '12px' : '0', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
                           <div style={{ fontSize: '11px', color: '#888', fontWeight: '600', lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.jurnalResultLabel}</div>
                           <div style={{ fontSize: '14px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{rezultatBucati.join(' · ')}</div>
