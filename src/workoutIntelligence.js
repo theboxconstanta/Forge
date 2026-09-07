@@ -109,6 +109,18 @@ const FORMAT_CONFIG_TRANSLATORS = {
   // Strength Sets.setsScheme as required, so an unresolved scheme correctly
   // lands the section in "needs review" instead of a silently-guessed one.
   'Strength Sets': (c) => (Array.isArray(c.setsScheme) && c.setsScheme.length > 0 ? { setsScheme: c.setsScheme } : {}),
+  // CANONICAL STRENGTH RESULT INTELLIGENCE Phase C - same shape as the
+  // Strength Sets translator above: the AI's structured integer
+  // (formatConfig.targetRepMax, transform.ts) maps onto the catalog's own
+  // "<N>RM" string (workoutFormats.js's targetLabel field, produced
+  // manually by RepMaxStepperField as `${n}RM`). Absent/unresolved
+  // (model couldn't find an explicit rep-max count) intentionally
+  // translates to {} - targetLabel has a catalog default ('1RM',
+  // required:false), so the section is NOT flagged needs-review in that
+  // case; the coach sees the same 1RM default they'd see authoring this
+  // format manually and can change it, exactly matching manual-authoring
+  // behavior rather than inventing a false "resolved" value.
+  'Build to Heavy/1RM': (c) => (Number.isInteger(c.targetRepMax) && c.targetRepMax >= 1 && c.targetRepMax <= 30 ? { targetLabel: `${c.targetRepMax}RM` } : {}),
   'AMRAP with Buy-In': (c) => ({ totalDurationSec: min2sec(c.timeCapMinutes) }),
   'Not For Time': () => ({}),
   // Spre deosebire de restul traducatoarelor, `stages` NU vine dintr-un

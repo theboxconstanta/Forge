@@ -93,6 +93,15 @@ function toFormatConfig(fc: any) {
     setsScheme: Array.isArray(fc?.setsScheme)
       ? fc.setsScheme.filter((n: any) => typeof n === "number" && Number.isFinite(n) && n > 0)
       : [],
+    // CANONICAL STRENGTH RESULT INTELLIGENCE Phase C - explicit rep-max
+    // target integer (Build to Heavy/1RM only). Only a whole number in
+    // [1,30] survives (same range RepMaxStepperField/parseRepMaxTarget
+    // already enforce client-side) - anything else (a hallucinated
+    // fraction, an out-of-range value, absent) becomes null, never a
+    // guessed/clamped value.
+    targetRepMax: (typeof fc?.targetRepMax === "number" && Number.isInteger(fc.targetRepMax) && fc.targetRepMax >= 1 && fc.targetRepMax <= 30)
+      ? fc.targetRepMax
+      : null,
     stages: Array.isArray(fc?.stages) ? fc.stages.map(toStage) : [],
   };
 }

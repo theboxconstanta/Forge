@@ -145,6 +145,19 @@ const FORMAT_CONFIG_DEF = {
     // Structured Outputs validation) for any format other than "Strength
     // Sets".
     setsScheme: { type: 'array', items: { type: 'number' } },
+    // CANONICAL STRENGTH RESULT INTELLIGENCE Phase C - the explicit rep-max
+    // target (DOAR pt "Build to Heavy/1RM"), same root cause/fix shape as
+    // setsScheme above: without a dedicated structured field the model has
+    // no way to express "build to a 3-rep max" except writing it into the
+    // movement's name/notes, which is exactly how real production rows
+    // ended up with `sets` keyed by a whole sentence ("Build to a 3-rep-max
+    // front squats") instead of a clean movement name. A plain integer
+    // (1-30, translated client-side to the catalog's own "<N>RM" string,
+    // workoutIntelligence.js) - never a free string - so there is no format
+    // to get wrong. null for every other format, and null here too when the
+    // text doesn't give an explicit, resolvable rep-max count (never
+    // guessed - see prompt.ts).
+    targetRepMax: { type: ['number', 'null'] },
     // Array GOL (nu null - Structured Outputs strict mode nu accepta
     // type:['array','null'] combinat cu `items`, gasit direct la deploy,
     // eroare "invalid_json_schema") pt orice format in afara de 'Chained
@@ -155,7 +168,7 @@ const FORMAT_CONFIG_DEF = {
   },
   required: [
     'timeCapMinutes', 'rounds', 'roundCount', 'stationMode', 'structure', 'intervalSeconds', 'workSeconds',
-    'restSeconds', 'startReps', 'incrementReps', 'setsScheme', 'stages',
+    'restSeconds', 'startReps', 'incrementReps', 'setsScheme', 'targetRepMax', 'stages',
   ],
 }
 
