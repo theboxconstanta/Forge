@@ -36,9 +36,18 @@ describe('prescriptionContract — construction', () => {
   })
 
   it('newMovementInstance seeds the default metric control', () => {
+    // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - a load-default movement that
+    // ALSO allows reps (Snatch) seeds reps only; load starts absent
+    // (opt-in via "+ Load"), so a coach who never touches Load lands on a
+    // fully valid, save-able prescription by default.
     const load = newMovementInstance({ name: 'Snatch', capability: { allowed: ['reps', 'load'], default: 'load' } })
-    expect(load.load).toEqual({ mode: 'sex_specific', male: null, female: null, unit: 'kg' })
+    expect(load.load).toBeUndefined()
     expect(load.reps).toEqual({ mode: 'universal', value: null })
+    // A load-ONLY capability (no reps allowed) still seeds load - there is
+    // nothing else to prescribe, so a control must exist.
+    const loadOnly = newMovementInstance({ name: 'Max Effort Lift', capability: { allowed: ['load'], default: 'load' } })
+    expect(loadOnly.load).toEqual({ mode: 'sex_specific', male: null, female: null, unit: 'kg' })
+    expect(loadOnly.reps).toBeUndefined()
     const bw = newMovementInstance({ name: 'Burpee', capability: { allowed: ['reps'], default: 'reps' } })
     expect(bw.reps).toEqual({ mode: 'universal', value: null })
     expect(bw.load).toBeUndefined()

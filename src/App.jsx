@@ -1331,7 +1331,21 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
   // from changeName right after a rename).
   const seed = (next, metric, capForSeed) => {
     if (metric === 'reps') next.reps = { mode: 'universal', value: null }
-    else if (metric === 'load') { next.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }; if (capForSeed.allowed.includes('reps') && !next.reps) next.reps = { mode: 'universal', value: null } }
+    else if (metric === 'load') {
+      // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - this is the ONLY call site
+      // that auto-seeds on a bare/untouched movement (changeName, below) -
+      // the explicit "+ Load" button always sets load directly, unaffected.
+      // A coach who types a load-default movement (Snatch, Clean & Jerk...)
+      // and never touches Load at all - the realistic, most common flow,
+      // confirmed live: clicking a separate "remove" link only fixes the
+      // case where the coach thinks to click it - must land on a load-free,
+      // fully valid prescription by default whenever `reps` also covers the
+      // structure, not a present-but-blank spec that still blocks save. A
+      // load-ONLY capability (no reps) keeps seeding load - there is nothing
+      // else to show, so an editable control must exist.
+      if (capForSeed.allowed.includes('reps')) next.reps = { mode: 'universal', value: null }
+      else next.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }
+    }
     else if (metric === 'distance') next.distance = { mode: 'universal', value: null, unit: 'm' }
     else if (metric === 'calories') next.calories = { mode: 'sex_specific', male: null, female: null }
   }

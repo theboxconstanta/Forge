@@ -55,12 +55,19 @@ export function newInstanceId() {
 export function newMovementInstance({ name = '', canonicalMovementId = null, capability = null } = {}) {
   const inst = { instanceId: newInstanceId(), name, canonicalMovementId }
   const def = capability && capability.default
+  // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - a load-default movement (Snatch,
+  // Clean & Jerk, Back Squat...) whose capability ALSO allows reps starts
+  // with reps only, load absent - programmed load is a prescription
+  // CHARACTERISTIC the coach opts INTO (the "+ Load" control, still capable
+  // and shown), never a value auto-seeded blank that then has to be
+  // explicitly removed to reach a valid, save-able "athlete selects their
+  // own load" prescription. A load-ONLY capability (no reps) still seeds
+  // load - there is nothing else to prescribe, so a control must exist.
   if (def === 'reps') inst.reps = { mode: 'universal', value: null }
+  else if (def === 'load' && capability.allowed.includes('reps')) inst.reps = { mode: 'universal', value: null }
   else if (def === 'load') inst.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }
   else if (def === 'distance') inst.distance = { mode: 'universal', value: null, unit: 'm' }
   else if (def === 'calories') inst.calories = { mode: 'sex_specific', male: null, female: null }
-  // reps is almost always relevant alongside load — seed an empty universal reps
-  if (def === 'load' && capability.allowed.includes('reps')) inst.reps = { mode: 'universal', value: null }
   return inst
 }
 
