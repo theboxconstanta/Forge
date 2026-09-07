@@ -221,6 +221,74 @@ describe('FormatLogger - family nft', () => {
   })
 })
 
+// FORGE - CANONICAL STRENGTH RESULT INTELLIGENCE, Phase B - proves the live
+// "Total Weight Lifted" wiring added to SetsFields (workoutFormats.js's
+// computeVolumeLoad/resolveMovementLoadCapabilityByKey, already unit-tested
+// in strengthVolumeLoad.test.js). Capability-driven: only fires when
+// prescriptionMovements carries RX-instance shapes with a real `.load` key,
+// never from a movement-name heuristic - a plain movements=['...'] string
+// list (legacy/no RX instances) must fail closed, and Build to Heavy/1RM
+// stays deliberately excluded (its own primary result is the RM, not volume).
+describe('FormatLogger - Total Weight Lifted (canonical volume load, Phase B)', () => {
+  const snatchInst = { instanceId: 'mi_sn', name: 'Snatch', canonicalMovementId: 'cm-snatch', reps: { mode: 'universal', value: null }, load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } }
+  const backSquatInst = { instanceId: 'mi_bs', name: 'Back Squat', canonicalMovementId: 'cm-bs', reps: { mode: 'universal', value: null }, load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } }
+  const row = (reps, weight) => ({ completed: false, distance: '', targetReps: null, reps, weight })
+
+  it('Strength Sets cu mișcare load-capable și seturi reale -> afișează Total Weight Lifted', () => {
+    const value = { sets: { Snatch: [row('5', '35'), row('5', '35'), row('3', '45')] } }
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5, 5, 3] }} movements={['Snatch']} prescriptionMovements={[snatchInst]}
+        value={value} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getByText(/Total Weight Lifted: 485kg/)).toBeInTheDocument()
+  })
+
+  it('nu are seturi logate încă -> nu afișează Total Weight Lifted (nimic de arătat, nu 0kg)', () => {
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5, 5, 3] }} movements={['Snatch']} prescriptionMovements={[snatchInst]}
+        value={{}} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.queryByText(/Total Weight Lifted/)).not.toBeInTheDocument()
+  })
+
+  it('fără prescriptionMovements (legacy, doar string-uri) -> nu ghicește capacitatea, nu afișează metrica', () => {
+    const value = { sets: { Snatch: [row('5', '35')] } }
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5] }} movements={['Snatch']}
+        value={value} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.queryByText(/Total Weight Lifted/)).not.toBeInTheDocument()
+  })
+
+  it('Build to Heavy/1RM rămâne exclus în mod deliberat (RM-ul e rezultatul principal, nu volumul)', () => {
+    const value = { sets: { Snatch: [row('3', '80')] } }
+    render(
+      <FormatLogger formatId="Build to Heavy/1RM" config={{ targetLabel: '3RM' }} movements={['Snatch']} prescriptionMovements={[snatchInst]}
+        value={value} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.queryByText(/Total Weight Lifted/)).not.toBeInTheDocument()
+  })
+
+  it('mai multe mișcări load-capable -> câte o linie per mișcare, cu numele mișcării', () => {
+    const value = { sets: { Snatch: [row('5', '35')], 'Back Squat': [row('5', '60')] } }
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5] }} movements={['Snatch', 'Back Squat']} prescriptionMovements={[snatchInst, backSquatInst]}
+        value={value} onChange={() => {}} weightUnit="kg" t={{}} />
+    )
+    expect(screen.getByText(/Total Weight Lifted \(Snatch\): 175kg/)).toBeInTheDocument()
+    expect(screen.getByText(/Total Weight Lifted \(Back Squat\): 300kg/)).toBeInTheDocument()
+  })
+
+  it('folosește label-ul tradus când e disponibil', () => {
+    const value = { sets: { Snatch: [row('5', '35')] } }
+    render(
+      <FormatLogger formatId="Strength Sets" config={{ setsScheme: [5] }} movements={['Snatch']} prescriptionMovements={[snatchInst]}
+        value={value} onChange={() => {}} weightUnit="kg" t={{ strengthTotalWeightLiftedLabel: 'Greutate totală ridicată' }} />
+    )
+    expect(screen.getByText(/Greutate totală ridicată: 175kg/)).toBeInTheDocument()
+  })
+})
+
 describe('PrCandidatesConfirm', () => {
   it('nu randeaza nimic fara candidati', () => {
     const { container } = render(<PrCandidatesConfirm candidates={null} onDismiss={() => {}} onConfirm={() => {}} onDone={() => {}} t={{}} />)

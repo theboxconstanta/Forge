@@ -2,7 +2,7 @@
 // definite de admin - genereaza UI-ul potrivit dupa "familia" formatului
 // (scored / sets / mixed / nft), generalizand blocurile existente de logare
 // AMRAP/For Time si de seturi Weightlifting din App.jsx.
-import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey, resolveStationUnitsByKey, resolveEmomTimeline, emomPositionWord } from './workoutFormats'
+import { getFormat, defaultRowsForFormat, addSetRow, updateSetRow, removeSetRow, computeSetsScore, resolveSetsScoringMode, setsScoreLabel, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, ascendingMovementsForRound, resolveIntervalStructure, intervalStationKey, emomStationKey, resolveStationUnitsByKey, resolveEmomTimeline, emomPositionWord, computeVolumeLoad, resolveMovementLoadCapabilityByKey } from './workoutFormats'
 import { resolveSequentialAmrapStations } from './sequentialAmrap'
 import SequentialAmrapFields from './SequentialAmrapFields'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII } from './movements'
@@ -590,6 +590,22 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
     )
   }
 
+  // STRENGTH VOLUME LOAD (canonical strength result intelligence) - Total
+  // Weight Lifted is a DERIVED SECONDARY metric, live as the member types,
+  // never replacing the primary score above (which stays whatever
+  // resolveSetsScoringMode already says - null for Strength Sets today,
+  // unchanged). Scoped to rowMode:'movement' formats where "training
+  // volume" is the right lens (Strength Sets, Weightlifting, Superset) -
+  // NOT Build to Heavy/1RM (an explicit rep-max TEST, not a volume session;
+  // its own primary result is the RM/PR - kept undiluted here, a deliberate
+  // scoping decision) and NOT Complex (rowMode:'round' - its rows are
+  // round-keyed, not movement-keyed, resolveMovementLoadCapabilityByKey
+  // never applies).
+  const volumeEligible = getFormat(formatId)?.rowMode === 'movement' && formatId !== 'Build to Heavy/1RM'
+  const volumeLoad = volumeEligible
+    ? computeVolumeLoad(rowsByKey, resolveMovementLoadCapabilityByKey(prescriptionMovements), weightUnit)
+    : null
+
   return (
     <>
       {Object.entries(rowsByKey).map(([key, rows]) => (
@@ -604,6 +620,15 @@ function SetsFields({ formatId, config, movements, sets, onChange, weightUnit, t
               scoringMode still scores by the schema default ('Total Reps'), and
               computeSetsScore already returns that SUM - the label must agree. */}
           {setsScoreLabel(resolveSetsScoringMode(formatId, config), t)}: {score}
+        </div>
+      )}
+      {volumeLoad && volumeLoad.byMovement.length > 0 && (
+        <div style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E', background: '#F0F4FF', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+          {volumeLoad.byMovement.map((m) => (
+            <div key={m.movementIdentity}>
+              {(t?.strengthTotalWeightLiftedLabel || 'Total Weight Lifted')}{volumeLoad.byMovement.length > 1 ? ` (${m.movementName})` : ''}: {m.totalWeight}{volumeLoad.weightUnit}
+            </div>
+          ))}
         </div>
       )}
     </>

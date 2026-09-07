@@ -54,7 +54,7 @@ import {
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
   resolveWorkoutStructureHeader, composeWorkoutHeadline, resolveCompactResultText,
-  resolveStationUnitsByKey, setsScoreUnitSuffix,
+  resolveStationUnitsByKey, setsScoreUnitSuffix, computeVolumeLoad, resolveMovementLoadCapabilityByKey,
 } from './workoutFormats'
 import {
   extractGreutateDinMiscare, parseLiniiWod, VARIANT_LEVELS, createSection, DEFAULT_NEW_WOD_SECTIONS,
@@ -6516,7 +6516,7 @@ function JurnalPhotoResult({ storagePath, showToast, ...cardProps }) {
   )
 }
 
-function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym, showToast }) {
+export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkill, gender, weightUnit, progressionByIdentity, t, lang, gym, showToast }) {
   // Cardurile sunt expandate implicit (membrul vede direct ce a logat, fara
   // sa apese pe fiecare) - urmarim doar cele inchise explicit de el, nu cele
   // deschise, ca implicit (set gol) sa insemne "toate deschise".
@@ -6630,6 +6630,22 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
               // format/log (unchanged behavior).
               const wUnitsByKey = wHasSets ? resolveStationUnitsByKey(formatTipResolvat, formatConfigResolvat, w.prescription_snapshot?.movements) : null
               const wSetsText = wHasSets ? setsScoreText(formatTipResolvat, formatConfigResolvat, w.sets, weightUnit, t.clasamentRepsUnit, wUnitsByKey) : null
+              // CANONICAL STRENGTH RESULT INTELLIGENCE - Total Weight Lifted,
+              // a derived SECONDARY metric (never replaces wSetsText/the
+              // primary score above). Same scoping as FormatLogger's live
+              // version: rowMode:'movement' formats only, never Build to
+              // Heavy/1RM (an RM test, not a volume session) or Complex
+              // (round-keyed, not movement-keyed). Resolved from this log's
+              // own FROZEN prescription_snapshot - never live prescription
+              // state - matching every other historical-truth read on this
+              // card. `weightUnit` here is the member's CURRENT profile
+              // setting, the same (pre-existing, unchanged) convention
+              // wSetsText/setsScoreText already use on this exact card - not
+              // a new limitation introduced here.
+              const wVolumeEligible = wHasSets && getFormat(formatTipResolvat)?.rowMode === 'movement' && formatTipResolvat !== 'Build to Heavy/1RM'
+              const wVolumeLoad = wVolumeEligible
+                ? computeVolumeLoad(w.sets, resolveMovementLoadCapabilityByKey(w.prescription_snapshot?.movements), weightUnit)
+                : null
               // Ascending AMRAP: "5 runde + 2/18 burpee..." e corect dar greu de
               // comparat dintr-o privire intre loguri - adaugam si totalul de
               // reps efectiv acumulate (identic cu stilul BTWB "126 reps"),
@@ -6768,13 +6784,22 @@ function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDeleteSkil
                         </div>
                       )}
                       {wHasSets && (
-                        <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0' }}>
+                        <div style={{ marginBottom: (wVolumeLoad?.byMovement.length > 0 || (noteLog && noteLog.trim())) ? '10px' : '0' }}>
                           {intervalResult ? (
                             <IntervalResultRounds intervalResult={intervalResult} t={t} />
                           ) : wSetsParti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
                               <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
                               <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {wVolumeLoad && wVolumeLoad.byMovement.length > 0 && (
+                        <div style={{ marginBottom: noteLog && noteLog.trim() ? '10px' : '0', fontSize: '12px', fontWeight: '600', lineHeight: 1.5, color: '#0E0E0E' }}>
+                          {wVolumeLoad.byMovement.map((m) => (
+                            <div key={m.movementIdentity}>
+                              {(t?.strengthTotalWeightLiftedLabel || 'Total Weight Lifted')}{wVolumeLoad.byMovement.length > 1 ? ` (${m.movementName})` : ''}: {m.totalWeight}{wVolumeLoad.weightUnit}
                             </div>
                           ))}
                         </div>
