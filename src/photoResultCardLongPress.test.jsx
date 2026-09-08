@@ -21,6 +21,20 @@
 // directly, per owner §7's explicit "preferred fallback" instruction - no
 // real iPhone was available in this session to test the gesture itself,
 // see the release report.
+//
+// iOS LONG PRESS STILL DOES NOTHING (2nd pass) - after 2da76b2 shipped
+// Pointer-Events-only, the owner's real iPhone still showed nothing at
+// all on a 2s hold. Grounded via WebSearch (W3C pointerevents#303): Safari
+// has documented interoperability problems specifically with directional
+// `touch-action` values (`pan-x`/`pan-y`, what 2da76b2 used) - only `auto`
+// and `manipulation` are reliably honored. The gesture was rearchitected
+// around raw Touch Events (touchstart/touchmove/touchend/touchcancel) as
+// the PRIMARY path for touch, with Pointer Events kept only as a
+// secondary path for mouse/pen (explicitly ignoring `pointerType ===
+// 'touch'`, since iOS also fires compatibility pointer events for the same
+// physical touch - owner §9J). The "PointerEvent (mouse/pen) path" block
+// below covers the secondary path unchanged; the new "Touch Event (iOS
+// primary) path" block below is this pass's actual regression coverage.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent, screen, act } from '@testing-library/react'
 import PhotoResultCard from './PhotoResultCard.jsx'
@@ -49,7 +63,7 @@ const getChip = (container) => container.querySelector('button[data-role="long-p
 beforeEach(() => { vi.useFakeTimers() })
 afterEach(() => { vi.useRealTimers() })
 
-describe('LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - gesture contract', () => {
+describe('LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - PointerEvent (mouse/pen, secondary) path', () => {
   it('A - a hold released before 2s never shows the chip or calls onShare', () => {
     const onShare = vi.fn()
     const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
@@ -198,5 +212,162 @@ describe('LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - gesture contract', () => 
     fireEvent.pointerDown(root, { clientX: 100, clientY: 100 })
     advance(2000)
     expect(getChip(container)).toBeNull()
+  })
+})
+
+// A single simulated touch point, shaped the way jsdom/testing-library
+// expects for TouchEvent init (`touches`/`changedTouches` as an array of
+// point-like objects) - one real finger, one `identifier`.
+const touchAt = (x, y) => ({ touches: [{ identifier: 0, clientX: x, clientY: y }], changedTouches: [{ identifier: 0, clientX: x, clientY: y }] })
+
+describe('iOS LONG PRESS STILL DOES NOTHING - Touch Event (iOS primary) path', () => {
+  it('A - a touch hold released before 2s never shows the chip or calls onShare', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    advance(1500)
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root)
+    expect(getChip(container)).toBeNull()
+    expect(onShare).not.toHaveBeenCalled()
+  })
+
+  it('B - a touch hold of >=2s reveals the contextual Share chip WITHOUT itself calling onShare', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    advance(2000)
+    expect(getChip(container)).toBeTruthy()
+    expect(onShare).not.toHaveBeenCalled()
+  })
+
+  it('C - small touchmove jitter during the hold does not cancel it - the chip still appears at 2s', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.touchMove(root, touchAt(103, 101)) // ~3px - well under the 12px tolerance
+    advance(2000)
+    expect(getChip(container)).toBeTruthy()
+  })
+
+  it('D - a large touchmove (real scroll/drag) cancels the hold - no chip, no share', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.touchMove(root, touchAt(100, 150)) // 50px - a real scroll/drag
+    advance(2000)
+    expect(getChip(container)).toBeNull()
+    expect(onShare).not.toHaveBeenCalled()
+  })
+
+  it('E - touchcancel cancels the hold - no chip, no share', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.touchCancel(root, touchAt(100, 100))
+    advance(2000)
+    expect(getChip(container)).toBeNull()
+    expect(onShare).not.toHaveBeenCalled()
+  })
+
+  it('F - a completed touch hold + touchend does not bubble into an outer (Journal toggle) click handler', () => {
+    const onShare = vi.fn()
+    const outerClick = vi.fn()
+    const { container } = render(
+      <div onClick={outerClick}><PhotoResultCard {...baseProps} onShare={onShare} /></div>
+    )
+    const root = container.firstChild.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    advance(2000)
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root) // the browser's own click following touchend
+    expect(outerClick).not.toHaveBeenCalled()
+  })
+
+  it('G - the synthetic click following a completed hold\'s touchend is suppressed exactly once, not on the next unrelated click', () => {
+    const onShare = vi.fn()
+    const outerClick = vi.fn()
+    const { container } = render(
+      <div onClick={outerClick}><PhotoResultCard {...baseProps} onShare={onShare} /></div>
+    )
+    const root = container.firstChild.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    advance(2000)
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root) // suppressed (the completed hold's own release)
+    expect(outerClick).not.toHaveBeenCalled()
+    fireEvent.touchStart(root, touchAt(100, 100)) // a later, unrelated, ordinary quick tap
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root)
+    expect(outerClick).toHaveBeenCalledTimes(1) // NOT suppressed - the flag only ever consumes one click
+  })
+
+  it('H - tapping the Share chip (revealed by a touch hold) invokes the canonical onShare exactly once', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    advance(2000)
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root) // suppressed release-click
+    const chip = getChip(container)
+    fireEvent.touchStart(chip, touchAt(100, 100))
+    fireEvent.touchEnd(chip, touchAt(100, 100))
+    fireEvent.click(chip)
+    expect(onShare).toHaveBeenCalledTimes(1)
+    expect(getChip(container)).toBeNull()
+  })
+
+  it('I - a touchstart also followed by a compatibility pointerdown (pointerType touch) for the SAME physical gesture never double-fires - only one hold timer, one chip', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.pointerDown(root, { clientX: 100, clientY: 100, pointerType: 'touch' }) // iOS compatibility pointer event - must be ignored
+    advance(2000)
+    expect(container.querySelectorAll('button[data-role="long-press-share-chip"]')).toHaveLength(1)
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.pointerUp(root, { clientX: 100, clientY: 100, pointerType: 'touch' })
+    fireEvent.click(root)
+    const chip = getChip(container)
+    fireEvent.click(chip)
+    expect(onShare).toHaveBeenCalledTimes(1) // never duplicated by the compatibility pointer path
+  })
+
+  it('J - normal Journal tap behavior (a quick, un-held tap) is completely unchanged by the touch adapter', () => {
+    const onShare = vi.fn()
+    const outerClick = vi.fn()
+    const { container } = render(
+      <div onClick={outerClick}><PhotoResultCard {...baseProps} onShare={onShare} /></div>
+    )
+    const root = container.firstChild.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.touchEnd(root, touchAt(100, 100))
+    fireEvent.click(root)
+    expect(onShare).not.toHaveBeenCalled()
+    expect(getChip(container)).toBeNull()
+    expect(outerClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('K - a second simultaneous touch during a hold cancels it immediately rather than starting a second hold', () => {
+    const onShare = vi.fn()
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={onShare} />)
+    const root = container.firstChild
+    fireEvent.touchStart(root, touchAt(100, 100))
+    fireEvent.touchMove(root, { touches: [{ identifier: 0, clientX: 100, clientY: 100 }, { identifier: 1, clientX: 200, clientY: 200 }] })
+    advance(2000)
+    expect(getChip(container)).toBeNull()
+    expect(onShare).not.toHaveBeenCalled()
+  })
+
+  it('draggable={false} and a dragstart guard are present on the member photo <img> (owner §7 - Safari native image drag/callout neutralized narrowly, never the export renderer/source)', () => {
+    const { container } = render(<PhotoResultCard {...baseProps} onShare={vi.fn()} />)
+    const img = [...container.querySelectorAll('img')].find(el => el.getAttribute('data-role') === 'member-photo')
+    expect(img.draggable).toBe(false)
   })
 })

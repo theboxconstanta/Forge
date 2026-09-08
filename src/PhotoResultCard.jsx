@@ -115,9 +115,9 @@ export default function PhotoResultCard({
   const statusText = notRxdLabel || variantLevel || null
 
   // LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - gesture state. Refs (not
-  // state) for anything read/written inside the timer/pointer callbacks
-  // themselves, so cancelling on movement/release never waits on a
-  // re-render; `shareChipVisible` is the one piece that actually needs to
+  // state) for anything read/written inside the timer/touch/pointer
+  // callbacks themselves, so cancelling on movement/release never waits on
+  // a re-render; `shareChipVisible` is the one piece that actually needs to
   // re-render (it drives the chip's presence in the tree).
   const [shareChipVisible, setShareChipVisible] = useState(false)
   const pressTimerRef = useRef(null)
@@ -133,17 +133,29 @@ export default function PhotoResultCard({
   // unmounts while the chip is showing must never leak its auto-hide timer.
   useEffect(() => () => { cancelPressTimer(); clearTimeout(chipHideTimerRef.current) }, [])
 
-  // pointerdown - starts the hold timer. A NEW gesture anywhere on the card
-  // also dismisses any already-showing chip from a PRIOR long press (owner
-  // §5 "tap elsewhere to dismiss"), and normal (short) taps are left
-  // completely alone - nothing here prevents/stops the browser's own click,
-  // so the existing tap-to-toggle Journal behavior keeps working exactly as
-  // before (owner §2 "normal tap: no unwanted expand/collapse").
-  const handlePressStart = (e) => {
+  // iOS LONG PRESS STILL DOES NOTHING - single shared hold state machine
+  // (beginHold/moveHold/cancelHold), driven by TWO separate input adapters
+  // below (owner §4 "one internal state machine, not duplicated timer
+  // logic"). Touch Events (touchstart/touchmove/touchend/touchcancel) are
+  // the PRIMARY path on iOS - not Pointer Events. Reason: `touch-action:
+  // pan-y` (this component's first attempt, 2da76b2) is exactly the kind
+  // of directional touch-action value documented to have Safari
+  // interoperability problems (W3C pointerevents#303 - Safari can dispatch
+  // pointercancel/hand the gesture to native panning unreliably for
+  // directional pan-x/pan-y values specifically, unlike plain `auto`/
+  // `manipulation`), which would explain a hold that silently never
+  // reaches 2000ms on a real iPhone despite working in every jsdom/Chrome
+  // test. Touch Events are the original, most battle-tested iOS Safari
+  // input API (Apple's own invention) and are used here as the source of
+  // truth for touch; Pointer Events remain wired for mouse/pen (desktop),
+  // but explicitly IGNORE `pointerType === 'touch'` - iOS also dispatches
+  // compatibility pointer events for the same physical touch, and without
+  // this guard both adapters would drive the same hold twice (owner §9J).
+  const beginHold = (x, y) => {
     if (!onShare) return
     if (shareChipVisible) setShareChipVisible(false)
     longPressFiredRef.current = false
-    startPosRef.current = { x: e.clientX, y: e.clientY }
+    startPosRef.current = { x, y }
     cancelPressTimer()
     pressTimerRef.current = setTimeout(() => {
       pressTimerRef.current = null
@@ -153,28 +165,56 @@ export default function PhotoResultCard({
       chipHideTimerRef.current = setTimeout(() => setShareChipVisible(false), SHARE_CHIP_AUTO_HIDE_MS)
     }, LONG_PRESS_MS)
   }
-  // pointermove - only intentional movement (a real scroll/drag) cancels
-  // the hold (owner §6E); tiny finger jitter well under the threshold must
-  // never invalidate an otherwise-still hold (owner §5D).
-  const handlePressMove = (e) => {
+  // Only intentional movement (a real scroll/drag) cancels the hold (owner
+  // §5E); tiny finger jitter well under the threshold must never
+  // invalidate an otherwise-still hold (owner §5D/§9C).
+  const moveHold = (x, y) => {
     if (!pressTimerRef.current || !startPosRef.current) return
-    const dx = e.clientX - startPosRef.current.x
-    const dy = e.clientY - startPosRef.current.y
+    const dx = x - startPosRef.current.x
+    const dy = y - startPosRef.current.y
     if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_CANCEL_PX) cancelPressTimer()
   }
-  // pointerup/pointercancel - releasing before 2s (or an actual cancel)
-  // simply stops the timer; nothing else to undo since a not-yet-fired
-  // hold never touched the DOM/state.
-  const handlePressEnd = () => { cancelPressTimer() }
+  // Releasing before 2s (or an actual cancel) simply stops the timer;
+  // nothing else to undo since a not-yet-fired hold never touched the
+  // DOM/state.
+  const cancelHold = () => cancelPressTimer()
+
+  // TOUCH adapter (primary on iOS) - a second simultaneous touch (e.g. an
+  // accidental extra finger) is treated as an immediate cancel, never a
+  // second independent hold.
+  const handleTouchStart = (e) => {
+    if (e.touches.length !== 1) { cancelHold(); return }
+    beginHold(e.touches[0].clientX, e.touches[0].clientY)
+  }
+  const handleTouchMove = (e) => {
+    if (e.touches.length !== 1) { cancelHold(); return }
+    moveHold(e.touches[0].clientX, e.touches[0].clientY)
+  }
+  const handleTouchEnd = () => cancelHold()
+  const handleTouchCancel = () => cancelHold()
+
+  // POINTER adapter (secondary - mouse/pen only). `pointerType === 'touch'`
+  // is explicitly ignored here: iOS fires a compatibility pointer event
+  // for every touch too, and the dedicated touch handlers above are
+  // already the authoritative source for touch input (owner §4/§9J - never
+  // let both paths drive the same physical gesture).
+  const handlePointerDown = (e) => { if (e.pointerType !== 'touch') beginHold(e.clientX, e.clientY) }
+  const handlePointerMove = (e) => { if (e.pointerType !== 'touch') moveHold(e.clientX, e.clientY) }
+  const handlePointerUp = (e) => { if (e.pointerType !== 'touch') cancelHold() }
+  const handlePointerCancel = (e) => { if (e.pointerType !== 'touch') cancelHold() }
+
   // The browser's own click (real mouse click, or the compatibility click
   // synthesized after a touch release) is the only reliable cross-engine
   // point to suppress "release after a completed hold" (owner §4/§8C) -
-  // pointerup's own preventDefault() is not consistently honored for this
-  // across engines, so this capture-phase check is the actual guarantee:
-  // it runs BEFORE the click can reach the Share/Close buttons' own
-  // onClick or bubble out to Journal's outer toggleClosed (owner §4/§8I).
-  // A normal completed tap (never held 2s) leaves longPressFiredRef false,
-  // so this is a no-op for every ordinary click.
+  // preventDefault() on touchend/pointerup is not consistently honored for
+  // this across engines (and React's own touchstart/touchmove listeners
+  // are passive by default, so preventDefault there would silently no-op
+  // anyway - owner §6), so this capture-phase check is the actual
+  // guarantee: it runs BEFORE the click can reach the Share/Close buttons'
+  // own onClick or bubble out to Journal's outer toggleClosed (owner
+  // §4/§9F/§9I). A normal completed tap (never held 2s) leaves
+  // longPressFiredRef false, so this is a no-op for every ordinary click
+  // (owner §9K).
   const handleClickCapture = (e) => {
     if (!longPressFiredRef.current) return
     longPressFiredRef.current = false
@@ -184,19 +224,24 @@ export default function PhotoResultCard({
 
   return (
     <div
-      onPointerDown={handlePressStart} onPointerMove={handlePressMove}
-      onPointerUp={handlePressEnd} onPointerCancel={handlePressEnd}
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchCancel}
+      onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}
       onClickCapture={handleClickCapture}
       onContextMenu={(e) => { if (onShare) e.preventDefault() }}
       style={{
         position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: exportMode ? 'none' : '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E',
         // Suppress iOS's native image callout (save/copy) and text
         // selection ONLY on this card surface (owner §6 "do not suppress
-        // native browser behavior globally") - `pan-y` keeps normal
-        // vertical scrolling of the surrounding Journal list working, our
-        // own JS threshold above is what actually distinguishes an
-        // intentional scroll/drag from a still hold.
-        touchAction: onShare ? 'pan-y' : undefined,
+        // native browser behavior globally"). `manipulation` (not the
+        // directional `pan-y` 2da76b2 used) is one of the two touch-action
+        // values Safari reliably supports (W3C pointerevents#303) - it
+        // still permits normal panning/pinch-zoom, only removes the
+        // double-tap-to-zoom delay; our own JS movement threshold above is
+        // what actually distinguishes an intentional scroll/drag from a
+        // still hold, not this CSS property.
+        touchAction: onShare ? 'manipulation' : undefined,
         WebkitTouchCallout: onShare ? 'none' : undefined,
         WebkitUserSelect: onShare ? 'none' : undefined,
         userSelect: onShare ? 'none' : undefined,
@@ -204,7 +249,18 @@ export default function PhotoResultCard({
       {photoUrl ? (
         <img src={photoUrl} alt="" onError={onPhotoError} data-role="member-photo"
           crossOrigin={exportMode ? 'anonymous' : undefined}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          // iOS LONG PRESS STILL DOES NOTHING §7 - Safari's native
+          // image drag/callout (its own "save photo" long-press
+          // recognizer) can compete with ours for the same touch;
+          // `draggable={false}` + a defensive dragstart block narrowly
+          // neutralize Safari's native image drag specifically, and
+          // -webkit-touch-callout is repeated directly on the <img>
+          // itself (not just inherited from the root above) since at
+          // least one current WebKit report describes the property not
+          // reliably suppressing the callout via inheritance alone.
+          // Never changes the export renderer or the actual image source.
+          draggable={false} onDragStart={(e) => e.preventDefault()}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', WebkitTouchCallout: onShare ? 'none' : undefined }} />
       ) : (
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#1c1c1c' }} />
       )}
@@ -248,15 +304,16 @@ export default function PhotoResultCard({
           direct user gesture that calls the exact same `onShare` the
           top-right button already uses - stopPropagation for the same
           reason as that button (never let this tap also bubble into
-          Journal's outer toggleClosed). Its OWN pointerdown must also
-          never reach the root's gesture handler above: that handler
-          dismisses/restarts on every new press so a stale chip from a
-          PRIOR hold doesn't linger under a later, unrelated tap - without
-          this stopPropagation, touching the chip to actually tap it would
-          hide the chip (and cancel this same tap) out from under the
-          user's own finger before the click ever fires. */}
+          Journal's outer toggleClosed). Its OWN touchstart/pointerdown must
+          also never reach the root's gesture handlers above: those
+          dismiss/restart on every new press so a stale chip from a PRIOR
+          hold doesn't linger under a later, unrelated tap - without this
+          stopPropagation, touching the chip to actually tap it would hide
+          the chip (and cancel this same tap) out from under the user's own
+          finger before the click ever fires. */}
       {onShare && shareChipVisible && (
         <button
+          onTouchStart={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); setShareChipVisible(false); onShare(e) }}
           aria-label={t.shareCardButton} disabled={!!sharePending} data-role="long-press-share-chip"
