@@ -6822,17 +6822,42 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                       <span style={{ fontSize: '14px', color: '#aaa' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
                   </div>
-                  <div style={{ marginTop: '4px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Calendar size={10} strokeWidth={2} />
-                      {new Date(w.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Clock size={10} strokeWidth={2} />
-                      {new Date(w.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  {wodSubtitlu && (
+                  {/* JOURNAL CLICK-TO-EXPAND DUPLICATION FIX (3rd pass) -
+                      the date/time row and format subtitle are the card's
+                      OWN persistent identity, shown collapsed or expanded
+                      for every log regardless of a photo - kept exactly as
+                      before in every case except one: once the card is
+                      OPEN and its photo is actually rendering, the SAME
+                      date, time, AND format are ALSO shown a second time
+                      inside PhotoResultCard's own self-contained metadata
+                      row + headline (that card is DELIBERATELY
+                      self-contained - it is reused standalone in
+                      WorkoutSharePopup, with no outer header at all, so it
+                      cannot drop its own date/time/headline without
+                      breaking that other, untouched surface - Photo Result
+                      layout stays exactly as approved). Suppressing the
+                      OUTER copy specifically in this one case (open +
+                      photo showing) removes the exact restatement that
+                      only ever becomes visible the moment a photo card
+                      expands - closing the card, or a photo that fails to
+                      load, brings this row straight back, unchanged. The
+                      title row above (variant/badges/camera icon/delete/
+                      chevron) stays untouched in every case - it is the
+                      card's persistent control surface, not purely
+                      informational content. */}
+                  {!(isOpen && photoRenderable) && (
+                    <div style={{ marginTop: '4px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#aaa', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Calendar size={10} strokeWidth={2} />
+                        {new Date(w.logged_at).toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Clock size={10} strokeWidth={2} />
+                        {new Date(w.logged_at).toLocaleTimeString(localeFor(lang), { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                  {wodSubtitlu && !(isOpen && photoRenderable) && (
                     <div style={{ marginTop: '2px', fontSize: '12px', fontWeight: '500', lineHeight: 1.35, color: '#888' }}>{wodSubtitlu}</div>
                   )}
                   {progressionNote && (

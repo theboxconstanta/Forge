@@ -98,16 +98,26 @@ export default function PhotoResultCard({
 
       {/* Close/Share - application chrome, not part of the visual result
           composition itself (owner §35/§36) - minimal floating icon
-          buttons, never redesigning the card to fit a large action. */}
+          buttons, never redesigning the card to fit a large action.
+          JOURNAL CLICK-TO-EXPAND DUPLICATION FIX (3rd pass, section 6/9G)
+          - stopPropagation on both: this card is sometimes embedded
+          inside another element that ALSO has its own onClick (Journal's
+          outer card wrapper toggles collapsed/expanded on any click
+          inside it) - without this, tapping Share/Close bubbles up and
+          fires that OUTER handler too, e.g. collapsing the Journal entry
+          in the same tap as sharing it. WorkoutSharePopup's own usage is
+          unaffected either way (its inner content div already stops
+          propagation before its backdrop's onClose) - this is a no-op
+          there, but the only protection Journal's usage has. */}
       <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {onShare && (
-          <button onClick={onShare} aria-label={t.shareCardButton} disabled={!!sharePending}
+          <button onClick={(e) => { e.stopPropagation(); onShare(e) }} aria-label={t.shareCardButton} disabled={!!sharePending}
             style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: sharePending ? 'default' : 'pointer', opacity: sharePending ? 0.55 : 1 }}>
             <Share2 size={13} strokeWidth={2.25} />
           </button>
         )}
         {onClose && (
-          <button onClick={onClose} aria-label={t.shareCardCloseLabel}
+          <button onClick={(e) => { e.stopPropagation(); onClose(e) }} aria-label={t.shareCardCloseLabel}
             style={{ background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
             <X size={14} strokeWidth={2.25} />
           </button>
