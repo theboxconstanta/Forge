@@ -44,8 +44,41 @@
 // all application chrome from the exported image (owner §4) - no separate
 // export-only markup branch exists.
 
+import { useEffect, useRef, useState } from 'react'
 import { MapPin, Calendar, Clock, X, Share2 } from 'lucide-react'
 import { localeFor } from './utils'
+
+// LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - a ~2s hold on the card must
+// invoke the SAME canonical `onShare` action as the existing top-right
+// button (never a second export/share implementation). Tuned to tolerate
+// normal finger micro-jitter (owner §5) while still cancelling on an
+// actual scroll/drag (owner §6) - see the gesture handlers below for the
+// full contract.
+const LONG_PRESS_MS = 2000
+const LONG_PRESS_MOVE_CANCEL_PX = 12
+// iOS SAFARI USER-ACTIVATION CONSTRAINT (owner §7) - calling
+// navigator.share() directly from this timer's callback would NOT be a
+// direct result of the user's tap: transient (user) activation is a
+// short, browser-internal timer WebKit's own engineering blog describes
+// as "a few seconds" that explicitly does not survive an async gap like
+// `setTimeout` reliably reaching an await'd API - this is the same,
+// widely-documented restriction behind "you can't open a popup from
+// setTimeout" (WebKit blog "The User Activation API"; W3C Web Share API
+// spec section on transient activation; Mozilla bug 1643205 "Navigator's
+// share() must consume user activation"). No real iPhone was available in
+// this session to empirically confirm the failure, but this is
+// established, citable cross-engine platform behavior, not a guess - so a
+// direct delayed `onShare()` call from the 2s timer risks silently
+// downgrading every long-press share to a local file download (the
+// existing, always-safe fallback already built into
+// shareGeneratedImageBlob) instead of the real native Share Sheet the
+// owner asked for. FIX: the completed long press reveals a small
+// contextual "Share" chip instead of calling onShare itself - the user's
+// OWN tap on that chip is a fresh, direct user gesture, so it reaches the
+// exact same canonical `onShare` handler the top-right button already
+// uses, under activation guaranteed valid on every engine (matching the
+// already-live-verified button path, bd8ede1).
+const SHARE_CHIP_AUTO_HIDE_MS = 4000
 
 export default function PhotoResultCard({
   photoUrl, onPhotoError,
@@ -80,8 +113,94 @@ export default function PhotoResultCard({
   // props/axes - this is only how ONE particular compact display picks
   // between them, not a collapse of the underlying axes.
   const statusText = notRxdLabel || variantLevel || null
+
+  // LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - gesture state. Refs (not
+  // state) for anything read/written inside the timer/pointer callbacks
+  // themselves, so cancelling on movement/release never waits on a
+  // re-render; `shareChipVisible` is the one piece that actually needs to
+  // re-render (it drives the chip's presence in the tree).
+  const [shareChipVisible, setShareChipVisible] = useState(false)
+  const pressTimerRef = useRef(null)
+  const chipHideTimerRef = useRef(null)
+  const startPosRef = useRef(null)
+  const longPressFiredRef = useRef(false)
+
+  const cancelPressTimer = () => {
+    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null }
+  }
+  // Cleans up both timers on unmount (owner §8J) - a card that closes/
+  // unmounts mid-hold must never fire a share afterwards, and a card that
+  // unmounts while the chip is showing must never leak its auto-hide timer.
+  useEffect(() => () => { cancelPressTimer(); clearTimeout(chipHideTimerRef.current) }, [])
+
+  // pointerdown - starts the hold timer. A NEW gesture anywhere on the card
+  // also dismisses any already-showing chip from a PRIOR long press (owner
+  // §5 "tap elsewhere to dismiss"), and normal (short) taps are left
+  // completely alone - nothing here prevents/stops the browser's own click,
+  // so the existing tap-to-toggle Journal behavior keeps working exactly as
+  // before (owner §2 "normal tap: no unwanted expand/collapse").
+  const handlePressStart = (e) => {
+    if (!onShare) return
+    if (shareChipVisible) setShareChipVisible(false)
+    longPressFiredRef.current = false
+    startPosRef.current = { x: e.clientX, y: e.clientY }
+    cancelPressTimer()
+    pressTimerRef.current = setTimeout(() => {
+      pressTimerRef.current = null
+      longPressFiredRef.current = true
+      setShareChipVisible(true)
+      clearTimeout(chipHideTimerRef.current)
+      chipHideTimerRef.current = setTimeout(() => setShareChipVisible(false), SHARE_CHIP_AUTO_HIDE_MS)
+    }, LONG_PRESS_MS)
+  }
+  // pointermove - only intentional movement (a real scroll/drag) cancels
+  // the hold (owner §6E); tiny finger jitter well under the threshold must
+  // never invalidate an otherwise-still hold (owner §5D).
+  const handlePressMove = (e) => {
+    if (!pressTimerRef.current || !startPosRef.current) return
+    const dx = e.clientX - startPosRef.current.x
+    const dy = e.clientY - startPosRef.current.y
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_CANCEL_PX) cancelPressTimer()
+  }
+  // pointerup/pointercancel - releasing before 2s (or an actual cancel)
+  // simply stops the timer; nothing else to undo since a not-yet-fired
+  // hold never touched the DOM/state.
+  const handlePressEnd = () => { cancelPressTimer() }
+  // The browser's own click (real mouse click, or the compatibility click
+  // synthesized after a touch release) is the only reliable cross-engine
+  // point to suppress "release after a completed hold" (owner §4/§8C) -
+  // pointerup's own preventDefault() is not consistently honored for this
+  // across engines, so this capture-phase check is the actual guarantee:
+  // it runs BEFORE the click can reach the Share/Close buttons' own
+  // onClick or bubble out to Journal's outer toggleClosed (owner §4/§8I).
+  // A normal completed tap (never held 2s) leaves longPressFiredRef false,
+  // so this is a no-op for every ordinary click.
+  const handleClickCapture = (e) => {
+    if (!longPressFiredRef.current) return
+    longPressFiredRef.current = false
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   return (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: exportMode ? 'none' : '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E' }}>
+    <div
+      onPointerDown={handlePressStart} onPointerMove={handlePressMove}
+      onPointerUp={handlePressEnd} onPointerCancel={handlePressEnd}
+      onClickCapture={handleClickCapture}
+      onContextMenu={(e) => { if (onShare) e.preventDefault() }}
+      style={{
+        position: 'relative', width: '100%', aspectRatio: '4 / 5', maxHeight: exportMode ? 'none' : '80vh', borderRadius: '16px', overflow: 'hidden', background: '#0E0E0E',
+        // Suppress iOS's native image callout (save/copy) and text
+        // selection ONLY on this card surface (owner §6 "do not suppress
+        // native browser behavior globally") - `pan-y` keeps normal
+        // vertical scrolling of the surrounding Journal list working, our
+        // own JS threshold above is what actually distinguishes an
+        // intentional scroll/drag from a still hold.
+        touchAction: onShare ? 'pan-y' : undefined,
+        WebkitTouchCallout: onShare ? 'none' : undefined,
+        WebkitUserSelect: onShare ? 'none' : undefined,
+        userSelect: onShare ? 'none' : undefined,
+      }}>
       {photoUrl ? (
         <img src={photoUrl} alt="" onError={onPhotoError} data-role="member-photo"
           crossOrigin={exportMode ? 'anonymous' : undefined}
@@ -123,6 +242,35 @@ export default function PhotoResultCard({
           </button>
         )}
       </div>
+
+      {/* LONG PRESS ON PHOTO DOES NOT TRIGGER SHARE - the completed-hold
+          contextual chip (owner §7 fallback). Tapping it is a fresh,
+          direct user gesture that calls the exact same `onShare` the
+          top-right button already uses - stopPropagation for the same
+          reason as that button (never let this tap also bubble into
+          Journal's outer toggleClosed). Its OWN pointerdown must also
+          never reach the root's gesture handler above: that handler
+          dismisses/restarts on every new press so a stale chip from a
+          PRIOR hold doesn't linger under a later, unrelated tap - without
+          this stopPropagation, touching the chip to actually tap it would
+          hide the chip (and cancel this same tap) out from under the
+          user's own finger before the click ever fires. */}
+      {onShare && shareChipVisible && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setShareChipVisible(false); onShare(e) }}
+          aria-label={t.shareCardButton} disabled={!!sharePending} data-role="long-press-share-chip"
+          style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 3,
+            display: 'flex', alignItems: 'center', gap: '7px',
+            background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '999px',
+            padding: '11px 20px', color: '#fff', fontSize: '13px', fontWeight: '700',
+            cursor: sharePending ? 'default' : 'pointer', opacity: sharePending ? 0.55 : 1,
+          }}>
+          <Share2 size={15} strokeWidth={2.25} />
+          {t.shareCardButton}
+        </button>
+      )}
 
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '16px 38px 46px 14px', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
         {/* 1. TOP WORKOUT SUMMARY - condensed/bold/uppercase/white/left,
