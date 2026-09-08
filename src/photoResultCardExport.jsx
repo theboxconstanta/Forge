@@ -97,6 +97,80 @@ async function fetchPhotoAsDataUrl(photoUrl) {
   })
 }
 
+// iOS SHARE EXPORT STILL MISSING PHOTO - the CORS/cache-bust fix above
+// (fetchPhotoAsDataUrl) closed one real, confirmed cause of a photo-less
+// export, but is NOT the cause of the owner's iPhone-specific failure: the
+// photo is already a `data:` URL by the time html-to-image touches it (no
+// network fetch involved at all for the actual capture), yet the photo
+// still comes out missing on a real iPhone while the exact same code
+// produces a correct image in desktop Chrome. This matches a SEPARATE,
+// independently well-documented WebKit/Safari limitation of this exact
+// SVG-foreignObject-to-canvas rendering technique (html-to-image and its
+// predecessor dom-to-image share the same core approach): embedded raster
+// images inside a foreignObject are unreliable on the FIRST capture
+// attempt in Safari/iOS specifically - confirmed against multiple
+// independent third-party reports of the identical symptom ("Image is
+// often missing on first render on Safari iOS" - dom-to-image issue #343;
+// "with nothing cached, most pieces of the image fail to render... hitting
+// refresh... everything renders correctly" - semisignal.com's own testing
+// on Safari 14.0.2, where a commenter separately confirms "rendering the
+// same page twice in succession" as the working mitigation, the first
+// attempt failing silently and the second consistently succeeding). This
+// is a genuine WebKit rendering-pipeline quirk, not a size/CORS/timing bug
+// this codebase's own code can prevent outright - so the correct response
+// is the DOCUMENTED community mitigation (verify + bounded retry) rather
+// than assuming the first capture worked.
+//
+// FIX: after rasterizing, verify the JPEG actually CONTAINS real photo
+// content (never trust "toJpeg resolved" alone) by decoding it and
+// sampling pixels for genuine color variance - the card's own background/
+// scrim, and any white/gray text drawn over it, are all colorless (R≈G≈B)
+// at every pixel; a real photo reliably is not, across a wide sampling
+// grid. If verification fails, the ENTIRE render+capture is retried once
+// (a fresh export instance - matching the documented "second attempt
+// succeeds" behavior). If it fails again, this is an explicit export
+// failure (owner invariant - never a silently photo-less "success").
+// Never touches the approved PhotoResultCard layout, storage policy, or
+// RLS - purely a rasterization-reliability safeguard for the SAME
+// existing capture path.
+const MAX_CAPTURE_ATTEMPTS = 2
+
+async function jpegHasRealPhotoContent(blob) {
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(blob)
+  } catch {
+    return false // if we can't even decode it, it certainly doesn't verifiably contain the photo
+  }
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(bitmap, 0, 0)
+    // A wide grid across the whole card - the photo is the card's own
+    // full-bleed background (position:absolute, inset:0), so real photo
+    // content is reachable from many points regardless of exactly where
+    // text/headline/prescription lines happen to sit for this particular
+    // result. Requiring color DIVERGENCE (max channel - min channel), not
+    // just brightness, is what correctly ignores white/gray text (R≈G≈B
+    // regardless of how bright) while still catching real photo content
+    // (skin tones, equipment, gym colors reliably have real channel
+    // divergence somewhere across a wide grid).
+    for (let fx = 0.1; fx <= 0.9; fx += 0.16) {
+      for (let fy = 0.06; fy <= 0.94; fy += 0.16) {
+        const x = Math.min(canvas.width - 1, Math.floor(canvas.width * fx))
+        const y = Math.min(canvas.height - 1, Math.floor(canvas.height * fy))
+        const [r, g, b] = ctx.getImageData(x, y, 1, 1).data
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 15) return true
+      }
+    }
+    return false
+  } finally {
+    bitmap.close?.()
+  }
+}
+
 // Embedding every @font-face this page can see (owner §20 - fonts must be
 // embedded, never skipped, so the export never falls back to a generic
 // system font) is the same fixed cost on every single share otherwise -
@@ -137,73 +211,104 @@ export async function generatePhotoResultCardImage(cardProps) {
       return { blob: null, error: new Error(`could not embed photo for export: ${error.message}`) }
     }
   }
-  const container = document.createElement('div')
-  container.style.position = 'fixed'
-  container.style.top = '0'
-  container.style.left = '-99999px'
-  container.style.width = `${EXPORT_WIDTH}px`
-  container.style.pointerEvents = 'none'
-  container.setAttribute('aria-hidden', 'true')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  try {
-    await new Promise((resolve) => {
-      root.render(
-        <PhotoResultCard
-          {...cardProps}
-          photoUrl={resolvedPhotoUrl}
-          exportMode
-          onClose={undefined}
-          onShare={undefined}
-          onPhotoError={() => {}}
-        />
-      )
-      // React's createRoot commit happens asynchronously relative to this
-      // call - wait for the instance to actually mount before checking
-      // anything about its photo <img>, or a fast (no-photo) path here
-      // could race ahead of the very first commit. The photo <img> src is
-      // now a `data:` URL (resolved above) - this settles near-instantly,
-      // kept as defense-in-depth rather than the primary readiness gate.
-      const start = Date.now()
-      const check = () => {
-        if (!container.firstElementChild) {
+  // One full render-and-rasterize attempt: fresh off-screen container,
+  // fresh React root, fresh toJpeg call. Returns { blob } or
+  // { blob: null, error }, and always cleans up its own DOM/root before
+  // returning - never leaves anything mounted between attempts.
+  const captureOnce = async () => {
+    const container = document.createElement('div')
+    container.style.position = 'fixed'
+    container.style.top = '0'
+    container.style.left = '-99999px'
+    container.style.width = `${EXPORT_WIDTH}px`
+    container.style.pointerEvents = 'none'
+    container.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await new Promise((resolve) => {
+        root.render(
+          <PhotoResultCard
+            {...cardProps}
+            photoUrl={resolvedPhotoUrl}
+            exportMode
+            onClose={undefined}
+            onShare={undefined}
+            onPhotoError={() => {}}
+          />
+        )
+        // React's createRoot commit happens asynchronously relative to this
+        // call - wait for the instance to actually mount before checking
+        // anything about its photo <img>, or a fast (no-photo) path here
+        // could race ahead of the very first commit. The photo <img> src is
+        // now a `data:` URL (resolved above) - this settles near-instantly,
+        // kept as defense-in-depth rather than the primary readiness gate.
+        const start = Date.now()
+        const check = () => {
+          if (!container.firstElementChild) {
+            if (Date.now() - start > IMAGE_READY_TIMEOUT_MS) { resolve(); return }
+            requestAnimationFrame(check); return
+          }
+          if (!resolvedPhotoUrl) { resolve(); return } // no photo to wait for
+          const img = container.querySelector('img[data-role="member-photo"]')
+          if (img?.complete) { resolve(); return }
           if (Date.now() - start > IMAGE_READY_TIMEOUT_MS) { resolve(); return }
-          requestAnimationFrame(check); return
+          requestAnimationFrame(check)
         }
-        if (!resolvedPhotoUrl) { resolve(); return } // no photo to wait for
-        const img = container.querySelector('img[data-role="member-photo"]')
-        if (img?.complete) { resolve(); return }
-        if (Date.now() - start > IMAGE_READY_TIMEOUT_MS) { resolve(); return }
         requestAnimationFrame(check)
+      })
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready } catch { /* best-effort only */ }
       }
-      requestAnimationFrame(check)
-    })
-    if (document.fonts?.ready) {
-      try { await document.fonts.ready } catch { /* best-effort only */ }
+      const cardNode = container.firstElementChild
+      if (!cardNode) return { blob: null, error: new Error('export card did not mount') }
+      let fontEmbedCSS
+      try { fontEmbedCSS = await getSessionFontEmbedCSS(cardNode) } catch { /* fall through without a cached CSS - toJpeg will embed inline itself */ }
+      const dataUrl = await toJpeg(cardNode, {
+        width: EXPORT_WIDTH, height: EXPORT_HEIGHT,
+        pixelRatio: EXPORT_PIXEL_RATIO,
+        quality: EXPORT_QUALITY,
+        backgroundColor: '#0E0E0E',
+        cacheBust: true,
+        ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
+      })
+      if (!dataUrl) return { blob: null, error: new Error('toJpeg returned no data') }
+      const blob = await dataUrlToBlob(dataUrl)
+      if (!blob) return { blob: null, error: new Error('data URL to Blob conversion failed') }
+      return { blob }
+    } catch (error) {
+      return { blob: null, error }
+    } finally {
+      root.unmount()
+      container.remove()
     }
-    const cardNode = container.firstElementChild
-    if (!cardNode) return { blob: null, error: new Error('export card did not mount') }
-    let fontEmbedCSS
-    try { fontEmbedCSS = await getSessionFontEmbedCSS(cardNode) } catch { /* fall through without a cached CSS - toJpeg will embed inline itself */ }
-    const dataUrl = await toJpeg(cardNode, {
-      width: EXPORT_WIDTH, height: EXPORT_HEIGHT,
-      pixelRatio: EXPORT_PIXEL_RATIO,
-      quality: EXPORT_QUALITY,
-      backgroundColor: '#0E0E0E',
-      cacheBust: true,
-      ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
-    })
-    if (!dataUrl) return { blob: null, error: new Error('toJpeg returned no data') }
-    const blob = await dataUrlToBlob(dataUrl)
-    if (!blob) return { blob: null, error: new Error('data URL to Blob conversion failed') }
-    return { blob }
-  } catch (error) {
-    console.error(error)
-    return { blob: null, error }
-  } finally {
-    root.unmount()
-    container.remove()
   }
+
+  // iOS SHARE EXPORT STILL MISSING PHOTO - verify + bounded retry (see the
+  // header comment above jpegHasRealPhotoContent for the full evidence
+  // trail). Only exercised when a photo was actually expected AND the
+  // capture itself otherwise succeeded (produced a real blob) - a
+  // genuine capture failure (toJpeg rejecting outright, no DOM mount,
+  // etc.) is a DIFFERENT failure class than "rendered successfully but
+  // the embedded photo didn't paint" and is returned immediately,
+  // unretried, exactly as before this fix. A no-photo capture also never
+  // enters the retry loop - nothing to verify, single attempt, unchanged.
+  const firstResult = await captureOnce()
+  if (!firstResult.blob || !resolvedPhotoUrl) return firstResult
+  let lastResult = firstResult
+  for (let attempt = 1; attempt <= MAX_CAPTURE_ATTEMPTS; attempt++) {
+    let containsPhoto
+    try { containsPhoto = await jpegHasRealPhotoContent(lastResult.blob) } catch { containsPhoto = true } // verification itself failing must never block an otherwise-successful export
+    if (containsPhoto) return lastResult
+    console.error(new Error(`generatePhotoResultCardImage: attempt ${attempt} produced a photo-less JPEG despite a photo being expected`))
+    if (attempt === MAX_CAPTURE_ATTEMPTS) break
+    lastResult = await captureOnce()
+    if (!lastResult.blob) break // the retry itself failed outright - fall through to the fail-closed return below
+  }
+  // Every attempt either failed outright on retry or produced a verifiably
+  // photo-less image - fail closed rather than hand back a "successful"
+  // JPEG missing the one thing the member chose to share (owner invariant).
+  return { blob: null, error: lastResult.error || new Error('exported image did not contain the photo after retrying') }
 }
 
 /** Deterministic, PII-free filename (owner §11) - a date is sufficient,

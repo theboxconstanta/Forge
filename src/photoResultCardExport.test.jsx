@@ -8,7 +8,7 @@
 // passed in, the data-URL-to-Blob conversion actually works, and cleanup
 // always happens even when rendering fails.
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { buildShareFilename, generatePhotoResultCardImage, EXPORT_WIDTH, EXPORT_HEIGHT, EXPORT_PIXEL_RATIO } from './photoResultCardExport.jsx'
 
 // A tiny real 1x1 JPEG, base64-encoded - exercises the REAL data-URL ->
@@ -144,6 +144,18 @@ describe('EXPORT-LOST-PHOTO REGRESSION - photo is fetched and embedded as a data
 
   it('fetches the EXACT signed photoUrl (no cache-bust query param appended by this module) and passes a data: URL - never the network URL - into the rendered/rasterized node', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(tinyJpegBlob(), { status: 200 }))
+    // This test is about URL substitution (data: URL vs network URL), not
+    // the iOS photo-content verification added later - stub
+    // createImageBitmap to report a colorful pixel so that verification
+    // passes on the FIRST attempt (matching a genuinely successful real
+    // capture), keeping this test fast/deterministic rather than
+    // exercising the (separately, thoroughly tested below) retry path.
+    // jsdom does not implement createImageBitmap at all - stubGlobal
+    // defines it (rather than spying on a property that doesn't exist).
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 4, height: 4, close: () => {} }))
+    const getImageDataSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: () => {}, getImageData: () => ({ data: new Uint8ClampedArray([200, 60, 30, 255]) }),
+    })
     let capturedImgSrc = null
     toJpeg.mockImplementationOnce(async (node) => {
       capturedImgSrc = node.querySelector('img[data-role="member-photo"]')?.src
@@ -153,6 +165,7 @@ describe('EXPORT-LOST-PHOTO REGRESSION - photo is fetched and embedded as a data
     expect(result.blob).toBeInstanceOf(Blob)
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(fetchSpy).toHaveBeenCalledWith(PHOTO_URL) // the EXACT signed URL, byte-identical, no appended query param
+    expect(toJpeg).toHaveBeenCalledTimes(1) // succeeded and verified on the first attempt - no retry needed
     // NOT the https:// signed URL - html-to-image never touches the network
     // for it. (jsdom's Blob/FileReader interop doesn't reliably preserve
     // the exact MIME type through readAsDataURL - a documented jsdom
@@ -163,6 +176,8 @@ describe('EXPORT-LOST-PHOTO REGRESSION - photo is fetched and embedded as a data
     expect(capturedImgSrc).toMatch(/^data:/)
     expect(capturedImgSrc).not.toMatch(/^https:/)
     fetchSpy.mockRestore()
+    vi.unstubAllGlobals()
+    getImageDataSpy.mockRestore()
   })
 
   it('a photo fetch failure (expired/invalid signed URL, network error) is an explicit export failure - never a silent photo-less "success"', async () => {
@@ -191,6 +206,126 @@ describe('EXPORT-LOST-PHOTO REGRESSION - photo is fetched and embedded as a data
     expect(result.blob).toBeInstanceOf(Blob)
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+})
+
+// iOS SHARE EXPORT STILL MISSING PHOTO - a real iPhone still produced a
+// photo-less JPEG even after the cache-bust/CORS fix above (the photo was
+// already a data: URL by the time html-to-image touched it - no network
+// fetch involved in the capture at all). This matches a SEPARATE,
+// independently well-documented WebKit/Safari limitation of this exact
+// SVG-foreignObject-to-canvas rendering technique: embedded raster images
+// are unreliable on the FIRST capture attempt specifically on Safari/iOS
+// (dom-to-image issue #343 "Image is often missing on first render on
+// Safari iOS"; semisignal.com's own Safari 14.0.2 testing - "with nothing
+// cached, most pieces of the image fail to render... hitting refresh...
+// everything renders correctly", with a commenter separately confirming
+// "rendering the same page twice in succession" as the community
+// mitigation). Fix: verify the generated JPEG actually contains real photo
+// pixel content (not just that toJpeg resolved), retry the WHOLE
+// render+capture once if it doesn't, and fail closed (never a silent
+// photo-less "success") if the retry doesn't help either.
+//
+// createImageBitmap is not implemented in jsdom - stubbed as a global for
+// every test in this block (rather than spied on a property that does not
+// exist), alongside canvas getContext, to deterministically control what
+// jpegHasRealPhotoContent "sees" per attempt without needing a real
+// decodable image per scenario.
+describe('iOS SHARE EXPORT STILL MISSING PHOTO - verify generated JPEG contains real photo content, retry once, fail closed', () => {
+  const PHOTO_URL = 'https://storage.example.supabase.co/object/sign/wod-photos/g1/m1/w1/photo.jpg?token=xyz'
+  const colorfulPixel = () => ({ data: new Uint8ClampedArray([200, 60, 30, 255]) }) // real channel divergence - "contains a photo"
+  const backgroundOnlyPixel = () => ({ data: new Uint8ClampedArray([14, 14, 14, 255]) }) // #0E0E0E, R=G=B - "no photo"
+  function tinyJpegBlob() {
+    const binary = atob(TINY_JPEG_BASE64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: 'image/jpeg' })
+  }
+  let fetchSpy
+  let getImageDataSpy
+  // A mutable slot each test points at its own pixel-generating function -
+  // avoids per-test spyOn/mockRestore pairs (a failed assertion mid-test
+  // would skip a trailing .mockRestore() and leak the spy into the NEXT
+  // test) in favor of ONE spy set up/torn down unconditionally every time.
+  let getImageDataImpl
+
+  beforeEach(() => {
+    // Every scenario below needs a real (non-network) photo fetch to
+    // SUCCEED first - this block is exclusively about what happens AFTER
+    // that (the html-to-image rasterization step), never about the fetch
+    // itself (already covered by the describe block above).
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(tinyJpegBlob(), { status: 200 }))
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 4, height: 4, close: () => {} }))
+    getImageDataImpl = () => colorfulPixel() // default: a real photo - each test overrides as needed
+    getImageDataSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: () => {}, getImageData: () => getImageDataImpl(),
+    })
+  })
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    getImageDataSpy.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  it('E - first attempt produces a photo-less JPEG, second attempt (retry) succeeds - the retried result is returned', async () => {
+    // Keyed off how many CAPTURE ATTEMPTS (toJpeg calls) have completed so
+    // far, not how many individual getImageData pixel samples have been
+    // read - jpegHasRealPhotoContent samples many points per verification
+    // and returns as soon as ONE diverges, so a per-sample-call counter
+    // would flip to "colorful" partway through the FIRST attempt's own
+    // sampling grid and never actually exercise the retry this test means
+    // to prove.
+    getImageDataImpl = () => (toJpeg.mock.calls.length <= 1 ? backgroundOnlyPixel() : colorfulPixel())
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeInstanceOf(Blob)
+    expect(toJpeg).toHaveBeenCalledTimes(2) // the whole render+capture was retried, not just re-verified
+  }, 15000) // two real captures, each bounded by the real 4s IMAGE_READY_TIMEOUT_MS (jsdom never fires img load) - exceeds vitest's 5s default
+
+  it('C - every attempt produces a photo-less JPEG (decode/paint keeps failing) - export fails closed, never a silent photo-less "success"', async () => {
+    getImageDataImpl = () => backgroundOnlyPixel()
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeNull()
+    expect(result.error).toBeInstanceOf(Error)
+    expect(result.error.message).toMatch(/did not contain the photo/)
+    expect(toJpeg).toHaveBeenCalledTimes(2) // both the original attempt and the one retry were genuinely exercised
+    expect(document.body.querySelector('div[aria-hidden="true"]')).toBeNull() // no dangling export container after failing closed
+  }, 15000) // two real captures - see the timeout note on test E above
+
+  it('a genuine capture failure (toJpeg rejects outright) on the FIRST attempt is returned immediately, never retried as if it were a missing-photo case', async () => {
+    toJpeg.mockRejectedValueOnce(new Error('rasterize failed'))
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeNull()
+    expect(result.error.message).toBe('rasterize failed') // the ORIGINAL error, not a generic "did not contain the photo" one
+    expect(toJpeg).toHaveBeenCalledTimes(1) // a genuine rejection is a different failure class - not retried by this logic
+  })
+
+  it('verification succeeding on the very first attempt never triggers a second capture (no wasted retry on the common/working case)', async () => {
+    getImageDataImpl = () => colorfulPixel()
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeInstanceOf(Blob)
+    expect(toJpeg).toHaveBeenCalledTimes(1)
+  })
+
+  it('a decode failure (createImageBitmap itself rejects) is treated as "no verified photo" and still retries/fails closed rather than crashing or false-passing', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('cannot decode')))
+    const result = await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    expect(result.blob).toBeNull()
+    expect(result.error).toBeInstanceOf(Error)
+    expect(toJpeg).toHaveBeenCalledTimes(2)
+  }, 15000) // two real captures - see the timeout note on test E above
+
+  it('G - a no-photo capture never enters the verify/retry path at all - single toJpeg call, exactly as before', async () => {
+    const result = await generatePhotoResultCardImage(baseCardProps) // photoUrl: null
+    expect(result.blob).toBeInstanceOf(Blob)
+    expect(toJpeg).toHaveBeenCalledTimes(1)
+  })
+
+  it('H - dimensions/pixelRatio options passed to toJpeg are unaffected by the verify/retry logic', async () => {
+    await generatePhotoResultCardImage({ ...baseCardProps, photoUrl: PHOTO_URL })
+    const [, options] = toJpeg.mock.calls[0]
+    expect(options.width).toBe(EXPORT_WIDTH)
+    expect(options.height).toBe(EXPORT_HEIGHT)
+    expect(options.pixelRatio).toBe(EXPORT_PIXEL_RATIO)
   })
 })
 
