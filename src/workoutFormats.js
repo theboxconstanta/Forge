@@ -1763,13 +1763,31 @@ export function defaultRowsForFormat(formatId, config, movements) {
     return out
   }
   // Strength Sets: un rand per intrare din setsScheme (tinta de reps a acelui
-  // set), purtata pe rand ca `targetReps` - FormatLogger o afiseaza ca hint
-  // ("/ N reps"), nu forteaza valoarea logata.
+  // set), purtata pe rand ca `targetReps`. PERFORMED REPS SEEDING - reps-ul
+  // editabil al randului e SEEDAT cu targetReps la CREAREA randului (nu doar
+  // afisat ca hint "/ N reps" langa un input gol) - un athlete care doar
+  // atinge campul de greutate pe seturile 2+ (targetul de reps ramanand
+  // neschimbat fata de ce a fost deja logat) nu mai lasa acele randuri fara
+  // reps performat salvat, care altfel excludea silentios acele seturi din
+  // Total Weight Lifted (computeVolumeLoad exclude corect orice rand cu reps
+  // gol - vezi owner ticket-ul respectiv). Ramane 100% editabil - athlete-ul
+  // poate schimba/goli explicit valoarea, iar acea alegere se salveaza ca
+  // atare (updateSetRow inlocuieste simplu campul, fara nicio restaurare).
+  // NICIODATA aplicat unui rand deja existent (defaultRowsForFormat e apelat
+  // DOAR cand `sets` e complet gol - FormatLogger.jsx - deci un log reschis
+  // cu evidenta performata reala, inclusiv randuri intentionat goale, nu
+  // trece niciodata pe aici din nou).
   if (formatId === 'Strength Sets') {
     const scheme = Array.isArray(config?.setsScheme) && config.setsScheme.length > 0 ? config.setsScheme : [null]
     const movs = (movements && movements.length > 0) ? movements : ['']
     const out = {}
-    movs.forEach(m => { out[movementNameOf(m)] = scheme.map(targetReps => ({ ...emptyRow(), targetReps: targetReps ?? null })) })
+    movs.forEach(m => {
+      out[movementNameOf(m)] = scheme.map(targetReps => ({
+        ...emptyRow(),
+        reps: targetReps != null ? String(targetReps) : '',
+        targetReps: targetReps ?? null,
+      }))
+    })
     return out
   }
   // Superset: mișcările alternante sunt configurate explicit de admin in
