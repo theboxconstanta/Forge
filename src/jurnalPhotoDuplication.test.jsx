@@ -153,6 +153,81 @@ describe('Journal - one log with a photo shows the photo card WITHOUT the redund
   })
 })
 
+// SECOND-PASS FINDING (owner live report - duplication STILL visible after
+// 261666f): confirmed via a real-browser render of the EXACT live
+// production row (Strength Sets, Snatch, 5-5-4-4-4-3-3, real
+// prescription_snapshot/sets/notes) that 261666f's own fix (movement-
+// bullet + REZULTAT block suppression) works correctly and completely for
+// what it targeted - a fresh reproduction showed rezultatBlockCount=0,
+// bulletMovementBlockCount=0, exactly one photo card. What remained: the
+// per-set breakdown's OWN movement-name header ("Snatch", small gray
+// label directly above the set-by-set detail) restates a name ALREADY
+// shown twice inside the untouched, approved PhotoResultCard (its
+// auto-composed headline "STRENGTH SETS: SNATCH" and its own movements
+// list "SNATCH") - a third, avoidable repetition of the same movement
+// name on one card, exactly matching the owner's "still looks duplicated"
+// impression even though it is not literally the same two full blocks
+// stacked as before. Fix: suppress that specific header ONLY when the
+// photo is actually rendering AND there is exactly one movement in the
+// breakdown (fully redundant in that case) - kept whenever it disambiguates
+// multiple movements sharing the block (e.g. Superset), or there is no
+// photo at all (unchanged, pre-existing no-photo behavior).
+describe('Journal - second-pass fix: per-set breakdown movement-name header no longer triples the movement name', () => {
+  it('single movement + photo renders -> the breakdown shows set detail WITHOUT its own redundant movement-name header', async () => {
+    createSignedUrlMock.mockResolvedValue({ data: { signedUrl: 'https://signed.example/photo.jpg' }, error: null })
+    const log = makeWodLog({
+      id: 'wlog-photo-single-movement',
+      sets: { Snatch: [{ completed: true, distance: '', reps: '5', targetReps: 5, weight: '65' }] },
+    })
+    render(<JurnalList entries={entriesFor([log])} validRecentPrEvents={[]} gender="male" weightUnit="kg" t={t} lang="en" />)
+    await waitFor(() => expect(renderPhotoOk()).toBeInTheDocument())
+    // The set-by-set detail line is still there, unique content.
+    expect(screen.getByText(/5 reps/)).toBeInTheDocument()
+    // "Snatch" now appears only from the photo card's own approved
+    // headline + movements list (2), never a 3rd time as a breakdown
+    // sub-header.
+    expect(screen.getAllByText(/Snatch/).length).toBe(2)
+  })
+
+  it('single movement + NO photo -> the breakdown header is kept (unchanged, pre-existing no-photo behavior)', () => {
+    const log = makeWodLog({
+      id: 'wlog-nophoto-single-movement',
+      wod_log_media: null,
+      sets: { Snatch: [{ completed: true, distance: '', reps: '5', targetReps: 5, weight: '65' }] },
+    })
+    render(<JurnalList entries={entriesFor([log])} validRecentPrEvents={[]} gender="male" weightUnit="kg" t={t} lang="en" />)
+    // Movement bullet (1) + breakdown header (1) - both legitimate without a photo.
+    expect(screen.getAllByText(/^Snatch$/).length + screen.getAllByText((_, el) => el?.textContent === '• Snatch').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/5 reps/)).toBeInTheDocument()
+  })
+
+  it('MULTIPLE movements + photo renders -> each breakdown header is KEPT (still needed to disambiguate which sets belong to which movement)', async () => {
+    createSignedUrlMock.mockResolvedValue({ data: { signedUrl: 'https://signed.example/photo.jpg' }, error: null })
+    const log = makeWodLog({
+      id: 'wlog-photo-multi-movement',
+      format_snapshot: 'Superset',
+      format_config_snapshot: { targetSets: 3 },
+      movements_snapshot: ['Snatch', 'Back Squat'],
+      sets: {
+        Snatch: [{ completed: true, distance: '', reps: '5', targetReps: null, weight: '40' }],
+        'Back Squat': [{ completed: true, distance: '', reps: '5', targetReps: null, weight: '80' }],
+      },
+    })
+    render(<JurnalList entries={entriesFor([log])} validRecentPrEvents={[]} gender="male" weightUnit="kg" t={t} lang="en" />)
+    await waitFor(() => expect(renderPhotoOk()).toBeInTheDocument())
+    // Both breakdown sub-headers are present - removing them would make it
+    // impossible to tell which set-line belongs to which movement.
+    expect(screen.getByText(/5 reps.*40/)).toBeInTheDocument()
+    expect(screen.getByText(/5 reps.*80/)).toBeInTheDocument()
+    // Snatch/Back Squat breakdown headers exist as their own dedicated
+    // elements (distinct from the photo card's own movements list entries).
+    const snatchHeaders = screen.getAllByText('Snatch')
+    const squatHeaders = screen.getAllByText('Back Squat')
+    expect(snatchHeaders.length).toBeGreaterThanOrEqual(2) // photo movements-list entry + breakdown header
+    expect(squatHeaders.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
 describe('Journal - two distinct logs (one with photo, one without) both render, no cross-log duplication', () => {
   it('two logs -> two entries, each rendering independently and correctly', async () => {
     createSignedUrlMock.mockResolvedValue({ data: { signedUrl: 'https://signed.example/photo.jpg' }, error: null })

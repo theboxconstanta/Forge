@@ -6888,7 +6888,24 @@ export function JurnalList({ entries, onEditWod, onDeleteWod, onEditSkill, onDel
                             <IntervalResultRounds intervalResult={intervalResult} t={t} />
                           ) : wSetsParti.map((p, j) => (
                             <div key={j} style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
+                              {/* JOURNAL PHOTO RESULT DUPLICATION FIX (2nd
+                                  pass) - the per-set breakdown's own
+                                  movement-name header restates a name
+                                  already shown in the photo card's headline
+                                  AND movements list (both untouched,
+                                  approved PhotoResultCard content) - when
+                                  there is only ONE movement AND the photo is
+                                  actually rendering, that header is fully
+                                  redundant (the set-by-set detail below it
+                                  already reads unambiguously on its own).
+                                  Kept whenever it's actually needed to
+                                  disambiguate (2+ movements sharing this
+                                  block, e.g. Superset) or there's no photo -
+                                  never removed where it carries real
+                                  information. */}
+                              {(!photoRenderable || wSetsParti.length > 1) && (
+                                <div style={{ fontSize: '13px', color: '#0E0E0E', fontWeight: '600', lineHeight: 1.4 }}>{p.cheie}</div>
+                              )}
                               <div style={{ fontSize: '12px', fontWeight: '500', lineHeight: 1.4, color: '#888' }}>{p.seturiTxt}</div>
                             </div>
                           ))}
