@@ -1140,6 +1140,7 @@ export const TRANSLATIONS = {
     wodSectionMakePrimary: 'Marchează ca sectiunea principală',
     wodSectionRemove: 'Șterge',
     wodSectionAddButton: '+ Adaugă sectiune',
+    wodSectionBackToStructure: 'Înapoi la structură',
     wodSectionsErrorPrimaryCount: (n) => n === 0
       ? 'Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - niciuna nu e marcată acum.'
       : `Exact o sectiune trebuie marcată ca sectiunea principală (antrenamentul scorat) - ${n} sunt marcate acum.`,
@@ -2360,6 +2361,7 @@ export const TRANSLATIONS = {
     wodSectionMakePrimary: 'Mark as the primary section',
     wodSectionRemove: 'Remove',
     wodSectionAddButton: '+ Add section',
+    wodSectionBackToStructure: 'Back to structure',
     wodSectionsErrorPrimaryCount: (n) => n === 0
       ? 'Exactly one section must be marked as the primary (scored) workout - none is marked right now.'
       : `Exactly one section must be marked as the primary (scored) workout - ${n} are marked right now.`,

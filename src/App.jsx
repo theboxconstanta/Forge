@@ -1373,7 +1373,7 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
           <input value={instance.name} placeholder="Movement" aria-label="Movement name"
             onFocus={() => { setNameFocused(true); setJustPicked(false) }} onBlur={() => setTimeout(() => setNameFocused(false), 120)}
             onChange={e => changeName(e.target.value)}
-            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+            style={{ width: '100%', padding: '8px 10px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', fontWeight: '600', color: '#0E0E0E', background: '#fafafa', boxSizing: 'border-box' }} />
           {nameSug.length > 0 && <MovementSuggestions suggestions={nameSug} onSelect={(s) => { setJustPicked(true); changeName(s) }} />}
         </div>
         <button style={pmpeIconBtn} onClick={onDuplicate} aria-label="Duplicate movement">⧉</button>
@@ -1383,7 +1383,7 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
         {quantityChoices.length > 1 && (
           <span style={{ display: 'inline-flex', border: '1px solid #e0e0e0', borderRadius: '7px', overflow: 'hidden' }}>
             {quantityChoices.map(m => (
-              <button key={m} onClick={() => setQuantity(m)} style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer', background: quantityMetric === m ? '#0E0E0E' : '#fff', color: quantityMetric === m ? '#fff' : '#666' }}>
+              <button key={m} onClick={() => setQuantity(m)} style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer', background: quantityMetric === m ? '#ABE73C' : '#fff', color: quantityMetric === m ? '#0E0E0E' : '#666' }}>
                 {m === 'distance' ? 'Distance' : m === 'calories' ? 'Calories' : 'Reps'}
               </button>
             ))}
@@ -1733,18 +1733,23 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
       <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
 
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #e0e0e0', marginBottom: '10px' }}>
-        {orderedLevels.map(v => (
-          <button key={v.key} onClick={() => setActiveTab(v.key)}
-            style={{
-              padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '600',
-              color: activeTab === v.key ? '#0E0E0E' : '#999',
-              borderBottom: activeTab === v.key ? '2px solid #0E0E0E' : '2px solid transparent',
-              marginBottom: '-1px',
-            }}>
-            {v.label}
-          </button>
-        ))}
+        {orderedLevels.map(v => {
+          const hasContent = (section.variants[v.key]?.instances || []).length > 0
+          return (
+            <button key={v.key} onClick={() => setActiveTab(v.key)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '12px', fontWeight: '600',
+                color: activeTab === v.key ? '#0E0E0E' : '#999',
+                borderBottom: activeTab === v.key ? '2px solid #ABE73C' : '2px solid transparent',
+                marginBottom: '-1px',
+              }}>
+              {v.label}
+              <span aria-hidden title={hasContent ? 'Programmed' : 'Empty'} style={{ width: '6px', height: '6px', borderRadius: '50%', background: hasContent ? '#ABE73C' : 'transparent', border: hasContent ? 'none' : '1px solid #ccc' }} />
+            </button>
+          )
+        })}
       </div>
 
       {activeTab === 'rx' && (
@@ -1822,7 +1827,7 @@ function ReviewFlagsList({ flags, t }) {
   )
 }
 
-function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, onMove, onMakePrimary, onSave, savingWod, movementCatalog, t }) {
+export function SectionCard({ section, index, total, sectionTypes, onChange, onToggleOpen, onRemove, onMove, onMakePrimary, onSave, savingWod, movementCatalog, t }) {
   // `patch` poate fi un obiect simplu SAU o functie `(variantaCurenta) =>
   // patch` - vezi comentariul din updateSection (App()) pentru motiv (doi
   // handlere onChange declansati sincron, al doilea trebuie sa vada
@@ -1835,23 +1840,36 @@ function SectionCard({ section, index, total, sectionTypes, onChange, onRemove, 
   const typeLabel = sectionTypes.find(st => st.key === section.typeKey)?.label || section.typeKey
   const isPlainText = section.typeKey === 'warmup' && !section.isPrimary && section.format == null
   const reorderBtn = { padding: '4px 7px', borderRadius: '6px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', cursor: 'pointer', color: '#555' }
+  // Phase 3 (B3) - a one-line summary visible even while collapsed, so a
+  // coach can see what's already programmed without opening every card
+  // (the gap startEditWod's own "open everything" default used to paper
+  // over - see that call site). Only the fields the domain actually gives
+  // this section: the primary's workout name, a non-primary's movement
+  // name - never invented.
+  const detailText = (section.isPrimary ? section.name : section.movementName || '').trim()
+  const toggleOpen = onToggleOpen || (() => onChange({ open: !section.open }))
 
   return (
     <div style={{ background: '#f0f0f0', borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <div onClick={() => onChange({ open: !section.open })} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
-            {section.title.trim() || typeLabel}
-            {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '600' }}>★ {t.wodSectionPrimaryBadge}</span>}
-            {!section.isPrimary && section.scored && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1F6B79', fontWeight: '600' }}>◆ {t.wodSectionScoredBadge}</span>}
-            {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '600' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
+        <div onClick={toggleOpen} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#0E0E0E' }}>
+              {section.title.trim() || typeLabel}
+              {section.isPrimary && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#B86E00', fontWeight: '600' }}>★ {t.wodSectionPrimaryBadge}</span>}
+              {!section.isPrimary && section.scored && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1F6B79', fontWeight: '600' }}>◆ {t.wodSectionScoredBadge}</span>}
+              {section.reviewFlags?.length > 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#8A6116', fontWeight: '600' }}>{t.wiReviewBadge(section.reviewFlags.length)}</span>}
+            </span>
+            {detailText && !section.open && (
+              <span style={{ display: 'block', fontSize: '11px', color: '#888', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detailText}</span>
+            )}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <button onClick={() => onMove(-1)} disabled={index === 0} style={{ ...reorderBtn, opacity: index === 0 ? 0.4 : 1 }}>↑</button>
           <button onClick={() => onMove(1)} disabled={index === total - 1} style={{ ...reorderBtn, opacity: index === total - 1 ? 0.4 : 1 }}>↓</button>
           {!section.isPrimary && <MiniSwitch checked={section.visible} onChange={(v) => onChange({ visible: v })} />}
-          <span onClick={() => onChange({ open: !section.open })} style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>{section.open ? '▲' : '▼'}</span>
+          <span onClick={toggleOpen} style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>{section.open ? '▲' : '▼'}</span>
         </div>
       </div>
       {section.open && (
@@ -4230,6 +4248,18 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const resolved = typeof patch === 'function' ? patch(s) : patch
     return { ...s, ...resolved }
   }))
+  // FORGE VISUAL SYSTEM V2 (Phase 3, B3) - "avoid showing every section
+  // expanded simultaneously". Exclusive by construction: setting one
+  // section's `open` to true always closes every other one in the same
+  // update, so at most one card can ever be open from a manual toggle -
+  // there is no separate "close the others" step to forget. Passing
+  // `nextOpen: false` for the currently-open section (re-clicking its own
+  // header, or the "Back to structure" link) collapses everything, back to
+  // the plain list. Deliberately NOT applied to the two seeded "open every
+  // section" moments below (AI Analyze's freshly-generated draft, and
+  // startEditWod's now-primary-only default) - see each call site's own
+  // comment for why.
+  const setSectionOpen = (id, nextOpen) => setWodSections(prev => prev.map(s => ({ ...s, open: s.id === id ? nextOpen : false })))
   const removeSection = (id) => setWodSections(prev => prev.filter(s => s.id !== id))
   const moveSection = (id, dir) => setWodSections(prev => {
     const i = prev.findIndex(s => s.id === id)
@@ -4240,7 +4270,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     return next
   })
   const makePrimarySection = (id) => setWodSections(prev => prev.map(s => ({ ...s, isPrimary: s.id === id })))
-  const addSection = (typeKey) => setWodSections(prev => [...prev, { ...createSection(typeKey, false), open: true }])
+  const addSection = (typeKey) => setWodSections(prev => [...prev.map(s => ({ ...s, open: false })), { ...createSection(typeKey, false), open: true }])
 
   // Text ramas in caseta "Paste rapid" (sectiunea primara) fara sa se fi
   // apasat explicit "Adauga din text" era pierdut silentios la Salvare - un
@@ -4423,7 +4453,16 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // silentioasa de mai jos (cand data aleasa coincide cu un WOD deja
   // existent, fara sa fi apasat explicit "editeaza").
   const syncWodFormFromRow = (w, opts) => {
-    const sections = sectionsFromLegacyWod(w, { ...opts, movementIndex: movementCatalog.index })
+    const raw = sectionsFromLegacyWod(w, { ...opts, movementIndex: movementCatalog.index })
+    // Phase 3 (B3) - sectionsFromLegacyWod still opens every section when
+    // asked to (opts.open), matching its own long-standing contract exactly
+    // (untouched, still used as-is by other callers/tests) - narrowed to
+    // "only the primary section" here, at the one call site (startEditWod)
+    // that used to mean "open everything". Safe now that SectionCard's own
+    // collapsed row shows enough (title/movement/format) for a coach to see
+    // what's already filled in without expanding each card - the exact gap
+    // that comment originally opened everything to work around.
+    const sections = opts?.open ? raw.map(s => ({ ...s, open: s.isPrimary })) : raw
     setEditWodId(w.id)
     setDataWod(w.date)
     setWodSections(sections)
@@ -4431,8 +4470,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const startEditWod = (w) => {
-    // La editare deschidem toate cardurile automat (altfel adminul nu vede ce
-    // e completat deja fara sa dea click pe fiecare titlu pe rand).
+    // Phase 3 (B3) - used to open every card automatically here (so the
+    // coach could see what's already filled in without clicking each title
+    // one by one). syncWodFormFromRow now narrows that to just the primary
+    // section - SectionCard's own collapsed-row summary (title/movement/
+    // format) covers the original visibility concern, and a coach editing
+    // an existing WOD lands on one focused card instead of every section
+    // expanded at once.
     syncWodFormFromRow(w, { open: true })
     setCreatingNewWod(false)
     setAdminTab('wod')
@@ -5583,10 +5627,21 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 Workout Sections, in loc de cele 4 carduri fixe WARM-UP/SKILL/
                 SKILL 2/Workout of the Day de dinainte - vezi SectionCard mai
                 sus, definit la scope de modul. */}
+            {/* Phase 3 (B3) - "Back to structure": collapses whichever
+                section is open, back to the plain list. Only shown once
+                something is actually open, and lives once above the list
+                (not per-card) since at most one card can ever be open. */}
+            {wodSections.some(s => s.open) && (
+              <button onClick={() => setWodSections(prev => prev.map(s => ({ ...s, open: false })))}
+                style={{ display: 'block', marginBottom: '8px', padding: 0, background: 'none', border: 'none', fontSize: '11px', fontWeight: '600', color: '#555', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
+                ← {t.wodSectionBackToStructure}
+              </button>
+            )}
             {wodSections.map((s, i) => (
               <SectionCard key={s.id} section={s} index={i} total={wodSections.length}
                 sectionTypes={sectionTypes}
                 onChange={(patch) => updateSection(s.id, patch)}
+                onToggleOpen={() => setSectionOpen(s.id, !s.open)}
                 onRemove={() => removeSection(s.id)}
                 onMove={(dir) => moveSection(s.id, dir)}
                 onMakePrimary={() => makePrimarySection(s.id)}
