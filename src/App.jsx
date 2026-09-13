@@ -3252,6 +3252,49 @@ async function checkInBooking(bookingId, checkedIn) {
 // of matching on the exception's own message text.
 const MEMBERSHIP_COVERAGE_ERROR_CODE = 'FRG01'
 
+// Builder Entry UX (narrow pass) - Start Empty is the primary authoring
+// action; Analyze with AI / Use Template are secondary accelerators below it
+// (owner decision - FORGE is primarily a workout-building tool, AI/Template
+// are accelerators, not the main path). Exported (mirrors SectionCard's own
+// precedent from Phase 3) purely so the action hierarchy is testable without
+// mounting the full Admin component (auth/data fetching). Pure presentation
+// + prop-forwarded handlers - owns no state, no domain logic; Admin still
+// owns aiParseText/aiAnalyzing and every handler (startEmptyWod/
+// analyzeWorkout/useTemplateWod) exactly as before, unchanged.
+export function BuilderEntryActions({ aiParseText, onAiParseTextChange, aiAnalyzing, onStartEmpty, onAnalyze, onUseTemplate, t }) {
+  return (
+    <>
+      <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', margin: '16px 0 4px' }}>{t.adminWodQuickCreateTitle}</div>
+      <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>{t.adminWodQuickCreateSubtitle}</div>
+      {/* PRIMARY CTA - canonical FORGE V2 lime action treatment (same
+          background/color/radius as the Builder's own Save button below),
+          first and full width, so "Start Empty" reads as the primary way to
+          create a workout in under a second. */}
+      <button onClick={onStartEmpty} disabled={aiAnalyzing}
+        style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: aiAnalyzing ? 'not-allowed' : 'pointer', opacity: aiAnalyzing ? 0.5 : 1 }}>
+        {t.adminWodQuickCreateEmptyButton}
+      </button>
+      <textarea value={aiParseText} onChange={e => onAiParseTextChange(e.target.value)}
+        placeholder={t.adminWodQuickCreatePlaceholder} rows={8}
+        style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none', lineHeight: '1.5', marginTop: '14px' }} />
+      {/* Secondary accelerators - equal visual weight, quieter than Start
+          Empty above (unchanged treatment from the pre-existing
+          Template/Empty row this replaces). */}
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button onClick={onAnalyze} disabled={aiAnalyzing || !aiParseText.trim()}
+          style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: (aiAnalyzing || !aiParseText.trim()) ? 'not-allowed' : 'pointer' }}>
+          {aiAnalyzing ? t.adminWodQuickCreateGenerateButtonLoading : t.adminWodQuickCreateGenerateButton}
+        </button>
+        <button onClick={onUseTemplate} disabled={aiAnalyzing}
+          style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: aiAnalyzing ? 'not-allowed' : 'pointer' }}>
+          {t.adminWodQuickCreateTemplateButton}
+        </button>
+      </div>
+      <div style={{ fontSize: '11px', color: '#aaa', marginTop: '12px', textAlign: 'center' }}>{t.adminWodQuickCreateFooter}</div>
+    </>
+  )
+}
+
 function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAdmin, onWodChanged, onWodDirtyChange, mainScrollRef, t, lang, clientsReloadToken, adminSubsReloadToken }) {
   const [adminTab, setAdminTab] = useState(isAdmin ? 'clienti' : 'wod')
   const [allGymsPlatform, setAllGymsPlatform] = useState([])
@@ -5556,12 +5599,14 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </button>
           {showQuickCreate ? (
             // Quick Create (30-Second Rule) - primul ecran vazut la crearea
-            // unui WOD nou: paste/type + Generate/Use Template/Start Empty.
-            // "Generate Workout" refoloseste analyzeWorkout() (acelasi AI
-            // Workout Parser ca inainte, doar mutat aici ca prim pas, nu ca
-            // optiune inline langa builder-ul mereu vizibil) - AI-ul nu e o
-            // feature separata, e doar calea cea mai rapida catre acelasi
-            // DraftWorkout (wodSections) pe care il produce si editarea manuala.
+            // unui WOD nou. Builder Entry UX pass (narrow) - Start Empty e
+            // acum actiunea primara (butonul lime, latime completa, primul),
+            // Analyze with AI / Use Template raman accelerator secundari sub
+            // el (owner decision - vezi BuilderEntryActions mai sus). "Analyze
+            // with AI" refoloseste analyzeWorkout() neschimbat (acelasi AI
+            // Workout Parser ca inainte) - AI-ul nu e o feature separata, e
+            // doar calea cea mai rapida catre acelasi DraftWorkout
+            // (wodSections) pe care il produce si editarea manuala.
             <div style={{ background: '#fff', borderRadius: '14px', padding: '20px 16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               {/* Quick Create Date-First Flow - data apare INAINTE de
                   continutul antrenamentului, ca antrenorul sa stie pt ce zi
@@ -5581,26 +5626,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   </button>
                 </div>
               )}
-              <div style={{ fontSize: '17px', fontWeight: '600', color: '#0E0E0E', margin: '16px 0 4px' }}>{t.adminWodQuickCreateTitle}</div>
-              <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>{t.adminWodQuickCreateSubtitle}</div>
-              <textarea value={aiParseText} onChange={e => setAiParseText(e.target.value)}
-                placeholder={t.adminWodQuickCreatePlaceholder} rows={8}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none', lineHeight: '1.5' }} />
-              <button onClick={analyzeWorkout} disabled={aiAnalyzing || !aiParseText.trim()}
-                style={{ marginTop: '10px', width: '100%', padding: '13px', background: '#0E0E0E', color: '#ABE73C', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: (aiAnalyzing || !aiParseText.trim()) ? 'not-allowed' : 'pointer', opacity: (aiAnalyzing || !aiParseText.trim()) ? 0.5 : 1 }}>
-                {aiAnalyzing ? t.adminWodQuickCreateGenerateButtonLoading : t.adminWodQuickCreateGenerateButton}
-              </button>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                <button onClick={useTemplateWod} disabled={aiAnalyzing}
-                  style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: aiAnalyzing ? 'not-allowed' : 'pointer' }}>
-                  {t.adminWodQuickCreateTemplateButton}
-                </button>
-                <button onClick={startEmptyWod} disabled={aiAnalyzing}
-                  style={{ flex: 1, padding: '12px', background: '#f0f0f0', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: aiAnalyzing ? 'not-allowed' : 'pointer' }}>
-                  {t.adminWodQuickCreateEmptyButton}
-                </button>
-              </div>
-              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '12px', textAlign: 'center' }}>{t.adminWodQuickCreateFooter}</div>
+              <BuilderEntryActions aiParseText={aiParseText} onAiParseTextChange={setAiParseText} aiAnalyzing={aiAnalyzing}
+                onStartEmpty={startEmptyWod} onAnalyze={analyzeWorkout} onUseTemplate={useTemplateWod} t={t} />
             </div>
           ) : (
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
