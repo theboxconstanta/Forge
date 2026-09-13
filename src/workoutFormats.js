@@ -326,6 +326,35 @@ export const WORKOUT_FORMATS = {
     family: 'scored', scoreMode: 'single_value',
     config: { movement: { type: 'movementText', required: false, labelKey: 'fmtMovementTest' } },
   },
+  // Workout Composer (Phase 1, docs/design-audit-v2/WORKOUT-COMPOSER-*.md) - the
+  // two minimal new formats a canonical Composer `component` can carry. Neither
+  // is a new scoring engine: 'Once' is structurally identical to 'Chipper'/
+  // 'For Time' (Sequence) - a one-pass, non-repeating movement list - reusing
+  // the exact same sequentialPartial engine (repsEfectiveSecvential/
+  // composePartialText) unchanged, which is exactly what a Buy-In/Cash-Out-style
+  // bookend already needs (Phase 0.3 forensic proof: today's family:'mixed'
+  // SimpleRepsRow aggregate loses per-movement position for a multi-movement
+  // bookend - 'Once' fixes that by using the correct existing tool instead of
+  // inventing a new one). 'Rest' is a genuinely new concept (no existing
+  // structural, non-movement, unscored top-level primitive existed before) -
+  // modeled on 'Not For Time''s minimal family + the existing restSec duration
+  // field already used by Tabata/Intervals, promoted to component-level.
+  // Neither format is ever a standalone top-level SECTION format in the
+  // Builder - they only ever appear as `component.format` inside a Metcon
+  // section's `components[]` (see componentContract.js). `producesScore`
+  // (component-level, not a format-level concept) defaults to false for both
+  // and is never coach-overridable for 'Rest' - see
+  // componentContract.js:defaultProducesScoreForFormat.
+  'Once': {
+    family: 'scored', scoreMode: 'fortime_or_amrap', sequentialPartial: true,
+    config: {},
+  },
+  'Rest': {
+    family: 'nft',
+    config: {
+      durationSec: { type: 'duration', required: true, labelKey: 'fmtDuration' },
+    },
+  },
 }
 
 export const FORMAT_IDS = Object.keys(WORKOUT_FORMATS)
