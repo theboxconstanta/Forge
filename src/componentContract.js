@@ -19,7 +19,7 @@
 // out of Phase 1 scope (WORKOUT-COMPOSER-COMPOSITE-SCORING.md), a later
 // phase's concern once real Composer-authored data exists.
 
-import { getFormat, repsEfectiveSecvential, composePartialText, WORKOUT_FORMATS } from './workoutFormats'
+import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, deriveDurationCompletionState, WORKOUT_FORMATS } from './workoutFormats'
 import { hydrateInstancesFromLegacy } from './wodSections'
 
 // ============================================================================
@@ -334,6 +334,74 @@ export function composeEnvelopeResult({ envelope, finishedValue, resultByCompone
     .join(', ')
 
   return { isComplete: false, finishedValue: null, cappedText, furthestComponentId }
+}
+
+// ============================================================================
+// Live save-path wiring for family:'mixed' (Workout Composer Phase 2, §23)
+// ============================================================================
+//
+// Wires composeEnvelopeResult into the REAL composeWodLogFieldsInner
+// (App.jsx) save path for today's ONE existing runtime envelope shape -
+// family:'mixed' (legacy 'Buy-In/Cash-Out'/'AMRAP with Buy-In', and any
+// future canonical 'Once'-bookend-owned scorer that reaches this same save
+// branch). Reuses composeAmrapResult/repsEfectiveSecvential/
+// composePartialText/deriveDurationCompletionState (workoutFormats.js)
+// UNCHANGED for the main component's own native value - this function only
+// composes what ALREADY exists into one envelope-correct result, exactly per
+// WORKOUT-COMPOSER-ARCHITECTURE.md §18.1's rule (finishedValue present ->
+// done outright, ignore partials; absent -> walk buyIn -> main -> cashOut to
+// the furthest with progress).
+
+/** `mainFormat`: 'AMRAP' | 'For Time' (already-resolved, same rule as
+ * componentsFromSection's own `mainIsAmrap` check). `finishedValue`: the
+ * one envelope-level time the athlete entered (`wodTime`) - present means
+ * "done", exactly mirroring composeFortimeOrAmrapFields's own
+ * shouldLogRoundsInsteadOfTime rule, now scoped to the whole envelope.
+ * `mainRoundsCompleted`/`mainPartialReps`/`mainMovements`: the main
+ * component's own existing fields, UNTOUCHED. `buyInMovements`/
+ * `buyInPartialReps`, `cashOutMovements`/`cashOutPartialReps`: the bookends'
+ * own movements (text lines) and raw partial-reps arrays (one entry per
+ * movement - see MultiMovementPartialRows, FormatLogger.jsx). Returns the
+ * exact `{result, time_result, completion_state}` shape
+ * composeWodLogFieldsInner already produces for every other scored format,
+ * plus `buyInText`/`cashOutText` for optional Journal/log_meta display. */
+export function composeMixedLogFields({
+  mainFormat, finishedValue,
+  mainRoundsCompleted, mainPartialReps, mainMovements,
+  buyInMovements, buyInPartialReps,
+  cashOutMovements, cashOutPartialReps,
+}) {
+  const buyInResult = (buyInMovements && buyInMovements.length > 0)
+    ? resolveOnceComponentResult(buyInMovements, buyInPartialReps) : null
+  const cashOutResult = (cashOutMovements && cashOutMovements.length > 0)
+    ? resolveOnceComponentResult(cashOutMovements, cashOutPartialReps) : null
+
+  let mainText
+  let mainHasProgress
+  if (mainFormat === 'AMRAP') {
+    mainText = composeAmrapResult(mainRoundsCompleted, mainPartialReps, mainMovements || []) || ''
+    mainHasProgress = !!(mainRoundsCompleted || '').toString().trim() || (mainPartialReps || []).some(v => (v || '').toString().trim() !== '')
+  } else {
+    const effective = repsEfectiveSecvential(mainPartialReps || [], mainMovements || [])
+    mainText = composePartialText(effective, mainMovements || [])
+    mainHasProgress = effective.some(v => (v || '').toString().trim() !== '')
+  }
+
+  const envelope = []
+  const resultByComponentId = {}
+  if (buyInResult) { envelope.push({ id: 'buyIn' }); resultByComponentId.buyIn = buyInResult }
+  envelope.push({ id: 'main' })
+  resultByComponentId.main = { hasProgress: mainHasProgress, text: mainText }
+  if (cashOutResult) { envelope.push({ id: 'cashOut' }); resultByComponentId.cashOut = cashOutResult }
+
+  const composed = composeEnvelopeResult({ envelope, finishedValue, resultByComponentId })
+  return {
+    time_result: composed.isComplete ? composed.finishedValue : null,
+    result: composed.isComplete ? null : (composed.cappedText || null),
+    completion_state: deriveDurationCompletionState(!composed.isComplete),
+    buyInText: buyInResult?.text || null,
+    cashOutText: cashOutResult?.text || null,
+  }
 }
 
 // ============================================================================

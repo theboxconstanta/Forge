@@ -10,7 +10,7 @@ import {
   newComponentId, createComponent, normalizeComponentOrder, validateComponents,
   getScoreEnvelope, getAllScoreEnvelopes, resolveOnceComponentResult,
   composeEnvelopeResult, componentsFromSection, defaultProducesScoreForFormat,
-  canJoinScoreEnvelope,
+  canJoinScoreEnvelope, composeMixedLogFields,
 } from './componentContract'
 import { fixtureA_simpleAmrap, fixtureB_oneEnvelope, fixtureC_multiScore, fixtureD_complexComposer } from './composerFixtures'
 import { createSection } from './wodSections'
@@ -322,6 +322,128 @@ describe('composeEnvelopeResult', () => {
     expect(amrapOut.furthestComponentId).toBe('fixD-amrap')
     // proves independence: the AMRAP's own capped text never mentions the RFT envelope's members
     expect(amrapOut.cappedText).not.toMatch(/Row|Toes-to-Bar|Run/)
+  })
+})
+
+// ============================================================================
+// composeMixedLogFields - live save-path wiring (Phase 2, ticket §9/§23)
+// ============================================================================
+
+describe('composeMixedLogFields - envelope-aware save composition', () => {
+  it('finished envelope: one entered time wins outright, completion_state completed', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '12:42',
+      mainRoundsCompleted: '', mainPartialReps: [], mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: ['800'],
+    })
+    expect(out.time_result).toBe('12:42')
+    expect(out.result).toBeNull()
+    expect(out.completion_state).toBe('completed')
+  })
+
+  it('Case A (ticket §14/PARTIAL_CASHOUT): main fully done, capped in Cash-Out -> preserved exactly', () => {
+    // Main movements marked done via repsEfectiveSecvential's own "reached
+    // the end" rule, fed the prescribed-target values (10/15) - this is how
+    // "finished the main work" is expressed with the existing sequential
+    // engine, unmodified.
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: ['10', '15'],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: ['463'],
+    })
+    expect(out.time_result).toBeNull()
+    expect(out.completion_state).toBe('capped')
+    expect(out.result).toBe('1000/1000 m Row, 10/10 Toes-to-Bar, 15/15 Wall Balls, 463/800 m Run')
+    expect(out.cashOutText).toBe('463/800 m Run')
+  })
+
+  it('cannot skip ahead: progress recorded only in a LATER envelope member than an untouched earlier one still walks to the latest one with progress (pure function does not itself enforce real-world sequencing - the Builder/logger UI is what prevents this input from arising)', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: [],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: ['463'],
+    })
+    // main has no progress, but cash-out does - furthest is cash-out, and
+    // the composed text correctly includes only the members with progress.
+    expect(out.result).toBe('1000/1000 m Row, 463/800 m Run')
+  })
+
+  it('Case B (PARTIAL_BUYIN): capped during Buy-In, main/Cash-Out never started', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: [],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: ['730'],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: [],
+    })
+    expect(out.time_result).toBeNull()
+    expect(out.completion_state).toBe('capped')
+    expect(out.result).toBe('730/1000 m Row')
+    expect(out.cashOutText).toBeNull()
+  })
+
+  it('Case C (PARTIAL_MAIN): Buy-In complete, main partial, Cash-Out not started', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: ['10', '7'],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: [],
+    })
+    expect(out.result).toBe('1000/1000 m Row, 10/10 Toes-to-Bar, 7/15 Wall Balls')
+    expect(out.completion_state).toBe('capped')
+  })
+
+  it('MULTI_MOVEMENT_BOOKENDS (Case D/E): exact position preserved on both bookends, never aggregated', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: ['10', '15'],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: ['500 m Row', '30 Burpees', '20 DB Snatches'], buyInPartialReps: ['500', '30', '11'],
+      cashOutMovements: ['400 m Run', '20 Pull-Ups'], cashOutPartialReps: [],
+    })
+    expect(out.result).toBe('500/500 m Row, 30/30 Burpees, 11/20 DB Snatches, 10/10 Toes-to-Bar, 15/15 Wall Balls')
+    expect(out.result).not.toMatch(/^\d+ reps$/) // never a lossy aggregate like "41 reps"
+    expect(out.result).toContain('11/20 DB Snatches') // exact position preserved, not "41 reps" or similar
+  })
+
+  it('OWNED_FOR_TIME with no bookends behaves exactly like a plain sequential For Time (legacy single-score equivalence)', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: ['10', '7'],
+      mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
+      buyInMovements: [], buyInPartialReps: [],
+      cashOutMovements: [], cashOutPartialReps: [],
+    })
+    expect(out.result).toBe('10/10 Toes-to-Bar, 7/15 Wall Balls')
+    expect(out.buyInText).toBeNull()
+    expect(out.cashOutText).toBeNull()
+  })
+
+  it('AMRAP-mode main (mainFormat AMRAP) reuses composeAmrapResult unchanged', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'AMRAP', finishedValue: '',
+      mainRoundsCompleted: '6', mainPartialReps: ['5'], mainMovements: ['10 Pull-Ups'],
+      buyInMovements: ['500 m Row'], buyInPartialReps: ['500'],
+      cashOutMovements: [], cashOutPartialReps: [],
+    })
+    expect(out.result).toBe('500/500 m Row, 6 runde + 5/10 Pull-Ups')
+  })
+
+  it('no progress anywhere and not finished: neutral capped result, never throws', () => {
+    const out = composeMixedLogFields({
+      mainFormat: 'For Time', finishedValue: '',
+      mainRoundsCompleted: '', mainPartialReps: [], mainMovements: ['10 Toes-to-Bar'],
+      buyInMovements: ['1000 m Row'], buyInPartialReps: [],
+      cashOutMovements: ['800 m Run'], cashOutPartialReps: [],
+    })
+    expect(out.result).toBeNull()
+    expect(out.completion_state).toBe('capped')
   })
 })
 

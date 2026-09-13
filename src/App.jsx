@@ -89,6 +89,7 @@ import { COLORS } from './theme'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
+import { composeMixedLogFields } from './componentContract'
 import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult, hasSequentialAmrapInput } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
 import { validatePhotoFile, attachWodLogPhoto } from './photoProcessing'
@@ -9909,6 +9910,44 @@ function App() {
         result: null, time_result: null, sets: null,
         log_meta: { stages: stageLogMeta, totalReps: totalRepsChained(stages, wodChainedStages) },
         completion_state: null,
+      }
+    }
+    // Workout Composer Phase 2 (docs/design-audit-v2/WORKOUT-COMPOSER-*.md,
+    // Phase 0.2/0.3 forensic findings) - family:'mixed' ('Buy-In/Cash-Out',
+    // 'AMRAP with Buy-In') gets its OWN dedicated envelope-aware branch
+    // instead of falling through to the generic isSequential/useReps chain
+    // below using ONLY the main work's own movements. That fallthrough was
+    // the confirmed gap: wodSets.__buyIn/__cashOut (now real per-movement
+    // partial rows - see MultiMovementPartialRows, FormatLogger.jsx) were
+    // never read for scoring at all, so a capped log lost all evidence of
+    // Buy-In/Cash-Out progress. composeMixedLogFields (componentContract.js)
+    // reuses composeAmrapResult/repsEfectiveSecvential/composePartialText
+    // UNCHANGED for the main work's own native value - it only decides,
+    // walking Buy-In -> Main -> Cash-Out in order, how far the athlete's
+    // OWN recorded progress reaches (WORKOUT-COMPOSER-ARCHITECTURE.md
+    // §18.1). wodTime present -> exactly today's "finished" behavior,
+    // untouched (buyIn/cashOut text is then purely supplementary log_meta,
+    // never overriding the entered time/score).
+    if (format.family === 'mixed') {
+      const mainIsAmrap = activeLogFormatId === 'AMRAP with Buy-In' || activeLogFormatConfig?.mainFormat === 'AMRAP'
+      const buyInMovements = Array.isArray(activeLogFormatConfig?.buyIn) ? activeLogFormatConfig.buyIn : []
+      const cashOutMovements = Array.isArray(activeLogFormatConfig?.cashOut) ? activeLogFormatConfig.cashOut : []
+      const buyInPartialReps = (wodSets?.__buyIn || []).map(row => row?.reps || '')
+      const cashOutPartialReps = (wodSets?.__cashOut || []).map(row => row?.reps || '')
+      const { result, time_result, completion_state, buyInText, cashOutText } = composeMixedLogFields({
+        mainFormat: mainIsAmrap ? 'AMRAP' : 'For Time',
+        finishedValue: wodTime,
+        mainRoundsCompleted: wodRoundsCompleted,
+        mainPartialReps: wodPartialReps,
+        mainMovements: effectivePartialMovements,
+        buyInMovements, buyInPartialReps,
+        cashOutMovements, cashOutPartialReps,
+      })
+      return {
+        result, time_result, completion_state,
+        sets: setsCurate(),
+        log_meta: (buyInText || cashOutText) ? { buyInText, cashOutText } : null,
+        weight_logged: wodWeightLogged.trim() || null,
       }
     }
     // La For Time/Ladder (sequentialPartial - secvente, nu runde repetate),

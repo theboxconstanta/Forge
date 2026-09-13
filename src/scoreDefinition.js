@@ -13,7 +13,7 @@ import { getFormat, effectiveScoreMode, isSequentialFormat, isSequentialAmrap, T
 
 export const SCORE_KINDS = [
   'TIME', 'TIME_CAPPED', 'ROUNDS_REPS', 'SEQUENTIAL_AMRAP', 'REPS', 'LOAD', 'DISTANCE', 'CALORIES',
-  'SETS', 'STAGES', 'NONE', 'FREE',
+  'SETS', 'STAGES', 'MIXED', 'NONE', 'FREE',
 ]
 
 // The dedicated optional time-cap field on Duration-primary formats (see the
@@ -61,6 +61,18 @@ export function scoreDefinitionFor(formatId, formatConfig, opts = {}) {
   if (format.family === 'sets') return { kind: 'SETS' }
   if (format.family === 'chained') return { kind: 'STAGES' }
   if (format.family === 'nft') return { kind: 'NONE' }
+  // Workout Composer Phase 2 - CONFIRMED PRE-EXISTING GAP CLOSED (Phase 0.2/0.3
+  // forensic finding): `family==='mixed'` used to fall through to the generic
+  // amrap/fortime_or_amrap branches below via effectiveScoreMode's own
+  // 'Buy-In/Cash-Out' special-case, reaching UniversalScoreInput as a plain
+  // TIME/TIME_CAPPED/ROUNDS_REPS kind - the PRIMARY official-WOD-of-the-day
+  // screen then rendered only a bare time/rounds field, with no Buy-In/
+  // Cash-Out UI at all (that content was only ever reachable through the
+  // secondary FormatLogger edit path). MIXED is delegated straight to
+  // <FormatLogger> in UniversalScoreInput.jsx, exactly like SETS/STAGES/FREE
+  // already are - reusing its existing, tested Buy-In/Main-Work/Cash-Out
+  // rendering unchanged, now on the primary screen too.
+  if (format.family === 'mixed') return { kind: 'MIXED' }
 
   const mode = effectiveScoreMode(formatId, config) || format.scoreMode
 

@@ -6,8 +6,11 @@
 //
 // Handled here (clean redesign): TIME · TIME_CAPPED · ROUNDS_REPS · REPS · LOAD
 // · DISTANCE · CALORIES · NONE.
-// Delegated to <FormatLogger> unchanged: SETS · STAGES · FREE / anything else
-// (the battle-tested strength/interval/chained/max-effort logic stays intact).
+// Delegated to <FormatLogger> unchanged: SETS · STAGES · MIXED · FREE / anything
+// else (the battle-tested strength/interval/chained/mixed/max-effort logic
+// stays intact). MIXED added Workout Composer Phase 2 - closes a confirmed
+// pre-existing gap (scoreDefinition.js) where Buy-In/Cash-Out(-family) content
+// never reached this primary screen at all.
 //
 // TOGGLE RULE (owner §3): Finished and Time Capped are mutually exclusive.
 // Switching clears the incompatible draft fields via onChange so the SUBMITTED
@@ -142,8 +145,11 @@ export default function UniversalScoreInput({
   const patch = (p) => onChange({ ...v, ...p })
   const kind = def?.kind || 'FREE'
 
-  // SETS / STAGES / anything else -> the existing, tested logger, unchanged.
-  if (kind === 'SETS' || kind === 'STAGES' || kind === 'FREE') {
+  // SETS / STAGES / MIXED / anything else -> the existing, tested logger,
+  // unchanged. MIXED added Workout Composer Phase 2 - closes the confirmed
+  // pre-existing gap where a Buy-In/Cash-Out(-family) log never reached this
+  // primary screen's own Buy-In/Cash-Out UI at all (see scoreDefinition.js).
+  if (kind === 'SETS' || kind === 'STAGES' || kind === 'MIXED' || kind === 'FREE') {
     return (
       <FormatLogger
         formatId={formatId} config={config} movements={movements} value={v} onChange={onChange}

@@ -278,6 +278,42 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
   )
 }
 
+// Workout Composer Phase 2 - a Buy-In/Cash-Out bookend with MORE THAN ONE
+// movement needs its own per-movement position preserved (Phase 0.3 forensic
+// finding: SimpleRepsRow's single aggregate reps field for the whole
+// joined-label loses this entirely - "11/20 DB Snatches" was not
+// representable as one combined number). One row per movement, each its own
+// reps input, keyed by INDEX (not name) - the same identity convention the
+// existing sequential engine already uses (sequentialAmrap.js: "a repeated
+// movement name stays two distinct stations"). Persisted shape is UNCHANGED
+// ([{reps,weight,completed}] per row, exactly SimpleRepsRow's own row shape -
+// Journal's existing wSetsParti render already handles this array-of-objects
+// shape without modification) - only now genuinely one entry per movement
+// instead of one aggregate entry for the whole joined list. Degenerates to
+// exactly today's single-movement behavior when there is only one movement.
+function MultiMovementPartialRows({ label, movements, rows, onChange, t }) {
+  return (
+    <div style={{ marginBottom: '10px' }}>
+      <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '6px' }}>{label}</div>
+      {movements.map((m, i) => (
+        <div key={i} style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ fontSize: '13px', color: '#0E0E0E', flex: 1 }}>{m}</div>
+          <input type="number" value={(rows && rows[i]?.reps) || ''}
+            onChange={e => {
+              const next = movements.map((_, j) => ({
+                ...(rows?.[j] || { reps: '', weight: '', completed: false }),
+                reps: j === i ? e.target.value : (rows?.[j]?.reps || ''),
+              }))
+              onChange(next)
+            }}
+            placeholder={t?.skillLogRepsPlaceholder || 'reps'}
+            style={{ width: '90px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // EMOM PERFORMED LOGGER PARITY - capability-driven per-entry score fields,
 // reused across EMOM's shared-interval (INC-01) and minute-pattern (INC-04)
 // station rendering. An entry's rendered fields come from the EFFECTIVE
@@ -646,11 +682,8 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
   }
 
   if (format.family === 'mixed') {
-    const buyIn = (config?.buyIn && config.buyIn.length > 0) ? config.buyIn : ['Buy-In']
-    const hasCashOut = Array.isArray(config?.cashOut)
-    const cashOut = (config?.cashOut && config.cashOut.length > 0) ? config.cashOut : ['Cash-Out']
-    const buyInRows = (v.sets || {})['__buyIn'] ? { [buyIn.join(' + ')]: v.sets['__buyIn'] } : { [buyIn.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
-    const cashOutRows = (v.sets || {})['__cashOut'] ? { [cashOut.join(' + ')]: v.sets['__cashOut'] } : { [cashOut.join(' + ')]: [{ reps: '', weight: '', completed: false }] }
+    const buyIn = Array.isArray(config?.buyIn) ? config.buyIn : []
+    const cashOut = Array.isArray(config?.cashOut) ? config.cashOut : []
     // effectiveScoreMode/isSequentialFormat - aceeasi sursa unica de adevar
     // folosita peste tot (Partner WOD, Chipper etc), nu un calcul local
     // duplicat. Bug real gasit (07-15): calculul local vechi nu marca
@@ -658,28 +691,22 @@ export default function FormatLogger({ formatId, config, movements, value, onCha
     // neterminat pe lucrul principal n-avea nicio urmarire structurata a
     // repetarilor (doar Timp + text liber, la fel ca bug-ul Chipper).
     const mainScoreMode = effectiveScoreMode(formatId, config) || format.scoreMode
-    // Buy-In/Cash-Out sunt sarcini facute o singura data (ex. "50 Cal Row"),
-    // nu seturi repetabile cu greutati diferite - acelasi motiv ca la Tabata:
-    // un singur input de reps, fara greutate, fara "+ Adauga set".
+    // Workout Composer Phase 2 (Phase 0.3 Correction 1) - Buy-In/Cash-Out
+    // each get ONE row PER MOVEMENT (MultiMovementPartialRows), not one
+    // aggregate SimpleRepsRow for the whole joined list - exact per-movement
+    // position now survives ("11/20 DB Snatches"), degenerating to today's
+    // exact single-movement behavior when there is only one.
     return (
       <>
-        <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '6px' }}>{t?.fmtBuyInSection || 'Buy-In'}</div>
-        {Object.entries(buyInRows).map(([key, rows]) => (
-          <SimpleRepsRow key={key} rowKey={key} rows={rows}
-            onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })}
-            weightUnit={weightUnit} t={t} />
-        ))}
+        {buyIn.length > 0 && (
+          <MultiMovementPartialRows label={t?.fmtBuyInSection || 'Buy-In'} movements={buyIn}
+            rows={v.sets?.__buyIn} onChange={nextRows => patch({ sets: { ...v.sets, __buyIn: nextRows } })} t={t} />
+        )}
         <div style={{ fontSize: '12px', fontWeight: '600', color: '#0E0E0E', margin: '10px 0 6px' }}>{t?.fmtMainWorkSection || 'Main Work'}</div>
         <ScoredFields scoreMode={mainScoreMode} movements={movements || []} value={v} onChange={patch} t={t} prescribedWeight={prescribedWeight} rxStatus={rxStatus} sequentialPartial={isSequentialFormat(formatId, config)} sequentialAmrap={isSequentialAmrap(formatId, config)} />
-        {hasCashOut && (
-          <>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', margin: '10px 0 6px' }}>{t?.fmtCashOutSection || 'Cash-Out'}</div>
-            {Object.entries(cashOutRows).map(([key, rows]) => (
-              <SimpleRepsRow key={key} rowKey={key} rows={rows}
-                onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })}
-                weightUnit={weightUnit} t={t} />
-            ))}
-          </>
+        {cashOut.length > 0 && (
+          <MultiMovementPartialRows label={t?.fmtCashOutSection || 'Cash-Out'} movements={cashOut}
+            rows={v.sets?.__cashOut} onChange={nextRows => patch({ sets: { ...v.sets, __cashOut: nextRows } })} t={t} />
         )}
       </>
     )
