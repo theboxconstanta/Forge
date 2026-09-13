@@ -11,8 +11,9 @@ import {
   getScoreEnvelope, getAllScoreEnvelopes, resolveOnceComponentResult,
   composeEnvelopeResult, componentsFromSection, defaultProducesScoreForFormat,
   canJoinScoreEnvelope, composeMixedLogFields,
+  getComponentResultsFromLog, composeComponentsLogFields,
 } from './componentContract'
-import { fixtureA_simpleAmrap, fixtureB_oneEnvelope, fixtureC_multiScore, fixtureD_complexComposer } from './composerFixtures'
+import { fixtureA_simpleAmrap, fixtureB_oneEnvelope, fixtureC_multiScore, fixtureD_complexComposer, fixtureThreeIndependentScores } from './composerFixtures'
 import { createSection } from './wodSections'
 import { newMovementInstance } from './prescriptionContract'
 
@@ -332,7 +333,7 @@ describe('composeEnvelopeResult', () => {
 describe('composeMixedLogFields - envelope-aware save composition', () => {
   it('finished envelope: one entered time wins outright, completion_state completed', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '12:42',
+      mainIsSequential: true, finishedValue: '12:42',
       mainRoundsCompleted: '', mainPartialReps: [], mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
       cashOutMovements: ['800 m Run'], cashOutPartialReps: ['800'],
@@ -348,7 +349,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
     // "finished the main work" is expressed with the existing sequential
     // engine, unmodified.
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: ['10', '15'],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
@@ -362,7 +363,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('cannot skip ahead: progress recorded only in a LATER envelope member than an untouched earlier one still walks to the latest one with progress (pure function does not itself enforce real-world sequencing - the Builder/logger UI is what prevents this input from arising)', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: [],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
@@ -375,7 +376,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('Case B (PARTIAL_BUYIN): capped during Buy-In, main/Cash-Out never started', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: [],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: ['730'],
@@ -389,7 +390,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('Case C (PARTIAL_MAIN): Buy-In complete, main partial, Cash-Out not started', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: ['10', '7'],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: ['1000'],
@@ -401,7 +402,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('MULTI_MOVEMENT_BOOKENDS (Case D/E): exact position preserved on both bookends, never aggregated', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: ['10', '15'],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: ['500 m Row', '30 Burpees', '20 DB Snatches'], buyInPartialReps: ['500', '30', '11'],
@@ -414,7 +415,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('OWNED_FOR_TIME with no bookends behaves exactly like a plain sequential For Time (legacy single-score equivalence)', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: ['10', '7'],
       mainMovements: ['10 Toes-to-Bar', '15 Wall Balls'],
       buyInMovements: [], buyInPartialReps: [],
@@ -427,7 +428,7 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('AMRAP-mode main (mainFormat AMRAP) reuses composeAmrapResult unchanged', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'AMRAP', finishedValue: '',
+      mainIsSequential: false, finishedValue: '',
       mainRoundsCompleted: '6', mainPartialReps: ['5'], mainMovements: ['10 Pull-Ups'],
       buyInMovements: ['500 m Row'], buyInPartialReps: ['500'],
       cashOutMovements: [], cashOutPartialReps: [],
@@ -437,13 +438,211 @@ describe('composeMixedLogFields - envelope-aware save composition', () => {
 
   it('no progress anywhere and not finished: neutral capped result, never throws', () => {
     const out = composeMixedLogFields({
-      mainFormat: 'For Time', finishedValue: '',
+      mainIsSequential: true, finishedValue: '',
       mainRoundsCompleted: '', mainPartialReps: [], mainMovements: ['10 Toes-to-Bar'],
       buyInMovements: ['1000 m Row'], buyInPartialReps: [],
       cashOutMovements: ['800 m Run'], cashOutPartialReps: [],
     })
     expect(out.result).toBeNull()
     expect(out.completion_state).toBe('capped')
+  })
+})
+
+// ============================================================================
+// Phase 2.1 - true multi-envelope persistence & reload proof
+// ============================================================================
+
+describe('composeComponentsLogFields / composeMultiEnvelopeLogFields - persistence', () => {
+  // Ticket Fixture A: AMRAP 8 (finished 6+12) + Rest + 5 RFT (finished 7:41)
+  const twoScoreInputs = {
+    'fixC-amrap': { roundsCompleted: '6', partialReps: ['12'], movementLines: ['10 DB Snatches', '10 Burpees'] },
+    'fixC-rft': { finishedValue: '7:41', movementLines: ['10 DB Snatches', '15 Box Jumps'] },
+  }
+
+  it('1. two native results survive serialization, no primary chosen', () => {
+    const components = fixtureC_multiScore()
+    const out = composeComponentsLogFields(components, twoScoreInputs)
+    expect(out.result).toBeNull()
+    expect(out.time_result).toBeNull()
+    expect(out.completion_state).toBeNull()
+    const cr = out.log_meta.componentResults
+    expect(Object.keys(cr).sort()).toEqual(['fixC-amrap', 'fixC-rft'])
+    expect(cr['fixC-amrap'].result).toBe('6 runde + 12/10 DB Snatches')
+    expect(cr['fixC-rft'].time_result).toBe('7:41')
+  })
+
+  it('2. three native results survive serialization', () => {
+    const components = fixtureThreeIndependentScores()
+    const out = composeComponentsLogFields(components, {
+      'fix3-amrap': { roundsCompleted: '6', partialReps: ['12'], movementLines: ['10 Pull-Ups', '10 Burpees'] },
+      'fix3-rft': { finishedValue: '7:41', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'fix3-emom': { sets: { 'Min 1': [{ reps: '12', weight: '', completed: true }], 'Min 2': [{ reps: '10', weight: '', completed: true }] } },
+    })
+    const cr = out.log_meta.componentResults
+    expect(Object.keys(cr).sort()).toEqual(['fix3-amrap', 'fix3-emom', 'fix3-rft'])
+    expect(cr['fix3-amrap'].result).toContain('6 runde')
+    expect(cr['fix3-rft'].time_result).toBe('7:41')
+    expect(cr['fix3-emom'].sets['Min 1'][0].reps).toBe('12')
+    expect(cr['fix3-emom'].result).toBeNull() // sets-family: score derived at READ time, unchanged convention
+  })
+
+  it('3. Rest produces no entry at all (not a null one)', () => {
+    const components = fixtureThreeIndependentScores()
+    const out = composeComponentsLogFields(components, {})
+    expect(Object.prototype.hasOwnProperty.call(out.log_meta.componentResults, 'fix3-rest1')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(out.log_meta.componentResults, 'fix3-rest2')).toBe(false)
+  })
+
+  it('4. an owned envelope alone emits exactly ONE result (legacy single-score equivalence)', () => {
+    const components = fixtureB_oneEnvelope() // Buy-In -> RFT -> Cash-Out, one scorer
+    const out = composeComponentsLogFields(components, {
+      'fixB-rft': { finishedValue: '12:42', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+    })
+    // exactly one scorer -> normal scalar fields, NOT log_meta.componentResults
+    expect(out.time_result).toBe('12:42')
+    expect(out.log_meta).toBeNull()
+  })
+
+  it('5. an owned envelope PLUS an independent scorer emits exactly TWO results', () => {
+    const envelopeComponents = fixtureB_oneEnvelope()
+    const amrap = createComponent({ id: 'extra-amrap', format: 'AMRAP', producesScore: true, config: { durationSec: 300 }, instances: [] })
+    const components = normalizeComponentOrder([...envelopeComponents, amrap])
+    const out = composeComponentsLogFields(components, {
+      'fixB-rft': { finishedValue: '12:42', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'extra-amrap': { roundsCompleted: '5', partialReps: [], movementLines: ['10 Push-Ups'] },
+    })
+    const cr = out.log_meta.componentResults
+    expect(Object.keys(cr).sort()).toEqual(['extra-amrap', 'fixB-rft'])
+    expect(cr['fixB-rft'].time_result).toBe('12:42')
+    expect(cr['fixB-rft'].envelopeComponentIds).toEqual(['fixB-buyin', 'fixB-rft', 'fixB-cashout'])
+    expect(cr['extra-amrap'].envelopeComponentIds).toEqual(['extra-amrap']) // bookends never leak into an unrelated envelope
+  })
+
+  it('6. component identity is used throughout - never array index, never format name, never movement name', () => {
+    const components = fixtureC_multiScore()
+    const out = composeComponentsLogFields(components, twoScoreInputs)
+    Object.keys(out.log_meta.componentResults).forEach(key => {
+      expect(components.some(c => c.id === key)).toBe(true) // every key IS a real componentId
+    })
+  })
+
+  it('7. a partial LATER envelope survives independently of an earlier finished one', () => {
+    const components = fixtureC_multiScore() // AMRAP -> Rest -> RFT
+    const out = composeComponentsLogFields(components, {
+      'fixC-amrap': { roundsCompleted: '7', partialReps: ['3'], movementLines: ['10 DB Snatches', '10 Burpees'] },
+      // capped mid-round-3-of-5: 2 full rounds done, currently on round 3
+      'fixC-rft': { finishedValue: '', roundsCompleted: '2', partialReps: ['7', '15'], movementLines: ['10 DB Snatches', '15 Box Jumps'] },
+    })
+    const cr = out.log_meta.componentResults
+    expect(cr['fixC-amrap'].result).toContain('7 runde')
+    expect(cr['fixC-rft'].time_result).toBeNull()
+    expect(cr['fixC-rft'].completion_state).toBe('capped')
+    expect(cr['fixC-rft'].result).toBe('2 runde + 7/10 DB Snatches, 15/15 Box Jumps')
+    // no cross-contamination: AMRAP's own result never mentions RFT's movements
+    expect(cr['fixC-amrap'].result).not.toMatch(/Box Jumps/)
+  })
+
+  it('8. a partial owned Cash-Out survives with a second independent finished score present', () => {
+    const envelopeComponents = fixtureB_oneEnvelope()
+    const amrap = createComponent({ id: 'extra-amrap2', format: 'AMRAP', producesScore: true, config: { durationSec: 300 }, instances: [] })
+    const components = normalizeComponentOrder([...envelopeComponents, amrap])
+    const out = composeComponentsLogFields(components, {
+      'fixB-buyin': { movementLines: ['1000 m Row'], partialReps: ['1000'] },
+      'fixB-rft': { finishedValue: '', roundsCompleted: '5', partialReps: [], movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'fixB-cashout': { movementLines: ['800 m Run'], partialReps: ['463'] },
+      'extra-amrap2': { roundsCompleted: '8', partialReps: [], movementLines: ['10 Push-Ups'] },
+    })
+    const cr = out.log_meta.componentResults
+    expect(cr['fixB-rft'].result).toBe('1000/1000 m Row, 5 runde complete, 463/800 m Run')
+    expect(cr['fixB-rft'].completion_state).toBe('capped')
+    expect(cr['extra-amrap2'].result).toContain('8 runde')
+    expect(cr['extra-amrap2'].completion_state).toBeNull()
+  })
+
+  it('9. editing one score leaves the others byte-identical', () => {
+    const components = fixtureThreeIndependentScores()
+    const baseInputs = {
+      'fix3-amrap': { roundsCompleted: '6', partialReps: ['12'], movementLines: ['10 Pull-Ups', '10 Burpees'] },
+      'fix3-rft': { finishedValue: '7:41', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'fix3-emom': { sets: { 'Min 1': [{ reps: '12', weight: '', completed: true }] } },
+    }
+    const first = composeComponentsLogFields(components, baseInputs)
+    const edited = composeComponentsLogFields(components, { ...baseInputs, 'fix3-rft': { finishedValue: '7:12', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] } })
+    expect(edited.log_meta.componentResults['fix3-amrap']).toEqual(first.log_meta.componentResults['fix3-amrap'])
+    expect(edited.log_meta.componentResults['fix3-emom']).toEqual(first.log_meta.componentResults['fix3-emom'])
+    expect(edited.log_meta.componentResults['fix3-rft'].time_result).toBe('7:12')
+    expect(first.log_meta.componentResults['fix3-rft'].time_result).toBe('7:41')
+  })
+
+  it('10. the whole payload survives a JSON round-trip (simulating Postgres JSONB storage)', () => {
+    const components = fixtureD_complexComposer()
+    const out = composeComponentsLogFields(components, {
+      'fixD-rft': { finishedValue: '11:00', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'fixD-amrap': { roundsCompleted: '6', partialReps: [], movementLines: ['6 Clean & Jerks', '8 Burpees'] },
+      'fixD-emom': { sets: { 'Min 1': [{ reps: '12', weight: '', completed: true }] } },
+    })
+    const roundTripped = JSON.parse(JSON.stringify(out))
+    expect(roundTripped).toEqual(out)
+    // this IS "connecting to the real save path": App.jsx's saveWodLog spreads
+    // composeWodLogFields()'s return value verbatim into
+    // supabase.from('wod_logs').insert/update({...}) (App.jsx ~L10070-10071) -
+    // composeComponentsLogFields produces the byte-identical {result,
+    // time_result, completion_state, sets, log_meta} shape, so this JSON
+    // round-trip is exactly what that Supabase JSONB column read/write does.
+  })
+
+  it('11. historical snapshot: mutating components AFTER composing never changes the already-produced result', () => {
+    const components = fixtureC_multiScore()
+    const out = composeComponentsLogFields(components, twoScoreInputs)
+    const frozen = JSON.parse(JSON.stringify(out))
+    // mutate the (now historical) canonical structure: reorder, rename, remove
+    components.reverse()
+    components[0].format = 'RFT'
+    components.length = 1
+    expect(out).toEqual(frozen) // already-composed result is untouched by later mutation
+  })
+
+  it('12. a legacy single-score log (no componentResults) returns exactly one entry, unchanged', () => {
+    const legacyLog = { result: '3 rounds + 22', time_result: null, completion_state: 'capped', sets: null }
+    const entries = getComponentResultsFromLog(legacyLog)
+    expect(entries).toEqual([{ componentId: null, format: null, result: '3 rounds + 22', time_result: null, completion_state: 'capped', sets: null }])
+  })
+
+  it('13. a legacy mixed-format log (no componentResults, old shape) returns exactly one entry, unchanged', () => {
+    const legacyMixedLog = { result: null, time_result: '12:42', completion_state: 'completed', sets: { __buyIn: [{ reps: '1000', weight: '', completed: true }] }, log_meta: null }
+    const entries = getComponentResultsFromLog(legacyMixedLog)
+    expect(entries).toHaveLength(1)
+    expect(entries[0].time_result).toBe('12:42')
+  })
+
+  it('14. no primary component is ever introduced for a genuine multi-score log', () => {
+    const components = fixtureC_multiScore()
+    const out = composeComponentsLogFields(components, twoScoreInputs)
+    // the section-level scalar fields never carry EITHER scorer's value
+    expect(out.result).toBeNull()
+    expect(out.time_result).toBeNull()
+  })
+
+  it('15. no native result is ever overwritten by another component\'s result', () => {
+    const components = fixtureThreeIndependentScores()
+    const out = composeComponentsLogFields(components, {
+      'fix3-amrap': { roundsCompleted: '6', partialReps: ['12'], movementLines: ['10 Pull-Ups', '10 Burpees'] },
+      'fix3-rft': { finishedValue: '7:41', movementLines: ['10 Toes-to-Bar', '15 Wall Balls'] },
+      'fix3-emom': { sets: { 'Min 1': [{ reps: '12', weight: '', completed: true }] } },
+    })
+    const cr = out.log_meta.componentResults
+    expect(cr['fix3-amrap'].result).not.toBe(cr['fix3-rft'].result)
+    expect(cr['fix3-rft'].time_result).toBe('7:41')
+    expect(cr['fix3-emom'].result).toBeNull()
+  })
+
+  it('16. no movement instance is ever duplicated by multi-envelope composition', () => {
+    const components = fixtureD_complexComposer()
+    const allInstanceIds = components.flatMap(c => c.instances.map(i => i.instanceId))
+    composeComponentsLogFields(components, {}) // composing must not mutate/duplicate anything
+    const allInstanceIdsAfter = components.flatMap(c => c.instances.map(i => i.instanceId))
+    expect(allInstanceIdsAfter).toEqual(allInstanceIds)
+    expect(new Set(allInstanceIdsAfter).size).toBe(allInstanceIdsAfter.length)
   })
 })
 

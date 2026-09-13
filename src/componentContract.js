@@ -19,7 +19,7 @@
 // out of Phase 1 scope (WORKOUT-COMPOSER-COMPOSITE-SCORING.md), a later
 // phase's concern once real Composer-authored data exists.
 
-import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, deriveDurationCompletionState, WORKOUT_FORMATS } from './workoutFormats'
+import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS } from './workoutFormats'
 import { hydrateInstancesFromLegacy } from './wodSections'
 
 // ============================================================================
@@ -352,9 +352,18 @@ export function composeEnvelopeResult({ envelope, finishedValue, resultByCompone
 // done outright, ignore partials; absent -> walk buyIn -> main -> cashOut to
 // the furthest with progress).
 
-/** `mainFormat`: 'AMRAP' | 'For Time' (already-resolved, same rule as
- * componentsFromSection's own `mainIsAmrap` check). `finishedValue`: the
- * one envelope-level time the athlete entered (`wodTime`) - present means
+/** `mainIsSequential`: boolean - whether the main component's own native
+ * partial engine is the SEQUENTIAL one-pass engine (`repsEfectiveSecvential`
+ * - For Time/Chipper/Ladder-style, or a `structure:'Sequence'` AMRAP) or the
+ * REPEATED-ROUNDS one (`composeAmrapResult` - classic AMRAP, or RFT/Partner-
+ * WOD-style repeated rounds). Callers should derive this from the main
+ * component's own actual format/config via `isSequentialFormat`
+ * (workoutFormats.js) - NOT a crude 'AMRAP' vs 'For Time' string check
+ * (an earlier version of this function conflated the two; a REPEATED-ROUNDS
+ * RFT main inside an envelope needs `composeAmrapResult`'s "N rounds +
+ * partial" composition, exactly like a bare AMRAP does - it is NOT
+ * sequential just because it isn't AMRAP). `finishedValue`: the one
+ * envelope-level time the athlete entered (`wodTime`) - present means
  * "done", exactly mirroring composeFortimeOrAmrapFields's own
  * shouldLogRoundsInsteadOfTime rule, now scoped to the whole envelope.
  * `mainRoundsCompleted`/`mainPartialReps`/`mainMovements`: the main
@@ -366,7 +375,7 @@ export function composeEnvelopeResult({ envelope, finishedValue, resultByCompone
  * composeWodLogFieldsInner already produces for every other scored format,
  * plus `buyInText`/`cashOutText` for optional Journal/log_meta display. */
 export function composeMixedLogFields({
-  mainFormat, finishedValue,
+  mainIsSequential, finishedValue,
   mainRoundsCompleted, mainPartialReps, mainMovements,
   buyInMovements, buyInPartialReps,
   cashOutMovements, cashOutPartialReps,
@@ -378,13 +387,13 @@ export function composeMixedLogFields({
 
   let mainText
   let mainHasProgress
-  if (mainFormat === 'AMRAP') {
-    mainText = composeAmrapResult(mainRoundsCompleted, mainPartialReps, mainMovements || []) || ''
-    mainHasProgress = !!(mainRoundsCompleted || '').toString().trim() || (mainPartialReps || []).some(v => (v || '').toString().trim() !== '')
-  } else {
+  if (mainIsSequential) {
     const effective = repsEfectiveSecvential(mainPartialReps || [], mainMovements || [])
     mainText = composePartialText(effective, mainMovements || [])
     mainHasProgress = effective.some(v => (v || '').toString().trim() !== '')
+  } else {
+    mainText = composeAmrapResult(mainRoundsCompleted, mainPartialReps, mainMovements || []) || ''
+    mainHasProgress = !!(mainRoundsCompleted || '').toString().trim() || (mainPartialReps || []).some(v => (v || '').toString().trim() !== '')
   }
 
   const envelope = []
@@ -402,6 +411,177 @@ export function composeMixedLogFields({
     buyInText: buyInResult?.text || null,
     cashOutText: cashOutResult?.text || null,
   }
+}
+
+// ============================================================================
+// True multi-envelope persistence (Workout Composer Phase 2.1)
+// ============================================================================
+//
+// Phase 2 proved ONE owned envelope (Buy-In/Main/Cash-Out -> one native
+// result) reaches the real save path. This section proves a components[]
+// list with 2+ INDEPENDENTLY scored envelopes (e.g. AMRAP + Rest + RFT, or
+// an owned Buy-In/RFT/Cash-Out envelope alongside a second independent
+// AMRAP) can be persisted and reloaded WITHOUT a DB migration and WITHOUT a
+// "primary component" - the exact two constraints the owner set.
+//
+// Persistence decision (traced against actual code, not assumed): a
+// components-bearing composed WOD log leaves the section-level scalar
+// fields (`result`, `time_result`, `completion_state`, `sets`) NULL and
+// stores every envelope's own native result in `log_meta.componentResults`,
+// keyed by stable componentId. This is NOT a new convention invented for
+// this ticket - it is the EXACT existing pattern `family:'chained'` and
+// `family:'sets'` already use in production today (composeWodLogFieldsInner,
+// App.jsx ~L9886-9912: both leave result/time_result/completion_state null
+// and store their real truth in log_meta/sets respectively). Every existing
+// consumer (sortSectionLogs, Journal's parseWodLogDetails, Photo Result)
+// already treats null result/time_result as "this format's score lives
+// elsewhere" - they do not crash or misrepresent a null-scalar log, they
+// simply show nothing from those fields, exactly as they already do for
+// every chained/sets-family log in production. A multi-envelope Composer
+// log is safe by the SAME precedent, not a new one.
+//
+// Dispatch here is deliberately narrow - exactly the format families the
+// ticket's own Fixtures A-E require (AMRAP, repeated-rounds RFT/Partner-WOD-
+// style via the existing composeFortimeOrAmrapFields, EMOM/Interval via the
+// existing `sets` passthrough convention, and an owned once-bookend envelope
+// via Phase 2's composeMixedLogFields) - NOT an exhaustive reimplementation
+// of every catalog format's dispatch (that already exists, unchanged, in
+// composeWodLogFieldsInner/App.jsx, for today's single-score runtime path).
+
+/** Compose ONE scoring envelope's own native result. `components`: the full
+ * canonical list (needed to resolve the envelope's bookend members).
+ * `scoringComponent`: one `producesScore:true` entry from it. `inputsById`:
+ * `{ [componentId]: { finishedValue?, roundsCompleted?, partialReps?,
+ * movementLines?, sets? } }` - the raw athlete input for every component in
+ * play, keyed by componentId (never array index). Returns
+ * `{ format, envelopeComponentIds, result, time_result, completion_state,
+ * sets }` - the shape stored under this scorer's own key in
+ * `log_meta.componentResults`. */
+export function composeEnvelopeNativeResult(components, scoringComponent, inputsById) {
+  const envelope = getScoreEnvelope(components, scoringComponent.id)
+  const bookends = envelope.filter(c => c.id !== scoringComponent.id)
+  const input = inputsById[scoringComponent.id] || {}
+
+  if (bookends.length > 0) {
+    // Owned envelope - reuse Phase 2's composeMixedLogFields UNCHANGED.
+    const buyIn = bookends.find(c => c.role === 'buy-in')
+    const cashOut = bookends.find(c => c.role === 'cash-out')
+    const out = composeMixedLogFields({
+      // Correct, general capability check (NOT a crude AMRAP/For-Time name
+      // check) - a repeated-rounds RFT or Partner WOD main inside an owned
+      // envelope needs composeAmrapResult's "N rounds + partial" text
+      // exactly like AMRAP does, never the sequential engine.
+      mainIsSequential: isSequentialFormat(scoringComponent.format, scoringComponent.config),
+      finishedValue: input.finishedValue,
+      mainRoundsCompleted: input.roundsCompleted,
+      mainPartialReps: input.partialReps,
+      mainMovements: input.movementLines,
+      buyInMovements: buyIn ? (inputsById[buyIn.id]?.movementLines || []) : [],
+      buyInPartialReps: buyIn ? (inputsById[buyIn.id]?.partialReps || []) : [],
+      cashOutMovements: cashOut ? (inputsById[cashOut.id]?.movementLines || []) : [],
+      cashOutPartialReps: cashOut ? (inputsById[cashOut.id]?.partialReps || []) : [],
+    })
+    return {
+      format: scoringComponent.format, envelopeComponentIds: envelope.map(c => c.id),
+      result: out.result, time_result: out.time_result, completion_state: out.completion_state, sets: null,
+    }
+  }
+
+  const fmt = getFormat(scoringComponent.format)
+
+  if (fmt.family === 'sets') {
+    // Exactly today's family:'sets' convention (App.jsx ~L9886-9888): the
+    // real score lives in `sets` (derived at READ time by setsDisplayScore/
+    // computeSetsScore, unchanged) - result/time_result stay null.
+    return {
+      format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
+      result: null, time_result: null, completion_state: null, sets: input.sets || null,
+    }
+  }
+
+  if (fmt.scoreMode === 'amrap') {
+    const text = composeAmrapResult(input.roundsCompleted, input.partialReps, input.movementLines || []) || null
+    return {
+      format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
+      result: text, time_result: null, completion_state: null, sets: null,
+    }
+  }
+
+  // Repeated-rounds RFT/Partner-WOD-style (scoreMode 'fortime_or_amrap',
+  // NOT sequential) - reuse the existing pure composer unchanged.
+  const { result, time_result, completionState } = composeFortimeOrAmrapFields({
+    wodTime: input.finishedValue, wodRoundsCompleted: input.roundsCompleted, wodPartialReps: input.partialReps,
+    movements: input.movementLines || [], rounds: scoringComponent.config?.rounds, wodResult: input.result,
+  })
+  return {
+    format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
+    result, time_result, completion_state: completionState, sets: null,
+  }
+}
+
+/** Compose every independent envelope's native result into ONE additive
+ * `wod_logs` payload, shaped identically to what `composeWodLogFieldsInner`
+ * (App.jsx) already produces for every other format - `{result, time_result,
+ * completion_state, sets, log_meta}` - so it is drop-in spreadable into the
+ * SAME `supabase.from('wod_logs').insert/update({...composeWodLogFields()})`
+ * call already used for every existing log (App.jsx ~L10070-10071), with
+ * zero schema change. Section-level scalars are always null here (§ above);
+ * `log_meta.componentResults` carries every scorer's own result, keyed by
+ * componentId. Rest and any `producesScore:false` component never appears -
+ * it produces no entry at all, not a null one. */
+export function composeMultiEnvelopeLogFields(components, inputsById) {
+  const scorers = (components || []).filter(c => c.producesScore)
+  const componentResults = {}
+  scorers.forEach(scorer => {
+    componentResults[scorer.id] = composeEnvelopeNativeResult(components, scorer, inputsById || {})
+  })
+  return {
+    result: null, time_result: null, completion_state: null, sets: null,
+    log_meta: { composerVersion: 1, componentResults },
+  }
+}
+
+/** Top-level decision point: exactly ONE scorer gets the "legacy single-
+ * score equivalence" treatment (WORKOUT-COMPOSER-ARCHITECTURE.md §16/§24) -
+ * normal scalar `result`/`time_result`/`completion_state`/`sets` fields,
+ * byte-identical in shape to today's single-format save, `log_meta: null`.
+ * TWO OR MORE independent scorers get `composeMultiEnvelopeLogFields`'s
+ * `log_meta.componentResults` treatment - scalars stay null for ALL of
+ * them, never populated from any one scorer (the owner's explicit "no
+ * primary component" requirement, ticket §20). This is the ONE place that
+ * decision is made - callers should use this, not choose between the two
+ * lower-level functions themselves. */
+export function composeComponentsLogFields(components, inputsById) {
+  const scorers = (components || []).filter(c => c.producesScore)
+  if (scorers.length === 1) {
+    const r = composeEnvelopeNativeResult(components, scorers[0], inputsById || {})
+    return { result: r.result, time_result: r.time_result, completion_state: r.completion_state, sets: r.sets, log_meta: null }
+  }
+  return composeMultiEnvelopeLogFields(components, inputsById)
+}
+
+/** Journal/leaderboard read contract (ticket §16/§17) - pure, format-
+ * agnostic. A Composer log (`log_meta.componentResults` present) returns one
+ * entry per scored component, in no particular order (callers needing
+ * canonical order pass `components` to sort by). A LEGACY log (no
+ * `componentResults`) returns exactly ONE entry synthesized from the
+ * existing scalar fields - "a legacy log naturally returns one native
+ * result" (ticket §16), matching every current consumer's existing
+ * expectation with zero change. Never infers/selects a "primary" entry for
+ * a multi-result log - every scorer's result is returned, undistinguished. */
+export function getComponentResultsFromLog(log) {
+  const cr = log?.log_meta?.componentResults
+  if (cr && typeof cr === 'object' && Object.keys(cr).length > 0) {
+    return Object.entries(cr).map(([componentId, r]) => ({
+      componentId, format: r.format ?? null, result: r.result ?? null,
+      time_result: r.time_result ?? null, completion_state: r.completion_state ?? null, sets: r.sets ?? null,
+    }))
+  }
+  return [{
+    componentId: null, format: null,
+    result: log?.result ?? null, time_result: log?.time_result ?? null,
+    completion_state: log?.completion_state ?? null, sets: log?.sets ?? null,
+  }]
 }
 
 // ============================================================================

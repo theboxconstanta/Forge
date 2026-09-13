@@ -9929,13 +9929,22 @@ function App() {
     // untouched (buyIn/cashOut text is then purely supplementary log_meta,
     // never overriding the entered time/score).
     if (format.family === 'mixed') {
+      // Legacy 'Buy-In/Cash-Out'/'AMRAP with Buy-In' main work is always
+      // EITHER classic repeated-rounds AMRAP OR sequential (chipper-style)
+      // For Time (confirmed forensic constraint - this legacy format family
+      // has no repeated-rounds-RFT main option at all, per its own catalog
+      // config: mainFormat is only ever 'AMRAP'|'For Time'). mainIsAmrap
+      // false therefore always means sequential here - exactly
+      // isSequentialFormat's own existing rule for this format
+      // (workoutFormats.js: `if (formatId === 'Buy-In/Cash-Out') return
+      // config?.mainFormat !== 'AMRAP'`).
       const mainIsAmrap = activeLogFormatId === 'AMRAP with Buy-In' || activeLogFormatConfig?.mainFormat === 'AMRAP'
       const buyInMovements = Array.isArray(activeLogFormatConfig?.buyIn) ? activeLogFormatConfig.buyIn : []
       const cashOutMovements = Array.isArray(activeLogFormatConfig?.cashOut) ? activeLogFormatConfig.cashOut : []
       const buyInPartialReps = (wodSets?.__buyIn || []).map(row => row?.reps || '')
       const cashOutPartialReps = (wodSets?.__cashOut || []).map(row => row?.reps || '')
       const { result, time_result, completion_state, buyInText, cashOutText } = composeMixedLogFields({
-        mainFormat: mainIsAmrap ? 'AMRAP' : 'For Time',
+        mainIsSequential: !mainIsAmrap,
         finishedValue: wodTime,
         mainRoundsCompleted: wodRoundsCompleted,
         mainPartialReps: wodPartialReps,

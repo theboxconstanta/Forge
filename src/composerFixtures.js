@@ -70,6 +70,31 @@ export function fixtureC_multiScore() {
   return normalizeComponentOrder([amrap, rest, rft])
 }
 
+// FIXTURE - THREE INDEPENDENT SCORES (Phase 2.1 ticket Fixture B): AMRAP 8 +
+// Rest 2:00 + 5 RFT + Rest 1:00 + EMOM 8. THREE independent producesScore:true
+// components, no owned envelope at all - distinct from Fixture D (which owns
+// an envelope AND has a third independent scorer).
+export function fixtureThreeIndependentScores() {
+  const amrap = createComponent({
+    id: 'fix3-amrap', format: 'AMRAP', producesScore: true,
+    config: { durationSec: 480 },
+    instances: [inst('Pull-Ups'), inst('Burpees')],
+  })
+  const rest1 = createComponent({ id: 'fix3-rest1', format: 'Rest', producesScore: false, config: { durationSec: 120 }, instances: [] })
+  const rft = createComponent({
+    id: 'fix3-rft', format: 'RFT', producesScore: true,
+    config: { rounds: 5 },
+    instances: [inst('Toes-to-Bar'), inst('Wall Balls')],
+  })
+  const rest2 = createComponent({ id: 'fix3-rest2', format: 'Rest', producesScore: false, config: { durationSec: 60 }, instances: [] })
+  const emom = createComponent({
+    id: 'fix3-emom', format: 'EMOM', producesScore: true,
+    config: { totalRounds: 8, intervalSec: 60 },
+    instances: [inst('Bike Calories'), inst('Pull-Ups')],
+  })
+  return normalizeComponentOrder([amrap, rest1, rft, rest2, emom])
+}
+
 // FIXTURE D - COMPLEX COMPOSER: Buy-In(500m Row) -> 5RFT -> Cash-Out(400m
 // Run) [one envelope] -> Rest 2:00 -> AMRAP 6 -> Rest 1:00 -> EMOM 8. Three
 // independent scoring components (the envelope's RFT, the AMRAP, the EMOM);
