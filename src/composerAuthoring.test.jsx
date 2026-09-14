@@ -61,7 +61,7 @@ describe('ComposerEditor - Add Component flow', () => {
     fireEvent.click(screen.getByText('+ Add Component'))
     fireEvent.click(screen.getByText('AMRAP'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText('AMRAP 10')).toBeInTheDocument() // default durationSec:600 -> "10"
+    expect(screen.getByText('AMRAP · 10:00')).toBeInTheDocument() // default durationSec:600 -> "10:00"
     expect(screen.queryByText('No Components yet.')).not.toBeInTheDocument()
   })
 
@@ -163,7 +163,7 @@ describe('ComposerEditor - reorder Components', () => {
     render(<Harness initial={[amrap, rft]} />)
     fireEvent.click(screen.getByLabelText(/Move AMRAP.*down/))
     // RFT's header should now render before AMRAP's in the DOM order.
-    const cardTexts = screen.getAllByText(/AMRAP 10|5 ROUNDS FOR TIME/).map(el => el.textContent)
+    const cardTexts = screen.getAllByText(/AMRAP · 10:00|5 ROUNDS FOR TIME/).map(el => el.textContent)
     expect(cardTexts[0]).toMatch(/ROUNDS FOR TIME/)
     expect(cardTexts[1]).toMatch(/AMRAP/)
   })

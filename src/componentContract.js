@@ -880,13 +880,16 @@ export function validateComposerForSave(components) {
 
 function componentDurationLabel(seconds) {
   if (seconds == null) return ''
-  return seconds % 60 === 0 ? String(Math.round(seconds / 60)) : secToTime(seconds)
+  return secToTime(seconds)
 }
 
-/** One component's human header - "AMRAP 6", "5 ROUNDS FOR TIME", "REST
- * 2:00", "BUY-IN", "CASH-OUT", "EMOM 8", "FOR TIME" - never an internal
- * term ("SCORE ENVELOPE", "SCORER", a component id). Buy-In/Cash-Out are
- * identified by `role`, never by format alone (both are format:'Once'). */
+/** One component's human header - "AMRAP · 6:00", "5 ROUNDS FOR TIME",
+ * "REST · 2:00", "BUY-IN", "CASH-OUT", "EMOM 8", "FOR TIME" - never an
+ * internal term ("SCORE ENVELOPE", "SCORER", a component id). Buy-In/
+ * Cash-Out are identified by `role`, never by format alone (both are
+ * format:'Once'). Duration-bearing headers use the full M:SS form with a
+ * middle-dot separator, exactly the ticket's own §21 examples ("AMRAP ·
+ * 6:00", "REST · 2:00") - not a bare minute count. */
 export function componentHeaderLabel(component) {
   if (component?.label) return component.label
   if (component?.role === 'buy-in') return 'BUY-IN'
@@ -895,11 +898,11 @@ export function componentHeaderLabel(component) {
   switch (component?.format) {
     case 'Rest': {
       const d = componentDurationLabel(c.durationSec)
-      return d ? `REST ${d}` : 'REST'
+      return d ? `REST · ${d}` : 'REST'
     }
     case 'AMRAP': {
       const d = componentDurationLabel(c.durationSec)
-      return d ? `AMRAP ${d}` : 'AMRAP'
+      return d ? `AMRAP · ${d}` : 'AMRAP'
     }
     case 'RFT':
       return c.rounds ? `${c.rounds} ROUNDS FOR TIME` : 'ROUNDS FOR TIME'

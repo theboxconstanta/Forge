@@ -239,10 +239,10 @@ describe('componentHeaderLabel', () => {
     expect(componentHeaderLabel(createComponent({ format: 'Once', role: 'buy-in' }))).toBe('BUY-IN')
     expect(componentHeaderLabel(createComponent({ format: 'Once', role: 'cash-out' }))).toBe('CASH-OUT')
   })
-  it('labels AMRAP/RFT/Rest/EMOM with their config-derived numbers', () => {
-    expect(componentHeaderLabel(createComponent({ format: 'AMRAP', config: { durationSec: 360 } }))).toBe('AMRAP 6')
+  it('labels AMRAP/RFT/Rest/EMOM with their config-derived numbers (ticket §21 - full M:SS with a middle dot)', () => {
+    expect(componentHeaderLabel(createComponent({ format: 'AMRAP', config: { durationSec: 360 } }))).toBe('AMRAP · 6:00')
     expect(componentHeaderLabel(createComponent({ format: 'RFT', config: { rounds: 5 } }))).toBe('5 ROUNDS FOR TIME')
-    expect(componentHeaderLabel(createComponent({ format: 'Rest', config: { durationSec: 120 } }))).toBe('REST 2')
+    expect(componentHeaderLabel(createComponent({ format: 'Rest', config: { durationSec: 120 } }))).toBe('REST · 2:00')
     expect(componentHeaderLabel(createComponent({ format: 'EMOM', config: { totalRounds: 8 } }))).toBe('EMOM 8')
     expect(componentHeaderLabel(createComponent({ format: 'For Time' }))).toBe('FOR TIME')
   })
@@ -264,7 +264,7 @@ describe('previewBlocksFromComponents', () => {
     const amrap = createComponent({ format: 'AMRAP', config: { durationSec: 600 }, instances: [inst('Pull-Ups'), inst('Burpees')] })
     const blocks = previewBlocksFromComponents([amrap])
     expect(blocks).toHaveLength(1)
-    expect(blocks[0].header).toBe('AMRAP 10')
+    expect(blocks[0].header).toBe('AMRAP · 10:00')
     expect(blocks[0].movementLines).toHaveLength(2)
   })
 
@@ -274,7 +274,7 @@ describe('previewBlocksFromComponents', () => {
     const rft = createComponent({ id: 'f', format: 'RFT', producesScore: true, config: { rounds: 5 } })
     const components = [amrap, rest, rft].map((c, i) => ({ ...c, order: i }))
     const blocks = previewBlocksFromComponents(components)
-    expect(blocks.map(b => b.header)).toEqual(['AMRAP 8', 'REST 2', '5 ROUNDS FOR TIME'])
+    expect(blocks.map(b => b.header)).toEqual(['AMRAP · 8:00', 'REST · 2:00', '5 ROUNDS FOR TIME'])
   })
 })
 
