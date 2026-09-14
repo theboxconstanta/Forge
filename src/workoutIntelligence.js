@@ -25,6 +25,7 @@
 
 import { createSection, newSectionId, emptySectionVariants, hydrateInstancesFromLegacy, VARIANT_LEVELS } from './wodSections'
 import { WORKOUT_FORMATS, getFormat } from './workoutFormats'
+import { componentsFromSection } from './componentContract'
 import { CARDIO_MISCARI } from './movements'
 
 // --- compunere text dintr-o miscare structurata ----------------------------
@@ -332,6 +333,17 @@ export function sectionFromAiSection(aiSection, isPrimary, sourceText) {
     section.durationMin = aiSection.durationMinutes != null ? String(Math.floor(aiSection.durationMinutes)) : base.durationMin
     section.durationSec = '0'
     section.variants = buildVariants(aiSection)
+    // WORKOUT COMPOSER PHASE 3 - PrimarySectionBody (App.jsx) always renders
+    // the Composer editor now, reading components[] - without this, an
+    // AI-drafted WOD would show as an empty Composer despite buildVariants
+    // having just populated real instances (`section.format`/`formatConfig`
+    // are already set above, so this is the exact same legacy->canonical
+    // projection sectionsFromLegacyWod already uses for an existing DB row -
+    // section.id was assigned above too, so this stays deterministic within
+    // this one draft, same as that call site's own guarantee).
+    for (const key of Object.keys(section.variants)) {
+      section.variants[key] = { ...section.variants[key], components: componentsFromSection(section, key) }
+    }
   } else {
     section.movementName = (aiSection.movements || [])[0]?.name || ''
     section.text = (aiSection.movements || []).map(composeMovementLine).filter(Boolean).join('\n')

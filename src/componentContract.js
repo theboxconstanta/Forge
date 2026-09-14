@@ -10,17 +10,27 @@
 //
 // COMPOSITION, NOT REIMPLEMENTATION - this file orchestrates the EXISTING
 // format engines (getFormat, repsEfectiveSecvential, composePartialText from
-// workoutFormats.js; hydrateInstancesFromLegacy from wodSections.js). It does
-// not implement a second AMRAP/For-Time/RFT/EMOM engine, a second movement-
-// identity system, or a second snapshot mechanism.
+// workoutFormats.js; hydrateInstancesFromLegacy from prescriptionContract.js).
+// It does not implement a second AMRAP/For-Time/RFT/EMOM engine, a second
+// movement-identity system, or a second snapshot mechanism.
 //
 // NO composite leaderboard here (average placement points, double-points,
 // Standard Competition Ranking, overall tie-break) - that is explicitly
 // out of Phase 1 scope (WORKOUT-COMPOSER-COMPOSITE-SCORING.md), a later
 // phase's concern once real Composer-authored data exists.
+//
+// DEPENDENCY DIRECTION (Workout Composer Phase 3) - this file imports only
+// from workoutFormats.js/prescriptionContract.js/utils.js (all dependency-
+// free leaves). wodSections.js imports FROM this file (componentsFromSection/
+// deriveLegacyFieldsFromComponents/createEmptyComposerVariants, for Composer
+// authoring persistence) - never the other way around, so
+// hydrateInstancesFromLegacy was moved out of wodSections.js into
+// prescriptionContract.js (re-exported from wodSections.js unchanged) rather
+// than importing wodSections.js here, which would have created a cycle.
 
-import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS } from './workoutFormats'
-import { hydrateInstancesFromLegacy } from './wodSections'
+import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS, VARIANTE_WEIGHT_BASE } from './workoutFormats'
+import { hydrateInstancesFromLegacy, renderInstanceLine, resolveSpec, buildLegacyArtifactsForVariant } from './prescriptionContract'
+import { secToTime } from './utils'
 
 // ============================================================================
 // Component identity
@@ -681,4 +691,393 @@ export function componentsFromSection(section, variantKey, opts = {}) {
   return normalizeComponentOrder([
     createComponent({ id: legacyComponentId(section, 'primary'), format, producesScore: true, config: cfg, instances }),
   ])
+}
+
+// ============================================================================
+// WORKOUT COMPOSER - PHASE 3 (PWA authoring UI domain support)
+// ============================================================================
+//
+// Everything below is pure, React-free authoring/persistence-shim logic the
+// new src/composerAuthoring.jsx UI and wodSections.js's Composer wiring both
+// call into. No new movement-identity system, no second format engine - a
+// coach-authored component still gets its config from the SAME WORKOUT_FORMATS
+// catalog every other editor already reads, and its movements are ordinary
+// prescriptionContract.js MovementInstance[] created via the SAME
+// newMovementInstance the rest of the app already uses.
+
+// The Composer's own curated, "genuinely authorable + loggable + persistable"
+// format catalog (ticket §7/§8) - deliberately narrower than the full
+// WORKOUT_FORMATS catalog. 'Intervals' is intentionally excluded: its
+// authoring model (roundCount/stationMode/restPlacement, INC-07) derives
+// station count from being the WHOLE primary section's one and only work,
+// which does not have a safe, proven meaning as one arbitrary-position
+// component among several yet (see Phase 3 final report for the full
+// reasoning) - not exposed simply because the format name exists in code.
+export const COMPOSER_FORMAT_GROUPS = [
+  {
+    key: 'one-time', label: 'One-time work',
+    options: [
+      { format: 'Once', role: 'buy-in', label: 'Buy-In' },
+      { format: 'Once', role: 'cash-out', label: 'Cash-Out' },
+    ],
+  },
+  {
+    key: 'completion', label: 'For completion',
+    options: [
+      { format: 'For Time', role: null, label: 'For Time' },
+      { format: 'RFT', role: null, label: 'Rounds For Time' },
+    ],
+  },
+  {
+    key: 'reps', label: 'For reps',
+    options: [{ format: 'AMRAP', role: null, label: 'AMRAP' }],
+  },
+  {
+    key: 'intervals', label: 'Intervals',
+    options: [{ format: 'EMOM', role: null, label: 'EMOM' }],
+  },
+  {
+    key: 'structure', label: 'Structure',
+    options: [{ format: 'Rest', role: null, label: 'Rest' }],
+  },
+]
+
+/** Sensible starting config for a freshly-added component, so the coach lands
+ * on something immediately valid/sensible rather than a blank/zeroed catalog
+ * field - reuses the same field defaults FormatConfigEditor already falls
+ * back to (`field.default`) where one is declared, plus the Composer's own
+ * defaults for the couple of fields that have no catalog default today. */
+export function defaultConfigForFormat(format) {
+  switch (format) {
+    case 'AMRAP': return { durationSec: 600 }
+    case 'RFT': return { rounds: 5 }
+    case 'EMOM': return { totalRounds: 8, intervalSec: 60 }
+    case 'Rest': return { durationSec: 120 }
+    default: return {}
+  }
+}
+
+/** Create one new, freshly-identified component ready to append (ticket §9 -
+ * stable id/order/format/role/producesScore/scoreOwnerId/config/instances,
+ * never a temporary UI-only id later swapped on save). */
+export function newComponentFromFormat(format, role = null) {
+  return createComponent({ format, role, config: defaultConfigForFormat(format) })
+}
+
+/** + Add Component (ticket §6/§9). Appends and renumbers order; never
+ * mutates the input array. */
+export function addComponentToList(components, format, role = null) {
+  return normalizeComponentOrder([...(components || []), newComponentFromFormat(format, role)])
+}
+
+/** Remove Component (ticket §22). Any OTHER component whose scoreOwnerId
+ * pointed at the removed one is cleared (never left dangling, never silently
+ * re-attached to a different owner, never deleted along with it) - the
+ * caller (UI) uses `clearedOwnershipFor` to warn the coach before/after the
+ * removal. `removed` is handed back so the UI can name it in that warning. */
+export function removeComponentFromList(components, id) {
+  const list = components || []
+  const removed = list.find(c => c.id === id) || null
+  const clearedOwnershipFor = []
+  const next = list
+    .filter(c => c.id !== id)
+    .map(c => {
+      if (c.scoreOwnerId === id) { clearedOwnershipFor.push(c.id); return { ...c, scoreOwnerId: null } }
+      return c
+    })
+  return { components: normalizeComponentOrder(next), removed, clearedOwnershipFor }
+}
+
+/** Reorder Components (ticket §11/§23/§49). Swaps the component at `id` with
+ * its neighbor in `direction` (-1 up, +1 down), then re-validates the WHOLE
+ * list - if the resulting order would break an envelope's contiguity (or any
+ * other domain rule), the reorder is rejected and the ORIGINAL array is
+ * returned unchanged (`ok:false`) rather than ever persisting an invalid
+ * Composer graph. A no-op at either end of the list succeeds trivially
+ * (`ok:true`, array unchanged) - there is nothing to reorder into. */
+export function moveComponent(components, id, direction) {
+  const list = components || []
+  const idx = list.findIndex(c => c.id === id)
+  if (idx === -1) return { components: list, ok: true }
+  const target = idx + direction
+  if (target < 0 || target >= list.length) return { components: list, ok: true }
+  const swapped = [...list]
+  const tmp = swapped[idx]
+  swapped[idx] = swapped[target]
+  swapped[target] = tmp
+  const reordered = normalizeComponentOrder(swapped)
+  const { valid, errors } = validateComponents(reordered)
+  if (!valid) return { components: list, ok: false, error: errors[0]?.code || 'INVALID' }
+  return { components: reordered, ok: true }
+}
+
+/** Establish or clear a Buy-In/Cash-Out's score ownership (ticket §10/§20).
+ * `scorerId === null` detaches it (becomes an independent, unscored
+ * component - the safe outcome after removing its former owner, ticket §22).
+ * Validates before applying; on failure the ORIGINAL array is returned
+ * unchanged with the domain error code, never a partially-applied edit. */
+export function setScoreOwner(components, bookendId, scorerId) {
+  const list = components || []
+  if (!list.some(c => c.id === bookendId)) return { components: list, ok: false, error: 'NOT_FOUND' }
+  const next = list.map(c => (c.id === bookendId ? { ...c, scoreOwnerId: scorerId } : c))
+  const { valid, errors } = validateComponents(next)
+  if (!valid) return { components: list, ok: false, error: errors[0]?.code || 'INVALID' }
+  return { components: next, ok: true }
+}
+
+/** Human-facing "Counts toward: [...]" candidate list (ticket §10) - every
+ * OTHER producesScore:true component `bookendId` could validly attach to.
+ * Never exposes raw ids to the coach; callers render each candidate's own
+ * `componentHeaderLabel`. */
+export function candidateScorersFor(components, bookendId) {
+  return (components || []).filter(c => c.id !== bookendId && c.producesScore)
+}
+
+/** Translate one validateComponents() error code into coach-facing copy
+ * (ticket §35) - never an internal code or a raw component id. `t` is the
+ * app's translation table (optional overrides); falls back to plain English
+ * so this remains usable from a pure test with no `t` at all. */
+export function describeValidationError(error, t) {
+  const code = typeof error === 'string' ? error : error?.code
+  const messages = {
+    DUPLICATE_ID: t?.composerErrDuplicateId || 'Something went wrong adding that component - try removing and re-adding it.',
+    UNKNOWN_FORMAT: t?.composerErrUnknownFormat || 'This component type is not supported.',
+    REST_CANNOT_SCORE: t?.composerErrRestCannotScore || 'Rest can never produce a score.',
+    SCORER_CANNOT_HAVE_OWNER: t?.composerErrScorerCannotHaveOwner || 'A scored component cannot itself count toward another component.',
+    SELF_OWNERSHIP: t?.composerErrSelfOwnership || 'A component cannot count toward itself.',
+    REST_CANNOT_BE_OWNED: t?.composerErrRestCannotBeOwned || 'Rest cannot belong to a scored workout.',
+    DANGLING_OWNER: t?.composerErrDanglingOwner || 'This component was counting toward a component that no longer exists.',
+    OWNER_CANNOT_SCORE: t?.composerErrOwnerCannotScore || 'This component must count toward a scored component.',
+    OWNERSHIP_CYCLE: t?.composerErrOwnershipCycle || 'These components are counting toward each other.',
+    BROKEN_ENVELOPE_CONTIGUITY: t?.composerErrBrokenEnvelope || 'Buy-In and Cash-Out must stay together with the workout they belong to.',
+  }
+  return messages[code] || t?.composerErrGeneric || 'This workout structure is not valid yet.'
+}
+
+/** Save gate (ticket §35/§36) - domain validation errors translated to coach
+ * copy, PLUS "an obviously invalid scored/one-time component with zero
+ * movements" (Rest is exempt - it never has movements). Returns
+ * `{valid, messages}`; `messages` is always coach-safe text, never an
+ * internal code or id. Does not decide "empty composer, nothing to save
+ * yet" - callers check `components.length === 0` themselves for that
+ * distinct, non-error state (ticket §5's true empty state is not a
+ * validation failure). */
+export function validateComposerForSave(components) {
+  const list = components || []
+  const domain = validateComponents(list)
+  const messages = domain.errors.map(e => describeValidationError(e))
+  list.forEach(c => {
+    if (c.format !== 'Rest' && (c.instances || []).length === 0) {
+      messages.push(`${componentHeaderLabel(c)}: add at least one movement.`)
+    }
+  })
+  return { valid: domain.valid && messages.length === domain.errors.length, messages }
+}
+
+// ----------------------------------------------------------------------------
+// Human-readable header + preview projection (ticket §21/§28/§29)
+// ----------------------------------------------------------------------------
+
+function componentDurationLabel(seconds) {
+  if (seconds == null) return ''
+  return seconds % 60 === 0 ? String(Math.round(seconds / 60)) : secToTime(seconds)
+}
+
+/** One component's human header - "AMRAP 6", "5 ROUNDS FOR TIME", "REST
+ * 2:00", "BUY-IN", "CASH-OUT", "EMOM 8", "FOR TIME" - never an internal
+ * term ("SCORE ENVELOPE", "SCORER", a component id). Buy-In/Cash-Out are
+ * identified by `role`, never by format alone (both are format:'Once'). */
+export function componentHeaderLabel(component) {
+  if (component?.label) return component.label
+  if (component?.role === 'buy-in') return 'BUY-IN'
+  if (component?.role === 'cash-out') return 'CASH-OUT'
+  const c = component?.config || {}
+  switch (component?.format) {
+    case 'Rest': {
+      const d = componentDurationLabel(c.durationSec)
+      return d ? `REST ${d}` : 'REST'
+    }
+    case 'AMRAP': {
+      const d = componentDurationLabel(c.durationSec)
+      return d ? `AMRAP ${d}` : 'AMRAP'
+    }
+    case 'RFT':
+      return c.rounds ? `${c.rounds} ROUNDS FOR TIME` : 'ROUNDS FOR TIME'
+    case 'EMOM':
+      return c.totalRounds ? `EMOM ${c.totalRounds}` : 'EMOM'
+    case 'For Time':
+      return 'FOR TIME'
+    default:
+      return String(component?.format || '').toUpperCase()
+  }
+}
+
+/** One component's movements as gender-neutral display lines - the SAME
+ * resolution every other coach-facing preview already uses
+ * (resolveSpec(_, null) + renderInstanceLine, prescriptionContract.js) so a
+ * Composer preview line reads identically to the legacy ComposedWorkoutView
+ * one for the same underlying instance. */
+export function renderComponentMovementLines(instances) {
+  return (instances || []).map(i => renderInstanceLine({
+    name: i.name,
+    reps: resolveSpec(i.reps, null),
+    load: resolveSpec(i.load, null),
+    distance: resolveSpec(i.distance, null),
+    calories: resolveSpec(i.calories, null),
+  }))
+}
+
+/** Preview projection reading canonical components[] directly, in canonical
+ * order (ticket §28) - no separate preview data, no envelope/scorer jargon
+ * (ticket §29): every component (bookend, scorer, or Rest) becomes one
+ * `{id, header, movementLines}` block, exactly the order the athlete will
+ * read it in. A single-component workout naturally previews as just that
+ * one block - nothing here numbers or labels it as "the only" component. */
+export function previewBlocksFromComponents(components) {
+  return (components || [])
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map(c => ({ id: c.id, header: componentHeaderLabel(c), movementLines: renderComponentMovementLines(c.instances) }))
+}
+
+// ----------------------------------------------------------------------------
+// Composer <-> legacy `wods` scalar-column write shim (ticket §32/§33/§34)
+// ----------------------------------------------------------------------------
+//
+// wodSections.js's legacyPayloadFromSections still writes `type`/
+// `format_config`/`movements_{k}` (the pre-Composer `wods` columns) on every
+// save - Home, the live single-score Logger and Photo Result all still read
+// ONLY those columns and are explicitly out of scope for this ticket. This
+// is the write-direction counterpart to componentsFromSection: given a
+// variant's authored components[], produce the best legacy-compatible
+// {type, formatConfig, instances} triple for those columns, while the FULL
+// components[] is ALWAYS additionally persisted verbatim (wodSections.js,
+// movement_prescriptions.variants[key].components) as the authoritative
+// truth for any Composer-aware reader (this same editor, on reopen).
+//
+// Three cases, in order of fidelity:
+//  1. exactly one scorer, no envelope -> byte-identical to Phase 1's
+//     existing "legacy single-score equivalence" (zero gap, zero limitation).
+//  2. exactly one scorer WITH an owned envelope, AND the scorer's format is
+//     'AMRAP' or 'For Time' (sequential) -> byte-identical to the EXISTING
+//     'AMRAP with Buy-In'/'Buy-In/Cash-Out' legacy shape - componentsFromSection
+//     already reads this exact shape back, and today's PRODUCTION Logger
+//     already fully supports it end to end (Phase 2). Zero gap.
+//  3. everything else (a repeated-rounds RFT/EMOM-scored envelope - the
+//     Composer's own primary illustrative "Buy-In -> 5 RFT -> Cash-Out"
+//     pattern, which has NO legacy 'mixed' equivalent per the Phase 0.2
+//     forensic finding; or 2+ independent scorers) -> falls back to the
+//     FIRST scorer's own format/config/instances alone (Phase 1's existing
+//     single-score-equivalence rule, applied to just that one component).
+//     This is a KNOWN, DOCUMENTED, REPORTED limitation (Phase 3 final
+//     report) - the pre-Composer scalar columns cannot represent this shape
+//     at all without a schema change (explicitly out of scope), so a reader
+//     that only understands those columns sees just that one component. It
+//     is NEVER lost: the persisted components[] (movement_prescriptions)
+//     remains complete and this same editor round-trips it perfectly on
+//     reopen. This is NOT the same decision as Phase 2.1's "no primary
+//     component" rule (wod_logs persistence, still enforced unchanged,
+//     untouched by this file) - it is an unrelated, pre-existing structural
+//     limit of the legacy `wods` scalar schema.
+export function deriveLegacyFieldsFromComponents(components) {
+  const list = components || []
+  const scorers = list.filter(c => c.producesScore)
+  if (scorers.length === 0) return null
+
+  const primaryScorer = scorers[0]
+  const envelope = getScoreEnvelope(list, primaryScorer.id)
+  const bookends = envelope.filter(c => c.id !== primaryScorer.id)
+
+  if (scorers.length === 1 && bookends.length > 0 && (primaryScorer.format === 'AMRAP' || primaryScorer.format === 'For Time')) {
+    const buyIn = bookends.find(c => c.role === 'buy-in')
+    const cashOut = bookends.find(c => c.role === 'cash-out')
+    const isAmrap = primaryScorer.format === 'AMRAP'
+    return {
+      type: isAmrap ? 'AMRAP with Buy-In' : 'Buy-In/Cash-Out',
+      formatConfig: {
+        ...(isAmrap
+          ? { totalDurationSec: primaryScorer.config?.durationSec ?? null }
+          : { mainFormat: 'For Time', mainDurationSec: primaryScorer.config?.timeCapSec ?? null }),
+        buyIn: buyIn ? buildLegacyArtifactsForVariant(buyIn.instances || []).lines : [],
+        cashOut: cashOut ? buildLegacyArtifactsForVariant(cashOut.instances || []).lines : [],
+      },
+      instances: primaryScorer.instances || [],
+    }
+  }
+
+  return {
+    type: primaryScorer.format,
+    formatConfig: primaryScorer.config || {},
+    instances: primaryScorer.instances || [],
+  }
+}
+
+/** Whether a components[] array represents genuine Composer authoring worth
+ * treating as authoritative, as opposed to componentsFromSection's own
+ * trivial single-component fallback wrapping an EMPTY, never-programmed
+ * variant (ticket §32 - every variant, even a bare/untouched one, gets a
+ * components[] projection purely so the Composer editor always has
+ * something to render; that projection must NOT be mistaken for "this
+ * variant was authored via the Composer" at save time - see
+ * wodSections.js's legacyPayloadFromSections, which must keep leaving
+ * movement_prescriptions.variants[key] entirely absent for a variant with
+ * nothing real in it, exactly as before this ticket). */
+export function hasComposerContent(components) {
+  const list = components || []
+  if (list.length > 1) return true
+  if (list.length === 1) {
+    const c = list[0]
+    return (c.instances || []).length > 0 || c.scoreOwnerId != null || c.role != null || c.format === 'Rest'
+  }
+  return false
+}
+
+/** Every MovementInstance across every component, flattened in canonical
+ * order - used ONLY for save-time prescription-completeness validation
+ * (wodSections.js's validatePrescriptionCompleteness), which does not care
+ * which component a movement belongs to, only whether every load/distance/
+ * calories spec the coach started is fully filled. Never used for scoring/
+ * envelope/persistence - those always resolve per-component. */
+export function allInstancesFromComponents(components) {
+  return (components || []).flatMap(c => c.instances || [])
+}
+
+/** Generate Variants / Regenerate with AI compatibility shim (ticket §31) -
+ * these two existing coach actions only ever operate on ONE variant's flat
+ * movement list at a time (scalingEngine.js/the AI regenerate endpoint - both
+ * unmodified, out of scope). For the overwhelming common "simple" Composer
+ * graph (RX has 0 or 1 component, no envelope), they still work unchanged:
+ * this produces the target variant's ONE component, mirroring the RX
+ * component's own format/role/config with freshly-generated instances - the
+ * exact same "regenerate this variant's movements" effect as before
+ * Composer existed, just re-homed into components[]. For a genuinely complex
+ * RX graph (2+ components) neither action has a safe, unambiguous target
+ * component to regenerate into - the caller (PrimarySectionBody) disables
+ * both and explains why, rather than guessing (ticket §31's own escape
+ * hatch: "preserve current legacy behavior and explicitly report the
+ * limitation"). */
+export function isSimpleComposerGraph(components) {
+  return (components || []).length <= 1
+}
+
+export function applyGeneratedInstancesToComponent(referenceComponent, instances) {
+  if (!referenceComponent) return []
+  return [createComponent({
+    format: referenceComponent.format, role: referenceComponent.role,
+    producesScore: referenceComponent.producesScore, config: referenceComponent.config, instances,
+  })]
+}
+
+/** A brand-new primary section's starting variants (ticket §5 - "Start
+ * Empty means exactly that": `components: []`, no default Buy-In/AMRAP/For
+ * Time/Rest ever auto-inserted). One independent, empty components[] array
+ * per variant (ticket §30 - variant independence from the very first
+ * moment), never a single array shared/aliased across variants. Carries the
+ * same `instances`/`movements`/`quickAdd`/`paste`/`weight`/`note` fields as
+ * wodSections.js's own emptySectionVariants() (`instances` stays an unused,
+ * harmless legacy mirror once Composer authoring is active - ticket §27's
+ * per-variant Notes field is the only one of those still read/written by
+ * the Composer editor). */
+export function createEmptyComposerVariants() {
+  return Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, { instances: [], movements: [], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '', components: [] }]))
 }

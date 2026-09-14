@@ -19,12 +19,21 @@
 import { VARIANTE_WEIGHT_BASE, AUTO_DURATION_FORMAT_IDS, estimateTotalDurationSec, isRestLine } from './workoutFormats'
 import {
   buildLegacyArtifactsForVariant,
-  parsePastedMovementLine,
   validatePrescriptionsForPublish,
   emptyPrescriptions,
   backfillInstanceIdentity,
-  resolveCatalogMovementByName,
+  hydrateInstancesFromLegacy,
 } from './prescriptionContract.js'
+import { componentsFromSection, deriveLegacyFieldsFromComponents, createEmptyComposerVariants, allInstancesFromComponents, hasComposerContent, validateComposerForSave } from './componentContract.js'
+// hydrateInstancesFromLegacy now lives in prescriptionContract.js (a
+// dependency-free leaf module) - re-exported here unchanged so every
+// existing `import { hydrateInstancesFromLegacy } from './wodSections'`
+// call site (App.jsx, workoutIntelligence.js, tests) keeps working. Moved
+// out (Workout Composer Phase 3) so componentContract.js could import it
+// too without creating a circular dependency with this file (wodSections.js
+// now imports componentContract.js for the Composer authoring/persistence
+// wiring below).
+export { hydrateInstancesFromLegacy }
 
 // Extrage greutatea dintr-o linie de miscare deja normalizata (ex. "21
 // Thrusters @ 43kg" sau "21 Thrusters @ 61/43kg") - "X/Y" e conventia RX
@@ -59,45 +68,6 @@ export const emptySectionVariants = () => Object.fromEntries(
   VARIANTE_WEIGHT_BASE.map(v => [v.key, { instances: [], movements: [], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' }])
 )
 
-// Per-Movement Prescription Engine (P5') - hydrate a legacy variant's editable
-// instance list from its `movements_{k}` text lines + optional shared
-// `{k}_weight_{male,female}` global pair. Same contract + shared parser as
-// forge-admin-web's sectionEditing.ts (hydrateInstancesFromLegacy). Pure,
-// best-effort, never persisted until the coach saves (architecture doc C.9.1).
-const LOADED_NAME_RE_PWA = /\b(snatch|clean|jerk|deadlift|thruster|squat|press|swing|lunge|carry|wall ?ball|barbell|dumbbell|kettlebell|db|kb|complex|shrug|curl|good morning|high pull|overhead)\b/i
-export const hydrateInstancesFromLegacy = (lines, globalWeight, movementIndex = null) => {
-  const instances = []
-  for (const line of lines || []) {
-    const parsed = parsePastedMovementLine(line)
-    if (!parsed) continue
-    // P9.3 - deterministic identity on reload: assign the canonical id when the
-    // name resolves unambiguously. Ambiguous names stay id-less (never guessed).
-    if (movementIndex && !parsed.instance.canonicalMovementId) {
-      const row = resolveCatalogMovementByName(movementIndex, parsed.instance.name)
-      if (row && !row.ambiguous) parsed.instance.canonicalMovementId = row.id
-    }
-    instances.push(parsed.instance)
-  }
-  const gm = parseWeightTextPwa(globalWeight?.male)
-  const gf = parseWeightTextPwa(globalWeight?.female)
-  const anyInlineLoad = instances.some(i => i.load)
-  // Only apply the shared global weight pair when NO line already carried an
-  // inline `@ x/y` load - a coach uses one convention or the other, not both.
-  if ((gm.value != null || gf.value != null) && !anyInlineLoad) {
-    const unit = gm.unit || gf.unit || 'kg'
-    const spec = { mode: 'sex_specific', male: gm.value, female: gf.value, unit }
-    let target = instances.find(i => !i.load && !i.distance && !i.calories && LOADED_NAME_RE_PWA.test(i.name))
-    if (!target) target = instances.find(i => !i.load && !i.distance && !i.calories)
-    if (target) target.load = spec
-  }
-  return instances
-}
-const parseWeightTextPwa = (raw) => {
-  const m = (raw || '').trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*(kg|lb|lbs)?/i)
-  if (!m) return { value: null, unit: null }
-  return { value: parseFloat(m[1]), unit: m[2] ? (/lb/i.test(m[2]) ? 'lb' : 'kg') : null }
-}
-
 // O sectiune "primara" (isPrimary) e singura care poate purta variante de
 // scalare + durata + nume WOD - restul (non-primare) sunt format+o singura
 // miscare+text liber (identic cu WARM-UP/SKILL/SKILL 2 dinainte de Faza 6).
@@ -118,6 +88,16 @@ const parseWeightTextPwa = (raw) => {
 // lista. null pt o sectiune noua, niciodata inca salvata - vezi
 // legacyPayloadFromSections mai jos pt de ce distinctia asta conteaza acum
 // (inainte de Layer 2a nu conta, continutul "urma pozitia" era inofensiv).
+// WORKOUT COMPOSER PHASE 3 (ticket §5 - "Start Empty means exactly that") -
+// a brand-new PRIMARY section starts with `components: []` on every variant
+// (createEmptyComposerVariants, componentContract.js), NEVER a default Buy-
+// In/AMRAP/For Time/Rest auto-inserted. `format`/`formatConfig` are left at
+// their old harmless defaults below (never read by the Composer editor once
+// `components` is an array - see PrimarySectionBody/legacyPayloadFromSections)
+// purely so this object's shape stays identical to before for any other
+// code that might still inspect it before the coach authors anything real.
+// A non-primary section (Warm-up/Skill) is completely untouched - Composer
+// authoring only ever applies to the one primary/Metcon section.
 export const createSection = (typeKey, isPrimary = false) => ({
   id: newSectionId(),
   typeKey,
@@ -134,7 +114,7 @@ export const createSection = (typeKey, isPrimary = false) => ({
   durationMin: '20',
   durationSec: '0',
   name: '',
-  variants: emptySectionVariants(),
+  variants: isPrimary ? createEmptyComposerVariants() : emptySectionVariants(),
 })
 
 // Sectiunile implicite la crearea unui WOD nou - familiare coach-ului
@@ -200,9 +180,12 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
     })
   }
   const [dMin, dSec] = (w.duration || '20:0').split(':')
+  const primaryId = newSectionId()
+  const primaryFormat = w.type || 'AMRAP'
+  const primaryFormatConfig = w.format_config || {}
   sections.push({
-    id: newSectionId(), typeKey: 'metcon', isPrimary: true, scored: true, visible: true, open,
-    title: '', format: w.type || 'AMRAP', formatConfig: w.format_config || {},
+    id: primaryId, typeKey: 'metcon', isPrimary: true, scored: true, visible: true, open,
+    title: '', format: primaryFormat, formatConfig: primaryFormatConfig,
     movementName: '', text: '', durationMin: dMin || '20', durationSec: dSec || '0', name: w.name || '',
     variants: Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => {
       const legacyLines = w[`movements_${v.key}`] || []
@@ -211,7 +194,25 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
       const instances = Array.isArray(structuredMovements) && structuredMovements.length > 0
         ? structuredMovements.map(m => ({ ...m }))
         : hydrateInstancesFromLegacy(legacyLines, weight, opts.movementIndex || null)
-      return [v.key, { instances, movements: legacyLines, quickAdd: '', paste: '', weight, note: w[`notes_${v.key}`] || '' }]
+      // WORKOUT COMPOSER PHASE 3 (ticket §32/§33 - "existing workout editing
+      // must still open through the Composer, using the Phase 1 adapter").
+      // A WOD already saved through the Composer carries its own persisted
+      // components[] (movement_prescriptions.variants[key].components) -
+      // preferred verbatim, with fresh top-level component objects (never
+      // aliased across reloads) but instances copied as-is (already-frozen
+      // JSON from this same read, matching the `structuredMovements` clone
+      // above). A WOD never touched by the Composer (the overwhelming
+      // majority today) falls back to componentsFromSection - the SAME
+      // Phase 1 legacy->canonical read adapter every other phase already
+      // uses - projecting this variant's format/formatConfig/instances into
+      // components[] on the fly, so the coach always sees a Composer
+      // Component card, never the old flat editor, even for a workout
+      // authored before the Composer existed.
+      const structuredComponents = w.movement_prescriptions?.variants?.[v.key]?.components
+      const components = Array.isArray(structuredComponents)
+        ? structuredComponents.map(c => ({ ...c, instances: (c.instances || []).map(m => ({ ...m })) }))
+        : componentsFromSection({ id: primaryId, format: primaryFormat, formatConfig: primaryFormatConfig, variants: { [v.key]: { instances } } }, v.key, { movementIndex: opts.movementIndex || null })
+      return [v.key, { instances, movements: legacyLines, quickAdd: '', paste: '', weight, note: w[`notes_${v.key}`] || '', components }]
     })),
   })
   return sections
@@ -386,6 +387,25 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
     }
   }
 
+  // WORKOUT COMPOSER PHASE 3 (ticket §32/§34) - once the RX variant carries
+  // canonical components[] (always true going forward for any primary
+  // section opened/created through this session's editor - see createSection/
+  // sectionsFromLegacyWod), the section-level legacy fields derive from
+  // THOSE components, never from primary.format/primary.formatConfig
+  // directly (those become a stale, unused mirror once Composer authoring
+  // is active). A bare section object built by a caller that never went
+  // through createSection/sectionsFromLegacyWod (rx.components null/empty)
+  // falls back to today's exact pre-Composer behavior, unchanged - see
+  // deriveLegacyFieldsFromComponents (componentContract.js) for the full
+  // mapping rules and their documented limitations.
+  const rxComponents = primary.variants?.rx?.components
+  const rxComposer = Array.isArray(rxComponents) && hasComposerContent(rxComponents) ? deriveLegacyFieldsFromComponents(rxComponents) : null
+  const effectiveFormat = rxComposer ? rxComposer.type : (primary.format || 'AMRAP')
+  const effectiveFormatConfigRaw = rxComposer ? rxComposer.formatConfig : (primary.formatConfig || {})
+  const rxInstancesForDerivation = rxComposer
+    ? rxComposer.instances
+    : (primary.variants?.rx?.instances?.length ? primary.variants.rx.instances : (primary.variants?.rx?.movements || []))
+
   // INC-07 - a structured per-interval Intervals section: the coach authored
   // `roundCount` (real rounds). Derive the legacy compat `rounds`
   // (= roundCount × RX station count, rest excluded), stamp the discriminators
@@ -393,11 +413,10 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   // section whose config never got a `roundCount` (a pre-INC-07 legacy row the
   // coach did not re-author) is left exactly as-is - legacy flat.
   const primaryFormatConfig = (() => {
-    const c = primary.formatConfig || {}
-    if (primary.format === 'Intervals') {
+    const c = effectiveFormatConfigRaw || {}
+    if (effectiveFormat === 'Intervals') {
       if (c.roundCount == null || !(Number(c.roundCount) > 0)) return c
-      const rxSv = primary.variants?.rx || {}
-      const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
+      const rxNames = rxInstancesForDerivation.map(m => (typeof m === 'string' ? m : m?.name))
       const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
       const roundCount = Number(c.roundCount)
       return {
@@ -427,15 +446,13 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
     // representation, while an EMOM never opened in it (or edited only via
     // an older client / AI regenerate) keeps falling through to the
     // existing shared-interval / legacy rules untouched.
-    if (primary.format === 'EMOM') {
-      const rxInstances = primary.variants?.rx?.instances || []
-      if (rxInstances.some((m) => Number.isInteger(m?.patternMinute))) {
+    if (effectiveFormat === 'EMOM') {
+      if (rxInstancesForDerivation.some((m) => m && typeof m === 'object' && Number.isInteger(m.patternMinute))) {
         return { ...c, stationMode: 'minute-pattern' }
       }
     }
-    if (primary.format === 'EMOM' && !(Array.isArray(c.intervals) && c.intervals.length > 0)) {
-      const rxSv = primary.variants?.rx || {}
-      const rxNames = (rxSv.instances?.length ? rxSv.instances.map(m => m?.name) : (rxSv.movements || []))
+    if (effectiveFormat === 'EMOM' && !(Array.isArray(c.intervals) && c.intervals.length > 0)) {
+      const rxNames = rxInstancesForDerivation.map(m => (typeof m === 'string' ? m : m?.name))
       const stationCount = rxNames.filter(n => typeof n === 'string' && n.trim() && !isRestLine(n)).length
       if (stationCount >= 2) {
         return { ...c, stationMode: 'shared-interval', roundCount: Number(c.totalRounds) || 0 }
@@ -444,9 +461,8 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
     return c
   })()
 
-  const autoDurationSec = AUTO_DURATION_FORMAT_IDS.includes(primary.format)
-    ? estimateTotalDurationSec(primary.format, primaryFormatConfig,
-        (primary.variants?.rx?.instances?.length ? primary.variants.rx.instances : primary.variants?.rx?.movements))
+  const autoDurationSec = AUTO_DURATION_FORMAT_IDS.includes(effectiveFormat)
+    ? estimateTotalDurationSec(effectiveFormat, primaryFormatConfig, rxInstancesForDerivation)
     : null
   const durationStr = autoDurationSec != null
     ? `${Math.floor(autoDurationSec / 60)}:${String(autoDurationSec % 60).padStart(2, '0')}`
@@ -460,8 +476,14 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
   const prescriptions = emptyPrescriptions()
   for (const v of VARIANTE_WEIGHT_BASE) {
     const sv = primary.variants?.[v.key] || { instances: [], movements: [], weight: { male: '', female: '' }, note: '' }
-    const rawInstances = movementIndex ? backfillInstanceIdentity(sv.instances || [], movementIndex) : (sv.instances || [])
-    const instances = normalizeEmomPatternMinute(primary.format, primaryFormatConfig.stationMode, stripBlankEmomInstances(primary.format, rawInstances))
+    // WORKOUT COMPOSER PHASE 3 - this variant's OWN components[] (variant
+    // independence, ticket §30 - RX and Beginner can author entirely
+    // different component graphs) decide this variant's legacy movement
+    // lines/weight mirror, never the shared primary.format/formatConfig.
+    const svComposer = Array.isArray(sv.components) && hasComposerContent(sv.components) ? deriveLegacyFieldsFromComponents(sv.components) : null
+    const sourceInstances = svComposer ? (svComposer.instances || []) : (sv.instances || [])
+    const rawInstances = movementIndex ? backfillInstanceIdentity(sourceInstances, movementIndex) : sourceInstances
+    const instances = normalizeEmomPatternMinute(effectiveFormat, primaryFormatConfig.stationMode, stripBlankEmomInstances(effectiveFormat, rawInstances))
     if (instances.length > 0) {
       prescriptions.variants[v.key] = { movements: instances }
       const art = buildLegacyArtifactsForVariant(instances)
@@ -474,10 +496,17 @@ export const legacyPayloadFromSections = (sections, opts = {}) => {
       variantFields[`${v.key}_weight_female`] = (sv.weight?.female || '').trim() || null
     }
     variantFields[`notes_${v.key}`] = (sv.note || '').trim() || null
+    // The FULL canonical components[] is ALWAYS additionally persisted
+    // verbatim (never lossy-summarized) - the authoritative truth this
+    // same editor prefers on reopen (sectionsFromLegacyWod above), no DB
+    // migration (movement_prescriptions is already free-form JSONB).
+    if (Array.isArray(sv.components) && hasComposerContent(sv.components)) {
+      prescriptions.variants[v.key] = { ...(prescriptions.variants[v.key] || {}), components: sv.components }
+    }
   }
 
   return {
-    type: primary.format || 'AMRAP',
+    type: effectiveFormat,
     duration: durationStr,
     format_config: Object.keys(primaryFormatConfig || {}).length > 0 ? primaryFormatConfig : null,
     name: primary.name.trim() || null,
@@ -562,7 +591,30 @@ export const validateSectionsForLegacy = (sections, t) => {
   }
   errors.push(...validateMovementPerformanceMetadata(sections, t))
   errors.push(...validatePrescriptionCompleteness(sections))
+  errors.push(...validateComposerSectionsForSave(sections))
   return { valid: errors.length === 0, errors }
+}
+
+// WORKOUT COMPOSER PHASE 3 (ticket §35/§36) - domain validateComposents()
+// errors (broken envelope contiguity, dangling owners, Rest scoring, etc.)
+// plus "an obviously invalid movement-requiring component with zero
+// movements", translated to coach-facing copy (describeValidationError,
+// componentContract.js), folded into the SAME save gate every other section
+// rule already goes through. A truly EMPTY components[] (Start Empty,
+// untouched - ticket §5) is not itself an error here, matching this gate's
+// existing behavior for an empty legacy movements list (an empty WOD was
+// always saveable before this ticket; this does not tighten that).
+export const validateComposerSectionsForSave = (sections) => {
+  const primary = sections.find(s => s.isPrimary)
+  if (!primary) return []
+  const messages = []
+  for (const v of VARIANTE_WEIGHT_BASE) {
+    const components = primary.variants?.[v.key]?.components
+    if (!Array.isArray(components) || components.length === 0) continue
+    const { valid, messages: msgs } = validateComposerForSave(components)
+    if (!valid) messages.push(...msgs)
+  }
+  return messages
 }
 
 // Per-Movement Prescription Engine save gate (P5') - `wods` has no draft state,
@@ -582,7 +634,18 @@ export const validatePrescriptionCompleteness = (sections) => {
     // "+ Add movement" had already written into `instances`. Stripped
     // BEFORE validateMovementPrescriptions ever sees it - scoped to EMOM
     // only, every other format's real "must have a name" rule is untouched.
-    const inst = stripBlankEmomInstances(primary.format, primary.variants?.[v.key]?.instances)
+    // WORKOUT COMPOSER PHASE 3 - a Composer-authored variant's real,
+    // coach-edited movements live in sv.components (every component's own
+    // instances, flattened - Buy-In's/Cash-Out's/every scorer's, not just
+    // one "legacy representative" component), never the stale sv.instances
+    // mirror. Without this, an incomplete load/distance/calories spec
+    // authored via the Composer would silently skip this save gate
+    // entirely (sv.instances stays empty while the coach only ever touches
+    // sv.components), not merely be validated against stale data.
+    const sv = primary.variants?.[v.key]
+    const rawInstances = Array.isArray(sv?.components) && sv.components.length > 0
+      ? allInstancesFromComponents(sv.components) : (sv?.instances || [])
+    const inst = stripBlankEmomInstances(primary.format, rawInstances)
     if (inst.length > 0) doc.variants[v.key] = { movements: inst }
   }
   if (Object.keys(doc.variants).length === 0) return []

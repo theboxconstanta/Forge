@@ -1481,3 +1481,51 @@ function titleWord(s) {
   // with the canonical form instead; this branch is the no-match fallback.
   return String(s).trim().replace(/\bdb\b/gi, 'DB').replace(/\bkb\b/gi, 'KB')
 }
+
+// Per-Movement Prescription Engine (P5') - hydrate a legacy variant's editable
+// instance list from its `movements_{k}` text lines + optional shared
+// `{k}_weight_{male,female}` global pair. Same contract + shared parser as
+// forge-admin-web's sectionEditing.ts (hydrateInstancesFromLegacy). Pure,
+// best-effort, never persisted until the coach saves (architecture doc C.9.1).
+//
+// Moved here from wodSections.js (Workout Composer Phase 3) - componentContract.js
+// needs this same hydration for its legacy->canonical read adapter
+// (componentsFromSection) and wodSections.js needs componentContract.js for
+// the reverse write direction (deriveLegacyFieldsFromComponents); this
+// function lives in prescriptionContract.js (a dependency-free leaf module)
+// so neither of those two files has to import the other. wodSections.js
+// re-exports this name unchanged, so every existing `import {
+// hydrateInstancesFromLegacy } from './wodSections'` call site is untouched.
+const LOADED_NAME_RE_PWA = /\b(snatch|clean|jerk|deadlift|thruster|squat|press|swing|lunge|carry|wall ?ball|barbell|dumbbell|kettlebell|db|kb|complex|shrug|curl|good morning|high pull|overhead)\b/i
+export const hydrateInstancesFromLegacy = (lines, globalWeight, movementIndex = null) => {
+  const instances = []
+  for (const line of lines || []) {
+    const parsed = parsePastedMovementLine(line)
+    if (!parsed) continue
+    // P9.3 - deterministic identity on reload: assign the canonical id when the
+    // name resolves unambiguously. Ambiguous names stay id-less (never guessed).
+    if (movementIndex && !parsed.instance.canonicalMovementId) {
+      const row = resolveCatalogMovementByName(movementIndex, parsed.instance.name)
+      if (row && !row.ambiguous) parsed.instance.canonicalMovementId = row.id
+    }
+    instances.push(parsed.instance)
+  }
+  const gm = parseWeightTextPwa(globalWeight?.male)
+  const gf = parseWeightTextPwa(globalWeight?.female)
+  const anyInlineLoad = instances.some(i => i.load)
+  // Only apply the shared global weight pair when NO line already carried an
+  // inline `@ x/y` load - a coach uses one convention or the other, not both.
+  if ((gm.value != null || gf.value != null) && !anyInlineLoad) {
+    const unit = gm.unit || gf.unit || 'kg'
+    const spec = { mode: 'sex_specific', male: gm.value, female: gf.value, unit }
+    let target = instances.find(i => !i.load && !i.distance && !i.calories && LOADED_NAME_RE_PWA.test(i.name))
+    if (!target) target = instances.find(i => !i.load && !i.distance && !i.calories)
+    if (target) target.load = spec
+  }
+  return instances
+}
+function parseWeightTextPwa(raw) {
+  const m = (raw || '').trim().replace(',', '.').match(/^(\d+(?:\.\d+)?)\s*(kg|lb|lbs)?/i)
+  if (!m) return { value: null, unit: null }
+  return { value: parseFloat(m[1]), unit: m[2] ? (/lb/i.test(m[2]) ? 'lb' : 'kg') : null }
+}

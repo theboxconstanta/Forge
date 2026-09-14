@@ -314,7 +314,7 @@ function EmomScoringField({ label, value, onChange, movementInstances, t }) {
   )
 }
 
-export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, movementInstances, t }) {
+export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, movementInstances, hideFormatSelector, t }) {
   const options = formatOptions || FORMAT_IDS
   const format = getFormat(formatId)
   const cfg = config || {}
@@ -323,12 +323,22 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
 
   return (
     <div>
-      <div style={fieldWrapStyle}>
-        <div style={labelStyle}>{t?.formatEditorTypeLabel || 'Format'}</div>
-        <select value={formatId} onChange={e => onFormatChange(e.target.value)} style={inputStyle}>
-          {options.map(id => <option key={id} value={id}>{id}</option>)}
-        </select>
-      </div>
+      {/* Workout Composer Phase 3 - a per-Component config editor (App.jsx's
+          ComponentCard) fixes the format at "+ Add Component" time (the
+          Picker is the one place a coach chooses it) and only needs the
+          config fields below, never this generic format dropdown - the
+          coach cannot silently retype an AMRAP Component into a Rest one
+          from inside its own card. Every other call site (PrimarySectionBody/
+          SectionCard's skill editor) is unaffected - they never pass this
+          prop, so the selector renders exactly as before. */}
+      {!hideFormatSelector && (
+        <div style={fieldWrapStyle}>
+          <div style={labelStyle}>{t?.formatEditorTypeLabel || 'Format'}</div>
+          <select value={formatId} onChange={e => onFormatChange(e.target.value)} style={inputStyle}>
+            {options.map(id => <option key={id} value={id}>{id}</option>)}
+          </select>
+        </div>
+      )}
       {Object.entries(format.config || {}).filter(([key]) => !excluded.includes(key)).map(([key, field]) => {
         const label = t?.[field.labelKey] || field.labelKey
         if (field.type === 'duration') return (

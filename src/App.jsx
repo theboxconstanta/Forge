@@ -65,8 +65,11 @@ import { sectionsFromAiAnalysis, deriveReviewFlags } from './workoutIntelligence
 import { diffAiVsSaved } from './aiProvenanceDiff'
 import { buildAggregateLeaderboard } from './aggregateLeaderboard'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
-import { composeSection } from './workoutComposer'
-import { ComposedWorkoutView } from './ComposedWorkoutView'
+import ComposerEditor, { ComposerPreview } from './composerAuthoring'
+import {
+  isSimpleComposerGraph, applyGeneratedInstancesToComponent,
+  renderComponentMovementLines, hasComposerContent, createComponent, normalizeComponentOrder,
+} from './componentContract'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
@@ -956,35 +959,6 @@ function MiscareQuickAdd({ value, onChange, onAdd, placeholder, weightUnit, t, h
   )
 }
 
-// Faza 6 - corpul sectiunii PRIMARE (format+durata+nume+cele 4 variante de
-// scalare) - identic cu vechiul card "Workout of the Day", doar ca citeste/
-// scrie din `section` in loc de starea individuala de dinainte de Faza 6.
-// Workout Composer (WORKOUT_COMPOSER_SPEC_v1.md) - previzualizare live, in
-// editorul de admin, a felului in care sectiunea primara se va citi pentru
-// sportiv (composeSection + ComposedWorkoutView, ambele deja testate izolat).
-// Doar varianta RX (referinta) - nu un selector complet de variante, care ar
-// fi UI nou neinclus in contractul deja validat. Prima expunere reala catre
-// utilizator a Composer-ului, deliberat DOAR in Admin (nu inca pe Acasa/
-// Jurnal/Clasament) - validare pe WOD-uri reale, din toate familiile, inainte
-// sa devina noua fundatie de randare (decizia userului).
-function ComposedWorkoutPreview({ section, t }) {
-  // P9.4 - ONE shared structured-workout projection. When the RX variant carries
-  // structured instances, the preview's movement lines come from the SAME
-  // resolveMovementInstance engine the member screen / logger / snapshot use
-  // (gender-neutral = coach mode: "20 Power Snatch @ 45/30 kg"). A legacy-only
-  // section keeps its regenerated text lines. composeSection still owns the
-  // TITLE / SCHEME / block layout.
-  const structured = composeStructuredWorkoutDisplay({ instances: section?.variants?.rx?.instances, mode: 'coach' })
-  const composed = composeSection(section, 'rx', structured ? structured.lines : null)
-  if (!composed || composed.blocks.length === 0) return null
-  return (
-    <div style={{ background: '#F7F7F5', border: '1px solid #eee', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
-      <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t.adminWodComposedPreviewLabel}</div>
-      <ComposedWorkoutView composed={composed} t={t} />
-    </div>
-  )
-}
-
 // P9.4 - one movement line for the Member workout screen. A STRUCTURED line
 // (from composeStructuredWorkoutDisplay - the same engine as the Coach Preview /
 // logger / snapshot) is already gender-resolved and clean: render it verbatim.
@@ -1587,63 +1561,27 @@ export function EmomMinutePatternEditor({ instances, onChange, catalog, interval
 }
 
 // Rendering for a single scaling variant's editable body (weight/movements/
-// quick-add/paste/notes) - factored out of the old VARIANT_LEVELS.map stack
-// so PrimarySectionBody can render exactly one active tab's variant instead
-// of all four stacked vertically. Behavior/markup unchanged from before the
-// tab-bar conversion (Coach Quick Create Phase 1).
-function VariantEditorBody({ v, sv, section, updateVariant, movementCatalog, t }) {
-  // Per-Movement Prescription Engine (P5') - `instances` is the canonical
-  // editable representation. The old per-variant weight M/F inputs + free-text
-  // movement list + quick-add + paste-textarea are replaced by the structured
-  // MovementRowListPWA (capability-driven per-movement prescription). Fast text
-  // authoring stays first-class via the row list's "Paste workout". Legacy
-  // `movements`/`weight`/`quickAdd`/`paste` fields are regenerated from
-  // `instances` at save (legacyPayloadFromSections) and not shown here.
-  // EMOM MINUTE-PATTERN AUTHORING - EMOM's flat movement list means
-  // something structurally different from every other format (usually ONE
-  // movement per minute, cycling - not all of them every minute), so it
-  // gets its own minute-grouped editor here instead of the generic flat
-  // MovementRowListPWA. Same underlying `instances` array/onChange
-  // contract either way - only the grouping UI differs.
-  return (
-    <div style={{ background: v.bg, borderRadius: '12px', padding: '12px', marginBottom: '10px' }}>
-      <div style={{ fontSize: '12px', fontWeight: '600', color: v.culoare, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><LevelDot nivel={v.nivel} /> {v.label}</div>
-      {section.format === 'EMOM' ? (
-        <EmomMinutePatternEditor
-          instances={sv.instances || []}
-          onChange={(instances) => updateVariant(v.key, { instances })}
-          catalog={movementCatalog}
-          intervalSec={section.formatConfig?.intervalSec}
-        />
-      ) : (
-        <MovementRowListPWA
-          instances={sv.instances || []}
-          onChange={(instances) => updateVariant(v.key, { instances })}
-          catalog={movementCatalog}
-        />
-      )}
-      <div style={{ fontSize: '11px', color: '#888', marginTop: '10px', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
-      <input value={sv.note} onChange={e => updateVariant(v.key, { note: e.target.value })}
-        placeholder={t.adminWodNotesPlaceholder}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
-    </div>
-  )
-}
-
 const REGENERATABLE_TIERS = ['intermediate', 'beginner', 'onramp']
 
-// Coach Quick Create Phase 1 (Automatic Variant Generation) - RX ->
-// Intermediate -> Beginner -> On-Ramp tab bar, replacing the old
-// VARIANT_LEVELS.map flat stack. VariantEditorBody is reused unmodified,
-// one instance per active tab.
+// WORKOUT COMPOSER PHASE 3 - the Metcon/primary section's body is now the
+// Composer editor (ComposerEditor, composerAuthoring.jsx) operating on the
+// active tab's canonical components[], replacing the old flat single-format
+// VariantEditorBody entirely (evolved, not opt-in - every primary section,
+// new or legacy-loaded, is hydrated with components[] by createSection/
+// sectionsFromLegacyWod, wodSections.js). section.format/formatConfig are a
+// stale, unused mirror once components[] is real (format is now chosen per
+// Component, via the Picker, not once for the whole section) - the old
+// top-level FormatConfigEditor is gone; each ComponentCard owns its own.
 //
-// "Generate Variants" (RX tab only) is the default, instant path
-// (scalingEngine.js, pure/synchronous - fits the 30-second
-// create-to-publish rule by construction). "Regenerate with AI" per
-// non-RX tab is optional and additive (one LLM call, that tab only) -
-// never part of the default path, never touches the other tabs' state.
-// Mirrors forge-admin-web's VariantTabs.tsx (same repo pair as
-// scalingEngine.js/scalingEngine.ts).
+// Coach Quick Create Phase 1 (Automatic Variant Generation) - RX ->
+// Intermediate -> Beginner -> On-Ramp tab bar. "Generate Variants"/
+// "Regenerate with AI" still work UNCHANGED for the overwhelming common
+// "simple" graph (RX has 0-1 components, no envelope) - they regenerate
+// that one component's instances into the other tiers (ticket §31). For a
+// genuinely complex RX graph they are disabled with an inline explanation
+// rather than guessing which component to regenerate - the ticket's own
+// escape hatch ("preserve current legacy behavior and explicitly report the
+// limitation").
 //
 // No new draft/publish state machine here either: this is still just the
 // section's existing `variants` field, covered by the same
@@ -1655,9 +1593,9 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
   const [regenerateError, setRegenerateError] = useState(null)
 
   const orderedLevels = [...VARIANT_LEVELS].reverse() // rx, intermediate, beginner, onramp
-  const activeLevel = orderedLevels.find(v => v.key === activeTab) || orderedLevels[0]
-  const rxHasMovements = (section.variants.rx.instances || []).length > 0
-  const renderRxLine = (i) => renderInstanceLine({ name: i.name, reps: resolveSpec(i.reps, null), load: resolveSpec(i.load, null), distance: resolveSpec(i.distance, null), calories: resolveSpec(i.calories, null) })
+  const rxComponents = section.variants.rx.components || []
+  const rxIsSimple = isSimpleComposerGraph(rxComponents)
+  const rxHasMovements = rxIsSimple && (rxComponents[0]?.instances || []).length > 0
 
   const generateVariants = () => {
     // Per-Movement Prescription Engine (P6/P5') - structured generation. Each
@@ -1665,16 +1603,16 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
     // no shared object references). Gym-created movements' default_substitutions
     // still take precedence over the static SCALING_SUBSTITUTIONS table.
     const generated = generateVariantInstancesFromRx(
-      section.variants.rx.instances || [],
+      rxComponents[0]?.instances || [],
       buildScalingOverrides(movementCatalog?.movements || []),
       (name) => movementCatalog?.lookupForParse?.(name) ?? null,
     )
     onChange((s) => ({
       variants: {
         ...s.variants,
-        intermediate: { ...s.variants.intermediate, instances: generated.intermediate },
-        beginner: { ...s.variants.beginner, instances: generated.beginner },
-        onramp: { ...s.variants.onramp, instances: generated.onramp },
+        intermediate: { ...s.variants.intermediate, components: applyGeneratedInstancesToComponent(rxComponents[0], generated.intermediate) },
+        beginner: { ...s.variants.beginner, components: applyGeneratedInstancesToComponent(rxComponents[0], generated.beginner) },
+        onramp: { ...s.variants.onramp, components: applyGeneratedInstancesToComponent(rxComponents[0], generated.onramp) },
       },
     }))
   }
@@ -1685,14 +1623,15 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
     setRegenerateError(null)
     try {
       const rx = section.variants.rx
+      const rxComponent = rxComponents[0]
       const result = await regenerateVariantApi({
-        rxSection: { movements: (rx.instances || []).map(renderRxLine), weight: rx.weight, note: rx.note, format: section.format || '' },
+        rxSection: { movements: renderComponentMovementLines(rxComponent?.instances), weight: rx.weight, note: rx.note, format: rxComponent?.format || '' },
         targetTier: tier,
         gymMovementContext: (movementCatalog?.movements || []).map(m => m.name),
       })
       const { movements } = parseWorkoutPaste((result.movements || []).join('\n'), { lookupCanonical: (name) => movementCatalog?.lookupForParse?.(name) ?? null })
       onChange((s) => ({
-        variants: { ...s.variants, [tier]: { ...s.variants[tier], instances: movements.map(m => m.instance), note: result.note } },
+        variants: { ...s.variants, [tier]: { ...s.variants[tier], components: applyGeneratedInstancesToComponent(rxComponent, movements.map(m => m.instance)), note: result.note } },
       }))
     } catch (e) {
       console.error('regenerateVariant failed:', e)
@@ -1703,39 +1642,23 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
 
   return (
     <div>
-      <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
-        config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })}
-        excludeConfigKeys={['durationSec', 'timeCapSec']} movementInstances={section.variants?.rx?.instances} t={t} />
-      {AUTO_DURATION_FORMAT_IDS.includes(section.format) ? (
-        <div style={{ marginBottom: '10px' }}>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0f0f0', fontSize: '13px', color: '#555' }}>
-            {estimateTotalDurationSec(section.format, section.formatConfig) != null
-              ? <>{secToTime(estimateTotalDurationSec(section.format, section.formatConfig))} <span style={{ color: '#aaa' }}>({t.adminWodDurationAuto})</span></>
-              : t.adminWodDurationPending}
-          </div>
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+        <div style={{ flex: 1 }}>
+          <input type="number" min="0" value={section.durationMin} onChange={e => onChange({ durationMin: e.target.value })} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
         </div>
-      ) : (
-        <>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodDurationLabel}</div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <input type="number" min="0" value={section.durationMin} onChange={e => onChange({ durationMin: e.target.value })} placeholder="20" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-              <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodMinutesLabel}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <input type="number" min="0" max="59" value={section.durationSec} onChange={e => onChange({ durationSec: e.target.value })} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
-              <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
-            </div>
-          </div>
-        </>
-      )}
+        <div style={{ flex: 1 }}>
+          <input type="number" min="0" max="59" value={section.durationSec} onChange={e => onChange({ durationSec: e.target.value })} placeholder="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
+          <div style={{ fontSize: '10px', color: '#aaa', marginTop: '3px', textAlign: 'center' }}>{t.adminWodSecondsLabel}</div>
+        </div>
+      </div>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNameLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
       <input value={section.name} onChange={e => onChange({ name: e.target.value })} placeholder='ex: "Fran", "Helen", "Grace"' style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
 
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #e0e0e0', marginBottom: '10px' }}>
         {orderedLevels.map(v => {
-          const hasContent = (section.variants[v.key]?.instances || []).length > 0
+          const hasContent = hasComposerContent(section.variants[v.key]?.components || [])
           return (
             <button key={v.key} onClick={() => setActiveTab(v.key)}
               style={{
@@ -1759,7 +1682,8 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
             style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: 'none', background: rxHasMovements ? '#0E0E0E' : '#ccc', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: rxHasMovements ? 'pointer' : 'not-allowed' }}>
             {t.adminWodGenerateVariantsButton}
           </button>
-          {!rxHasMovements && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{t.adminWodGenerateVariantsHint}</div>}
+          {!rxIsSimple && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{t.composerGenerateVariantsMultiComponent || 'Generate Variants works for a single-Component RX workout - build each variant\'s Components separately for a multi-Component Metcon.'}</div>}
+          {rxIsSimple && !rxHasMovements && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{t.adminWodGenerateVariantsHint}</div>}
         </div>
       )}
 
@@ -1769,7 +1693,7 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
         </div>
       )}
 
-      {REGENERATABLE_TIERS.includes(activeTab) && (
+      {REGENERATABLE_TIERS.includes(activeTab) && rxIsSimple && (
         <div style={{ marginBottom: '10px' }}>
           <button onClick={() => regenerateWithAi(activeTab)} disabled={!rxHasMovements || regenerating !== null}
             style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '12px', fontWeight: '600', color: '#555', cursor: (!rxHasMovements || regenerating !== null) ? 'not-allowed' : 'pointer', opacity: (!rxHasMovements || regenerating !== null) ? 0.6 : 1 }}>
@@ -1778,14 +1702,28 @@ function PrimarySectionBody({ section, onChange, updateVariant, movementCatalog,
         </div>
       )}
 
-      <VariantEditorBody v={activeLevel} sv={section.variants[activeTab]} section={section} updateVariant={updateVariant} movementCatalog={movementCatalog} t={t} />
+      <ComposerEditor
+        components={section.variants[activeTab]?.components || []}
+        onChange={(components) => updateVariant(activeTab, { components })}
+        movementCatalog={movementCatalog}
+        MovementEditor={MovementRowListPWA}
+        EmomEditor={EmomMinutePatternEditor}
+        t={t}
+      />
+
+      <div style={{ marginTop: '10px' }}>
+        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminWodNotesLabel} <span style={{ color: '#bbb' }}>{t.adminWodNameOptional}</span></div>
+        <input value={section.variants[activeTab]?.note || ''} onChange={e => updateVariant(activeTab, { note: e.target.value })}
+          placeholder={t.adminWodNotesPlaceholder}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box' }} />
+      </div>
 
       {/* PREVIEW (how the athlete will read this) - the LAST, read-only block of
-          the variant editor. Same source/projection as before (composeSection
-          -> ComposedWorkoutView, RX reference); only its position moved so the
-          coach finishes all authoring before reviewing. */}
+          the variant editor. Reads canonical components[] directly (ticket
+          §28/§29), RX reference only - same deliberate scope as before
+          Composer existed ("first real exposure... deliberately RX only"). */}
       <div style={{ marginTop: '18px', paddingTop: '4px', borderTop: '1px solid #e0e0e0' }}>
-        <ComposedWorkoutPreview section={section} t={t} />
+        <ComposerPreview components={section.variants.rx.components} t={t} />
       </div>
     </div>
   )
@@ -4634,7 +4572,21 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     primary.formatConfig = { rounds: 5, timeCapSec: 18 * 60 }
     primary.open = true
     const movements = ['10 pull-ups', '15 push-ups', '20 air squats'].map(parseMiscareLinePasta)
-    const mkVar = () => ({ instances: hydrateInstancesFromLegacy(movements, { male: null, female: null }, movementCatalog.index), movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '' })
+    // WORKOUT COMPOSER PHASE 3 - PrimarySectionBody now always renders the
+    // Composer editor (components[]), never the old flat instances-only
+    // body - without a components[] entry here, "Use Template" would
+    // silently show an empty Composer despite these instances being
+    // present (legacyPayloadFromSections would still save correctly via
+    // its own components-absent fallback, but the coach would see nothing
+    // to edit). One plain RFT component, no envelope, mirrors this
+    // template's own format/config exactly.
+    const mkVar = () => {
+      const instances = hydrateInstancesFromLegacy(movements, { male: null, female: null }, movementCatalog.index)
+      return {
+        instances, movements: [...movements], quickAdd: '', paste: '', weight: { male: '', female: '' }, note: '',
+        components: normalizeComponentOrder([createComponent({ format: 'RFT', producesScore: true, config: primary.formatConfig, instances })]),
+      }
+    }
     primary.variants = Object.fromEntries(VARIANTE_WEIGHT_BASE.map(v => [v.key, mkVar()]))
     setWodSections([primary])
     if (shouldEnterNewWodSession(editWodId)) setCreatingNewWod(true)
