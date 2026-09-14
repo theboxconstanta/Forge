@@ -28,7 +28,7 @@
 // prescriptionContract.js (re-exported from wodSections.js unchanged) rather
 // than importing wodSections.js here, which would have created a cycle.
 
-import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS, VARIANTE_WEIGHT_BASE } from './workoutFormats'
+import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS, VARIANTE_WEIGHT_BASE, getWorkoutFormatDisplay } from './workoutFormats'
 import { hydrateInstancesFromLegacy, renderInstanceLine, resolveSpec, buildLegacyArtifactsForVariant } from './prescriptionContract'
 import { secToTime } from './utils'
 
@@ -922,32 +922,94 @@ export function componentHeaderLabel(component) {
   }
 }
 
-/** One component's movements as gender-neutral display lines - the SAME
- * resolution every other coach-facing preview already uses
- * (resolveSpec(_, null) + renderInstanceLine, prescriptionContract.js) so a
- * Composer preview line reads identically to the legacy ComposedWorkoutView
- * one for the same underlying instance. */
-export function renderComponentMovementLines(instances) {
+/** One component's movements as display lines - `gender` defaults to null
+ * (gender-neutral "45/30 kg", the coach-facing Builder Preview convention,
+ * resolveSpec(_, null) + renderInstanceLine, prescriptionContract.js).
+ * Phase 3.2 - the SAME athlete's own gender ('male'|'female') the member
+ * Home card already resolves every other movement line with
+ * (memberGenderKey/resolveAthleteGenderKey, App.jsx) can be passed here too,
+ * so a Composer member prescription line resolves identically to a legacy
+ * one for the same underlying instance - one shared projection, not two
+ * independent interpretations (ticket §20). */
+export function renderComponentMovementLines(instances, gender = null) {
   return (instances || []).map(i => renderInstanceLine({
     name: i.name,
-    reps: resolveSpec(i.reps, null),
-    load: resolveSpec(i.load, null),
-    distance: resolveSpec(i.distance, null),
-    calories: resolveSpec(i.calories, null),
+    reps: resolveSpec(i.reps, gender),
+    load: resolveSpec(i.load, gender),
+    distance: resolveSpec(i.distance, gender),
+    calories: resolveSpec(i.calories, gender),
   }))
 }
 
-/** Preview projection reading canonical components[] directly, in canonical
- * order (ticket §28) - no separate preview data, no envelope/scorer jargon
- * (ticket §29): every component (bookend, scorer, or Rest) becomes one
- * `{id, header, movementLines}` block, exactly the order the athlete will
- * read it in. A single-component workout naturally previews as just that
- * one block - nothing here numbers or labels it as "the only" component. */
-export function previewBlocksFromComponents(components) {
+/** Secondary timing metadata for one component's header (Phase 3.2, ticket
+ * §10 - "5 ROUNDS FOR TIME    Time cap 20:00") - reuses the EXISTING
+ * canonical getWorkoutFormatDisplay (workoutFormats.js, already powers the
+ * legacy per-section WorkoutFormatHeader widget) for JUST its secondary
+ * value, discarding its `primary` (that helper's "5 RFT" abbreviated
+ * convention is NOT the Composer's own header language -
+ * componentHeaderLabel already owns "5 ROUNDS FOR TIME" for that). Returns
+ * null for Buy-In/Cash-Out/Rest (never a time-cap concept) or a scorer with
+ * no time-relevant config set - never invents a value.
+ *
+ * ONLY returns a value when getWorkoutFormatDisplay attaches a real LABEL
+ * (i.e. `secondaryLabel` truthy - TIME_CAP_LABEL_FORMAT_IDS in
+ * workoutFormats.js: 'For Time'/'RFT'/'Chipper'/'Ladder'/'Partner WOD',
+ * same existing `!!secondaryLabel` convention workoutFormats.js's own
+ * setsScoreLabel already uses to distinguish "this is a time CAP" from "this
+ * is just a bare duration"). An AMRAP/EMOM's own duration/round count is
+ * already embedded in componentHeaderLabel's header text ("AMRAP · 6:00",
+ * "EMOM 8") - surfacing getWorkoutFormatDisplay's unlabeled duration for
+ * those here too would render the same number twice, once as the header and
+ * once as a confusing, unlabeled secondary value (found live via the QA
+ * harness - "AMRAP · 8:00" next to a bare, unlabeled "8:00"). */
+export function componentSecondaryTiming(component, t) {
+  if (!component || component.role === 'buy-in' || component.role === 'cash-out' || component.format === 'Rest') return null
+  const { secondaryLabel, secondaryValue } = getWorkoutFormatDisplay(component.format, component.config || {}, null, t)
+  if (!secondaryLabel || !secondaryValue) return null
+  return { label: secondaryLabel, value: secondaryValue }
+}
+
+/** Preview/prescription projection reading canonical components[] directly,
+ * in canonical order (ticket §28) - no separate preview data, no envelope/
+ * scorer jargon (ticket §29): every component (bookend, scorer, or Rest)
+ * becomes one `{id, header, movementLines, secondary}` block, exactly the
+ * order the athlete will read it in. A single-component workout naturally
+ * previews as just that one block - nothing here numbers or labels it as
+ * "the only" component. `opts.gender` and `opts.t` thread through to
+ * renderComponentMovementLines/componentSecondaryTiming - the ONE shared
+ * projection both the Builder Preview (composerAuthoring.jsx, gender-
+ * neutral) and the member prescription card (composerMemberPrescription.jsx,
+ * the athlete's own gender) call, so their component order/content can
+ * never diverge (ticket §20). */
+export function previewBlocksFromComponents(components, opts = {}) {
+  const { gender = null, t = null } = opts
   return (components || [])
     .slice()
     .sort((a, b) => a.order - b.order)
-    .map(c => ({ id: c.id, header: componentHeaderLabel(c), movementLines: renderComponentMovementLines(c.instances) }))
+    .map(c => ({
+      id: c.id,
+      header: componentHeaderLabel(c),
+      movementLines: renderComponentMovementLines(c.instances, gender),
+      secondary: componentSecondaryTiming(c, t),
+    }))
+}
+
+/** Decide whether ONE variant's member prescription should render from
+ * canonical components[] (Phase 3.2, ticket §1/§3 - a genuine multi-
+ * Component graph: an owned envelope, a Rest, or 2+ independent scorers,
+ * none of which the legacy scalar columns can fully represent) or fall
+ * back to the existing single-format path (ticket §19 - a trivial 0-1-
+ * component graph stays visually byte-identical to before this phase).
+ * Reads ONLY `variantKey`'s own components - ticket §15/§26, never another
+ * variant's (no cross-variant leakage - each variant is independently
+ * resolved). Returns the components[] array when the Composer path
+ * applies, else `null` (the caller's existing legacy renderer stays
+ * exactly as it was). An unprogrammed variant (components: [], the Phase
+ * 3.1 hydration fix's own guarantee) correctly returns `null` here too -
+ * no phantom member prescription block (ticket §16). */
+export function resolveMemberComposerPrescription(prescriptionDoc, variantKey) {
+  const components = prescriptionDoc?.variants?.[variantKey]?.components
+  return Array.isArray(components) && components.length > 1 ? components : null
 }
 
 // ----------------------------------------------------------------------------

@@ -66,9 +66,11 @@ import { diffAiVsSaved } from './aiProvenanceDiff'
 import { buildAggregateLeaderboard } from './aggregateLeaderboard'
 import { resolveTargetDateOptions, buildDuplicateRows, toggleRowSelected, removeRow as removeDuplicateRow } from './duplicateWorkout'
 import ComposerEditor, { ComposerPreview } from './composerAuthoring'
+import MemberComposerPrescription from './composerMemberPrescription'
 import {
   isSimpleComposerGraph, applyGeneratedInstancesToComponent,
   renderComponentMovementLines, hasComposerContent, createComponent, normalizeComponentOrder,
+  resolveMemberComposerPrescription,
 } from './componentContract'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
 import {
@@ -11943,6 +11945,20 @@ function App() {
                     const miscari = v.movements
                     const notaVarianta = v.notes
                     const scheduleLines = primarySectionV ? formatMemberScheduleLines(primarySectionV.format, primarySectionV.formatConfig, t) : []
+                    // WORKOUT COMPOSER PHASE 3.2 (ticket §1/§3) - member
+                    // prescription display != scoring component display. A
+                    // genuine multi-Component graph (an owned envelope, a
+                    // Rest, or 2+ independent scorers - anything the legacy
+                    // scalar columns cannot fully represent, ticket §14 of
+                    // Phase 3's own report) reads straight from canonical
+                    // components[] (activePrescriptionDoc - already fetched
+                    // for this exact WOD, no new query, no DB migration),
+                    // never from primarySectionV.format/formatConfig alone.
+                    // A trivial 0-1-component graph (the ordinary single-
+                    // format case, ticket §19) is UNCHANGED below - byte-
+                    // identical to before this phase.
+                    const composerComponents = resolveMemberComposerPrescription(activePrescriptionDoc, variantKeyFromLevel(v.level))
+                    const useComposerPrescription = !!composerComponents
                     return (
                       <div style={{ marginTop: '24px' }}>
                         {/* Universal Member Workout Format Header - ierarhia
@@ -11956,28 +11972,34 @@ function App() {
                           <LevelDot nivel={v.nivel} size={6} />
                           <span style={{ fontSize: '14px', fontWeight: '500', color: '#0E0E0E' }}>{v.nivel}</span>
                         </div>
-                        <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
-                        {/* Universal Visual Hierarchy Rule - FORMAT -> PRESCRIPTION
-                            STRUCTURE (aceeasi emfaza ca restul cardului - text
-                            inchis, semibold, NU stilul gri/muted de metadata) ->
-                            MISCARI -> SECONDARY METADATA (scoringMode etc.,
-                            dupa miscari, discret). Clasificarea vine din
-                            workoutFormats.js (per camp, nu per format). */}
-                        {scheduleLines.prescriptionLines.map((line, li) => (
-                          <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
-                        ))}
-                        {miscari.length > 0 && (
-                          <div style={{ marginTop: '16px' }}>
-                            {miscari.map((m, mi) => (
-                              <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
-                                {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
-                              </div>
+                        {useComposerPrescription ? (
+                          <MemberComposerPrescription components={composerComponents} gender={activeAthleteGenderKey} t={t} />
+                        ) : (
+                          <>
+                            <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
+                            {/* Universal Visual Hierarchy Rule - FORMAT -> PRESCRIPTION
+                                STRUCTURE (aceeasi emfaza ca restul cardului - text
+                                inchis, semibold, NU stilul gri/muted de metadata) ->
+                                MISCARI -> SECONDARY METADATA (scoringMode etc.,
+                                dupa miscari, discret). Clasificarea vine din
+                                workoutFormats.js (per camp, nu per format). */}
+                            {scheduleLines.prescriptionLines.map((line, li) => (
+                              <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
                             ))}
-                          </div>
+                            {miscari.length > 0 && (
+                              <div style={{ marginTop: '16px' }}>
+                                {miscari.map((m, mi) => (
+                                  <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
+                                    {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {scheduleLines.metadataLines.map((line, li) => (
+                              <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
+                            ))}
+                          </>
                         )}
-                        {scheduleLines.metadataLines.map((line, li) => (
-                          <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
-                        ))}
                         {notaVarianta && (
                           <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
                             <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
@@ -11998,6 +12020,10 @@ function App() {
                       const miscari = v.movements
                       const notaVarianta = v.notes
                       const isSelected = variantaAleasa === i
+                      // WORKOUT COMPOSER PHASE 3.2 - same rule as the single-
+                      // variant branch above, per accordion row/variant.
+                      const composerComponents = resolveMemberComposerPrescription(activePrescriptionDoc, variantKeyFromLevel(v.level))
+                      const useComposerPrescription = !!composerComponents
                       return (
                         <div key={i} onClick={() => {
                           const dejaSelectata = variantaAleasa === i
@@ -12028,27 +12054,35 @@ function App() {
                                   -> continut. Format/timp nu mai apar nicaieri
                                   altundeva pe acest ecran (cardul "Workout of the
                                   Day" de deasupra ramane doar nume + buton). */}
-                              <div style={{ marginTop: '16px' }}>
-                                <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
-                                {/* Universal Visual Hierarchy Rule - vezi
-                                    comentariul identic din ramura membrului cu o
-                                    singura varianta, mai sus. */}
-                                {accordionScheduleLines.prescriptionLines.map((line, li) => (
-                                  <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
-                                ))}
-                              </div>
-                              {miscari.length > 0 && (
+                              {useComposerPrescription ? (
                                 <div style={{ marginTop: '16px' }}>
-                                  {miscari.map((m, mi) => (
-                                    <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
-                                      {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
-                                    </div>
-                                  ))}
+                                  <MemberComposerPrescription components={composerComponents} gender={activeAthleteGenderKey} t={t} />
                                 </div>
+                              ) : (
+                                <>
+                                  <div style={{ marginTop: '16px' }}>
+                                    <WorkoutFormatHeader formatId={primarySectionV?.format} formatConfig={primarySectionV?.formatConfig} legacyDuration={formatWodDurata(wodZiData?.duration)} t={t} />
+                                    {/* Universal Visual Hierarchy Rule - vezi
+                                        comentariul identic din ramura membrului cu o
+                                        singura varianta, mai sus. */}
+                                    {accordionScheduleLines.prescriptionLines.map((line, li) => (
+                                      <div key={li} style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.4, color: '#0E0E0E', marginTop: li === 0 ? '6px' : '2px' }}>{line}</div>
+                                    ))}
+                                  </div>
+                                  {miscari.length > 0 && (
+                                    <div style={{ marginTop: '16px' }}>
+                                      {miscari.map((m, mi) => (
+                                        <div key={mi} style={{ paddingTop: '4px', paddingBottom: mi < miscari.length - 1 ? '12px' : '4px', paddingLeft: '4px', fontSize: '15px', color: '#0E0E0E', lineHeight: '1.6', borderBottom: mi < miscari.length - 1 ? `1px solid ${COLORS.divider}` : 'none' }}>
+                                          {memberMovementLine(m, v.structured || v.intervalTimeline, activeAthleteGenderKey)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {accordionScheduleLines.metadataLines.map((line, li) => (
+                                    <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
+                                  ))}
+                                </>
                               )}
-                              {accordionScheduleLines.metadataLines.map((line, li) => (
-                                <div key={li} style={{ fontSize: '13px', color: '#6B7280', marginTop: li === 0 ? '12px' : '2px' }}>{line}</div>
-                              ))}
                               {notaVarianta && (
                                 <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${COLORS.divider}` }}>
                                   <div style={{ fontSize: '11px', fontWeight: '600', color: '#A1A1AA', lineHeight: 1.2, letterSpacing: '0.06em', marginBottom: '4px' }}>{t.homeWodNotesLabel.toUpperCase()}</div>
