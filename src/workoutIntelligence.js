@@ -25,7 +25,7 @@
 
 import { createSection, newSectionId, emptySectionVariants, hydrateInstancesFromLegacy, VARIANT_LEVELS } from './wodSections'
 import { WORKOUT_FORMATS, getFormat } from './workoutFormats'
-import { componentsFromSection } from './componentContract'
+import { componentsFromSection, hasComposerContent } from './componentContract'
 import { CARDIO_MISCARI } from './movements'
 
 // --- compunere text dintr-o miscare structurata ----------------------------
@@ -341,8 +341,20 @@ export function sectionFromAiSection(aiSection, isPrimary, sourceText) {
     // projection sectionsFromLegacyWod already uses for an existing DB row -
     // section.id was assigned above too, so this stays deterministic within
     // this one draft, same as that call site's own guarantee).
+    //
+    // PHASE 3.1 (duplicate validation message fix) - componentsFromSection
+    // always projects exactly one component even for a tier the AI draft
+    // never populated (e.g. a scalingVersion the model didn't return for
+    // Beginner/OnRamp) - that phantom, movement-less component then failed
+    // save validation independently per empty tier, the same root cause
+    // traced in sectionsFromLegacyWod (wodSections.js). hasComposerContent
+    // is the SAME predicate used there and at save time
+    // (legacyPayloadFromSections) - a tier with nothing real projects to
+    // true components: [] here too, symmetric with every other hydration
+    // path.
     for (const key of Object.keys(section.variants)) {
-      section.variants[key] = { ...section.variants[key], components: componentsFromSection(section, key) }
+      const projected = componentsFromSection(section, key)
+      section.variants[key] = { ...section.variants[key], components: hasComposerContent(projected) ? projected : [] }
     }
   } else {
     section.movementName = (aiSection.movements || [])[0]?.name || ''

@@ -209,9 +209,30 @@ export const sectionsFromLegacyWod = (w, opts = {}) => {
       // Component card, never the old flat editor, even for a workout
       // authored before the Composer existed.
       const structuredComponents = w.movement_prescriptions?.variants?.[v.key]?.components
-      const components = Array.isArray(structuredComponents)
-        ? structuredComponents.map(c => ({ ...c, instances: (c.instances || []).map(m => ({ ...m })) }))
-        : componentsFromSection({ id: primaryId, format: primaryFormat, formatConfig: primaryFormatConfig, variants: { [v.key]: { instances } } }, v.key, { movementIndex: opts.movementIndex || null })
+      let components
+      if (Array.isArray(structuredComponents)) {
+        components = structuredComponents.map(c => ({ ...c, instances: (c.instances || []).map(m => ({ ...m })) }))
+      } else {
+        // PHASE 3.1 (duplicate validation fix) - componentsFromSection ALWAYS
+        // projects exactly one component for the default/mixed families
+        // (Phase 1's own "legacy single-score equivalence" contract, byte-
+        // identical whether or not that component has any movements yet -
+        // unchanged, still correct for a variant that DOES have real
+        // content). But an unprogrammed tier (Intermediate/Beginner/OnRamp
+        // never filled in, the common real case for older WODs) has ZERO
+        // legacy instances - projecting it anyway produced a PHANTOM
+        // component (e.g. "5 ROUNDS FOR TIME" with no movements)
+        // indistinguishable from a coach's own real in-progress work,
+        // independently in up to 3 tiers at once. hasComposerContent is the
+        // SAME predicate legacyPayloadFromSections already uses to decide
+        // "is this real, save-worthy authoring" - applying it symmetrically
+        // here means an unprogrammed tier hydrates to true components: []
+        // ("No Components yet", exactly Start Empty's own state) instead of
+        // a phantom card that then fails validation 1-3 times over for
+        // tiers the coach never touched.
+        const projected = componentsFromSection({ id: primaryId, format: primaryFormat, formatConfig: primaryFormatConfig, variants: { [v.key]: { instances } } }, v.key, { movementIndex: opts.movementIndex || null })
+        components = hasComposerContent(projected) ? projected : []
+      }
       return [v.key, { instances, movements: legacyLines, quickAdd: '', paste: '', weight, note: w[`notes_${v.key}`] || '', components }]
     })),
   })
@@ -604,6 +625,30 @@ export const validateSectionsForLegacy = (sections, t) => {
 // untouched - ticket §5) is not itself an error here, matching this gate's
 // existing behavior for an empty legacy movements list (an empty WOD was
 // always saveable before this ticket; this does not tighten that).
+//
+// PHASE 3.1 (duplicate validation message fix) - real root cause traced to
+// the HYDRATION layer (sectionsFromLegacyWod/sectionFromAiSection), not
+// here: an unprogrammed Intermediate/Beginner/OnRamp tier used to hydrate
+// to a PHANTOM single component (componentsFromSection's own "legacy
+// single-score equivalence" contract projects exactly one component
+// regardless of whether it has movements) that was indistinguishable from
+// a coach's real in-progress work - so the SAME "needs a movement" error
+// fired independently, once per untouched tier, up to 3-4 times for one
+// underlying (non-)problem. That hydration bug is now fixed at the source
+// (both call sites gate the projection on hasComposerContent) - by the time
+// this function runs, an untouched tier's `components` is genuinely `[]`
+// and is skipped below exactly as it always was.
+//
+// Two DEFENSIVE (not primary) measures stay on top of that root-cause fix,
+// for the case where two DIFFERENT variants are GENUINELY, independently
+// authored with the same real mistake (a legitimate scenario the hydration
+// fix does not and should not suppress): each message is attributed to its
+// own variant's label, so "RX: 5 Rounds For Time needs a movement" and
+// "Beginner: 5 Rounds For Time needs a movement" read as two distinct,
+// individually actionable facts rather than indistinguishable repeats; and
+// a final dedup guarantees no byte-identical string is ever shown twice
+// even so. Per the ticket's own instruction, this dedup is explicitly NOT
+// the primary fix - it is a defensive backstop on top of the real one.
 export const validateComposerSectionsForSave = (sections) => {
   const primary = sections.find(s => s.isPrimary)
   if (!primary) return []
@@ -612,9 +657,12 @@ export const validateComposerSectionsForSave = (sections) => {
     const components = primary.variants?.[v.key]?.components
     if (!Array.isArray(components) || components.length === 0) continue
     const { valid, messages: msgs } = validateComposerForSave(components)
-    if (!valid) messages.push(...msgs)
+    if (!valid) {
+      const label = VARIANT_LEVELS.find(level => level.key === v.key)?.label || v.key
+      messages.push(...msgs.map(m => `${label}: ${m}`))
+    }
   }
-  return messages
+  return [...new Set(messages)]
 }
 
 // Per-Movement Prescription Engine save gate (P5') - `wods` has no draft state,
