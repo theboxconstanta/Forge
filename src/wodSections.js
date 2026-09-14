@@ -646,23 +646,40 @@ export const validateSectionsForLegacy = (sections, t) => {
 // own variant's label, so "RX: 5 Rounds For Time needs a movement" and
 // "Beginner: 5 Rounds For Time needs a movement" read as two distinct,
 // individually actionable facts rather than indistinguishable repeats; and
-// a final dedup guarantees no byte-identical string is ever shown twice
-// even so. Per the ticket's own instruction, this dedup is explicitly NOT
-// the primary fix - it is a defensive backstop on top of the real one.
+// a final dedup collapses only an ACCIDENTALLY-repeated report of the exact
+// SAME canonical issue.
+//
+// PHASE 3.1.1 - that final dedup used to key on the rendered message
+// STRING (`new Set(messages)`), which is not a valid identity: two
+// DIFFERENT components can legitimately produce byte-identical text (e.g.
+// two separate empty AMRAP components both read "AMRAP: add at least one
+// movement.") - a string-keyed Set would have silently collapsed those into
+// ONE displayed issue, hiding a real second problem. Dedup now keys on
+// `${variant}::${componentId}::${code}` (validateComposerForSave's own
+// `issues`, componentContract.js - each carries a stable componentId + code
+// that never depends on the rendered text), so two distinct components
+// never collapse into each other, while a truly duplicate report of the
+// SAME component+code+variant still collapses to one line as intended.
 export const validateComposerSectionsForSave = (sections) => {
   const primary = sections.find(s => s.isPrimary)
   if (!primary) return []
+  const seenIssueKeys = new Set()
   const messages = []
   for (const v of VARIANTE_WEIGHT_BASE) {
     const components = primary.variants?.[v.key]?.components
     if (!Array.isArray(components) || components.length === 0) continue
-    const { valid, messages: msgs } = validateComposerForSave(components)
+    const { valid, issues } = validateComposerForSave(components)
     if (!valid) {
       const label = VARIANT_LEVELS.find(level => level.key === v.key)?.label || v.key
-      messages.push(...msgs.map(m => `${label}: ${m}`))
+      issues.forEach(issue => {
+        const identityKey = `${v.key}::${issue.componentId}::${issue.code}`
+        if (seenIssueKeys.has(identityKey)) return // same canonical issue reported twice - collapse
+        seenIssueKeys.add(identityKey)
+        messages.push(`${label}: ${issue.message}`)
+      })
     }
   }
-  return [...new Set(messages)]
+  return messages
 }
 
 // Per-Movement Prescription Engine save gate (P5') - `wods` has no draft state,

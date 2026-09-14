@@ -857,21 +857,28 @@ export function describeValidationError(error, t) {
 /** Save gate (ticket §35/§36) - domain validation errors translated to coach
  * copy, PLUS "an obviously invalid scored/one-time component with zero
  * movements" (Rest is exempt - it never has movements). Returns
- * `{valid, messages}`; `messages` is always coach-safe text, never an
- * internal code or id. Does not decide "empty composer, nothing to save
- * yet" - callers check `components.length === 0` themselves for that
+ * `{valid, issues}` - `issues` is `{code, componentId, message}[]`, NEVER a
+ * bare string list (Phase 3.1.1 - a bare message string is not a stable
+ * identity: two DIFFERENT components can legitimately produce
+ * byte-identical text, e.g. two separate empty AMRAP components both
+ * reading "AMRAP: add at least one movement." - collapsing on the STRING
+ * would silently hide one of two real, distinct problems. `componentId`
+ * (always present, unique per component) + `code` is the caller's stable
+ * dedup/attribution key; `message` is coach-safe display text only, never
+ * itself used as identity). Does not decide "empty composer, nothing to
+ * save yet" - callers check `components.length === 0` themselves for that
  * distinct, non-error state (ticket §5's true empty state is not a
  * validation failure). */
 export function validateComposerForSave(components) {
   const list = components || []
   const domain = validateComponents(list)
-  const messages = domain.errors.map(e => describeValidationError(e))
+  const issues = domain.errors.map(e => ({ code: e.code, componentId: e.componentId, message: describeValidationError(e) }))
   list.forEach(c => {
     if (c.format !== 'Rest' && (c.instances || []).length === 0) {
-      messages.push(`${componentHeaderLabel(c)}: add at least one movement.`)
+      issues.push({ code: 'EMPTY_MOVEMENTS', componentId: c.id, message: `${componentHeaderLabel(c)}: add at least one movement.` })
     }
   })
-  return { valid: domain.valid && messages.length === domain.errors.length, messages }
+  return { valid: domain.valid && issues.length === domain.errors.length, issues }
 }
 
 // ----------------------------------------------------------------------------

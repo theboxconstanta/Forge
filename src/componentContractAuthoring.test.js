@@ -205,9 +205,9 @@ describe('describeValidationError', () => {
 describe('validateComposerForSave', () => {
   it('blocks a movement-requiring component with zero movements', () => {
     const amrap = createComponent({ id: 'amrap', format: 'AMRAP', producesScore: true, instances: [] })
-    const { valid, messages } = validateComposerForSave([amrap])
+    const { valid, issues } = validateComposerForSave([amrap])
     expect(valid).toBe(false)
-    expect(messages.length).toBeGreaterThan(0)
+    expect(issues.length).toBeGreaterThan(0)
   })
 
   it('Rest is exempt from the "needs a movement" rule', () => {
@@ -216,19 +216,31 @@ describe('validateComposerForSave', () => {
     expect(valid).toBe(true)
   })
 
-  it('a fully valid graph passes with no messages', () => {
+  it('a fully valid graph passes with no issues', () => {
     const amrap = createComponent({ id: 'amrap', format: 'AMRAP', producesScore: true, instances: [inst('Burpees')] })
-    const { valid, messages } = validateComposerForSave([amrap])
+    const { valid, issues } = validateComposerForSave([amrap])
     expect(valid).toBe(true)
-    expect(messages).toEqual([])
+    expect(issues).toEqual([])
   })
 
   it('surfaces a domain validation error as coach-facing copy', () => {
     const rft = createComponent({ id: 'rft', format: 'RFT', producesScore: true, instances: [inst('Wall Balls')] })
     const rest = createComponent({ id: 'rest', format: 'Rest', producesScore: false, scoreOwnerId: 'rft' })
-    const { valid, messages } = validateComposerForSave([rft, rest])
+    const { valid, issues } = validateComposerForSave([rft, rest])
     expect(valid).toBe(false)
-    expect(messages.some(m => /rest/i.test(m))).toBe(true)
+    expect(issues.some(i => /rest/i.test(i.message))).toBe(true)
+  })
+
+  it('each issue carries a stable componentId + code, never relying on message text as identity (ticket §Phase 3.1.1)', () => {
+    const amrapA = createComponent({ id: 'a', format: 'AMRAP', producesScore: true, instances: [] })
+    const amrapB = createComponent({ id: 'b', format: 'AMRAP', producesScore: true, instances: [] })
+    const { issues } = validateComposerForSave([amrapA, amrapB])
+    expect(issues).toHaveLength(2)
+    expect(issues.map(i => i.componentId).sort()).toEqual(['a', 'b'])
+    expect(issues.every(i => i.code === 'EMPTY_MOVEMENTS')).toBe(true)
+    // byte-identical display text, but each issue is independently identified
+    expect(issues[0].message).toBe(issues[1].message)
+    expect(issues[0].componentId).not.toBe(issues[1].componentId)
   })
 })
 

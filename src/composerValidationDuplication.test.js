@@ -20,6 +20,20 @@
 // correctly ignores. A defensive (not primary) variant-label attribution +
 // final dedup stays on top for the case where two DIFFERENT variants are
 // genuinely, independently authored with the same real mistake.
+//
+// PHASE 3.1.1 follow-up: the defensive dedup originally keyed on the
+// rendered MESSAGE STRING (`new Set(messages)`), which is not a valid
+// identity - two DIFFERENT components can legitimately produce byte-
+// identical text (two separate empty AMRAP components both read "AMRAP:
+// add at least one movement."), and a string-keyed Set would have silently
+// collapsed those into ONE displayed issue, hiding a real second problem.
+// validateComposerForSave now returns structured `issues`
+// ({code, componentId, message}[], componentContract.js) instead of bare
+// strings, and validateComposerSectionsForSave dedups on
+// `${variant}::${componentId}::${code}` - never on message text. The tests
+// below (describe block "Phase 3.1.1") prove distinct components with
+// identical text stay distinct while a genuinely-duplicated report of the
+// SAME issue still collapses to one line.
 
 import { describe, it, expect } from 'vitest'
 import {
@@ -27,7 +41,7 @@ import {
   validateComposerSectionsForSave,
 } from './wodSections'
 import { sectionFromAiSection } from './workoutIntelligence'
-import { addComponentToList } from './componentContract'
+import { addComponentToList, validateComposerForSave, createComponent } from './componentContract'
 
 function addMovement(components, componentId, name) {
   return components.map(c => (c.id === componentId ? { ...c, instances: [...c.instances, { instanceId: `mi_${name}`, name }] } : c))
@@ -219,5 +233,136 @@ describe('legacyPayloadFromSections still saves a genuinely-fixed WOD correctly'
     for (const key of ['intermediate', 'beginner', 'onramp']) {
       expect(reopenedPrimary.variants[key].components).toEqual([]) // still no phantom on re-reopen
     }
+  })
+})
+
+// ============================================================================
+// PHASE 3.1.1 - identity-aware validation (not string-keyed dedup)
+// ============================================================================
+
+describe('Phase 3.1.1 - 1. one real invalid RFT -> one visible issue', () => {
+  it('a single empty RFT produces exactly one message', () => {
+    const primary = createSection('metcon', true)
+    primary.variants.rx.components = addComponentToList([], 'RFT')
+    expect(validateComposerSectionsForSave([primary])).toHaveLength(1)
+  })
+})
+
+describe('Phase 3.1.1 - 2. one real invalid AMRAP -> one visible issue', () => {
+  it('a single empty AMRAP produces exactly one message', () => {
+    const primary = createSection('metcon', true)
+    primary.variants.rx.components = addComponentToList([], 'AMRAP')
+    const messages = validateComposerSectionsForSave([primary])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatch(/AMRAP/)
+  })
+})
+
+describe('Phase 3.1.1 - 3. two DIFFERENT invalid AMRAP Components in the same variant -> TWO visible issues, even with byte-identical text', () => {
+  it('never collapses two distinct components merely because their rendered text matches', () => {
+    const primary = createSection('metcon', true)
+    let components = addComponentToList([], 'AMRAP')
+    components = addComponentToList(components, 'AMRAP')
+    primary.variants.rx.components = components
+    expect(components[0].id).not.toBe(components[1].id) // genuinely distinct components
+
+    const messages = validateComposerSectionsForSave([primary])
+    expect(messages).toHaveLength(2) // NOT collapsed to 1 by a string Set
+    expect(messages[0]).toBe(messages[1]) // the text is legitimately identical...
+    // ...yet both are present, proving dedup is not string-based
+  })
+})
+
+describe('Phase 3.1.1 - 4. same canonical issue accidentally collected twice internally -> ONE visible issue', () => {
+  it('a components array with the same component object present twice collapses to one EMPTY_MOVEMENTS issue for that id', () => {
+    const amrap = addComponentToList([], 'AMRAP')[0]
+    const { issues } = validateComposerForSave([amrap, amrap]) // same object, accidentally duplicated
+    const emptyMovementIssues = issues.filter(i => i.code === 'EMPTY_MOVEMENTS' && i.componentId === amrap.id)
+    expect(emptyMovementIssues).toHaveLength(2) // the low-level function genuinely collected it twice...
+
+    const primary = createSection('metcon', true)
+    primary.variants.rx.components = [amrap, amrap]
+    const messages = validateComposerSectionsForSave([primary])
+    // ...but the aggregator's identity-keyed dedup (variant::componentId::code)
+    // collapses the accidental duplicate to exactly one displayed line for
+    // EMPTY_MOVEMENTS. DUPLICATE_ID is a separate, additional real issue
+    // (different code, same componentId) - not swallowed.
+    const emptyMovementMessages = messages.filter(m => /add at least one movement/.test(m))
+    expect(emptyMovementMessages).toHaveLength(1)
+  })
+})
+
+describe('Phase 3.1.1 - 5. same Component with two different validation codes -> TWO issues', () => {
+  it('a Rest illegally scoring AND self-owned produces two distinct, separately identified issues', () => {
+    const rest = createComponent({ id: 'rest-1', format: 'Rest', producesScore: true, scoreOwnerId: 'rest-1' })
+    const { issues } = validateComposerForSave([rest])
+    const codesForThisComponent = issues.filter(i => i.componentId === 'rest-1').map(i => i.code)
+    expect(codesForThisComponent).toContain('REST_CANNOT_SCORE')
+    expect(codesForThisComponent).toContain('SELF_OWNERSHIP')
+    expect(new Set(codesForThisComponent).size).toBe(codesForThisComponent.length) // no code repeated
+  })
+})
+
+describe('Phase 3.1.1 - 6. same issue in different variants remains contextually distinct', () => {
+  it('RX and Beginner both carrying an identically-empty AMRAP produce two variant-attributed messages', () => {
+    const primary = createSection('metcon', true)
+    primary.variants.rx.components = addComponentToList([], 'AMRAP')
+    primary.variants.beginner.components = addComponentToList([], 'AMRAP')
+    const messages = validateComposerSectionsForSave([primary])
+    expect(messages).toHaveLength(2)
+    expect(messages.some(m => m.startsWith('RX:'))).toBe(true)
+    expect(messages.some(m => m.startsWith('Beginner:'))).toBe(true)
+  })
+})
+
+describe('Phase 3.1.1 - 7. unprogrammed tiers still hydrate to components: [] (hydration fix preserved)', () => {
+  it('re-confirms the Phase 3.1 root-cause fix is untouched by this identity-aware refactor', () => {
+    const w = {
+      id: 'w-3-1-1', date: '2026-01-01', type: 'RFT', format_config: { rounds: 5 },
+      movements_rx: ['Toes-to-Bar'],
+    }
+    const primary = sectionsFromLegacyWod(w).find(s => s.isPrimary)
+    for (const key of ['intermediate', 'beginner', 'onramp']) {
+      expect(primary.variants[key].components).toEqual([])
+    }
+    expect(validateComposerSectionsForSave([primary])).toEqual([]) // no phantom validation
+  })
+})
+
+describe('Phase 3.1.1 - 8. fixing one of two identical-text invalid Components -> exactly one remaining issue', () => {
+  it('adding a movement to only the first AMRAP leaves exactly one message, for the second', () => {
+    const primary = createSection('metcon', true)
+    let components = addComponentToList([], 'AMRAP')
+    components = addComponentToList(components, 'AMRAP')
+    primary.variants.rx.components = components
+    expect(validateComposerSectionsForSave([primary])).toHaveLength(2)
+
+    primary.variants.rx.components = addMovement(components, components[0].id, 'Burpees')
+    const messages = validateComposerSectionsForSave([primary])
+    expect(messages).toHaveLength(1)
+  })
+})
+
+describe('Phase 3.1.1 - 9. invalid Composer still blocks Save', () => {
+  it('two identical-text invalid AMRAP components still fail the real save gate', () => {
+    const primary = createSection('metcon', true)
+    let components = addComponentToList([], 'AMRAP')
+    components = addComponentToList(components, 'AMRAP')
+    primary.variants.rx.components = components
+    expect(validateSectionsForLegacy([primary], {}).valid).toBe(false)
+  })
+})
+
+describe('Phase 3.1.1 - 10. valid Composer saves', () => {
+  it('two DIFFERENT, fully-authored AMRAP components with movements pass the save gate cleanly', () => {
+    const primary = createSection('metcon', true)
+    let components = addComponentToList([], 'AMRAP')
+    components = addMovement(components, components[0].id, 'Burpees')
+    components = addComponentToList(components, 'RFT')
+    components[1].config = { rounds: 5 }
+    components = addMovement(components, components[1].id, 'Wall Balls')
+    primary.variants.rx.components = components
+    expect(validateComposerSectionsForSave([primary])).toEqual([])
+    expect(validateSectionsForLegacy([primary], {}).valid).toBe(true)
   })
 })
