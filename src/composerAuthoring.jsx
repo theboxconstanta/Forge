@@ -139,7 +139,11 @@ export default function ComposerEditor({ components, onChange, movementCatalog, 
     const ownsOthers = list.some(c => c.scoreOwnerId === id)
     if (ownsOthers) {
       const dependents = list.filter(c => c.scoreOwnerId === id).map(c => componentHeaderLabel(c)).join(', ')
-      const msg = t?.composerConfirmRemoveOwner
+      // PHASE 4.1 fix (found via live QA harness verification alongside the
+      // same class of bug in composerLogging.jsx) - a missing i18n key's
+      // dev-mode placeholder is a truthy STRING, not undefined; a bare
+      // truthiness check is not enough, it must also be callable.
+      const msg = typeof t?.composerConfirmRemoveOwner === 'function'
         ? t.composerConfirmRemoveOwner(componentHeaderLabel(target), dependents)
         : `Removing "${componentHeaderLabel(target)}" will stop counting ${dependents} toward it. Continue?`
       if (!window.confirm(msg)) return

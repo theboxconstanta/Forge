@@ -76,7 +76,13 @@ export default function MultiScorerLogger({ envelopes, valuesByComponentId, onCh
       {!single && (
         <div style={{ marginBottom: '10px' }}>
           <div style={stepLabel}>
-            {(t?.logWodScoreStepLabel && t.logWodScoreStepLabel(clampedStep + 1, list.length)) || `SCORE ${clampedStep + 1} OF ${list.length}`}
+            {/* PHASE 4.1 fix (found via live QA harness verification, ticket
+                §19 - the exact reason literal live rendering was required):
+                the app's i18n dev-proxy (translations.js's wrapDev) returns
+                a truthy PLACEHOLDER STRING for a missing key, not undefined -
+                a bare truthiness check on a translator function is not
+                enough, it must also be callable. */}
+            {(typeof t?.logWodScoreStepLabel === 'function' ? t.logWodScoreStepLabel(clampedStep + 1, list.length) : null) || `SCORE ${clampedStep + 1} OF ${list.length}`}
           </div>
         </div>
       )}

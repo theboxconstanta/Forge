@@ -72,6 +72,7 @@ import {
   renderComponentMovementLines, hasComposerContent, createComponent, normalizeComponentOrder,
   resolveMemberComposerPrescription,
   getOrderedScoreEnvelopes, buildComposeInputsById, composeComponentsLogFields,
+  allInstancesFromComponents, resolveHistoricalComponentsForEdit, hydrateAllScorerValuesFromLog,
 } from './componentContract'
 import MultiScorerLogger from './composerLogging'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
@@ -7846,6 +7847,14 @@ function App() {
   // still uses - see useComposerLogger below.
   const [wodScorerValues, setWodScorerValues] = useState({})
   const [wodScorerStep, setWodScorerStep] = useState(0)
+  // WORKOUT COMPOSER PHASE 4.1 - when editing an EXISTING multi-score log
+  // (Journal's onEditWod), the canonical components[] to log/resave against
+  // are the log's OWN frozen historical evidence (resolveHistoricalComponentsForEdit),
+  // never the CURRENT live workout's components (which may have been
+  // reordered/edited/removed since - ticket §3/§7). null = not currently
+  // editing a multi-score log (every other flow, including a fresh
+  // logWodPrimaryPath session, computes its own components live below).
+  const [editComposerComponents, setEditComposerComponents] = useState(null)
   // Doua casute (minute/secunde), ca la Admin - nu text liber, evita
   // ambiguitati ("20 minute" vs "20:00") si se compune direct in acelasi
   // format "mm:ss" folosit peste tot in app.
@@ -10063,7 +10072,7 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditLogPrescribedWeight('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
       return
@@ -10130,7 +10139,7 @@ function App() {
         showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
         setScreen(prevScreen === 'log' ? 'log' : 'home'); if (prevScreen === 'log') setLogTab('jurnal')
         setLogTargetSectionId(null)
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null)
       }
       setWodSaving(false)
       return
@@ -10426,7 +10435,7 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null)
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
       // PHOTO RESULT / SHARE CARD Phase 1 - runs ONLY after the WOD result
       // above is already fully saved, the toast shown, and the screen/state
@@ -10869,30 +10878,48 @@ function App() {
   // which, in a frozen flow, is logCtx.prescriptionDoc (frozen at click) -
   // never re-resolved from live wods. null -> legacy text fallback.
   const frozenVariantKey = variantaAleasa !== null ? variantKeyFromLevel(VARIANTE_CONFIG[variantaAleasa]?.nivel) : null
-  // WORKOUT COMPOSER PHASE 4 (ticket §2/§3) - canonical score envelopes for
-  // the WOD being logged, read from activePrescriptionDoc (already fetched,
-  // zero new query - Phase 3.2's own finding) rather than legacy
-  // activeLogFormatId/activeLogFormatConfig (Phase 3's single-scorer legacy
-  // shim). Scoped to the fresh, primary-WOD logging flow ONLY
-  // (logWodPrimaryPath - not editLogId's Journal-edit flow, which
-  // reconstructs its format from a frozen snapshot with no variant context
-  // to resolve components against, and not logTargetSection, an additional
-  // scored section outside Composer scope) - a deliberate, reported
-  // boundary (see final report), not an oversight.
-  const logComponents = (!editLogId && !logTargetSection && frozenVariantKey)
-    ? (activePrescriptionDoc?.variants?.[frozenVariantKey]?.components || [])
-    : []
+  // WORKOUT COMPOSER PHASE 4/4.1 (ticket §2/§3) - canonical score envelopes
+  // for the WOD being logged. Two sources, never mixed: editComposerComponents
+  // (set by onEditWod below, ONLY for a genuine multi-score log - the log's
+  // OWN frozen historical evidence, resolveHistoricalComponentsForEdit) when
+  // editing; activePrescriptionDoc (already fetched, zero new query -
+  // Phase 3.2's own finding) for a FRESH primary-WOD logging session.
+  // logTargetSection (an additional scored section) stays outside Composer
+  // scope entirely, as in Phase 4.
+  const logComponents = editLogId
+    ? (editComposerComponents || [])
+    : (!logTargetSection && frozenVariantKey) ? (activePrescriptionDoc?.variants?.[frozenVariantKey]?.components || []) : []
   const logScoreEnvelopes = getOrderedScoreEnvelopes(logComponents)
   // ticket §7/§8 - a bare 0-1-scorer graph (the overwhelming common case)
   // and an already-working legacy family:'mixed' envelope (Phase 2, fully
   // production-tested) BOTH keep the exact existing single-format path,
   // untouched. The Composer stepper only takes over for a genuine 2+-scorer
-  // graph, or a 1-scorer OWNED envelope whose format has no legacy 'mixed'
-  // equivalent (Phase 3's own documented gap - e.g. an RFT-scored Buy-In/
-  // Cash-Out envelope, which the legacy family:'mixed' path cannot
-  // represent at all).
-  const useComposerLogger = logScoreEnvelopes.length > 1
-    || (logScoreEnvelopes.length === 1 && (logScoreEnvelopes[0].buyIn || logScoreEnvelopes[0].cashOut) && getFormat(activeLogFormatId)?.family !== 'mixed')
+  // graph (fresh or edit), or - fresh sessions only, ticket §7 of Phase 4 -
+  // a 1-scorer OWNED envelope whose format has no legacy 'mixed' equivalent.
+  // Editing a single-envelope (1-scorer) log deliberately stays on the
+  // existing legacy edit path (editComposerComponents is only ever set for
+  // a TRUE 2+-scorer log - see onEditWod) - a reported Phase 4 scope
+  // boundary, unchanged by this phase.
+  const useComposerLogger = editLogId
+    ? logScoreEnvelopes.length > 1
+    : (logScoreEnvelopes.length > 1
+        || (logScoreEnvelopes.length === 1 && (logScoreEnvelopes[0].buyIn || logScoreEnvelopes[0].cashOut) && getFormat(activeLogFormatId)?.family !== 'mixed'))
+  // WORKOUT COMPOSER PHASE 4.1 (ticket §8/§9/§10) - the EXISTING P9.5.2A
+  // performed-prescription mechanism (buildPrescriptionSnapshot/
+  // performedMatchesProgrammed/performedIsModified/PerformedEditPanel, all
+  // UNCHANGED) only ever reads `doc.variants[variantKey].movements` - a
+  // thin synthetic wrapper is enough to orchestrate it over EVERY
+  // Component's own instances (allInstancesFromComponents, Phase 3) instead
+  // of activePrescriptionDoc's single-variant flat list (which, for a
+  // Composer WOD, only ever reflects the first scorer - Phase 3's legacy
+  // shim). Each MovementInstance's own id is already globally unique across
+  // every Component in the WOD (Phase 1), so sourceInstanceId-keyed
+  // performed overrides stay correctly scoped to their own scorer/envelope
+  // by construction - no new performed-prescription shape, no per-scorer
+  // duplication (ticket §10/§11).
+  const composerPerformedDoc = useComposerLogger
+    ? { variants: { [frozenVariantKey]: { movements: allInstancesFromComponents(logComponents) } } }
+    : activePrescriptionDoc
   const structuredLogDisplay = (variantaAleasa !== null && frozenVariantKey)
     ? (composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey }) ?? null)
     : null
@@ -11942,7 +11969,7 @@ function App() {
                           if (!homeDisplayIsCurrent) return
                           setLogCtx(captureLogCtx())
                           setLogTargetSectionId(section.id); setEditLogId(null)
-                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
+                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null)
                           setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
                         }} t={t} />
                     )
@@ -12431,6 +12458,58 @@ function App() {
                 const linii = prefix.split('\n').filter(Boolean)
                 const headerTip = linii.length > 0 ? legacyHeaderTypeOf(linii[0]) : null
                 const movimenteLog = linii.slice(headerTip ? 1 : 0)
+                // WORKOUT COMPOSER PHASE 4.1 (ticket §1/§2/§4) - a genuine
+                // multi-score log (log_meta.componentResults with 2+ entries)
+                // takes a COMPLETELY SEPARATE hydration path, entirely
+                // bypassing the legacy single-format parsing below (never
+                // touched for this case - ticket §16 legacy parity).
+                //
+                // Variant recovery (ticket §4): log.variant_level ('RX'/
+                // 'Intermediate'/'Beginner'/'OnRamp') is written directly on
+                // every wod_logs insert (saveWodLog) - real, persisted
+                // evidence, never guessed from the current UI tab.
+                //
+                // Snapshot-first (ticket §3): resolveHistoricalComponentsForEdit
+                // prefers log.log_meta.componentsSnapshot (frozen at save
+                // time by THIS SAME phase's own composeMultiEnvelopeLogFields
+                // addition) - the current, possibly-since-mutated live
+                // components (log.wods?.movement_prescriptions, the joined
+                // CURRENT wods row) is used ONLY as a defensive fallback for
+                // a log saved before this snapshot field existed (Workout
+                // Composer Phase 4 was never deployed before this fix, so in
+                // practice this fallback should not fire against real data).
+                const multiScoreResults = log.log_meta?.componentResults
+                if (multiScoreResults && typeof multiScoreResults === 'object' && Object.keys(multiScoreResults).length > 1) {
+                  const editVariantKey = variantKeyFromLevel(log.variant_level)
+                  const currentComponentsFallback = editVariantKey ? (log.wods?.movement_prescriptions?.variants?.[editVariantKey]?.components || []) : []
+                  const resolved = resolveHistoricalComponentsForEdit(log, currentComponentsFallback)
+                  const historicalComponents = resolved?.components || []
+                  const envelopes = getOrderedScoreEnvelopes(historicalComponents)
+                  setEditComposerComponents(historicalComponents)
+                  setWodScorerValues(hydrateAllScorerValuesFromLog(envelopes, log))
+                  setWodScorerStep(0)
+                  setEditLogId(log.id)
+                  setEditLogHeader(headerTip ? linii[0] : '')
+                  setEditLogFormatId(null)
+                  setEditLogFormatConfig(null)
+                  setEditLogMiscari(movimenteLog)
+                  setEditLogMiscareCurenta('')
+                  setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime('')
+                  setWodSets({}); setWodChainedStages([]); setWodCompleted(false)
+                  setWodNote(parts.length > 1 ? parts[1] : '')
+                  setWodWeightLogged(log.weight_logged || '')
+                  setEditLogPrescribedWeight('')
+                  // ticket §8/§9 - the log's OWN frozen performed overlay
+                  // reopens through the EXACT existing mechanism (V1 has no
+                  // structured re-edit UI on the edit-existing path, same as
+                  // the legacy branch below - read-through only here too).
+                  setPerformedCommitted(log.performed_prescription || null); setPerformedDraft(null); setLogWodEditMode(false)
+                  setVariantaAleasa(VARIANTE_CONFIG.findIndex(v => v.nivel === log.variant_level))
+                  setPrevScreen('log')
+                  setScreen('logWOD')
+                  return
+                }
+                setEditComposerComponents(null)
                 // P10 - reopening a historical log rebuilds its PRESCRIBED
                 // context from the provenance frozen on the log itself
                 // (resolveResultProvenance: format_snapshot / format_config_snapshot
@@ -12557,16 +12636,16 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               // Layer 2a - la fel ca editLogId mai sus: formatul e deja fixat
               // de sectiune, nu exista pas "compose" de revenit la el - back
               // navigheaza direct in afara ecranului.
-              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setScreen(prevScreen || 'home') }
+              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setScreen(prevScreen || 'home') }
               else if (!logWodPrimaryPath && logWodStep === 'score') { setLogWodStep('compose') }
               else {
                 // P9.5.1 - clear the score draft when leaving the single-screen
                 // Universal Log WOD without saving, so the next workout opens clean.
-                if (logWodPrimaryPath) { setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0) }
+                if (logWodPrimaryPath) { setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null) }
                 setScreen(prevScreen || 'home')
               }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
@@ -12603,7 +12682,7 @@ function App() {
             // materially differs from what was programmed. When active, the
             // read-only workout rows below show what THEY did; the programmed
             // prescription stays untouched in activePrescriptionDoc / snapshot.
-            const performedActive = !!performedCommitted && performedIsModified(performedCommitted, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
+            const performedActive = !!performedCommitted && performedIsModified(performedCommitted, composerPerformedDoc, frozenVariantKey, memberGenderKey)
             // P9.5.2A - performed rows come from the group-aware projection
             // (renders each 1->N child + a "not performed" line for a marked
             // source); the programmed prescription is never consulted here.
@@ -12619,18 +12698,25 @@ function App() {
             // gender (§57 - an unknown gender against sex-specific prescriptions
             // is a HARD STOP for this path: hide Edit rather than guess). Legacy
             // free-text workouts (no structuredDisplay) never show Edit (§42).
-            const editEligible = !!structuredDisplay && memberGenderKey != null && !!frozenVariantKey
+            // WORKOUT COMPOSER PHASE 4.1 - a Composer multi-scorer session is
+            // ALWAYS Edit-eligible when a member gender is known (its
+            // "structured" evidence is composerPerformedDoc itself, built
+            // from every Component's own instances - never structuredDisplay,
+            // which only ever reflects the legacy first-scorer shim).
+            const editEligible = useComposerLogger
+              ? (memberGenderKey != null && logComponents.length > 0)
+              : (!!structuredDisplay && memberGenderKey != null && !!frozenVariantKey)
             const openPerformedEdit = () => {
               setPerformedDraft(performedCommitted
                 ? snapshotPrescriptionDoc(performedCommitted)
-                : buildPerformedPrescriptionDraft({ doc: activePrescriptionDoc, variantKey: frozenVariantKey }))
+                : buildPerformedPrescriptionDraft({ doc: composerPerformedDoc, variantKey: frozenVariantKey }))
               setLogWodEditMode(true)
             }
             const commitPerformedEdit = () => {
               const draft = performedDraft
               const check = validatePerformedPrescription(draft)
               if (!check.valid) { showToast(t.performedEditInvalid); return }
-              const matches = performedMatchesProgrammed(draft, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
+              const matches = performedMatchesProgrammed(draft, composerPerformedDoc, frozenVariantKey, memberGenderKey)
               const committed = matches ? null : draft
               // P9.5.2A - a structured-interval composition change redefines the
               // per-cell score inputs; clear any reps already entered so the
@@ -12647,7 +12733,7 @@ function App() {
               return (
                 <PerformedEditPanel
                   draft={performedDraft} gender={memberGenderKey} movementIndex={memberMovementIndex}
-                  programmedInstances={activePrescriptionDoc?.variants?.[frozenVariantKey]?.movements || []}
+                  programmedInstances={composerPerformedDoc?.variants?.[frozenVariantKey]?.movements || []}
                   inheritReps
                   repsEditable={getFormat(activeLogFormatId)?.rowMode !== 'interval'}
                   onChange={setPerformedDraft}

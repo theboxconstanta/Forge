@@ -577,7 +577,26 @@ export function composeMultiEnvelopeLogFields(components, inputsById) {
   })
   return {
     result: null, time_result: null, completion_state: null, sets: null,
-    log_meta: { composerVersion: 1, componentResults },
+    // Workout Composer Phase 4.1 (ticket §3 - "snapshot-first historical
+    // truth") - the FULL canonical components[] as they existed AT LOG
+    // TIME, frozen here, immutable. Investigated first: the EXISTING
+    // prescription_snapshot mechanism (buildPrescriptionSnapshot,
+    // prescriptionContract.js) freezes only a FLAT, format-agnostic
+    // movements array with no component/envelope grouping or identity at
+    // all - structurally unable to represent "which movements belonged to
+    // scorer A vs scorer B's Buy-In". Rather than reinterpret a multi-
+    // score log from the CURRENT mutable wods.movement_prescriptions on
+    // every future edit (explicitly forbidden - a later Builder edit must
+    // never reinterpret an old log), this additive log_meta field is the
+    // authoritative source an edit reads back (componentContract.js's
+    // resolveHistoricalComponentsForEdit) - no DB migration, log_meta is
+    // already free-form JSONB.
+    // A CLONE, never a live reference - `components` is the caller's own
+    // mutable array/objects (e.g. React state); Phase 2.1's own "historical
+    // snapshot immutability" invariant (a later mutation of `components`
+    // must never change an already-produced result) applies to this field
+    // exactly as it already does to every other part of this return value.
+    log_meta: { composerVersion: 1, componentResults, componentsSnapshot: (components || []).map(c => ({ ...c, instances: (c.instances || []).map(i => ({ ...i })) })) },
   }
 }
 
@@ -775,6 +794,33 @@ export function hydrateAllScorerValuesFromLog(envelopes, log) {
     valuesByComponentId[scorer.id] = hydrateScorerLoggerValueFromNativeResult(scorer, native, renderComponentMovementLines(scorer.instances))
   })
   return valuesByComponentId
+}
+
+/** Resolve the canonical components[] to edit an EXISTING log against -
+ * SNAPSHOT-FIRST (ticket §3/§4/§7): `log.log_meta.componentsSnapshot`
+ * (frozen at save time by composeMultiEnvelopeLogFields, immutable) is the
+ * authoritative source whenever present - a later Builder edit to the
+ * live workout (reordering, adding/removing a Component, changing config)
+ * NEVER reinterprets this historical log, exactly the existing FORGE
+ * invariant "historical logs are never re-derived from mutable current
+ * data" already applied everywhere else (resolveResultProvenance,
+ * P10). `currentComponentsFallback` is used ONLY when no snapshot exists
+ * on the log at all (a log saved before this snapshot field existed - in
+ * practice this should not occur, since Workout Composer Phase 4 (the
+ * only prior code that could have produced a multi-score log) was never
+ * deployed before this fix) - `source` on the return value tells the
+ * caller which case fired, so this is never silent. Returns `null` when
+ * NEITHER source has real multi-scorer evidence (not a multi-score log). */
+export function resolveHistoricalComponentsForEdit(log, currentComponentsFallback) {
+  const snapshot = log?.log_meta?.componentsSnapshot
+  if (Array.isArray(snapshot) && snapshot.length > 0) {
+    return { components: snapshot, source: 'snapshot' }
+  }
+  const cr = log?.log_meta?.componentResults
+  if (cr && typeof cr === 'object' && Object.keys(cr).length > 0) {
+    return { components: currentComponentsFallback || [], source: 'current-fallback' }
+  }
+  return null
 }
 
 // ============================================================================
