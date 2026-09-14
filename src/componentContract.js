@@ -28,7 +28,11 @@
 // prescriptionContract.js (re-exported from wodSections.js unchanged) rather
 // than importing wodSections.js here, which would have created a cycle.
 
-import { getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields, deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS, VARIANTE_WEIGHT_BASE, getWorkoutFormatDisplay } from './workoutFormats'
+import {
+  getFormat, repsEfectiveSecvential, composePartialText, composeAmrapResult, composeFortimeOrAmrapFields,
+  deriveDurationCompletionState, isSequentialFormat, WORKOUT_FORMATS, VARIANTE_WEIGHT_BASE, getWorkoutFormatDisplay,
+  composeCappedRoundsResult, parsePartialText, parseCappedRoundsResult,
+} from './workoutFormats'
 import { hydrateInstancesFromLegacy, renderInstanceLine, resolveSpec, buildLegacyArtifactsForVariant } from './prescriptionContract'
 import { secToTime } from './utils'
 
@@ -386,7 +390,7 @@ export function composeEnvelopeResult({ envelope, finishedValue, resultByCompone
  * plus `buyInText`/`cashOutText` for optional Journal/log_meta display. */
 export function composeMixedLogFields({
   mainIsSequential, finishedValue,
-  mainRoundsCompleted, mainPartialReps, mainMovements,
+  mainRoundsCompleted, mainPartialReps, mainMovements, mainAdditionalReps,
   buyInMovements, buyInPartialReps,
   cashOutMovements, cashOutPartialReps,
 }) {
@@ -401,6 +405,17 @@ export function composeMixedLogFields({
     const effective = repsEfectiveSecvential(mainPartialReps || [], mainMovements || [])
     mainText = composePartialText(effective, mainMovements || [])
     mainHasProgress = effective.some(v => (v || '').toString().trim() !== '')
+  } else if (mainAdditionalReps !== undefined) {
+    // Workout Composer Phase 4 - the REAL live UniversalScoreInput logger's
+    // "Time Capped" control for a non-sequential (repeated-rounds) format
+    // collects ONE summed "additional reps" number (RoundsAndAdditionalReps,
+    // UniversalScoreInput.jsx), never a per-movement breakdown - exactly the
+    // same distinction composeFortimeOrAmrapFields (workoutFormats.js) already
+    // makes for a bare (non-envelope) scorer. mainPartialReps stays supported
+    // (undefined mainAdditionalReps, existing tests/callers) for the older
+    // per-movement FormatLogger-flow convention.
+    mainText = composeCappedRoundsResult(mainRoundsCompleted, mainAdditionalReps) || ''
+    mainHasProgress = !!(mainRoundsCompleted || '').toString().trim()
   } else {
     mainText = composeAmrapResult(mainRoundsCompleted, mainPartialReps, mainMovements || []) || ''
     mainHasProgress = !!(mainRoundsCompleted || '').toString().trim() || (mainPartialReps || []).some(v => (v || '').toString().trim() !== '')
@@ -485,6 +500,7 @@ export function composeEnvelopeNativeResult(components, scoringComponent, inputs
       finishedValue: input.finishedValue,
       mainRoundsCompleted: input.roundsCompleted,
       mainPartialReps: input.partialReps,
+      mainAdditionalReps: input.additionalReps,
       mainMovements: input.movementLines,
       buyInMovements: buyIn ? (inputsById[buyIn.id]?.movementLines || []) : [],
       buyInPartialReps: buyIn ? (inputsById[buyIn.id]?.partialReps || []) : [],
@@ -510,7 +526,17 @@ export function composeEnvelopeNativeResult(components, scoringComponent, inputs
   }
 
   if (fmt.scoreMode === 'amrap') {
-    const text = composeAmrapResult(input.roundsCompleted, input.partialReps, input.movementLines || []) || null
+    // Workout Composer Phase 4 - the real UniversalScoreInput AMRAP control
+    // (kind:'ROUNDS_REPS') collects roundsCompleted + ONE summed
+    // additionalReps number, never a per-movement partialReps array -
+    // composeCappedRoundsResult is the SAME generic "N rounds + M" composer
+    // composeFortimeOrAmrapFields already uses for this exact distinction.
+    // input.additionalReps undefined (existing tests/FormatLogger-flow
+    // callers) falls back to the older per-movement composeAmrapResult,
+    // unchanged.
+    const text = input.additionalReps !== undefined
+      ? (composeCappedRoundsResult(input.roundsCompleted, input.additionalReps) || null)
+      : (composeAmrapResult(input.roundsCompleted, input.partialReps, input.movementLines || []) || null)
     return {
       format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
       result: text, time_result: null, completion_state: null, sets: null,
@@ -518,9 +544,13 @@ export function composeEnvelopeNativeResult(components, scoringComponent, inputs
   }
 
   // Repeated-rounds RFT/Partner-WOD-style (scoreMode 'fortime_or_amrap',
-  // NOT sequential) - reuse the existing pure composer unchanged.
+  // NOT sequential) - reuse the existing pure composer unchanged. Phase 4 -
+  // now also threads wodAdditionalReps through (composeFortimeOrAmrapFields's
+  // own existing, pre-Composer parameter) so a real UniversalScoreInput RFT
+  // input composes identically to the single-score "official WOD" screen.
   const { result, time_result, completionState } = composeFortimeOrAmrapFields({
     wodTime: input.finishedValue, wodRoundsCompleted: input.roundsCompleted, wodPartialReps: input.partialReps,
+    wodAdditionalReps: input.additionalReps,
     movements: input.movementLines || [], rounds: scoringComponent.config?.rounds, wodResult: input.result,
   })
   return {
@@ -592,6 +622,159 @@ export function getComponentResultsFromLog(log) {
     result: log?.result ?? null, time_result: log?.time_result ?? null,
     completion_state: log?.completion_state ?? null, sets: log?.sets ?? null,
   }]
+}
+
+// ============================================================================
+// WORKOUT COMPOSER - PHASE 4 (multi-scorer member logging orchestration)
+// ============================================================================
+//
+// Pure functions only - React orchestration lives in composerLogging.jsx.
+// This section wraps the EXISTING native format engines/composers (Phase 1/
+// 2/2.1, all unchanged above) into a per-scorer logging session: ordering,
+// UI-state defaults, edit-time hydration from a saved log, and mapping a
+// native logger's own value shape into composeEnvelopeNativeResult's input
+// shape. It does not reimplement AMRAP/RFT/EMOM/sequential scoring - every
+// text composition still goes through composeEnvelopeNativeResult/
+// composeComponentsLogFields, untouched.
+
+/** Every native score envelope in components[], in CANONICAL EXECUTION
+ * ORDER (ticket §11 - the scorer's own `order`, never object-key order,
+ * format-name order, or producesScore order). One entry per
+ * producesScore:true component; Rest and any non-scoring, non-owned
+ * component never appears - "Rest produces no logger" falls out of this by
+ * construction (ticket §9/§10). `buyIn`/`cashOut` are the envelope's owned
+ * bookends (null when absent) - ticket §8: an owned envelope is always ONE
+ * entry here, never split into separate steps. */
+export function getOrderedScoreEnvelopes(components) {
+  const list = components || []
+  const scorers = list.filter(c => c.producesScore).slice().sort((a, b) => a.order - b.order)
+  return scorers.map(scorer => {
+    const envelope = getScoreEnvelope(list, scorer.id)
+    const bookends = envelope.filter(c => c.id !== scorer.id)
+    return {
+      scorer,
+      buyIn: bookends.find(c => c.role === 'buy-in') || null,
+      cashOut: bookends.find(c => c.role === 'cash-out') || null,
+      envelope,
+    }
+  })
+}
+
+/** One scorer's fresh (never-logged) UI draft - the exact value shape
+ * UniversalScoreInput/FormatLogger already read/write
+ * ({result,time,roundsCompleted,additionalReps,partialReps,sets,completed,
+ * weightLogged,stages}), byte-identical to the single-score screen's own
+ * initial state - no new field, no Composer-specific shape. */
+export function emptyScorerLoggerValue() {
+  return { result: '', time: '', roundsCompleted: '', additionalReps: '', partialReps: [], sets: {}, completed: false, weightLogged: '', stages: [] }
+}
+
+/** Map ONE native format's `{result, time_result, sets}` (as returned by
+ * getComponentResultsFromLog, or one entry of log_meta.componentResults)
+ * back into the SAME UI draft shape emptyScorerLoggerValue() produces -
+ * reusing the EXISTING inverse parsers (parseAmrapResult/parsePartialText/
+ * parseCappedRoundsResult, workoutFormats.js) the single-score Journal edit
+ * flow (App.jsx's onEditWod) already uses, never a second parsing
+ * implementation. `movementLines` is the scorer's own resolved movement
+ * text lines (same source the single-score edit flow already resolves via
+ * resolveMovementInstance/renderInstanceLine). Ticket §25 - this is what
+ * lets an existing multi-score log hydrate ALL of its native results back
+ * into the stepper on edit. */
+export function hydrateScorerLoggerValueFromNativeResult(scorer, nativeResult, movementLines) {
+  const base = emptyScorerLoggerValue()
+  if (!nativeResult) return base
+  const { result, time_result, sets } = nativeResult
+  if (sets != null) return { ...base, sets }
+  if (time_result) return { ...base, time: time_result }
+  if (!result) return base
+  if (isSequentialFormat(scorer.format, scorer.config)) {
+    return { ...base, partialReps: parsePartialText(result, movementLines || []) }
+  }
+  // Repeated-rounds (RFT/Partner WOD) or plain AMRAP capped text - both use
+  // the SAME "N rounds + M" grammar (composeCappedRoundsResult), so the
+  // SAME inverse parser reopens either one into roundsCompleted+additionalReps,
+  // matching exactly what UniversalScoreInput's RoundsAndAdditionalReps
+  // control (the real production UI) reads/writes.
+  const { rounds, additional } = parseCappedRoundsResult(result)
+  return { ...base, roundsCompleted: rounds, additionalReps: additional }
+}
+
+/** Map ONE scorer's native UI draft (UniversalScoreInput/FormatLogger's own
+ * value shape) into composeEnvelopeNativeResult's expected `inputsById[id]`
+ * input shape - the ONE place this translation happens, so the compose
+ * step never has to know about UI-control conventions and the UI never has
+ * to know about the compose contract. `movementLines` is injected by the
+ * caller (the scorer's own resolved movement text). Bookend inputs
+ * (buyIn/cashOut's own partialReps) are read directly from
+ * `value.sets.__buyIn`/`.__cashOut` - the EXACT existing convention
+ * MultiMovementPartialRows (FormatLogger.jsx) already writes, unchanged. */
+export function scorerValueToEnvelopeInput(value, movementLines) {
+  const v = value || {}
+  return {
+    finishedValue: v.time, roundsCompleted: v.roundsCompleted, additionalReps: v.additionalReps,
+    partialReps: v.partialReps, result: v.result, sets: v.sets, movementLines: movementLines || [],
+  }
+}
+
+/** Bookend (Buy-In/Cash-Out) partial-reps array, from the SAME
+ * `sets.__buyIn`/`sets.__cashOut` row convention MultiMovementPartialRows
+ * already writes (one row per movement, `{reps,weight,completed}`) - never
+ * a second bookend-input shape. */
+export function bookendPartialRepsFromValue(value, role) {
+  const rows = value?.sets?.[role === 'buy-in' ? '__buyIn' : '__cashOut']
+  return (rows || []).map(row => row?.reps || '')
+}
+
+/** Build composeComponentsLogFields's full `inputsById` map for one logging
+ * session - one entry per SCORER (from its own UI draft,
+ * scorerValueToEnvelopeInput) plus one entry per owned bookend (its
+ * movement lines + the partial-reps rows recorded INSIDE the scorer's own
+ * draft, `sets.__buyIn`/`__cashOut` - ticket §8: an owned envelope is one
+ * logger, so its bookends' input lives in that SAME draft, never a
+ * separate top-level componentId slot). `valuesByComponentId` is keyed by
+ * scorer id only - matches ticket §20's identity requirement (state keyed
+ * by stable componentId, never array position). */
+export function buildComposeInputsById(envelopes, valuesByComponentId) {
+  const inputsById = {}
+  ;(envelopes || []).forEach(({ scorer, buyIn, cashOut }) => {
+    const value = (valuesByComponentId || {})[scorer.id] || emptyScorerLoggerValue()
+    inputsById[scorer.id] = scorerValueToEnvelopeInput(value, renderComponentMovementLines(scorer.instances))
+    if (buyIn) {
+      inputsById[buyIn.id] = { movementLines: renderComponentMovementLines(buyIn.instances), partialReps: bookendPartialRepsFromValue(value, 'buy-in') }
+    }
+    if (cashOut) {
+      inputsById[cashOut.id] = { movementLines: renderComponentMovementLines(cashOut.instances), partialReps: bookendPartialRepsFromValue(value, 'cash-out') }
+    }
+  })
+  return inputsById
+}
+
+/** Hydrate EVERY scorer's UI draft from an existing saved log (ticket §25 -
+ * "edit existing multi-score log"), one entry per envelope, keyed by
+ * scorer id. Reuses getComponentResultsFromLog (Phase 2.1) to read the
+ * saved native results, then hydrateScorerLoggerValueFromNativeResult per
+ * scorer - never re-derives a log from today's mutable components (the
+ * log's OWN frozen componentId/format/result/time_result/sets are the only
+ * things read here). A legacy single-score log (getComponentResultsFromLog's
+ * `componentId: null` fallback) applies its one result to the sole scorer
+ * ONLY when there is exactly one envelope (ticket §27 parity) - a legacy
+ * log predates the Composer and never had a per-scorer breakdown, so for
+ * 2+ envelopes there is nothing to hydrate beyond each scorer's own empty
+ * draft. Bookend (Buy-In/Cash-Out) rows start blank on edit, matching
+ * today's EXISTING single-mixed-format edit behavior exactly (log_meta's
+ * buyInText/cashOutText are supplementary display text, never re-parsed
+ * into rows by the current edit flow either - not a Phase 4 regression). */
+export function hydrateAllScorerValuesFromLog(envelopes, log) {
+  const list = envelopes || []
+  const nativeResults = getComponentResultsFromLog(log)
+  const byComponentId = Object.fromEntries(nativeResults.filter(r => r.componentId != null).map(r => [r.componentId, r]))
+  const legacySingle = list.length === 1 && nativeResults.length === 1 && nativeResults[0].componentId == null ? nativeResults[0] : null
+  const valuesByComponentId = {}
+  list.forEach(({ scorer }) => {
+    const native = byComponentId[scorer.id] || legacySingle
+    valuesByComponentId[scorer.id] = hydrateScorerLoggerValueFromNativeResult(scorer, native, renderComponentMovementLines(scorer.instances))
+  })
+  return valuesByComponentId
 }
 
 // ============================================================================

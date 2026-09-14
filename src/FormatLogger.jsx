@@ -291,7 +291,11 @@ function SimpleRepsRow({ rowKey, rows, onChange, t }) {
 // shape without modification) - only now genuinely one entry per movement
 // instead of one aggregate entry for the whole joined list. Degenerates to
 // exactly today's single-movement behavior when there is only one movement.
-function MultiMovementPartialRows({ label, movements, rows, onChange, t }) {
+// Exported (Workout Composer Phase 4) so composerLogging.jsx can reuse this
+// EXACT Buy-In/Cash-Out row UI for a canonical owned envelope's bookends,
+// regardless of whether the scorer's own format happens to be legacy
+// family:'mixed' - the same component, never a second implementation.
+export function MultiMovementPartialRows({ label, movements, rows, onChange, t }) {
   return (
     <div style={{ marginBottom: '10px' }}>
       <div style={{ fontSize: '12px', fontWeight: '600', color: '#791F1F', marginBottom: '6px' }}>{label}</div>

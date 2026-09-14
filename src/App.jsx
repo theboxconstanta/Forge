@@ -71,7 +71,9 @@ import {
   isSimpleComposerGraph, applyGeneratedInstancesToComponent,
   renderComponentMovementLines, hasComposerContent, createComponent, normalizeComponentOrder,
   resolveMemberComposerPrescription,
+  getOrderedScoreEnvelopes, buildComposeInputsById, composeComponentsLogFields,
 } from './componentContract'
+import MultiScorerLogger from './composerLogging'
 import { generateVariantsFromRx, generateVariantInstancesFromRx, buildScalingOverrides } from './scalingEngine'
 import {
   resolveMovementCapability, resolveMovementInstance, renderInstanceLine, resolveSpec,
@@ -7836,6 +7838,14 @@ function App() {
   // FormatLogger.jsx si composeWodLogFields.
   const [wodChainedStages, setWodChainedStages] = useState([])
   const [wodCompleted, setWodCompleted] = useState(false)
+  // WORKOUT COMPOSER PHASE 4 - a genuine multi-scorer (or bookend-owning,
+  // non-legacy-mixed) Composer session's per-scorer drafts, keyed by
+  // stable componentId (ticket §20 - never array position), plus the
+  // stepper's current step. The single-format wod*/above stay completely
+  // untouched and are what ANY 0-1-scorer WOD (the overwhelming majority)
+  // still uses - see useComposerLogger below.
+  const [wodScorerValues, setWodScorerValues] = useState({})
+  const [wodScorerStep, setWodScorerStep] = useState(0)
   // Doua casute (minute/secunde), ca la Admin - nu text liber, evita
   // ambiguitati ("20 minute" vs "20:00") si se compune direct in acelasi
   // format "mm:ss" folosit peste tot in app.
@@ -9829,6 +9839,18 @@ function App() {
   // client vechi care ar ocoli ramurile actuale.
   const composeWodLogFields = () => normalizeCompletionState(composeWodLogFieldsInner())
   const composeWodLogFieldsInner = () => {
+    // WORKOUT COMPOSER PHASE 4 (ticket §4/§23) - a genuine multi-scorer (or
+    // bookend-owning non-mixed) Composer session bypasses EVERY legacy
+    // branch below entirely, via composeComponentsLogFields (Phase 2.1,
+    // unchanged) - the SAME single atomic save every other format already
+    // goes through (saveWodLog spreads this object verbatim, unchanged).
+    // No new persistence model (§4): 1 scorer keeps legacy scalar fields,
+    // 2+ scorers go to log_meta.componentResults, exactly Phase 2.1's own
+    // contract. Any 0-1-scorer WOD (the overwhelming majority) never enters
+    // this branch at all - zero risk to any branch below.
+    if (useComposerLogger) {
+      return composeComponentsLogFields(logComponents, buildComposeInputsById(logScoreEnvelopes, wodScorerValues))
+    }
     const format = getFormat(activeLogFormatId)
     const setsCurate = () => {
       const cleaned = {}
@@ -10041,7 +10063,7 @@ function App() {
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
         setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
       return
@@ -10108,7 +10130,7 @@ function App() {
         showToast(t.toastWodSaved); await fetchWodLogs(); fetchClasament()
         setScreen(prevScreen === 'log' ? 'log' : 'home'); if (prevScreen === 'log') setLogTab('jurnal')
         setLogTargetSectionId(null)
-        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+        setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
       }
       setWodSaving(false)
       return
@@ -10404,7 +10426,7 @@ function App() {
       if (prevScreen === 'log') { setScreen('log'); setLogTab('jurnal') }
       else { setScreen('home'); setWodDeschis(false) }
       setVariantaAleasa(null); setWodMiscariCustom(null)
-      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+      setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
       setWodTip('AMRAP'); setWodFormatConfig({}); setWodDurataMin(''); setWodDurataSec(''); setWodMiscari([]); setWodMiscareCurenta('')
       // PHOTO RESULT / SHARE CARD Phase 1 - runs ONLY after the WOD result
       // above is already fully saved, the toast shown, and the screen/state
@@ -10847,6 +10869,30 @@ function App() {
   // which, in a frozen flow, is logCtx.prescriptionDoc (frozen at click) -
   // never re-resolved from live wods. null -> legacy text fallback.
   const frozenVariantKey = variantaAleasa !== null ? variantKeyFromLevel(VARIANTE_CONFIG[variantaAleasa]?.nivel) : null
+  // WORKOUT COMPOSER PHASE 4 (ticket §2/§3) - canonical score envelopes for
+  // the WOD being logged, read from activePrescriptionDoc (already fetched,
+  // zero new query - Phase 3.2's own finding) rather than legacy
+  // activeLogFormatId/activeLogFormatConfig (Phase 3's single-scorer legacy
+  // shim). Scoped to the fresh, primary-WOD logging flow ONLY
+  // (logWodPrimaryPath - not editLogId's Journal-edit flow, which
+  // reconstructs its format from a frozen snapshot with no variant context
+  // to resolve components against, and not logTargetSection, an additional
+  // scored section outside Composer scope) - a deliberate, reported
+  // boundary (see final report), not an oversight.
+  const logComponents = (!editLogId && !logTargetSection && frozenVariantKey)
+    ? (activePrescriptionDoc?.variants?.[frozenVariantKey]?.components || [])
+    : []
+  const logScoreEnvelopes = getOrderedScoreEnvelopes(logComponents)
+  // ticket §7/§8 - a bare 0-1-scorer graph (the overwhelming common case)
+  // and an already-working legacy family:'mixed' envelope (Phase 2, fully
+  // production-tested) BOTH keep the exact existing single-format path,
+  // untouched. The Composer stepper only takes over for a genuine 2+-scorer
+  // graph, or a 1-scorer OWNED envelope whose format has no legacy 'mixed'
+  // equivalent (Phase 3's own documented gap - e.g. an RFT-scored Buy-In/
+  // Cash-Out envelope, which the legacy family:'mixed' path cannot
+  // represent at all).
+  const useComposerLogger = logScoreEnvelopes.length > 1
+    || (logScoreEnvelopes.length === 1 && (logScoreEnvelopes[0].buyIn || logScoreEnvelopes[0].cashOut) && getFormat(activeLogFormatId)?.family !== 'mixed')
   const structuredLogDisplay = (variantaAleasa !== null && frozenVariantKey)
     ? (composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey }) ?? null)
     : null
@@ -11896,7 +11942,7 @@ function App() {
                           if (!homeDisplayIsCurrent) return
                           setLogCtx(captureLogCtx())
                           setLogTargetSectionId(section.id); setEditLogId(null)
-                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('')
+                          setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0)
                           setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
                         }} t={t} />
                     )
@@ -12511,16 +12557,16 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               // Layer 2a - la fel ca editLogId mai sus: formatul e deja fixat
               // de sectiune, nu exista pas "compose" de revenit la el - back
               // navigheaza direct in afara ecranului.
-              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setScreen(prevScreen || 'home') }
+              else if (logTargetSectionId) { setLogTargetSectionId(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setScreen(prevScreen || 'home') }
               else if (!logWodPrimaryPath && logWodStep === 'score') { setLogWodStep('compose') }
               else {
                 // P9.5.1 - clear the score draft when leaving the single-screen
                 // Universal Log WOD without saving, so the next workout opens clean.
-                if (logWodPrimaryPath) { setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged('') }
+                if (logWodPrimaryPath) { setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0) }
                 setScreen(prevScreen || 'home')
               }
             }} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
@@ -12682,14 +12728,32 @@ function App() {
                   ))}
                 </div>
 
-                <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
-                <UniversalScoreInput
-                  def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
-                  movements={effectivePartialMovements} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
-                  intervalComposition={intervalCompositionActive} prescriptionMovements={frozenProgrammedInstances}
-                  value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
-                  onChange={dispatchScorePatch}
-                  weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+                {useComposerLogger ? (
+                  // WORKOUT COMPOSER PHASE 4 (ticket §5/§6) - one native
+                  // logger per score envelope, in canonical execution
+                  // order, reusing UniversalScoreInput/MultiMovementPartialRows
+                  // UNCHANGED (composerLogging.jsx). State is owned here
+                  // (wodScorerValues/wodScorerStep), keyed by componentId
+                  // (ticket §20) - Back/Next never remounts this component,
+                  // so entered state is never lost (ticket §21).
+                  <MultiScorerLogger
+                    envelopes={logScoreEnvelopes} valuesByComponentId={wodScorerValues} step={wodScorerStep}
+                    onStepChange={setWodScorerStep}
+                    onChangeComponent={(componentId, next) => setWodScorerValues(v => ({ ...v, [componentId]: next }))}
+                    weightUnit={userProfile?.weight_unit || 'kg'} t={t} gender={memberGenderKey}
+                  />
+                ) : (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', marginBottom: '12px' }}>{t.logWodYourScoreLabel}</div>
+                    <UniversalScoreInput
+                      def={scoreDef} formatId={activeLogFormatId} config={activeLogFormatConfig}
+                      movements={effectivePartialMovements} prescribedWeight={primaryPrescribedWeight} rxStatus={liveRxStatus}
+                      intervalComposition={intervalCompositionActive} prescriptionMovements={frozenProgrammedInstances}
+                      value={{ result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted, additionalReps: wodAdditionalReps, partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted, weightLogged: wodWeightLogged, stages: wodChainedStages }}
+                      onChange={dispatchScorePatch}
+                      weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+                  </>
+                )}
 
                 <div style={{ marginTop: '16px' }}>
                   <div style={{ fontSize: '11px', color: '#9A9A9A', marginBottom: '6px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodNoteLabel}</div>
