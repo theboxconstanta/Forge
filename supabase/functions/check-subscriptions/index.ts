@@ -86,8 +86,8 @@ async function notify(
   if (!res.ok) console.error("Brevo error for", email, await res.text());
 }
 
-// Decide daca apikey-ul primit este chiar secret key-ul "default" al
-// proiectului - singurul apelant de incredere pentru acest job (un
+// Decide daca apikey-ul primit este chiar secret key-ul dedicat "scheduler"
+// al proiectului - singurul apelant de incredere pentru acest job (un
 // scheduler, nu un utilizator din aplicatie). Pura / fara I/O ca sa poata
 // fi testata fara un backend Supabase live - vezi index.test.ts. Exista
 // DOAR pentru ca functia asta ruleaza pe service_role si, inainte de acest
@@ -99,9 +99,15 @@ async function notify(
 // intelege doar JWT-uri legacy, nu si noile secret keys. Varianta de mai
 // jos urmeaza "Option 1" din ghidul oficial de migrare Supabase:
 // verify_jwt=false, header apikey, SUPABASE_SECRET_KEYS (dictionar JSON
-// dupa nume - singura cheie existenta azi in proiect e "default").
-// Esueaza inchis (fail closed) la orice problema: header lipsa/gol, JSON
-// invalid, sau cheia "default" absenta din dictionar.
+// dupa nume). P0.2 (09-15) - trecuta de la cheia "default" (folosita si de
+// alte procese, ex. PostgREST) la o cheie dedicata, creata special pentru
+// acest job in Dashboard - un secret rotat/revocat pentru "default" nu mai
+// poate rupe accidental acest cron, si invers. Numele exact e
+// "schedulerv2" (Dashboard) - prima incercare "scheduler" a fost inlocuita
+// de proprietarul proiectului, iar Vault-ul care alimenteaza header-ul
+// apikey al cron-ului tine acum valoarea lui "schedulerv2". Esueaza inchis
+// (fail closed) la orice problema: header lipsa/gol, JSON invalid, sau
+// cheia "schedulerv2" absenta din dictionar.
 export function isAuthorizedScheduler(apikeyHeader: string | null, secretKeysJson: string | undefined): boolean {
   if (!apikeyHeader || !secretKeysJson) return false;
   let secretKeys: Record<string, string>;
@@ -110,7 +116,7 @@ export function isAuthorizedScheduler(apikeyHeader: string | null, secretKeysJso
   } catch {
     return false;
   }
-  const expected = secretKeys?.["default"];
+  const expected = secretKeys?.["schedulerv2"];
   if (!expected) return false;
   return apikeyHeader === expected;
 }
