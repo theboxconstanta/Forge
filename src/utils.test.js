@@ -6,6 +6,7 @@ import {
   resolveMemberIdentity,
   resolveClassColor, getReadableTextColor, parseHexColor, contrastRatio,
   CLASS_COLOR_DEFAULT_BG, CLASS_COLOR_FG_LIGHT, CLASS_COLOR_FG_DARK,
+  classifyQueuedSubscription, QUEUED_SUBSCRIPTION_CLASS, isScheduledRenewal,
 } from './utils'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -87,6 +88,85 @@ describe('daysUntil', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-02-25T10:00:00'))
     expect(daysUntil('2026-03-25')).toBe(28)
+  })
+})
+
+describe('classifyQueuedSubscription - ABANDONED CHECKOUT / SCHEDULED SEPARATION', () => {
+  it('a queued row with NO linked order classifies as an intentional admin-created scheduled renewal', () => {
+    expect(classifyQueuedSubscription(false)).toBe(QUEUED_SUBSCRIPTION_CLASS.SCHEDULED_RENEWAL)
+  })
+
+  it('a queued row WITH a linked order classifies as a self-service pending checkout', () => {
+    expect(classifyQueuedSubscription(true)).toBe(QUEUED_SUBSCRIPTION_CLASS.PENDING_CHECKOUT)
+  })
+})
+
+describe('isScheduledRenewal - the single predicate both Admin surfaces must share', () => {
+  function abonamentFixture(overrides) {
+    return { id: 'sub-1', member_email: 'member@test.com', is_active: false, queued: true, ...overrides }
+  }
+
+  // ticket fixture A: no queued row at all -> not scheduled, trivially
+  it('A. a plain active-only subscription (not queued) is never a scheduled renewal', () => {
+    const active = abonamentFixture({ is_active: true, queued: false, _queuedClass: undefined })
+    expect(isScheduledRenewal(active)).toBe(false)
+  })
+
+  // ticket fixture B: admin-created queued renewal (no linked order) -> Scheduled
+  it('B. an admin-created queued renewal (no linked order) IS a scheduled renewal', () => {
+    const adminQueued = abonamentFixture({ _queuedClass: classifyQueuedSubscription(false) })
+    expect(isScheduledRenewal(adminQueued)).toBe(true)
+  })
+
+  // ticket fixture C: unpaid self-service checkout (linked order exists) -> NOT Scheduled
+  it('C. an unpaid self-service checkout (linked order exists) is NOT a scheduled renewal', () => {
+    const pendingCheckout = abonamentFixture({ _queuedClass: classifyQueuedSubscription(true) })
+    expect(isScheduledRenewal(pendingCheckout)).toBe(false)
+  })
+
+  // ticket fixture D: 3 unpaid self-service attempts -> none count as Scheduled
+  it('D. multiple unpaid self-service attempts for the same member all stay excluded (no +N scheduled)', () => {
+    const attempts = [
+      abonamentFixture({ id: 'sub-a', _queuedClass: classifyQueuedSubscription(true) }),
+      abonamentFixture({ id: 'sub-b', _queuedClass: classifyQueuedSubscription(true) }),
+      abonamentFixture({ id: 'sub-c', _queuedClass: classifyQueuedSubscription(true) }),
+    ]
+    expect(attempts.filter(isScheduledRenewal)).toHaveLength(0)
+  })
+
+  // ticket fixture L: Valentin-shaped fixture - active membership + one abandoned pending checkout
+  it('L. Valentin-shaped fixture: active membership + abandoned pending checkout -> only Active counts, no Scheduled', () => {
+    const list = [
+      { id: 'active-1', member_email: 'valentin@test.com', is_active: true, queued: false, start_date: '2026-08-17', end_date: '2026-09-17', sessions_total: 24, sessions_used: 5 },
+      abonamentFixture({ id: 'queued-1', member_email: 'valentin@test.com', start_date: '2026-08-19', end_date: '2026-08-19', sessions_total: 24, sessions_used: 0, _queuedClass: classifyQueuedSubscription(true) }),
+    ]
+    const activeRow = list.find(a => a.is_active && !a.queued)
+    const scheduledRows = list.filter(isScheduledRenewal)
+    expect(activeRow.id).toBe('active-1')
+    expect(activeRow.sessions_used).toBe(5) // untouched
+    expect(activeRow.end_date).toBe('2026-09-17') // untouched
+    expect(scheduledRows).toHaveLength(0)
+  })
+
+  // ticket §7 required test: ACTIVE + ADMIN-CREATED queued renewal -> still Scheduled
+  it('F. an active membership plus a genuine admin-created queued renewal keeps the Scheduled card visible', () => {
+    const list = [
+      { id: 'active-1', member_email: 'm@test.com', is_active: true, queued: false },
+      abonamentFixture({ id: 'renewal-1', member_email: 'm@test.com', _queuedClass: classifyQueuedSubscription(false) }),
+    ]
+    expect(list.filter(isScheduledRenewal).map(a => a.id)).toEqual(['renewal-1'])
+  })
+
+  // M: member-list and member-detail must derive from the exact same predicate
+  it('M. the same predicate used for the client-list single-match also drives the member-detail multi-match', () => {
+    const list = [
+      abonamentFixture({ id: 'renewal-1', member_email: 'm@test.com', _queuedClass: classifyQueuedSubscription(false) }),
+      abonamentFixture({ id: 'pending-1', member_email: 'm@test.com', _queuedClass: classifyQueuedSubscription(true) }),
+    ]
+    const singleMatch = list.find(isScheduledRenewal) // client-list style (.find)
+    const multiMatch = list.filter(isScheduledRenewal) // member-detail style (.filter)
+    expect(singleMatch.id).toBe('renewal-1')
+    expect(multiMatch.map(a => a.id)).toEqual(['renewal-1'])
   })
 })
 

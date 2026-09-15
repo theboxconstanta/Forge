@@ -21,6 +21,7 @@ import {
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial, resolveMemberIdentity,
   resolveClassColor, getReadableTextColor,
+  classifyQueuedSubscription, isScheduledRenewal,
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet } from './components'
 import { getT } from './translations'
@@ -3655,7 +3656,24 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const fetchAbonamente = async () => {
     const { data } = await supabase.from('subscriptions').select('*, subscription_plans(name, sessions, duration_months)')
       .or('is_active.eq.true,queued.eq.true').order('created_at', { ascending: false })
-    if (data) setAbonamente(data)
+    if (data) {
+      // ABANDONED CHECKOUT / SCHEDULED SEPARATION - a self-service purchase
+      // ALWAYS gets a linked `orders` row at creation (create-checkout-session
+      // needs it for the Stripe client_reference_id/metadata before Checkout
+      // even exists), while an admin-intentional queued renewal never does
+      // until it activates. Fetched once here, centrally, so both the
+      // client-list and member-detail Scheduled surfaces below classify off
+      // the exact same evidence (never scattered raw `.queued` checks).
+      const queuedIds = data.filter(a => a.queued).map(a => a.id)
+      let orderedSubIds = new Set()
+      if (queuedIds.length > 0) {
+        const { data: linkedOrders } = await supabase.from('orders').select('subscription_id').in('subscription_id', queuedIds)
+        orderedSubIds = new Set((linkedOrders || []).map(o => o.subscription_id))
+      }
+      setAbonamente(data.map(a => a.queued
+        ? { ...a, _queuedClass: classifyQueuedSubscription(orderedSubIds.has(a.id)) }
+        : a))
+    }
     const azi = new Date(); const aziStr = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
     const { data: claseViit } = await supabase.from('classes').select('id').gte('date', aziStr)
     if (claseViit && claseViit.length > 0) {
@@ -4823,7 +4841,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const getAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.is_active && !a.queued)
-  const getQueuedAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && a.queued)
+  const getQueuedAbonamentClient = (email) => abonamente.find(a => a.member_email?.toLowerCase() === email?.toLowerCase() && isScheduledRenewal(a))
 
   const esteClientActiv = (email) => {
     const abo = getAbonamentClient(email)
@@ -5228,7 +5246,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 {emails.map(email => {
                   const list = grouped[email]
                   const activ = list.find(a => a.is_active && !a.queued)
-                  const queued = list.filter(a => a.queued)
+                  const queued = list.filter(isScheduledRenewal)
                   const membruNume = clienti.find(c => c.email?.toLowerCase() === email)?.full_name
                   const expanded = !!aboExpandat[email]
                   const zileRamase = activ ? daysUntil(activ.end_date) : null

@@ -234,6 +234,32 @@ export function daysUntil(endDateStr) {
   return Math.round((end - todayMidnight) / 86400000)
 }
 
+export const QUEUED_SUBSCRIPTION_CLASS = { SCHEDULED_RENEWAL: 'scheduledRenewal', PENDING_CHECKOUT: 'pendingCheckout' }
+
+// ABANDONED CHECKOUT / SCHEDULED SEPARATION - a `subscriptions.queued=true` row
+// is Admin-facing "Scheduled" ONLY when it was created by an intentional
+// admin/coach renewal (create_subscription's admin+has-valid-active branch,
+// which never creates an `orders` row at creation time). A self-service
+// purchase (create_subscription's non-admin branch) ALWAYS creates a linked
+// `orders` row immediately, before Stripe Checkout even exists - so, while
+// still queued, presence of a linked order is a structural fact, not a
+// guessed heuristic (never timestamps/email/age), that a row originated
+// from a member-initiated checkout that has not (yet, or ever) been paid.
+// Once such a checkout succeeds, the row stops being queued at all
+// (activate_queued_subscription flips it), so this distinction is only ever
+// evaluated against rows that are still queued.
+export function classifyQueuedSubscription(hasLinkedOrder) {
+  return hasLinkedOrder ? QUEUED_SUBSCRIPTION_CLASS.PENDING_CHECKOUT : QUEUED_SUBSCRIPTION_CLASS.SCHEDULED_RENEWAL
+}
+
+// The ONE predicate both Admin surfaces (client-list badge/card, member-detail
+// Subscriptions section) call to decide whether a queued row is shown as
+// "Scheduled" - never a raw `sub.queued` check on its own. `sub._queuedClass`
+// is expected to already be set by classifyQueuedSubscription at fetch time.
+export function isScheduledRenewal(sub) {
+  return !!sub?.queued && sub._queuedClass === QUEUED_SUBSCRIPTION_CLASS.SCHEDULED_RENEWAL
+}
+
 export function levenshtein(a, b) {
   const m = a.length, n = b.length
   const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0))

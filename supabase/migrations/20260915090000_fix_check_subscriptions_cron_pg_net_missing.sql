@@ -1,0 +1,17 @@
+-- ABANDONED CHECKOUT / SCHEDULED SEPARATION (§10/§22) - root-cause fix for
+-- check-subscriptions-daily's cron failure ("schema \"net\" does not exist").
+-- A prior investigation (FINANCIAL_P0_UNAUTHORIZED_MEMBERSHIP_ACTIVATION_REPORT.md)
+-- attributed this to a rejected scheduler secret; a fresh live check (pg_extension)
+-- found the ACTUAL current cause is simpler and more fundamental: the pg_net
+-- extension itself is not installed in this database at all (confirmed - it
+-- is absent from pg_extension entirely, alongside pg_cron/pg_stat_statements/
+-- pgcrypto/uuid-ossp/supabase_vault, none of which are pg_net). The cron job's
+-- own command already calls the fully-schema-qualified `net.http_post(...)`
+-- (see cron.job), so once the extension exists (it creates its own `net`
+-- schema and functions, independent of any search_path), that call resolves
+-- with no other change needed - the job's command/schedule/secret are untouched.
+--
+-- Non-destructive: pg_net is Supabase's own standard extension for exactly
+-- this pg_cron -> Edge Function HTTP-call pattern; installing it touches no
+-- existing table, function, or RLS policy.
+create extension if not exists pg_net;
