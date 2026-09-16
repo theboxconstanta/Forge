@@ -10181,9 +10181,15 @@ function App() {
       // wodTime.trim() already satisfies areContiutSectiune and this is moot.
       const seqPartialAreContiutSectiune = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
         && !wodTime.trim() && hasSequentialAmrapInput(wodPartialReps)
+      // MULTI-PART SCORING - same reason as the primary-path guard below:
+      // a Composer multi-scorer session's real content lives in
+      // wodScorerValues, never these legacy top-level fields.
+      const composerAreContiutSectiune = useComposerLogger && Object.values(wodScorerValues || {}).some(v =>
+        (v?.result ?? '').toString().trim() || (v?.time ?? '').toString().trim() || (v?.roundsCompleted ?? '').toString().trim()
+        || (v?.partialReps || []).some(x => (x ?? '').toString().trim()) || Object.keys(v?.sets || {}).length > 0 || v?.completed)
       const areContiutSectiune = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim()
         || Object.keys(wodSets).length > 0 || wodCompleted || wodWeightLogged.trim() || chainedAreContiutSectiune
-        || seqAmrapAreContiutSectiune || seqPartialAreContiutSectiune
+        || seqAmrapAreContiutSectiune || seqPartialAreContiutSectiune || composerAreContiutSectiune
       if (!areContiutSectiune) { showToast(t.toastFillResultOrTime); return }
       setWodSaving(true)
       const sectionHeaderLine = `${logTargetSection.format || ''}${logTargetSection.title ? ' — "' + logTargetSection.title + '"' : ''}`.trim()
@@ -10244,8 +10250,25 @@ function App() {
     // wodTime.trim() already satisfies areContiut and this is moot.
     const seqPartialAreContiut = isSequentialFormat(activeLogFormatId, activeLogFormatConfig)
       && !wodTime.trim() && hasSequentialAmrapInput(wodPartialReps)
+    // MULTI-PART SCORING - a Composer multi-scorer session (useComposerLogger)
+    // never touches the legacy top-level wodResult/wodTime/wodRoundsCompleted/
+    // wodSets/wodCompleted state at all - MultiScorerLogger writes every
+    // scorer's own draft into wodScorerValues (keyed by componentId) instead
+    // (see composeWodLogFieldsInner's own useComposerLogger branch just
+    // above, which reads wodScorerValues, never these). Without this check,
+    // areContiut below is unconditionally false for every multi-scorer
+    // session - even a fully-logged TIME+LOAD result - silently blocking
+    // save behind "Fill result or time" before ever reaching Supabase (found
+    // via live acceptance testing this ticket's own canonical two-part
+    // workout). Mirrors the same non-empty-draft check FormatLogger/
+    // UniversalScoreInput's own value shape already uses elsewhere, per
+    // scorer, never a new representation.
+    const composerAreContiut = useComposerLogger && Object.values(wodScorerValues || {}).some(v =>
+      (v?.result ?? '').toString().trim() || (v?.time ?? '').toString().trim() || (v?.roundsCompleted ?? '').toString().trim()
+      || (v?.partialReps || []).some(x => (x ?? '').toString().trim()) || Object.keys(v?.sets || {}).length > 0 || v?.completed)
     const areContiut = wodResult.trim() || wodRoundsCompleted.trim() || wodTime.trim() || wodMiscari.length > 0
       || Object.keys(wodSets).length > 0 || wodCompleted || chainedAreContiut || seqAmrapAreContiut || seqPartialAreContiut
+      || composerAreContiut
     if (!areContiut) { showToast(t.toastFillResultOrTime); return }
     setWodSaving(true)
     // P9.5.8 / P9.5.8.1 - DEFENSIVE SAVE GUARD, ROLE-INDEPENDENT. A logged
