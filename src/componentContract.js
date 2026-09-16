@@ -525,6 +525,32 @@ export function composeEnvelopeNativeResult(components, scoringComponent, inputs
     }
   }
 
+  if (fmt.scoreMode === 'single_value' && scoringComponent.format === 'Max Effort') {
+    // MULTI-PART SCORING - a timed Max Effort / For Load component's native
+    // result is a single numeric LOAD value (kg), never a time/rounds/reps
+    // text. Read from `input.result` - the SAME generic slot
+    // scorerValueToEnvelopeInput already threads through unchanged
+    // (UniversalScoreInput's LOAD kind writes the athlete's number into
+    // `v.result`, byte-identical to REPS/DISTANCE/CALORIES). Stored under a
+    // NEW, explicit `load_result` key - never `result`/`time_result` - so it
+    // can never be mistaken for a time or fall into any existing text-based
+    // result parser (parseCappedRoundsResult/parsePartialText/etc never see
+    // it). Purely additive: every other branch's return shape is unchanged,
+    // and an old componentResults entry with no `load_result` key remains
+    // exactly as valid as before (getComponentResultsFromLog defaults it to
+    // null). Gated on format==='Max Effort' specifically (not scoreMode
+    // alone) - 'Max Effort' is the only single_value format wired to LOAD
+    // today; a hypothetical future single_value format would need its own
+    // explicit branch, never silently inherit this one.
+    const raw = input.result
+    const num = raw !== '' && raw != null ? Number(raw) : null
+    return {
+      format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
+      result: null, time_result: null, completion_state: null, sets: null,
+      load_result: Number.isFinite(num) ? num : null,
+    }
+  }
+
   if (fmt.scoreMode === 'amrap') {
     // Workout Composer Phase 4 - the real UniversalScoreInput AMRAP control
     // (kind:'ROUNDS_REPS') collects roundsCompleted + ONE summed
@@ -540,6 +566,32 @@ export function composeEnvelopeNativeResult(components, scoringComponent, inputs
     return {
       format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
       result: text, time_result: null, completion_state: null, sets: null,
+    }
+  }
+
+  // MULTI-PART SCORING fix - a standalone (bookend-less) SEQUENTIAL scorer
+  // (e.g. the canonical target workout's own Part A: a bare 'For Time' with
+  // a Time Cap, no Buy-In/Cash-Out, sitting alongside an independent Part B)
+  // must compose its capped/partial result exactly like the owned-envelope
+  // branch above already does for a sequential main - via composeEnvelopeResult
+  // (isComplete/furthest-progress), never composeFortimeOrAmrapFields's
+  // rounds-only `shouldLogRoundsInsteadOfTime` gate, which a genuinely
+  // sequential (non-repeated-rounds) format never satisfies (it has no
+  // `roundsCompleted` at all) - reaching it unconditionally silently dropped
+  // a capped/partial-only sequential result to `result:null,
+  // completion_state:'completed'` (found while testing Part 10's DNF-
+  // integrity requirement). Reuse composeMixedLogFields UNCHANGED with empty
+  // bookends - not a second engine, the exact same primitive an owned
+  // envelope's sequential main already goes through.
+  if (isSequentialFormat(scoringComponent.format, scoringComponent.config)) {
+    const out = composeMixedLogFields({
+      mainIsSequential: true, finishedValue: input.finishedValue,
+      mainPartialReps: input.partialReps, mainMovements: input.movementLines || [],
+      buyInMovements: [], buyInPartialReps: [], cashOutMovements: [], cashOutPartialReps: [],
+    })
+    return {
+      format: scoringComponent.format, envelopeComponentIds: [scoringComponent.id],
+      result: out.result, time_result: out.time_result, completion_state: out.completion_state, sets: null,
     }
   }
 
@@ -614,6 +666,19 @@ export function composeComponentsLogFields(components, inputsById) {
   const scorers = (components || []).filter(c => c.producesScore)
   if (scorers.length === 1) {
     const r = composeEnvelopeNativeResult(components, scorers[0], inputsById || {})
+    // MULTI-PART SCORING - a load_result has no legacy scalar slot to live
+    // in at all (Part 5's own reason for inventing it as an additive
+    // log_meta field in the first place) - so a SOLE Max Effort/Load scorer
+    // (a real, reachable authoring choice: a coach can add exactly one)
+    // must still route through componentResults here, or its value would be
+    // silently dropped (result/time_result/completion_state/sets never
+    // carry it). Every PRE-EXISTING single-scorer format is byte-identical
+    // to before - r.load_result is only ever non-null for 'Max Effort',
+    // which had zero working legacy-scalar callers before this ticket (dead
+    // config), so this branch changes behavior for NO existing format.
+    if (r.load_result != null) {
+      return { result: null, time_result: null, completion_state: null, sets: null, log_meta: { componentResults: { [scorers[0].id]: r } } }
+    }
     return { result: r.result, time_result: r.time_result, completion_state: r.completion_state, sets: r.sets, log_meta: null }
   }
   return composeMultiEnvelopeLogFields(components, inputsById)
@@ -634,12 +699,16 @@ export function getComponentResultsFromLog(log) {
     return Object.entries(cr).map(([componentId, r]) => ({
       componentId, format: r.format ?? null, result: r.result ?? null,
       time_result: r.time_result ?? null, completion_state: r.completion_state ?? null, sets: r.sets ?? null,
+      // MULTI-PART SCORING - additive; a pre-existing componentResults entry
+      // saved before this field existed simply has no `load_result` key,
+      // defaulting to null here exactly like every other optional field.
+      load_result: r.load_result ?? null,
     }))
   }
   return [{
     componentId: null, format: null,
     result: log?.result ?? null, time_result: log?.time_result ?? null,
-    completion_state: log?.completion_state ?? null, sets: log?.sets ?? null,
+    completion_state: log?.completion_state ?? null, sets: log?.sets ?? null, load_result: null,
   }]
 }
 
@@ -702,8 +771,16 @@ export function emptyScorerLoggerValue() {
 export function hydrateScorerLoggerValueFromNativeResult(scorer, nativeResult, movementLines) {
   const base = emptyScorerLoggerValue()
   if (!nativeResult) return base
-  const { result, time_result, sets } = nativeResult
+  const { result, time_result, sets, load_result } = nativeResult
   if (sets != null) return { ...base, sets }
+  // MULTI-PART SCORING - symmetric with composeEnvelopeNativeResult's own
+  // `load_result` write: UniversalScoreInput's LOAD kind reads its value
+  // from `v.result` (the same generic slot REPS/DISTANCE/CALORIES use), so
+  // hydration restores it there too - a plain round-trippable string, never
+  // routed through any time/rounds text parser below. Checked before
+  // `time_result`/`result` so a load-scored entry can never be misread as a
+  // time or capped-rounds string.
+  if (load_result != null) return { ...base, result: String(load_result) }
   if (time_result) return { ...base, time: time_result }
   if (!result) return base
   if (isSequentialFormat(scorer.format, scorer.config)) {
@@ -965,6 +1042,19 @@ export const COMPOSER_FORMAT_GROUPS = [
     key: 'intervals', label: 'Intervals',
     options: [{ format: 'EMOM', role: null, label: 'EMOM' }],
   },
+  // MULTI-PART SCORING - the existing 'Max Effort' format (workoutFormats.js,
+  // scoreMode:'single_value') was never reachable from the Composer picker,
+  // the exact root cause the owner's "3:00 to find 1RM" workaround (abusing
+  // Cash-Out) traced back to. Generic - deliberately NOT named/labeled for
+  // "1RM" specifically: the rep target (1RM/3RM/...) is expressed through
+  // the component's own structured movement instance's `reps` field (e.g.
+  // reps:1 for a 1RM, reps:3 for a 3RM), the SAME mechanism every other
+  // format already uses for a movement's rep scheme - no new schema concept
+  // invented merely for display copy.
+  {
+    key: 'max-effort', label: 'Max effort',
+    options: [{ format: 'Max Effort', role: null, label: 'Max Effort' }],
+  },
   {
     key: 'structure', label: 'Structure',
     options: [{ format: 'Rest', role: null, label: 'Rest' }],
@@ -982,6 +1072,7 @@ export function defaultConfigForFormat(format) {
     case 'RFT': return { rounds: 5 }
     case 'EMOM': return { totalRounds: 8, intervalSec: 60 }
     case 'Rest': return { durationSec: 120 }
+    case 'Max Effort': return { timeCapSec: 180 }
     default: return {}
   }
 }

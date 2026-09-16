@@ -1050,12 +1050,32 @@ export function applyPerformedSubstitution(instance, targetRow, capability) {
     if (instance.distance) next.distance = instance.distance
     if (instance.calories) next.calories = instance.calories
   } else {
-    if (allowed.includes('reps')) next.reps = instance.reps ?? { mode: 'universal', value: null }
     if (allowed.includes('load')) next.load = instance.load ?? { mode: 'universal', value: null, unit: 'kg' }
+    // MULTI-PART SCORING / SHUTTLE RUN - `reps` is independent (coexists
+    // with `load`, e.g. Clean & Jerk - that movement's own capability never
+    // includes 'distance' at all) UNLESS this movement's capability ALSO
+    // includes 'distance' (Shuttle Run's own new capability,
+    // ["distance","reps"]) - in that case 'reps' IS distance's mutually-
+    // exclusive pair partner (never both active at once, same invariant as
+    // Row's distance/calories pair), handled by the survivor logic below
+    // instead of here. No catalog movement declares all three
+    // (distance+calories+reps) together, so this split is exhaustive.
+    const repsIsDistancePartner = allowed.includes('distance') && allowed.includes('reps')
+    if (allowed.includes('reps') && !repsIsDistancePartner) next.reps = instance.reps ?? { mode: 'universal', value: null }
+    const distancePartnerKey = allowed.includes('calories') ? 'calories' : repsIsDistancePartner ? 'reps' : null
     const survivor = (instance.distance && allowed.includes('distance')) ? 'distance'
-      : (instance.calories && allowed.includes('calories')) ? 'calories' : null
+      : (distancePartnerKey && instance[distancePartnerKey] && allowed.includes(distancePartnerKey)) ? distancePartnerKey : null
     if (survivor) {
       next[survivor] = instance[survivor]
+    } else if (distancePartnerKey === 'reps') {
+      // Same "seed only the default, fail open to both when undefaulted"
+      // convention initializePerformedMetrics already uses for distance/
+      // calories - inlined here rather than extending that function, which
+      // explicitly documents "never touches reps" (also depended on by
+      // addPerformedMovement, out of this ticket's scope).
+      const dflt = (capability.default === 'reps' || capability.default === 'distance') ? capability.default : null
+      if (!dflt || dflt === 'distance') next.distance = { mode: 'universal', value: null, unit: 'm' }
+      if (!dflt || dflt === 'reps') next.reps = { mode: 'universal', value: null }
     } else {
       Object.assign(next, initializePerformedMetrics({
         allowed: allowed.filter((mk) => mk === 'distance' || mk === 'calories'),
@@ -1206,14 +1226,28 @@ export function setPerformedMetricValue(instance, metric, value, unit) {
 // every other field (instanceId, name, canonicalMovementId, sourceInstanceId,
 // substitutedFrom, reps, load, notPerformed, ...) survives untouched via the
 // shallow copy.
+// MULTI-PART SCORING / SHUTTLE RUN - generalized from the original
+// distance<->calories-only pair to also cover distance<->reps (Shuttle Run's
+// own new capability, allowed_prescription_metrics=["distance","reps"]).
+// Switching TO 'distance' clears whichever of {calories, reps} is actually
+// present on the instance (never both, never blindly by name) - a real
+// catalog movement's switchable pair is always exactly one of these two, so
+// this cannot clear an unrelated field: Row/Ski/Bike (distance<->calories)
+// never carry a `reps` prescription scheme in this pairing, so an unrelated
+// `reps` field elsewhere on the instance is untouched, exactly as before.
+// Switching TO 'calories'/'reps' only ever clears 'distance', their one
+// fixed partner. Pure; `instance` is never mutated.
 export function switchPerformedQuantityMetric(instance, metric) {
-  if (!instance || (metric !== 'distance' && metric !== 'calories')) return instance
-  const other = metric === 'distance' ? 'calories' : 'distance'
+  if (!instance || !['distance', 'calories', 'reps'].includes(metric)) return instance
   const next = { ...instance }
-  delete next[other]
-  next[metric] = metric === 'distance'
-    ? { mode: 'universal', value: null, unit: 'm' }
-    : { mode: 'universal', value: null }
+  if (metric === 'distance') {
+    if ('calories' in next) delete next.calories
+    else if ('reps' in next) delete next.reps
+    next.distance = { mode: 'universal', value: null, unit: 'm' }
+  } else {
+    delete next.distance
+    next[metric] = { mode: 'universal', value: null }
+  }
   return next
 }
 

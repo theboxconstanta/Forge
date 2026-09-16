@@ -725,6 +725,9 @@ export const TRANSLATIONS = {
     clasamentWeightPrescribedSuffix: (prescribed) => `(prescris: ${prescribed})`,
     clasamentPartMetconLabel: 'Metcon',
     clasamentSectionEmptyLabel: 'Niciun rezultat încă pentru această secțiune',
+    clasamentOverallLabel: 'GENERAL',
+    clasamentIncompleteLabel: 'Incomplet',
+    clasamentPointsLabel: (n) => `${n} pct`,
 
     // Feed
     feedTitle: 'Feed',
@@ -1956,6 +1959,9 @@ export const TRANSLATIONS = {
     clasamentWeightPrescribedSuffix: (prescribed) => `(prescribed: ${prescribed})`,
     clasamentPartMetconLabel: 'Metcon',
     clasamentSectionEmptyLabel: 'No results yet for this section',
+    clasamentOverallLabel: 'OVERALL',
+    clasamentIncompleteLabel: 'Incomplete',
+    clasamentPointsLabel: (n) => `${n} pts`,
 
     // Feed
     feedTitle: 'Feed',

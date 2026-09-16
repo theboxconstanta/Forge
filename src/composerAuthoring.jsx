@@ -80,8 +80,16 @@ export function ComponentCard({ component, index, total, allComponents, onPatch,
         </div>
       </div>
 
+      {/* MULTI-PART SCORING - Max Effort's own `config.movement` free-text
+          field exists only for that format's PRE-EXISTING (legacy,
+          non-Composer) callers; a Composer-authored Max Effort component
+          identifies its movement through the real structured
+          `instances`/MovementEditor below, exactly like every other format -
+          excluded here so the coach is never shown two different ways to
+          name the same movement on one component. */}
       <FormatConfigEditor formatId={component.format} config={component.config} onConfigChange={c => onPatch({ config: c })}
-        onFormatChange={() => {}} hideFormatSelector movementInstances={component.instances} t={t} />
+        onFormatChange={() => {}} hideFormatSelector movementInstances={component.instances} t={t}
+        excludeConfigKeys={component.format === 'Max Effort' ? ['movement'] : []} />
 
       {isOwnable && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0' }}>

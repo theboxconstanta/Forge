@@ -99,6 +99,8 @@ import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { scoreDefinitionFor } from './scoreDefinition'
 import { composeMixedLogFields } from './componentContract'
+import { logHasComponentResults } from './componentLeaderboard'
+import ComposerPartLeaderboard from './composerLeaderboardUI'
 import { resolveSequentialAmrapStations, composeSequentialAmrapResult, parseSequentialAmrapResult, hasSequentialAmrapInput } from './sequentialAmrap'
 import UniversalScoreInput from './UniversalScoreInput'
 import { validatePhotoFile, attachWodLogPhoto } from './photoProcessing'
@@ -1038,18 +1040,21 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
     ...PERFORMED_EDITABLE_METRICS.filter(k => inst[k]),
   ]
   // PERFORMED METRIC SWITCHING - capability-driven (never movement-name-driven):
-  // a Calories | Distance selector appears ONLY when THIS instance's own
-  // catalog capability (id-first, mirrors pickSubstitute's own
-  // resolveMovementCapability below) allows BOTH. Scope is deliberately just
-  // this one pair - reps+load (Clean & Jerk etc., both simultaneously
-  // meaningful) and load+distance carries (their own future decision) get no
-  // selector and are otherwise byte-identical to today. Active state comes
-  // from the INSTANCE itself (the athlete's current truth), never the
-  // catalog default - if the athlete already has calories, Calories is
-  // active, even though Row's own catalog default also happens to be calories.
+  // a two-way selector appears ONLY when THIS instance's own catalog
+  // capability (id-first, mirrors pickSubstitute's own
+  // resolveMovementCapability below) allows a known switchable pair.
+  // MULTI-PART SCORING / SHUTTLE RUN - a second pair, distance<->reps
+  // (Shuttle Run's own new capability), joins the original
+  // distance<->calories pair (Row/Ski/Bike) - explicit pair list, never a
+  // broad "any 2 metrics" rule, so load+reps (Clean & Jerk etc.) and
+  // load+distance carries (their own future decision) still get no selector,
+  // byte-identical to before. Active state comes from the INSTANCE itself
+  // (the athlete's current truth), never the catalog default.
   const quantityCap = resolveInstanceCapability(movementIndex, inst)
-  const quantitySwitchEligible = quantityCap.allowed.includes('distance') && quantityCap.allowed.includes('calories')
-  const activeQuantityMetric = inst.calories ? 'calories' : inst.distance ? 'distance' : null
+  const QUANTITY_SWITCH_PAIRS = [['calories', 'distance'], ['reps', 'distance']]
+  const quantitySwitchPair = QUANTITY_SWITCH_PAIRS.find(pair => pair.every(m => quantityCap.allowed.includes(m))) || null
+  const quantitySwitchEligible = !!quantitySwitchPair
+  const activeQuantityMetric = quantitySwitchPair ? (quantitySwitchPair.find(m => inst[m]) || null) : null
   const pickSubstitute = (row) => {
     onChange(applyPerformedSubstitution(inst, row, resolveMovementCapability(row)))
     setSubOpen(false)
@@ -1085,7 +1090,7 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
 
       {quantitySwitchEligible && (
         <span style={{ display: 'inline-flex', border: `1px solid ${COLORS.border}`, borderRadius: '7px', overflow: 'hidden', marginTop: '10px' }}>
-          {['calories', 'distance'].map((m) => (
+          {quantitySwitchPair.map((m) => (
             <button key={m} onClick={() => onChange(switchPerformedQuantityMetric(inst, m))} aria-label={`${inst.name} performed metric ${m}`}
               style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer',
                 background: activeQuantityMetric === m ? '#0E0E0E' : '#fff', color: activeQuantityMetric === m ? '#fff' : '#666' }}>
@@ -2253,6 +2258,28 @@ const NIVELE = [
   { id: 'OnRamp', culoare: '#0C447C', bg: '#E6F1FB' },
 ]
 
+// MULTI-PART SCORING (ticket §8/§14) - the leaderboard root fix's ONE
+// detection point: does this Section's own data actually carry a Composer
+// multi-part score at all? Resolved from a REPRESENTATIVE log's own frozen
+// componentsSnapshot (snapshot-first, exactly like sortFormatFor already
+// picks one representative log's frozen format for legacy Sections just
+// above) - never the section's CURRENT live definition. Returns null for
+// every legacy/single-scorer Section (byte-identical old UI keeps
+// rendering) - only a 2+-scored-component log ever returns a non-null
+// array, per the ticket's own "exactly 1 scored component -> preserve
+// current UI exactly" rule (a solo Max Effort/Load scorer has no
+// componentsSnapshot at all - componentContract.js's own additive fix -
+// so it falls through here too, a disclosed, narrow gap for that specific
+// edge case).
+const resolveComposerScorers = (logsUnicePerMembru) => {
+  const rep = (logsUnicePerMembru || []).reduce((a, b) => (logIsMoreRecent(b, a) ? b : a), null)
+  if (!rep || !logHasComponentResults(rep)) return null
+  const snapshot = rep.log_meta?.componentsSnapshot
+  if (!Array.isArray(snapshot) || snapshot.length === 0) return null
+  const scorers = getOrderedScoreEnvelopes(snapshot).map(e => e.scorer)
+  return scorers.length >= 2 ? scorers : null
+}
+
 // INC-09 - representative-log selection lives in src/leaderboardSelection.js
 // (pure, unit-tested). `resolveMonotonicLoggedAt` wraps the sibling query.
 async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, base, excludeId }) {
@@ -2365,7 +2392,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
     }
     const niveleData = NIVELE.map(nivel => ({ nivel, ...splitRxSiMixed(nivel.id, getSectionLogsForTier(nivel.id)) }))
     const toateLogurileMixed = niveleData.flatMap(nd => nd.mixedLogs)
-    return [
+    const blocks = [
       ...niveleData
         .map(({ nivel, rxLogs }) => ({ nivel, weightGroups: [{ weight: null, label: null, logs: rxLogs }] }))
         .filter(s => s.weightGroups[0].logs.length > 0),
@@ -2380,6 +2407,11 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
           .filter(g => g.logs.length > 0),
       }] : []),
     ]
+    // MULTI-PART SCORING (ticket §8/§14) - additive: a legacy/single-scorer
+    // Section's `composerScorers` is always null (blocks/weightGroups above
+    // stay the ONLY thing ever rendered for it), computed from the SAME
+    // deduped logsUnicePerMembru the tiers above already split from.
+    return { blocks, logsUnicePerMembru, composerScorers: resolveComposerScorers(logsUnicePerMembru) }
   }
 
   // O Sectiune suplimentara (Skill/Skill2/orice sectiune noua adaugata prin
@@ -2400,11 +2432,20 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
     const filtered = genderTab === 'masculin' ? sorted.filter(l => l.profile?.gender === 'masculin')
       : genderTab === 'feminin' ? sorted.filter(l => l.profile?.gender === 'feminin')
       : sorted
-    if (filtered.length === 0) return []
-    return [{
-      nivel: { id: section.title || section.slot_key, culoare: '#0E0E0E', bg: '#f0f0f0' },
-      weightGroups: [{ weight: null, label: null, logs: filtered.map(log => ({ ...log, _supportsRx: false })) }],
-    }]
+    // MULTI-PART SCORING (ticket §8/§14) - resolved BEFORE the empty-filter
+    // early return below, from the full latestPerMember set (gender-tab-
+    // filtered separately inside ComposerPartLeaderboard itself, matching
+    // the primary path's own per-tier filtering convention).
+    const composerScorers = resolveComposerScorers(latestPerMember)
+    if (filtered.length === 0) return { blocks: [], logsUnicePerMembru: latestPerMember, composerScorers }
+    return {
+      blocks: [{
+        nivel: { id: section.title || section.slot_key, culoare: '#0E0E0E', bg: '#f0f0f0' },
+        weightGroups: [{ weight: null, label: null, logs: filtered.map(log => ({ ...log, _supportsRx: false })) }],
+      }],
+      logsUnicePerMembru: latestPerMember,
+      composerScorers,
+    }
   }
 
   // Section Leaderboard Visibility - filtrarea de vizibilitate se aplica
@@ -2430,13 +2471,25 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
   const renderGroups = partsToRender.map(section => {
     const isPrimaryPart = section.slot_key === 'metcon'
     const sectionLogsForPart = hasV2Sections ? (logsBySection[section.id] || []) : (logsBySection.__legacy || [])
-    const blocks = isPrimaryPart ? buildBlocksForPrimary(sectionLogsForPart) : buildBlocksForAdditionalSection(sectionLogsForPart, section)
+    const { blocks, logsUnicePerMembru, composerScorers } = isPrimaryPart
+      ? buildBlocksForPrimary(sectionLogsForPart) : buildBlocksForAdditionalSection(sectionLogsForPart, section)
     const sectionFormatId = isPrimaryPart ? wodZiData?.type : section.format
     const sectionFormatConfig = isPrimaryPart ? wodZiData?.format_config : section.format_config
+    // MULTI-PART SCORING (ticket §14) - gender-tab filtering applied HERE,
+    // uniformly for both the primary/additional path, exactly mirroring
+    // getSectionLogsForTier's own filter - ComposerPartLeaderboard itself
+    // stays gender-agnostic, only ever seeing an already-filtered pool.
+    const composerLogsForPart = composerScorers
+      ? (genderTab === 'masculin' ? logsUnicePerMembru.filter(l => l.profile?.gender === 'masculin')
+        : genderTab === 'feminin' ? logsUnicePerMembru.filter(l => l.profile?.gender === 'feminin')
+        : logsUnicePerMembru)
+      : null
     return {
       partId: section.id || '__legacy',
       partLabel: showPartLabels ? (section.title || (isPrimaryPart ? t.clasamentPartMetconLabel : section.slot_key)) : null,
       blocks,
+      composerScorers,
+      composerLogsForPart,
       sectionFormat: sectionFormatId ? getFormat(sectionFormatId) : null,
       sectionFormatId,
       sectionFormatConfig,
@@ -2507,10 +2560,12 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                   {renderGroup.partLabel}
                 </div>
               )}
-              {renderGroup.partLabel && renderGroup.blocks.length === 0 && (
+              {renderGroup.partLabel && !renderGroup.composerScorers && renderGroup.blocks.length === 0 && (
                 <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#bbb', marginBottom: '16px' }}>{t.clasamentSectionEmptyLabel}</div>
               )}
-              {renderGroup.blocks.map(({ nivel, weightGroups }) => {
+              {renderGroup.composerScorers ? (
+                <ComposerPartLeaderboard scorers={renderGroup.composerScorers} nivele={NIVELE} logsUnicePerMembru={renderGroup.composerLogsForPart} t={t} />
+              ) : renderGroup.blocks.map(({ nivel, weightGroups }) => {
             const sectionLogs = weightGroups.flatMap(g => g.logs)
             const isForTime = sectionLogs.some(l => l.time_result) &&
               sectionLogs.filter(l => l.time_result).length >= sectionLogs.filter(l => l.result).length

@@ -324,7 +324,24 @@ export const WORKOUT_FORMATS = {
   },
   'Max Effort': {
     family: 'scored', scoreMode: 'single_value',
-    config: { movement: { type: 'movementText', required: false, labelKey: 'fmtMovementTest' } },
+    // MULTI-PART SCORING - `timeCapSec` reuses the EXACT canonical time-cap
+    // field/type/labelKey 'For Time' already declares (never a second
+    // time-cap representation) - the generic, schema-driven
+    // FormatConfigEditor picks it up with zero new UI code. This is the
+    // TIME WINDOW available to establish the score (e.g. "3:00 to find
+    // 1RM"), deliberately independent of `scoreMode` - the score itself
+    // (LOAD, via Workout Composer's own instances/scoreDefinitionFor wiring)
+    // is never derived from this duration. `movement` stays as free text for
+    // this format's own PRE-EXISTING (legacy, non-Composer) callers; a
+    // Composer-authored Max Effort component identifies its movement via the
+    // real structured `instances` array instead (see componentContract.js's
+    // COMPOSER_FORMAT_GROUPS/ComponentCard `excludeConfigKeys`), matching
+    // every other Composer format - never a duplicate movement-identity
+    // input for the same component.
+    config: {
+      movement: { type: 'movementText', required: false, labelKey: 'fmtMovementTest' },
+      timeCapSec: { type: 'duration', required: false, labelKey: 'fmtTimeCapOptional' },
+    },
   },
   // Workout Composer (Phase 1, docs/design-audit-v2/WORKOUT-COMPOSER-*.md) - the
   // two minimal new formats a canonical Composer `component` can carry. Neither

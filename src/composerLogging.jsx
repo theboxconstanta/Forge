@@ -33,7 +33,14 @@ const navBtnPrimary = { ...navBtn, background: '#0E0E0E', color: '#fff', border:
 export function ScorerEnvelopeFields({ scorer, buyIn, cashOut, value, onChange, weightUnit, t, gender, prescribedWeight, rxStatus }) {
   const v = value || {}
   const patchSets = (key, rows) => onChange({ ...v, sets: { ...(v.sets || {}), [key]: rows } })
-  const scoreDef = scoreDefinitionFor(scorer.format, scorer.config, {})
+  // MULTI-PART SCORING - the only place a Composer scorer's LOAD kind is
+  // actually activated: scoreDefinitionFor's own single_value/LOAD branch
+  // already existed (scoreDefinition.js) but nothing ever supplied
+  // `singleValueUnit` before this. Unit is resolved from the member's own
+  // weightUnit preference (kg/lb), matching UniversalScoreInput's own
+  // existing kg/lb fallback convention exactly - never a second unit source.
+  const scoreDef = scoreDefinitionFor(scorer.format, scorer.config,
+    scorer.format === 'Max Effort' ? { singleValueUnit: 'load', unit: weightUnit === 'lbs' ? 'lb' : 'kg' } : {})
   const movements = renderComponentMovementLines(scorer.instances, gender)
 
   return (

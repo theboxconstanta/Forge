@@ -153,6 +153,48 @@ describe('P9.5.2 — applyPerformedSubstitution', () => {
     const sub = applyPerformedSubstitution(d.movements[0], { id: 'cm-x', name: 'Mystery' }, { allowed: [], default: null, unknown: true })
     expect(sub.load).toBeTruthy()
   })
+
+  // MULTI-PART SCORING / SHUTTLE RUN - the distance<->reps pair (Shuttle
+  // Run's own new capability) must behave like the existing distance<->
+  // calories pair: mutually exclusive, survivor-preserved, never both.
+  describe('MULTI-PART SCORING / SHUTTLE RUN - distance<->reps mutual exclusivity', () => {
+    const shuttleCap = () => resolveMovementCapability({ allowed_prescription_metrics: ['distance', 'reps'], default_prescription_metric: 'distance' })
+
+    it('distance survives a substitution into another distance+reps movement', () => {
+      const orig = { instanceId: 'mi_1', name: 'Run', canonicalMovementId: 'cm-run', distance: { mode: 'universal', value: 400, unit: 'm' } }
+      const sub = applyPerformedSubstitution(orig, { id: 'cm-shuttle', name: 'Shuttle Run' }, shuttleCap())
+      expect(sub.distance).toEqual({ mode: 'universal', value: 400, unit: 'm' })
+      expect(sub.reps).toBeUndefined()
+    })
+
+    it('reps survives a substitution when the source already had reps and target allows it', () => {
+      const orig = { instanceId: 'mi_1', name: 'Shuttle Run', canonicalMovementId: '01ff26ed-d381-47fa-b0f6-ed7d3f1301ab', reps: { mode: 'universal', value: 10 } }
+      const sub = applyPerformedSubstitution(orig, { id: 'cm-shuttle', name: 'Shuttle Run' }, shuttleCap())
+      expect(sub.reps).toEqual({ mode: 'universal', value: 10 })
+      expect(sub.distance).toBeUndefined()
+    })
+
+    it('neither survives (fresh, no prior distance/reps) -> seeds only the capability default (distance) blank', () => {
+      const orig = { instanceId: 'mi_1', name: 'Burpees', canonicalMovementId: 'cm-burpees' }
+      const sub = applyPerformedSubstitution(orig, { id: 'cm-shuttle', name: 'Shuttle Run' }, shuttleCap())
+      expect(sub.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+      expect(sub.reps).toBeUndefined()
+    })
+
+    it('distance+reps never coexist on the same instance after substitution', () => {
+      const orig = { instanceId: 'mi_1', name: 'Run', canonicalMovementId: 'cm-run', distance: { mode: 'universal', value: 400, unit: 'm' } }
+      const sub = applyPerformedSubstitution(orig, { id: 'cm-shuttle', name: 'Shuttle Run' }, shuttleCap())
+      expect('distance' in sub && 'reps' in sub).toBe(false)
+    })
+
+    it('load-independent movements (Clean & Jerk: reps+load, no distance) are unaffected - reps stays independent there', () => {
+      const cjCap = resolveMovementCapability({ allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' })
+      const orig = { instanceId: 'mi_1', name: 'Squat Clean', canonicalMovementId: 'cm-sc', reps: { mode: 'universal', value: 5 }, load: { mode: 'universal', value: 60, unit: 'kg' } }
+      const sub = applyPerformedSubstitution(orig, { id: 'cm-cj', name: 'Clean & Jerk' }, cjCap)
+      expect(sub.reps).toEqual({ mode: 'universal', value: 5 })
+      expect(sub.load).toEqual({ mode: 'universal', value: 60, unit: 'kg' })
+    })
+  })
 })
 
 // ROW MOVEMENT PICKER (2026-09-04) - substitution-contract regression, real
@@ -301,18 +343,51 @@ describe('PERFORMED METRIC SWITCHING — switchPerformedQuantityMetric', () => {
   it('an invalid target metric is a no-op (returns the instance unchanged)', () => {
     const orig = rowCalories()
     expect(switchPerformedQuantityMetric(orig, 'load')).toBe(orig)
-    expect(switchPerformedQuantityMetric(orig, 'reps')).toBe(orig)
     expect(switchPerformedQuantityMetric(null, 'distance')).toBeNull()
+  })
+
+  // MULTI-PART SCORING / SHUTTLE RUN - 'reps' is now a valid switch target
+  // (Shuttle Run's own new distance<->reps pair), no longer a no-op.
+  it('TEST G — Shuttle Run distance 75m -> switch Reps: reps blank, distance key absent', () => {
+    const shuttleDistance = {
+      instanceId: 'mi_shuttle000000000001', name: 'Shuttle Run', canonicalMovementId: '01ff26ed-d381-47fa-b0f6-ed7d3f1301ab',
+      distance: { mode: 'universal', unit: 'm', value: 75 },
+    }
+    const next = switchPerformedQuantityMetric(shuttleDistance, 'reps')
+    expect(next.reps).toEqual({ mode: 'universal', value: null })
+    expect(next.distance).toBeUndefined()
+    expect('distance' in next).toBe(false)
+  })
+
+  it('TEST H — Shuttle Run reps 10 -> switch Distance: distance blank/m, reps key absent', () => {
+    const shuttleReps = {
+      instanceId: 'mi_shuttle000000000001', name: 'Shuttle Run', canonicalMovementId: '01ff26ed-d381-47fa-b0f6-ed7d3f1301ab',
+      reps: { mode: 'universal', value: 10 },
+    }
+    const next = switchPerformedQuantityMetric(shuttleReps, 'distance')
+    expect(next.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+    expect(next.reps).toBeUndefined()
+    expect('reps' in next).toBe(false)
+  })
+
+  it('TEST I — Row calories<->distance switching still never touches an unrelated reps field (Row has no reps in its own pair)', () => {
+    const rowWithUnrelatedReps = { ...rowCalories(), reps: { mode: 'universal', value: 10 } }
+    const next = switchPerformedQuantityMetric(rowWithUnrelatedReps, 'distance')
+    expect(next.reps).toEqual({ mode: 'universal', value: 10 })
+    expect(next.distance).toEqual({ mode: 'universal', value: null, unit: 'm' })
+    expect(next.calories).toBeUndefined()
   })
 })
 
 describe('PERFORMED METRIC SWITCHING — capability matrix (drives the UI selector eligibility)', () => {
-  // eligibility === cap.allowed includes BOTH distance and calories - exactly
-  // what PerformedEditRow's quantitySwitchEligible computes via
-  // resolveInstanceCapability. Real catalog rows (forensic audit).
+  // eligibility === cap.allowed satisfies one of the known switchable pairs
+  // (distance<->calories, distance<->reps) - exactly what PerformedEditRow's
+  // quantitySwitchEligible computes via resolveInstanceCapability. Real
+  // catalog rows (forensic audit).
+  const SWITCH_PAIRS = [['distance', 'calories'], ['distance', 'reps']]
   const eligible = (row) => {
     const cap = resolveMovementCapability(row)
-    return cap.allowed.includes('distance') && cap.allowed.includes('calories')
+    return SWITCH_PAIRS.some(pair => pair.every(m => cap.allowed.includes(m)))
   }
   it('Row — allowed [distance, calories] -> selector eligible', () => {
     expect(eligible({ allowed_prescription_metrics: ['distance', 'calories'], default_prescription_metric: 'calories' })).toBe(true)
@@ -329,10 +404,13 @@ describe('PERFORMED METRIC SWITCHING — capability matrix (drives the UI select
   it('Run — allowed [distance] only -> NO selector', () => {
     expect(eligible({ allowed_prescription_metrics: ['distance'], default_prescription_metric: 'distance' })).toBe(false)
   })
-  it('Shuttle Run — allowed [distance] only -> NO selector', () => {
+  it('Shuttle Sprint — allowed [distance] only -> NO selector (untouched by the Shuttle Run capability change)', () => {
     expect(eligible({ allowed_prescription_metrics: ['distance'], default_prescription_metric: 'distance' })).toBe(false)
   })
-  it('Clean & Jerk — allowed [reps, load] -> NO distance/calories selector (out of scope)', () => {
+  it('Shuttle Run — REAL catalog capability, allowed [distance, reps] -> selector eligible', () => {
+    expect(eligible({ allowed_prescription_metrics: ['distance', 'reps'], default_prescription_metric: 'distance' })).toBe(true)
+  })
+  it('Clean & Jerk — allowed [reps, load] -> NO selector (reps here is independent, paired with load, not distance)', () => {
     expect(eligible({ allowed_prescription_metrics: ['reps', 'load'], default_prescription_metric: 'load' })).toBe(false)
   })
   it('a load+distance carry movement (e.g. Farmers Carry) -> NO selector in this incident (out of scope)', () => {
@@ -503,8 +581,13 @@ describe('PERFORMED METRIC SWITCHING — UI source guard (capability-driven, not
     const { dirname, join } = await import('node:path')
     const app = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'App.jsx'), 'utf8')
     expect(app).toMatch(/const quantityCap = resolveInstanceCapability\(movementIndex, inst\)/)
-    expect(app).toMatch(/const quantitySwitchEligible = quantityCap\.allowed\.includes\('distance'\) && quantityCap\.allowed\.includes\('calories'\)/)
-    expect(app).toMatch(/const activeQuantityMetric = inst\.calories \? 'calories' : inst\.distance \? 'distance' : null/)
+    // MULTI-PART SCORING / SHUTTLE RUN - generalized to a pair LIST (distance
+    // <->calories for Row/Ski/Bike, distance<->reps for Shuttle Run), still
+    // entirely capability-driven, never name-driven.
+    expect(app).toMatch(/const QUANTITY_SWITCH_PAIRS = \[\['calories', 'distance'\], \['reps', 'distance'\]\]/)
+    expect(app).toMatch(/const quantitySwitchPair = QUANTITY_SWITCH_PAIRS\.find\(pair => pair\.every\(m => quantityCap\.allowed\.includes\(m\)\)\) \|\| null/)
+    expect(app).toMatch(/const quantitySwitchEligible = !!quantitySwitchPair/)
+    expect(app).toMatch(/const activeQuantityMetric = quantitySwitchPair \? \(quantitySwitchPair\.find\(m => inst\[m\]\) \|\| null\) : null/)
     expect(app).toMatch(/onClick=\{\(\) => onChange\(switchPerformedQuantityMetric\(inst, m\)\)\}/)
     // never a movement-name allowlist (e.g. inst.name === 'Row')
     expect(app).not.toMatch(/inst\.name === ['"]Row['"]/)

@@ -605,7 +605,7 @@ describe('composeComponentsLogFields / composeMultiEnvelopeLogFields - persisten
   it('12. a legacy single-score log (no componentResults) returns exactly one entry, unchanged', () => {
     const legacyLog = { result: '3 rounds + 22', time_result: null, completion_state: 'capped', sets: null }
     const entries = getComponentResultsFromLog(legacyLog)
-    expect(entries).toEqual([{ componentId: null, format: null, result: '3 rounds + 22', time_result: null, completion_state: 'capped', sets: null }])
+    expect(entries).toEqual([{ componentId: null, format: null, result: '3 rounds + 22', time_result: null, completion_state: 'capped', sets: null, load_result: null }])
   })
 
   it('13. a legacy mixed-format log (no componentResults, old shape) returns exactly one entry, unchanged', () => {
