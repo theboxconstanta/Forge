@@ -223,6 +223,28 @@ export function addMonthsClamped(startDate, months) {
   return `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`
 }
 
+// DURATION SEMANTICS FIX - a subscription's calendar-month duration is a
+// consecutive period with NO overlapping renewal day: `startDate` +
+// `months` calendar months names the day the NEXT period would start
+// (addMonthsClamped's own result), so the LAST day this subscription is
+// itself valid on is one calendar day before that, never that day itself.
+// Without this, a 1-month subscription starting Oct 16 would be valid on
+// BOTH Oct 16 AND Nov 16 (two renewal-day charges' worth of coverage
+// overlapping) since end_date is already inclusive everywhere entitlement
+// is checked (`start_date <= class_date AND end_date >= class_date`) -
+// this function is the ONLY place that inclusive-end_date meaning changes;
+// every entitlement predicate elsewhere is untouched. Pure, does not
+// mutate `startDate`. This is the canonical helper every end_date write
+// path must use - addMonthsClamped itself stays generic/unchanged, since
+// other, unrelated future callers may genuinely want "same day next
+// month," not a subscription's own last-valid-day semantics.
+export function calculateSubscriptionEndDate(startDate, months) {
+  const pad = n => String(n).padStart(2, '0')
+  const nextPeriodStart = new Date(addMonthsClamped(startDate, months) + 'T00:00:00')
+  nextPeriodStart.setDate(nextPeriodStart.getDate() - 1)
+  return `${nextPeriodStart.getFullYear()}-${pad(nextPeriodStart.getMonth() + 1)}-${pad(nextPeriodStart.getDate())}`
+}
+
 // Numarul de zile calendaristice de la azi (miezul noptii local) pana la
 // `endDateStr` (YYYY-MM-DD), indiferent de ora curenta din zi. Poate fi
 // negativ (data a trecut). Comparand ora curenta cu sfarsitul zilei de

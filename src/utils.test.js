@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, resolveLoggedWorkoutIdentity, addMonthsClamped, calculateSubscriptionEndDate, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow,
   resolveMemberIdentity,
@@ -55,6 +55,56 @@ describe('addMonthsClamped', () => {
 
   it('lună de start cu 30 de zile: 4 septembrie + 1 lună -> 4 octombrie (30 zile)', () => {
     expect(addMonthsClamped(new Date('2026-09-04T00:00:00'), 1)).toBe('2026-10-04')
+  })
+})
+
+describe('calculateSubscriptionEndDate - DURATION SEMANTICS FIX (last inclusive day, no overlapping renewal day)', () => {
+  it('Oct 16 + 1 month -> Nov 15 (the ticket\'s primary example)', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-10-16T00:00:00'), 1)).toBe('2026-11-15')
+  })
+
+  it('Oct 1 + 1 month -> Oct 31', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-10-01T00:00:00'), 1)).toBe('2026-10-31')
+  })
+
+  it('Sep 16 + 1 month -> Oct 15', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-09-16T00:00:00'), 1)).toBe('2026-10-15')
+  })
+
+  it('Jan 31 2026 (non-leap) + 1 month -> Feb 27 2026', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-01-31T00:00:00'), 1)).toBe('2026-02-27')
+  })
+
+  it('Jan 31 2028 (leap) + 1 month -> Feb 28 2028', () => {
+    expect(calculateSubscriptionEndDate(new Date('2028-01-31T00:00:00'), 1)).toBe('2028-02-28')
+  })
+
+  it('Feb 28 2026 + 1 month -> Mar 27 2026', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-02-28T00:00:00'), 1)).toBe('2026-03-27')
+  })
+
+  it('Dec 31 2026 + 1 month -> Jan 30 2027', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-12-31T00:00:00'), 1)).toBe('2027-01-30')
+  })
+
+  it('multi-month: Oct 16 2026 + 3 months -> Jan 15 2027', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-10-16T00:00:00'), 3)).toBe('2027-01-15')
+  })
+
+  it('does not mutate the startDate object passed in', () => {
+    const start = new Date('2026-10-16T00:00:00')
+    const before = start.getTime()
+    calculateSubscriptionEndDate(start, 1)
+    expect(start.getTime()).toBe(before)
+  })
+
+  it('is timezone-stable: the calendar date does not shift regardless of the time-of-day component', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-10-16T00:05:00'), 1)).toBe('2026-11-15')
+    expect(calculateSubscriptionEndDate(new Date('2026-10-16T23:50:00'), 1)).toBe('2026-11-15')
+  })
+
+  it('returns an ISO YYYY-MM-DD calendar date string', () => {
+    expect(calculateSubscriptionEndDate(new Date('2026-10-16T00:00:00'), 1)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
 

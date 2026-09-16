@@ -63,6 +63,22 @@ export function addMonthsClamped(startDate: Date, months: number): string {
   return `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
 }
 
+// DURATION SEMANTICS FIX - identical logic to src/utils.js's own
+// calculateSubscriptionEndDate (used by activateQueuedSubscription/
+// adminActiveazaAboQueued/saveAbonament in App.jsx) - a subscription's
+// calendar-month duration must produce the same LAST valid day regardless
+// of which of the three activation paths (self-service in-app, admin
+// manual, or this webhook) computed it. Reimplemented here (not imported)
+// for the same reason addMonthsClamped itself is duplicated above -
+// App.jsx is frontend code, unusable in a Deno runtime. Test parity is
+// enforced in index.test.ts against src/utils.test.js's own cases.
+export function calculateSubscriptionEndDate(startDate: Date, months: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const nextPeriodStart = new Date(addMonthsClamped(startDate, months) + "T00:00:00");
+  nextPeriodStart.setDate(nextPeriodStart.getDate() - 1);
+  return `${nextPeriodStart.getFullYear()}-${pad(nextPeriodStart.getMonth() + 1)}-${pad(nextPeriodStart.getDate())}`;
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok");
 
@@ -139,7 +155,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       .maybeSingle();
     const planRow = Array.isArray(subRow?.subscription_plans) ? subRow?.subscription_plans[0] : subRow?.subscription_plans;
     const durationMonths = (planRow as { duration_months: number } | undefined)?.duration_months || 1;
-    const endDate = addMonthsClamped(new Date(), durationMonths);
+    const endDate = calculateSubscriptionEndDate(new Date(), durationMonths);
 
     const { error: activateErr } = await supabase.rpc("activate_queued_subscription", {
       p_subscription_id: context.subscriptionId,

@@ -16,7 +16,7 @@ import ActivationDashboard from './ActivationDashboard'
 import PlatformBilling from './PlatformBilling'
 import TrialExpiredPaywall from './TrialExpiredPaywall'
 import {
-  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, addMonthsClamped, daysUntil, levenshtein, urlBase64ToUint8Array,
+  todayLocalStr, dateWithCurrentTime, localDayBoundsUTC, computeWodHeaderLine, resolveWodIdForLog, isWorkoutFetchCurrent, homeWorkoutResponseIsCurrent, logIsMoreRecent, freezeLoggingContext, calculateSubscriptionEndDate, daysUntil, levenshtein, urlBase64ToUint8Array,
   fmt, secToTime, timeToSec, convertWeight, formatPR, getInitiale, parseWodMinute, formatWodDurata,
   localeFor, authErrorMessage, RESET_LINK_ERROR_CODES, isInAttendanceGraceWindow, NIVEL_DOT_COLORS,
   formatFirstNameLastInitial, resolveMemberIdentity,
@@ -281,7 +281,7 @@ async function activateQueuedSubscription(memberEmail) {
   if (!queued) return null
 
   const duration = queued.subscription_plans?.duration_months || 1
-  const endStr = addMonthsClamped(new Date(), duration)
+  const endStr = calculateSubscriptionEndDate(new Date(), duration)
 
   // activate_queued_subscription (Financial Domain, Phase 1 Extension)
   // accepts admin OR the subscription's own owner - this is the
@@ -4040,7 +4040,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
 
   const adminActiveazaAboQueued = async (aboQueued, memberEmail, method, amountPaid) => {
     const duration = aboQueued.subscription_plans?.duration_months || 1
-    const endStr = addMonthsClamped(new Date(), duration)
+    const endStr = calculateSubscriptionEndDate(new Date(), duration)
     const parsedAmount = amountPaid ? parseFloat(amountPaid) : null
     const validAmount = (parsedAmount != null && !isNaN(parsedAmount)) ? parsedAmount : null
     const { error } = await supabase.rpc('activate_queued_subscription', {
@@ -4742,7 +4742,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // pastrat neschimbat fata de logica veche - doar mutat sa ruleze
     // necondiționat, pentru ca decizia queued/activ e acum luata server-side
     // in create_subscription (Financial Domain, Phase 1 Extension)
-    const endDateStr = addMonthsClamped(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
+    const endDateStr = calculateSubscriptionEndDate(new Date(dataStartAbonament + 'T00:00:00'), plan?.duration_months || 1)
     const amountPaid = pretPlatit ? parseFloat(pretPlatit) : null
     const validAmountPaid = (amountPaid != null && !isNaN(amountPaid)) ? amountPaid : null
 

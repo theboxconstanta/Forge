@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { extractOrderContext, validateOrderMatch, addMonthsClamped, handleRequest } from "./index.ts";
+import { extractOrderContext, validateOrderMatch, addMonthsClamped, calculateSubscriptionEndDate, handleRequest } from "./index.ts";
 
 const orderId = "11111111-1111-1111-1111-111111111111";
 const gymId = "22222222-2222-2222-2222-222222222222";
@@ -124,6 +124,45 @@ Deno.test("addMonthsClamped: mid-month date, no clamping needed", () => {
 });
 Deno.test("addMonthsClamped: regular case", () => {
   assertEquals(addMonthsClamped(new Date("2026-09-04T00:00:00"), 1), "2026-10-04");
+});
+
+// DURATION SEMANTICS FIX - identical cases to src/utils.test.js's own
+// calculateSubscriptionEndDate suite, proving the Deno reimplementation
+// stays in sync with the frontend's activation-date logic (self-service
+// in-app, admin-manual, and webhook-driven activation must all compute
+// the exact same last-valid-day for the same plan/duration/start).
+Deno.test("calculateSubscriptionEndDate: Oct 16 + 1 month -> Nov 15 (ticket's primary example)", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-10-16T00:00:00"), 1), "2026-11-15");
+});
+Deno.test("calculateSubscriptionEndDate: Oct 1 + 1 month -> Oct 31", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-10-01T00:00:00"), 1), "2026-10-31");
+});
+Deno.test("calculateSubscriptionEndDate: Sep 16 + 1 month -> Oct 15", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-09-16T00:00:00"), 1), "2026-10-15");
+});
+Deno.test("calculateSubscriptionEndDate: Jan 31 2026 (non-leap) + 1 month -> Feb 27 2026", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-01-31T00:00:00"), 1), "2026-02-27");
+});
+Deno.test("calculateSubscriptionEndDate: Jan 31 2028 (leap) + 1 month -> Feb 28 2028", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2028-01-31T00:00:00"), 1), "2028-02-28");
+});
+Deno.test("calculateSubscriptionEndDate: Feb 28 2026 + 1 month -> Mar 27 2026", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-02-28T00:00:00"), 1), "2026-03-27");
+});
+Deno.test("calculateSubscriptionEndDate: Dec 31 2026 + 1 month -> Jan 30 2027", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-12-31T00:00:00"), 1), "2027-01-30");
+});
+Deno.test("calculateSubscriptionEndDate: multi-month, Oct 16 2026 + 3 months -> Jan 15 2027", () => {
+  assertEquals(calculateSubscriptionEndDate(new Date("2026-10-16T00:00:00"), 3), "2027-01-15");
+});
+Deno.test("calculateSubscriptionEndDate: does not mutate the startDate object passed in", () => {
+  const start = new Date("2026-10-16T00:00:00");
+  const before = start.getTime();
+  calculateSubscriptionEndDate(start, 1);
+  assertEquals(start.getTime(), before);
+});
+Deno.test("calculateSubscriptionEndDate: returns an ISO YYYY-MM-DD calendar date string", () => {
+  assertEquals(/^\d{4}-\d{2}-\d{2}$/.test(calculateSubscriptionEndDate(new Date("2026-10-16T00:00:00"), 1)), true);
 });
 
 // 19. Missing stripe-signature header -> 400 before any I/O (raw body isn't
