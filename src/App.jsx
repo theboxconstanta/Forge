@@ -50,7 +50,7 @@ import {
   formatTypeLabel, weightKeyForVariant, weightMatches, greutateNumerica, emomPositionWord,
   VARIANTE_WEIGHT_BASE, ALL_WEIGHT_COLUMNS, setsDisplayScore, setsScoreText, isSequentialFormat, isSequentialAmrap,
   isWeightScoredSetsFormat, toKgForRanking, resolveSetsScoringMode,
-  isMixedCategory, resultCompositionModified, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
+  isMixedCategory, resultCompositionModified, performedPrescriptionSubstantiveModification, ascendingMovementsForRound, parseAscendingAmrapResult, totalRepsAscendingAmrap,
   composeStageResult, totalRepsChained,
   composeFortimeOrAmrapFields, deriveDurationCompletionState, normalizeCompletionState,
   sortSectionLogs, composeCappedRoundsResult, parseCappedRoundsResult,
@@ -12829,6 +12829,19 @@ function App() {
             // read-only workout rows below show what THEY did; the programmed
             // prescription stays untouched in activePrescriptionDoc / snapshot.
             const performedActive = !!performedCommitted && performedIsModified(performedCommitted, composerPerformedDoc, frozenVariantKey, memberGenderKey)
+            // ATHLETE-SELECTED MOVEMENT LOAD - the live "Modified" tag must NOT
+            // fire merely because the athlete filled in (or opened and left
+            // blank) an optional Load field the coach left programmed-blank
+            // (product rule: no automatic Rx->Mixed demotion). Reuses the exact
+            // same narrow exception performedPrescriptionSubstantiveModification
+            // already applies at Journal/Leaderboard read time, against a
+            // throwaway prescription_snapshot built from the SAME frozen
+            // programmed doc this live session already holds - never a live
+            // re-lookup, never a second comparison rule.
+            const performedBadgeActive = performedActive && performedPrescriptionSubstantiveModification({
+              performed_prescription: performedCommitted,
+              prescription_snapshot: buildPrescriptionSnapshot({ doc: composerPerformedDoc, variantKey: frozenVariantKey, gender: memberGenderKey, source: 'structured' }),
+            })
             // P9.5.2A - performed rows come from the group-aware projection
             // (renders each 1->N child + a "not performed" line for a marked
             // source); the programmed prescription is never consulted here.
@@ -12924,7 +12937,7 @@ function App() {
                     <LevelDot nivel={VARIANTE_CONFIG[variantaAleasa].nivel} size={6} />
                     <span style={{ fontSize: '12px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#0E0E0E' }}>{VARIANTE_CONFIG[variantaAleasa].nivel.toUpperCase()}</span>
                   </div>
-                  {performedActive && (
+                  {performedBadgeActive && (
                     <div style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: '999px', background: '#FEF3E2', border: '1px solid #F5D9AE' }}>
                       <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#B7791F' }}>{t.performedModifiedTag}</span>
                     </div>

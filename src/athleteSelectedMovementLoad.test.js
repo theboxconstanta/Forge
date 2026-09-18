@@ -332,4 +332,48 @@ describe('PerformedEditRow UI wiring (App.jsx golden-source)', () => {
   it('the leaderboard bucket call site threads prescriptionSnapshot through isMixedCategory opts', () => {
     expect(appSource).toMatch(/isMixedCategory\(log\.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log\.performed_prescription, \{ result: log\.result, formatId: prov\.formatId, formatConfig: prov\.formatConfig, prescriptionSnapshot: log\.prescription_snapshot \}\)/)
   })
+
+  // LIVE ACCEPTANCE REGRESSION (found during Live Test A) - a SECOND, separate
+  // "Modified" indicator exists on the live Log WOD screen (performedActive /
+  // t.performedModifiedTag), driven by the raw performedIsModified, NOT
+  // resultCompositionModified. It was initially missed and fired "MODIFIED"
+  // purely from filling in a blank-programmed-load field, live, before save -
+  // the exact violation this ticket forbids. Fixed by a second, narrower
+  // performedBadgeActive boolean gating ONLY the visual tag.
+  it('the live "Modified" tag is gated by a substantive-modification check, not the raw performedIsModified alone', () => {
+    expect(appSource).toMatch(/const performedBadgeActive = performedActive && performedPrescriptionSubstantiveModification\(\{/)
+    expect(appSource).toMatch(/\{performedBadgeActive && \(/)
+    // the raw performedActive must NOT be the badge's own render condition anymore
+    expect(appSource).not.toMatch(/\{performedActive && \(\s*<div style=\{\{ display: 'inline-flex'.*performedModifiedTag/s)
+  })
+
+  it('performedBadgeActive builds its comparison snapshot from the SAME frozen composerPerformedDoc already in scope (never a live re-lookup)', () => {
+    expect(appSource).toMatch(/prescription_snapshot: buildPrescriptionSnapshot\(\{ doc: composerPerformedDoc, variantKey: frozenVariantKey, gender: memberGenderKey, source: 'structured' \}\)/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Live-badge regression, proven with real fixtures (not just golden-source)
+// ---------------------------------------------------------------------------
+describe('live "Modified" tag - blank-load-fill must never trigger it', () => {
+  it('blank programmed load + performed 70kg: substantive-modification check (the live badge gate) is false', () => {
+    const inst = loadInst({ name: 'Deadlift', load: null })
+    const prog = programmedDoc([inst])
+    const draft = performedDraftFor([inst])
+    draft.movements[0] = setPerformedMetricValue(draft.movements[0], 'load', 70, 'kg')
+    // performedActive (the OLD raw check) is true - it still IS a persisted difference
+    expect(performedIsModified(draft, prog, 'rx', null)).toBe(true)
+    // but the live badge's own additional check must say "not substantive"
+    const snap = buildPrescriptionSnapshot({ doc: prog, variantKey: 'rx', gender: null, source: 'structured' })
+    expect(performedPrescriptionSubstantiveModification({ performed_prescription: draft, prescription_snapshot: snap })).toBe(false)
+  })
+
+  it('prescribed 100kg -> performed 90kg: the live badge DOES fire (genuine mismatch, unchanged)', () => {
+    const inst = loadInst({ name: 'Deadlift', load: 100 })
+    const prog = programmedDoc([inst])
+    const draft = performedDraftFor([inst])
+    draft.movements[0] = setPerformedMetricValue(draft.movements[0], 'load', 90, 'kg')
+    const snap = buildPrescriptionSnapshot({ doc: prog, variantKey: 'rx', gender: null, source: 'structured' })
+    expect(performedPrescriptionSubstantiveModification({ performed_prescription: draft, prescription_snapshot: snap })).toBe(true)
+  })
 })
