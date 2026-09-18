@@ -13164,41 +13164,113 @@ function App() {
                 Composer logging flow already uses (envelopes/valuesByComponentId/
                 step all already correctly populated by onEditWod), never a
                 second scoring engine. */}
-            {useComposerLogger ? (
-              <MultiScorerLogger
-                envelopes={logScoreEnvelopes} valuesByComponentId={wodScorerValues} step={wodScorerStep}
-                onStepChange={setWodScorerStep}
-                onChangeComponent={(componentId, next) => setWodScorerValues(v => ({ ...v, [componentId]: next }))}
-                weightUnit={userProfile?.weight_unit || 'kg'} t={t} gender={memberGenderKey}
-              />
-            ) : (
-              <FormatLogger
-                formatId={activeLogFormatId}
-                config={activeLogFormatConfig}
-                movements={effectivePartialMovements}
-                sequentialAmrapStations={sequentialAmrapStations}
-                intervalComposition={intervalCompositionActive}
-                prescriptionMovements={frozenProgrammedInstances}
-                movementIndex={memberMovementIndex}
-                prescribedWeight={prescribedWeightPentruLog}
-                rxStatus={liveRxStatus}
-                value={{
-                  result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
-                  partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
-                  weightLogged: wodWeightLogged, stages: wodChainedStages,
-                }}
-                onChange={(patch) => {
-                  if ('result' in patch) setWodResult(patch.result)
-                  if ('time' in patch) setWodTime(patch.time)
-                  if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
-                  if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
-                  if ('sets' in patch) setWodSets(patch.sets)
-                  if ('stages' in patch) setWodChainedStages(patch.stages)
-                  if ('completed' in patch) setWodCompleted(patch.completed)
-                  if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
-                }}
-                weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
-            )}
+            {(() => {
+              // ATHLETE-SELECTED MOVEMENT LOAD - this block is ALSO the ONLY
+              // score-input renderer ever reached for a single-scorer historical
+              // edit (editLogId, !useComposerLogger) - the same architectural gap
+              // 10d2140 fixed for the multi-scorer case, but for FormatLogger:
+              // no Edit/Adjust affordance into PerformedEditPanel existed here at
+              // all, so a single-scorer Journal Edit could never reach the
+              // optional Load field (or any other performed-prescription edit).
+              // useComposerLogger's own MultiScorerLogger branch is untouched -
+              // its scorer values are componentResults, not performed_prescription,
+              // and already worked correctly before this ticket. The free-text
+              // logWodStep==='score' fresh-logging case is unaffected: it never
+              // has a structured prescription doc, so editEligibleHere is false
+              // there and this renders nothing extra, exactly as before.
+              const editEligibleHere = !useComposerLogger && memberGenderKey != null && !!frozenVariantKey
+                && !!composeStructuredWorkoutDisplay({ doc: activePrescriptionDoc, variantKey: frozenVariantKey, mode: 'member', gender: memberGenderKey })
+              const performedActiveHere = editEligibleHere && !!performedCommitted
+                && performedIsModified(performedCommitted, composerPerformedDoc, frozenVariantKey, memberGenderKey)
+              const performedBadgeActiveHere = performedActiveHere && performedPrescriptionSubstantiveModification({
+                performed_prescription: performedCommitted,
+                prescription_snapshot: buildPrescriptionSnapshot({ doc: composerPerformedDoc, variantKey: frozenVariantKey, gender: memberGenderKey, source: 'structured' }),
+              })
+              if (useComposerLogger) {
+                return (
+                  <MultiScorerLogger
+                    envelopes={logScoreEnvelopes} valuesByComponentId={wodScorerValues} step={wodScorerStep}
+                    onStepChange={setWodScorerStep}
+                    onChangeComponent={(componentId, next) => setWodScorerValues(v => ({ ...v, [componentId]: next }))}
+                    weightUnit={userProfile?.weight_unit || 'kg'} t={t} gender={memberGenderKey}
+                  />
+                )
+              }
+              if (logWodEditMode) {
+                return (
+                  <PerformedEditPanel
+                    draft={performedDraft} gender={memberGenderKey} movementIndex={memberMovementIndex}
+                    programmedInstances={composerPerformedDoc?.variants?.[frozenVariantKey]?.movements || []}
+                    inheritReps
+                    repsEditable={getFormat(activeLogFormatId)?.rowMode !== 'interval'}
+                    onChange={setPerformedDraft}
+                    onCancel={() => { setPerformedDraft(null); setLogWodEditMode(false) }}
+                    onDone={() => {
+                      const draft = performedDraft
+                      const check = validatePerformedPrescription(draft)
+                      if (!check.valid) { showToast(t.performedEditInvalid); return }
+                      const matches = performedMatchesProgrammed(draft, composerPerformedDoc, frozenVariantKey, memberGenderKey)
+                      const committed = matches ? null : draft
+                      const prevSig = JSON.stringify((performedCommitted?.movements || []).map(m => [m.sourceInstanceId, m.instanceId, m.notPerformed]))
+                      const nextSig = JSON.stringify((committed?.movements || []).map(m => [m.sourceInstanceId, m.instanceId, m.notPerformed]))
+                      if (getFormat(activeLogFormatId)?.rowMode === 'interval' && prevSig !== nextSig) setWodSets({})
+                      setPerformedCommitted(committed)
+                      setPerformedDraft(null)
+                      setLogWodEditMode(false)
+                    }}
+                    showToast={showToast} t={t} />
+                )
+              }
+              return (
+                <>
+                  {editEligibleHere && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                      {performedBadgeActiveHere && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: '999px', background: '#FEF3E2', border: '1px solid #F5D9AE' }}>
+                          <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, letterSpacing: '0.05em', color: '#B7791F' }}>{t.performedModifiedTag}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setPerformedDraft(performedCommitted
+                            ? snapshotPrescriptionDoc(performedCommitted)
+                            : buildPerformedPrescriptionDraft({ doc: composerPerformedDoc, variantKey: frozenVariantKey }))
+                          setLogWodEditMode(true)
+                        }}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#0E0E0E', fontSize: '13px', fontWeight: '600', textDecoration: 'underline', textUnderlineOffset: '3px', cursor: 'pointer', padding: '4px 0' }}>
+                        {performedActiveHere ? t.performedEditAdjust : t.performedEditOpen}
+                      </button>
+                    </div>
+                  )}
+                  <FormatLogger
+                    formatId={activeLogFormatId}
+                    config={activeLogFormatConfig}
+                    movements={effectivePartialMovements}
+                    sequentialAmrapStations={sequentialAmrapStations}
+                    intervalComposition={intervalCompositionActive}
+                    prescriptionMovements={frozenProgrammedInstances}
+                    movementIndex={memberMovementIndex}
+                    prescribedWeight={prescribedWeightPentruLog}
+                    rxStatus={liveRxStatus}
+                    value={{
+                      result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
+                      partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
+                      weightLogged: wodWeightLogged, stages: wodChainedStages,
+                    }}
+                    onChange={(patch) => {
+                      if ('result' in patch) setWodResult(patch.result)
+                      if ('time' in patch) setWodTime(patch.time)
+                      if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
+                      if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
+                      if ('sets' in patch) setWodSets(patch.sets)
+                      if ('stages' in patch) setWodChainedStages(patch.stages)
+                      if ('completed' in patch) setWodCompleted(patch.completed)
+                      if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
+                    }}
+                    weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+                </>
+              )
+            })()}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodNoteLabel}</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />

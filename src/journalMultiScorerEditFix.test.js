@@ -98,8 +98,14 @@ describe('App.jsx routing guard - useComposerLogger drives BOTH editLogId JSX br
   })
 
   it('the editLogId/logWodStep score-section branch renders MultiScorerLogger when useComposerLogger, FormatLogger otherwise', () => {
-    expect(appSource).toMatch(/\{useComposerLogger \? \(\s*<MultiScorerLogger/)
-    expect(appSource).toMatch(/<MultiScorerLogger[\s\S]{0,20}envelopes=\{logScoreEnvelopes\}[\s\S]{0,40}valuesByComponentId=\{wodScorerValues\}[\s\S]{0,40}step=\{wodScorerStep\}/)
+    // ATHLETE-SELECTED MOVEMENT LOAD - this branch was restructured from a
+    // plain ternary into an IIFE with an early `if (useComposerLogger) return
+    // (<MultiScorerLogger .../>)` so the FormatLogger side could also gain a
+    // logWodEditMode interception (PerformedEditPanel) + an Edit/Adjust
+    // affordance for single-scorer historical edits - the same routing
+    // decision (useComposerLogger), same MultiScorerLogger usage, same props.
+    expect(appSource).toMatch(/if \(useComposerLogger\) \{\s*return \(\s*<MultiScorerLogger/)
+    expect(appSource).toMatch(/<MultiScorerLogger[\s\S]{0,30}envelopes=\{logScoreEnvelopes\}[\s\S]{0,40}valuesByComponentId=\{wodScorerValues\}[\s\S]{0,40}step=\{wodScorerStep\}/)
   })
 
   it('reuses the SAME MultiScorerLogger component for both fresh logging and historical edit - never a second scoring engine', () => {
