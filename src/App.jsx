@@ -98,6 +98,7 @@ import { dedupLatestPerMember, monotonicLoggedAt } from './leaderboardSelection'
 import { COLORS } from './theme'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
+import { currentWeekStartStr, fetchAllClasses, groupClassesByDay, groupPastClassesByWeek } from './classesPaging'
 import { scoreDefinitionFor } from './scoreDefinition'
 import { composeMixedLogFields } from './componentContract'
 import { logHasComponentResults } from './componentLeaderboard'
@@ -3317,7 +3318,22 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [paidUntilEdits, setPaidUntilEdits] = useState({})
   const [signupCodes, setSignupCodes] = useState([])
   const [generatingSignupCode, setGeneratingSignupCode] = useState(false)
+  // FORGE - ADMIN CLASSES current-week-first + pagination. `clase` is now
+  // CURRENT + FUTURE ONLY (date >= currentWeekStartStr()) - the primary
+  // operational dataset, loaded eagerly. Historical classes live in
+  // `claseTrecute`, fetched lazily the first time the admin opens
+  // SĂPTĂMÂNILE TRECUTE (toggleClaseTrecuteOpen), then cached for the rest
+  // of the admin session. Both queries page past PostgREST's 1000-row
+  // max_rows cap via fetchAllClasses (classesPaging.js) instead of
+  // silently truncating - the root cause of the pre-existing "CLASSES
+  // (1000)" undercount (1039 real rows, only 1000 ever reached the
+  // client).
   const [clase, setClase] = useState([])
+  const [claseTrecute, setClaseTrecute] = useState([])
+  const [claseTrecuteLoaded, setClaseTrecuteLoaded] = useState(false)
+  const [claseTrecuteOpen, setClaseTrecuteOpen] = useState(() => {
+    try { return sessionStorage.getItem('claseTrecuteOpen') === '1' } catch { return false }
+  })
   const [wods, setWods] = useState([])
   // Coach Quick Create Phase 2 (Movement Catalog Consolidation) - this
   // gym's own catalog rows + the platform-global tier, fetched once on
@@ -3333,6 +3349,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [confirmCancelAbo, setConfirmCancelAbo] = useState(null)
   const [confirmArchivePlan, setConfirmArchivePlan] = useState(null)
   const [_loadingClase, setLoadingClase] = useState(true)
+  const [_loadingClaseTrecute, setLoadingClaseTrecute] = useState(false)
   const [searchClienti, setSearchClienti] = useState('')
   const [rapoarteData, setRapoarteData] = useState(null)
 
@@ -3561,9 +3578,37 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
 
   const fetchClase = async () => {
     setLoadingClase(true)
-    const { data } = await supabase.from('classes').select('*').order('date', { ascending: true }).order('start_time', { ascending: true })
-    if (data) setClase(data)
+    const rows = await fetchAllClasses(supabase, (q) => q.gte('date', currentWeekStartStr()))
+    if (rows) setClase(rows)
     setLoadingClase(false)
+  }
+
+  const fetchClaseTrecute = async () => {
+    setLoadingClaseTrecute(true)
+    const rows = await fetchAllClasses(supabase, (q) => q.lt('date', currentWeekStartStr()))
+    if (rows) { setClaseTrecute(rows); setClaseTrecuteLoaded(true) }
+    setLoadingClaseTrecute(false)
+  }
+
+  // Single refresh point reused everywhere the old fetchClase() was called
+  // after a mutation - always refreshes the primary (current+future)
+  // dataset, and additionally refreshes past classes only if that
+  // accordion has already been opened/loaded this session (never fetches
+  // history the admin hasn't asked to see). Covers every mutation that
+  // could touch a past row (Delete Past deletes date < today, which can
+  // include already-loaded historical weeks; a single class delete can
+  // target a past class shown in the accordion) without needing per-call-
+  // site analysis of which dataset each mutation could affect.
+  const refreshClase = async () => {
+    await fetchClase()
+    if (claseTrecuteLoaded) await fetchClaseTrecute()
+  }
+
+  const toggleClaseTrecuteOpen = () => {
+    const next = !claseTrecuteOpen
+    setClaseTrecuteOpen(next)
+    try { sessionStorage.setItem('claseTrecuteOpen', next ? '1' : '0') } catch {}
+    if (next && !claseTrecuteLoaded) fetchClaseTrecute()
   }
 
   const fetchWods = async () => {
@@ -3904,7 +3949,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const getClassNotifParams = (classId) => {
-    const c = clase.find(cl => cl.id === classId)
+    const c = clase.find(cl => cl.id === classId) || claseTrecute.find(cl => cl.id === classId)
     if (!c) return { className: 'Clasă', classDate: '' }
     const ora = c.start_time?.slice(0, 5) || ''
     return {
@@ -3925,7 +3970,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     checkAndBookFromWaitlist(classId)
     showToast(t.toastRemovedFromClass)
     fetchRezervariClasa(classId)
-    fetchClase()
+    refreshClase()
     const member = clienti.find(c => c.id === memberId)
     if (member?.email) {
       const { className, classDate } = getClassNotifParams(classId)
@@ -3946,7 +3991,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const member = clienti.find(c => c.id === memberId)
     if (member?.email) {
       const memberEmail = member.email.toLowerCase()
-      const cls = clase.find(c => c.id === classId)
+      const cls = clase.find(c => c.id === classId) || claseTrecute.find(c => c.id === classId)
       if (cls?.date && cls?.start_time) {
         const remindAt = new Date(new Date(`${cls.date}T${cls.start_time}`).getTime() - 3600000)
         if (remindAt > new Date())
@@ -3957,7 +4002,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
     setAdaugaMembruSearch(prev => ({ ...prev, [classId]: '' }))
     fetchRezervariClasa(classId)
-    fetchClase()
+    refreshClase()
   }
 
   // Class Operations - Instant Coach Check-in: optimistic wrapper around
@@ -4173,7 +4218,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     if (error) { showToast(t.toastGenericErrorWithFallback(error.message || t.errorWordExclaim)); console.error(error) }
     else {
       showToast(repetitiva ? t.toastClassesCreated(records.length) : t.toastClassCreated)
-      await fetchClase(); setDataClasa(''); setCoachClasa(''); setCuloarClasa(null)
+      await refreshClase(); setDataClasa(''); setCoachClasa(''); setCuloarClasa(null)
     }
     setSavingClasa(false)
   }
@@ -4204,7 +4249,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const { error } = await supabase.from('classes').delete().in('id', idsDeSters)
     if (error) { showToast(t.toastGenericErrorWithFallback(error.message)); return }
     showToast(t.toastClassDeletePastSummary(idsDeSters.length, nPastrate))
-    fetchClase()
+    refreshClase()
   }
 
   const stergeSeria = async (c) => {
@@ -4246,7 +4291,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       .gte('date', aziS)
     if (error) showToast(t.toastGenericErrorWithFallback(error.message))
     else showToast(t.toastSeriesDeleted)
-    await fetchClase()
+    await refreshClase()
   }
 
   // P0-01 (audit platformă) - ștergerea unei clase nu mai poate orfaniza
@@ -4302,7 +4347,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
     const { error } = await supabase.from('classes').delete().eq('id', id)
     if (error) { showToast(t.toastGenericErrorWithFallback(error.message)); return }
-    showToast(t.toastClassDeleted); await fetchClase()
+    showToast(t.toastClassDeleted); await refreshClase()
   }
 
   // Faza 6 - editorul de sectiuni traieste in `wodSections` (vezi
@@ -4931,6 +4976,118 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       return sortClienti === 'activi' ? esteClientActiv(c.email) : !esteClientActiv(c.email)
     })
 
+  // Extracted so both the primary (current+future) flat list and each week
+  // inside SĂPTĂMÂNILE TRECUTE render identical day/class cards - byte-
+  // identical to the pre-existing inline block, just made reusable via a
+  // closure over the same handlers/state as before (clasaDeschisa,
+  // rezervariClasa, adminToggleCheckIn, pendingCheckins,
+  // adaugaMembruSearch, clienti, t, lang). Nothing about bookings/check-in/
+  // add-member/series-delete/delete changes.
+  const renderClassDayGroup = (date, claseZi) => {
+    const dateObj = new Date(date + 'T00:00:00')
+    const _azd = new Date()
+    const azi = `${_azd.getFullYear()}-${String(_azd.getMonth()+1).padStart(2,'0')}-${String(_azd.getDate()).padStart(2,'0')}`
+    const eAzi = date === azi
+    const eTrecut = date < azi
+    const ziLabel = dateObj.toLocaleDateString(localeFor(lang), { weekday: 'long', day: 'numeric', month: 'long' })
+    return (
+      <div key={date} style={{ marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#0E0E0E' : eTrecut ? '#f0f0f0' : '#0E0E0E', borderRadius: '20px', padding: '5px 14px' }}>
+            {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em' }}>{t.adminClassTodayBadge}</span>}
+            <span style={{ fontSize: '13px', fontWeight: '600', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
+          </div>
+          <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+        </div>
+        {claseZi.map(c => (
+          <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.name}</div>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                  <Clock size={11} /> {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · <User size={11} /> {c.coach} · {t.adminClassSpotsCount(c.max_spots)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
+                  style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Users size={13} color="#0E0E0E" /></button>
+                <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                <button onClick={() => { if (window.confirm(t.adminClassDeleteSeriesConfirm(c.name, c.start_time?.slice(0,5)))) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.adminClassDeleteSeriesButton}</button>
+              </div>
+            </div>
+            {clasaDeschisa === c.id && (
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+                {(() => {
+                  const rez = rezervariClasa[c.id]
+                  const nrCheckin = (rez || []).filter(r => r.checked_in).length
+                  const nrTotal = rez?.length || 0
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>{t.adminClassBookingsHeader(nrTotal, c.max_spots)}</div>
+                      {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#0E0E0E' : '#aaa', background: nrCheckin > 0 ? '#f0f0f0' : '#FFFFFF', padding: '2px 8px', borderRadius: '20px' }}>{t.adminClassPresentCount(nrCheckin, nrTotal)}</div>}
+                    </div>
+                  )
+                })()}
+                {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>{t.adminClassLoading}</div>
+                  : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>{t.adminClassNoBooking}</div>
+                  : rezervariClasa[c.id].map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #FFFFFF' : 'none' }}>
+                    <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '12px', fontWeight: '500', color: '#0E0E0E' }}>{r.full_name || t.adminClassUserFallback}</div>
+                      <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
+                    </div>
+                    {(() => {
+                      const clasaInceput = new Date(`${c.date}T${c.start_time}`) <= new Date()
+                      const sePonteaza = pendingCheckins.has(r.booking_id)
+                      return (
+                        <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.booking_id, r.checked_in)}
+                          disabled={sePonteaza}
+                          style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #0E0E0E' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#FFFFFF', color: r.checked_in ? '#0E0E0E' : '#aaa', fontSize: '11px', cursor: sePonteaza ? 'wait' : 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400', opacity: sePonteaza ? 0.5 : 1 }}>
+                          {r.checked_in ? t.adminClassPresentLabel : clasaInceput ? t.adminClassAbsentLabel : t.adminClassMarkLabel}
+                        </button>
+                      )
+                    })()}
+                    <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
+                      style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                  </div>
+                ))}
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #FFFFFF' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
+                  <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
+                    placeholder={t.adminClassSearchMemberPlaceholder}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
+                  {adaugaMembruSearch[c.id]?.trim() && (() => {
+                    const q = adaugaMembruSearch[c.id].toLowerCase()
+                    const rezultate = clienti.filter(cl =>
+                      (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
+                      !(rezervariClasa[c.id] || []).some(r => r.member_id === cl.id)
+                    ).slice(0, 5)
+                    return rezultate.length > 0 ? (
+                      <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
+                        {rezultate.map(cl => (
+                          <div key={cl.id} onClick={() => adminAdaugaInClasa(c.id, cl.id)}
+                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '500', color: '#0E0E0E' }}>{cl.full_name || cl.email}</div>
+                              <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
+                            </div>
+                            <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>{t.adminClassAddButton}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>{t.adminClassNoResult}</div>
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
@@ -5523,117 +5680,51 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ fontSize: '12px', color: '#888' }}>{t.adminClassListHeader(clase.length)}</div>
-            {clase.some(c => c.date < `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`) && (
-              <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>{t.adminClassDeletePast}</button>
-            )}
+            <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>{t.adminClassDeletePast}</button>
           </div>
-          {(() => {
-            const grouped = clase.reduce((acc, c) => { if (!acc[c.date]) acc[c.date] = []; acc[c.date].push(c); return acc }, {})
-            const _azd = new Date()
-            const azi = `${_azd.getFullYear()}-${String(_azd.getMonth()+1).padStart(2,'0')}-${String(_azd.getDate()).padStart(2,'0')}`
-            return Object.entries(grouped).map(([date, claseZi]) => {
-              const dateObj = new Date(date + 'T00:00:00')
-              const eAzi = date === azi
-              const eTrecut = date < azi
-              const ziLabel = dateObj.toLocaleDateString(localeFor(lang), { weekday: 'long', day: 'numeric', month: 'long' })
-              return (
-                <div key={date} style={{ marginBottom: '18px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: eAzi ? '#0E0E0E' : eTrecut ? '#f0f0f0' : '#0E0E0E', borderRadius: '20px', padding: '5px 14px' }}>
-                      {eAzi && <span style={{ fontSize: '10px', color: '#ABE73C', fontWeight: '600', lineHeight: 1.3, letterSpacing: '0.06em' }}>{t.adminClassTodayBadge}</span>}
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: eAzi ? '#fff' : eTrecut ? '#aaa' : '#fff', textTransform: 'capitalize' }}>{ziLabel}</span>
-                    </div>
-                    <div style={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
-                  </div>
-                  {claseZi.map(c => (
-                    <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{c.name}</div>
-                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                            <Clock size={11} /> {c.start_time?.slice(0,5)}–{c.end_time?.slice(0,5)} · <User size={11} /> {c.coach} · {t.adminClassSpotsCount(c.max_spots)}
-                          </div>
+
+          {/* SĂPTĂMÂNILE TRECUTE - same accordion visual/interaction pattern
+              as Admin -> WOD's Past WODs (togglePastWodsOpen/pastWodsOpen):
+              white card, full-width clickable header, rotating ChevronDown,
+              CSS-grid height animation, sessionStorage-persisted open state
+              (own key, doesn't collide with pastWodsOpen). Collapsed by
+              default; historical classes are fetched only on first open
+              (toggleClaseTrecuteOpen), then cached in claseTrecute for the
+              rest of the admin session. */}
+          <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '14px' }}>
+            <button onClick={toggleClaseTrecuteOpen}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box' }}>
+              <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminClassPastWeeksHeader}</div>
+              <ChevronDown size={16} color="#A1A1AA" strokeWidth={1.5}
+                style={{ flexShrink: 0, transform: claseTrecuteOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }} />
+            </button>
+            <div style={{ display: 'grid', gridTemplateRows: claseTrecuteOpen ? '1fr' : '0fr', transition: 'grid-template-rows 220ms ease' }}>
+              <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '0 14px 14px' }}>
+                  {_loadingClaseTrecute ? (
+                    <div style={{ fontSize: '12px', color: '#aaa', padding: '4px 0 8px' }}>{t.adminClassLoading}</div>
+                  ) : claseTrecuteLoaded && claseTrecute.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#aaa', padding: '4px 0 8px' }}>{t.adminClassNoPastClasses}</div>
+                  ) : (
+                    groupPastClassesByWeek(claseTrecute).map(({ weekStartStr, weekEndStr, days }) => (
+                      <div key={weekStartStr} style={{ marginBottom: '20px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                          {new Date(weekStartStr + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' })} – {new Date(weekEndStr + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: 'numeric', month: 'short' })}
                         </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
-                            style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Users size={13} color="#0E0E0E" /></button>
-                          <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
-                          <button onClick={() => { if (window.confirm(t.adminClassDeleteSeriesConfirm(c.name, c.start_time?.slice(0,5)))) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.adminClassDeleteSeriesButton}</button>
-                        </div>
+                        {days.map(([date, claseZi]) => renderClassDayGroup(date, claseZi))}
                       </div>
-                      {clasaDeschisa === c.id && (
-                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-                          {(() => {
-                            const rez = rezervariClasa[c.id]
-                            const nrCheckin = (rez || []).filter(r => r.checked_in).length
-                            const nrTotal = rez?.length || 0
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: '600', color: '#888' }}>{t.adminClassBookingsHeader(nrTotal, c.max_spots)}</div>
-                                {nrTotal > 0 && <div style={{ fontSize: '10px', fontWeight: '600', color: nrCheckin > 0 ? '#0E0E0E' : '#aaa', background: nrCheckin > 0 ? '#f0f0f0' : '#FFFFFF', padding: '2px 8px', borderRadius: '20px' }}>{t.adminClassPresentCount(nrCheckin, nrTotal)}</div>}
-                              </div>
-                            )
-                          })()}
-                          {!rezervariClasa[c.id] ? <div style={{ fontSize: '12px', color: '#aaa' }}>{t.adminClassLoading}</div>
-                            : rezervariClasa[c.id].length === 0 ? <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '10px' }}>{t.adminClassNoBooking}</div>
-                            : rezervariClasa[c.id].map((r, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < rezervariClasa[c.id].length - 1 ? '1px solid #FFFFFF' : 'none' }}>
-                              <AvatarCircle name={r.full_name || r.email || r.member_id} avatarUrl={r.avatar_url} size={28} />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '12px', fontWeight: '500', color: '#0E0E0E' }}>{r.full_name || t.adminClassUserFallback}</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>{r.email || r.member_id?.slice(0,8) + '...'}</div>
-                              </div>
-                              {(() => {
-                                const clasaInceput = new Date(`${c.date}T${c.start_time}`) <= new Date()
-                                const sePonteaza = pendingCheckins.has(r.booking_id)
-                                return (
-                                  <button onClick={() => adminToggleCheckIn(c.id, r.member_id, r.booking_id, r.checked_in)}
-                                    disabled={sePonteaza}
-                                    style={{ padding: '3px 8px', borderRadius: '8px', border: r.checked_in ? '1px solid #0E0E0E' : '1px solid #d0d0d0', background: r.checked_in ? '#f0f0f0' : '#FFFFFF', color: r.checked_in ? '#0E0E0E' : '#aaa', fontSize: '11px', cursor: sePonteaza ? 'wait' : 'pointer', flexShrink: 0, fontWeight: r.checked_in ? '600' : '400', opacity: sePonteaza ? 0.5 : 1 }}>
-                                    {r.checked_in ? t.adminClassPresentLabel : clasaInceput ? t.adminClassAbsentLabel : t.adminClassMarkLabel}
-                                  </button>
-                                )
-                              })()}
-                              <button onClick={() => adminScoateDinClasa(c.id, r.member_id)}
-                                style={{ padding: '3px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#C62828', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
-                            </div>
-                          ))}
-                          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #FFFFFF' }}>
-                            <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
-                            <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              placeholder={t.adminClassSearchMemberPlaceholder}
-                              style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
-                            {adaugaMembruSearch[c.id]?.trim() && (() => {
-                              const q = adaugaMembruSearch[c.id].toLowerCase()
-                              const rezultate = clienti.filter(cl =>
-                                (cl.full_name?.toLowerCase().includes(q) || cl.email?.toLowerCase().includes(q)) &&
-                                !(rezervariClasa[c.id] || []).some(r => r.member_id === cl.id)
-                              ).slice(0, 5)
-                              return rezultate.length > 0 ? (
-                                <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
-                                  {rezultate.map(cl => (
-                                    <div key={cl.id} onClick={() => adminAdaugaInClasa(c.id, cl.id)}
-                                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '12px', borderBottom: '1px solid #FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <div>
-                                        <div style={{ fontWeight: '500', color: '#0E0E0E' }}>{cl.full_name || cl.email}</div>
-                                        <div style={{ fontSize: '10px', color: '#888' }}>{cl.email}</div>
-                                      </div>
-                                      <span style={{ fontSize: '11px', color: '#0E0E0E', fontWeight: '600' }}>{t.adminClassAddButton}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : <div style={{ fontSize: '11px', color: '#aaa', marginTop: '6px', padding: '4px' }}>{t.adminClassNoResult}</div>
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
-              )
-            })
-          })()}
+              </div>
+            </div>
+          </div>
+
+          {/* CURRENT + FUTURE - unchanged flat day-by-day rendering, now
+              starting at the current week's Monday instead of the earliest
+              row in the table (clase is fetched with date >= that boundary,
+              see fetchClase). */}
+          {Object.entries(groupClassesByDay(clase)).map(([date, claseZi]) => renderClassDayGroup(date, claseZi))}
         </>
       )}
 
