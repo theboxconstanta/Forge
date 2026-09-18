@@ -12749,6 +12749,26 @@ function App() {
           </div>
 
           {editLogId ? (
+            // JOURNAL MULTI-SCORER EDIT FIX - a Composer multi-scorer log's
+            // movements live in its own frozen componentsSnapshot (structured
+            // instances, one set per scored component), never in a single
+            // flat free-text line list - the legacy SortableList/
+            // MiscareQuickAdd editor below edits `editLogMiscari`, a concept
+            // that doesn't exist for this log shape at all. MultiScorerLogger
+            // (rendered further below, alongside FormatLogger's own swap)
+            // already shows each component's own movements inline above its
+            // score fields (renderComponentMovementLines, same as fresh
+            // logging) - so this card is correctly skipped entirely for a
+            // Composer edit, never shown empty/broken. editLogHeader (parsed
+            // from the log's own frozen notes, same for both shapes) still
+            // renders when present.
+            useComposerLogger ? (
+              editLogHeader ? (
+                <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
+                </div>
+              ) : null
+            ) : (
             <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               {editLogHeader ? (
                 <div style={{ fontSize: '11px', fontWeight: '600', color: '#0E0E0E', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{editLogHeader}</div>
@@ -12764,6 +12784,7 @@ function App() {
                 placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
                 weightUnit={userProfile?.weight_unit} t={t} />
             </div>
+            )
           ) : logWodPrimaryPath ? (() => {
             // P9.5 - Universal Log WOD (structured or legacy programmed workout).
             // ONE clean screen: variant badge -> read-only workout (P9.4
@@ -13082,32 +13103,60 @@ function App() {
                 ← {t.logWodBackToComposeLink}
               </div>
             )}
-            <FormatLogger
-              formatId={activeLogFormatId}
-              config={activeLogFormatConfig}
-              movements={effectivePartialMovements}
-              sequentialAmrapStations={sequentialAmrapStations}
-              intervalComposition={intervalCompositionActive}
-              prescriptionMovements={frozenProgrammedInstances}
-              movementIndex={memberMovementIndex}
-              prescribedWeight={prescribedWeightPentruLog}
-              rxStatus={liveRxStatus}
-              value={{
-                result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
-                partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
-                weightLogged: wodWeightLogged, stages: wodChainedStages,
-              }}
-              onChange={(patch) => {
-                if ('result' in patch) setWodResult(patch.result)
-                if ('time' in patch) setWodTime(patch.time)
-                if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
-                if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
-                if ('sets' in patch) setWodSets(patch.sets)
-                if ('stages' in patch) setWodChainedStages(patch.stages)
-                if ('completed' in patch) setWodCompleted(patch.completed)
-                if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
-              }}
-              weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+            {/* JOURNAL MULTI-SCORER EDIT FIX - this block already served BOTH
+                a historical edit (editLogId) and the free-text/non-primary-
+                path fresh-logging score step (logWodStep==='score'), but only
+                ever rendered the legacy FormatLogger, with zero awareness of
+                useComposerLogger. A Composer multi-scorer log's real content
+                lives in wodScorerValues (per componentId), never the legacy
+                wodResult/wodTime/... state FormatLogger reads/writes - so an
+                edit landed on a FormatLogger fed entirely empty state,
+                rendering the wrong control and (for a sequential For Time)
+                pre-filling partial-round inputs with the full prescribed reps
+                as if nothing had been done, even though the log was FINISHED
+                (root cause of the confirmed production bug). The free-text
+                logWodStep==='score' case is untouched here: useComposerLogger
+                is always false there (it's gated on the official-WOD primary
+                path), so it keeps using FormatLogger exactly as before -
+                reusing the EXACT SAME MultiScorerLogger wiring the fresh
+                Composer logging flow already uses (envelopes/valuesByComponentId/
+                step all already correctly populated by onEditWod), never a
+                second scoring engine. */}
+            {useComposerLogger ? (
+              <MultiScorerLogger
+                envelopes={logScoreEnvelopes} valuesByComponentId={wodScorerValues} step={wodScorerStep}
+                onStepChange={setWodScorerStep}
+                onChangeComponent={(componentId, next) => setWodScorerValues(v => ({ ...v, [componentId]: next }))}
+                weightUnit={userProfile?.weight_unit || 'kg'} t={t} gender={memberGenderKey}
+              />
+            ) : (
+              <FormatLogger
+                formatId={activeLogFormatId}
+                config={activeLogFormatConfig}
+                movements={effectivePartialMovements}
+                sequentialAmrapStations={sequentialAmrapStations}
+                intervalComposition={intervalCompositionActive}
+                prescriptionMovements={frozenProgrammedInstances}
+                movementIndex={memberMovementIndex}
+                prescribedWeight={prescribedWeightPentruLog}
+                rxStatus={liveRxStatus}
+                value={{
+                  result: wodResult, time: wodTime, roundsCompleted: wodRoundsCompleted,
+                  partialReps: wodPartialReps, sets: wodSets, completed: wodCompleted,
+                  weightLogged: wodWeightLogged, stages: wodChainedStages,
+                }}
+                onChange={(patch) => {
+                  if ('result' in patch) setWodResult(patch.result)
+                  if ('time' in patch) setWodTime(patch.time)
+                  if ('roundsCompleted' in patch) setWodRoundsCompleted(patch.roundsCompleted)
+                  if ('partialReps' in patch) setWodPartialReps(patch.partialReps)
+                  if ('sets' in patch) setWodSets(patch.sets)
+                  if ('stages' in patch) setWodChainedStages(patch.stages)
+                  if ('completed' in patch) setWodCompleted(patch.completed)
+                  if ('weightLogged' in patch) setWodWeightLogged(patch.weightLogged)
+                }}
+                weightUnit={userProfile?.weight_unit || 'kg'} t={t} />
+            )}
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodNoteLabel}</div>
               <input value={wodNote} onChange={e => setWodNote(e.target.value)} placeholder={t.logWodNotePlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
