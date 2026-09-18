@@ -7888,6 +7888,19 @@ function App() {
   const [performedCommitted, setPerformedCommitted] = useState(null)
   const [performedDraft, setPerformedDraft] = useState(null)
   const [logWodEditMode, setLogWodEditMode] = useState(false)
+  // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - onEditWod's
+  // single-scorer branch needs a structured prescription doc to drive
+  // PerformedEditPanel/composeStructuredWorkoutDisplay, but the log being
+  // edited may belong to a WOD other than whatever date Home last had
+  // loaded into `wodZiData` (a UI-editing-context concern only - never
+  // historical truth, which stays entirely on the log's own frozen
+  // performed_prescription/prescription_snapshot, untouched by this).
+  // Set directly from the log's own joined `wods` row (`log.wods`, already
+  // fetched by fetchWodLogs - see its extended select) - synchronous, no
+  // extra round trip, never touches the shared dataAcasa/wodZiData Home
+  // state (so Cancel/Back can never poison Home's own date view). Cleared
+  // everywhere editLogId is cleared.
+  const [editWodZiData, setEditWodZiData] = useState(null)
   // Member-side movement catalog index (for the Edit-mode substitution picker).
   // The lazy fetch that fills `memberGymMovements` lives further down, AFTER the
   // `userProfile` declaration it reads - see the effect next to `myGymIdRef`
@@ -8486,6 +8499,12 @@ function App() {
     if (screen !== 'logWOD' && screen !== 'logSkill') {
       setLogCtx(null)
       setPerformedCommitted(null); setPerformedDraft(null); setLogWodEditMode(false)
+      // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - safety net for
+      // every exit path (not just the explicit Cancel/Back button): leaving
+      // the logger/edit screen always drops the edit-scoped historical WOD
+      // context so it can never leak into a later, unrelated session. Never
+      // touches the shared dataAcasa/wodZiData Home state.
+      setEditWodZiData(null)
     }
     if (screen === 'home') {
       // INC-04 - returning to Home must NOT reset the selected date. The Home
@@ -9282,7 +9301,12 @@ function App() {
     // hasPhoto (and, once expanded, which Storage path to sign) for every
     // row in a single batched query - never a signed URL, never a second
     // per-log query, never image bytes.
-    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')}), wod_log_media(storage_path)`).eq('member_id', user.id).order('logged_at', { ascending: false })
+    // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - `movement_prescriptions`
+    // added to the existing wods(...) join so onEditWod can set editWodZiData
+    // directly from this already-fetched log.wods (UI editing context only -
+    // never read as historical truth, which stays on the log's own frozen
+    // prescription_snapshot/performed_prescription).
+    const { data } = await supabase.from('wod_logs').select(`*, wods(name, type, duration, format_config, movement_prescriptions, movements_onramp, movements_beginner, movements_intermediate, movements_rx, ${ALL_WEIGHT_COLUMNS.join(', ')}), wod_log_media(storage_path)`).eq('member_id', user.id).order('logged_at', { ascending: false })
     if (data) setWodLogs(data)
   }
 
@@ -10150,17 +10174,44 @@ function App() {
         })
         if (mono && mono !== curRow.logged_at) editLoggedAt = mono
       }
+      // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - this .update()
+      // never wrote performed_prescription at all (the "carry the overlay
+      // through the edit" comment near onEditWod's read side only meant the
+      // OLD value survives by omission - an actual 70->75 edit through
+      // PerformedEditPanel was silently dropped, never persisted). Mirrors
+      // the exact same prune-then-modification-check the fresh-log INSERT
+      // path already uses (below), against THIS edit session's own
+      // activePrescriptionDoc/frozenVariantKey (now correctly resolved from
+      // the log's own historical WOD via editWodZiData, never Home's
+      // currently-loaded one). Explicit null when reverted-to-programmed -
+      // never merely omitted, which would leave a stale DB value. Gated to
+      // !useComposerLogger && frozenVariantKey known - a multi-scorer edit
+      // (10d2140, untouched) and any log with no resolved variant (legacy)
+      // keep the exact prior "never touch this column" behavior.
+      const performedPrescriptionEditPayload = (!useComposerLogger && frozenVariantKey) ? {
+        performed_prescription: (() => {
+          const prunedForEdit = performedCommitted
+            ? pruneUntouchedBlankLoad(performedCommitted, activePrescriptionDoc, frozenVariantKey)
+            : null
+          return (prunedForEdit
+            && performedIsModified(prunedForEdit, activePrescriptionDoc, frozenVariantKey, memberGenderKey)
+            && validatePerformedPrescription(prunedForEdit).valid)
+            ? prunedForEdit
+            : null
+        })(),
+      } : {}
       const { error } = await supabase.from('wod_logs').update({
         ...composeWodLogFields(),
         notes: noteFull || null,
         ...(editLoggedAt ? { logged_at: editLoggedAt } : {}),
+        ...performedPrescriptionEditPayload,
       }).eq('id', editLogId)
       if (error) { showToast(t.toastLogWodUpdateError); console.error(error) }
       else {
         showToast(t.toastWodUpdated)
         await fetchWodLogs(); fetchClasament()
         setScreen('log'); setLogTab('jurnal')
-        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([])
+        setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setEditWodZiData(null)
         setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setEditLogPrescribedWeight('')
       }
       setWodSaving(false)
@@ -10916,9 +10967,19 @@ function App() {
   // click, NEVER re-read from live wodZiData). On the Home card it is the live
   // wods row's doc. `logWodZiData?.movement_prescriptions` resolves to the same
   // frozen ref inside a frozen flow (logWodZiData === logCtx.wodZiData).
+  // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - during a historical
+  // edit (editLogId set), `wodZiData` is whatever date Home last happened to
+  // have loaded - unrelated to the log actually being edited. editWodZiData
+  // (set by onEditWod from the log's OWN joined wods row) takes priority
+  // whenever present; this is still only a UI-editing-context resolution
+  // (which movements/capabilities the performed-prescription editor should
+  // offer) - the log's frozen performed_prescription/prescription_snapshot
+  // remain the sole source of historical TRUTH, read elsewhere, untouched by
+  // this. Fresh logging (editLogId null, editWodZiData never set) is
+  // byte-identical to before.
   const activePrescriptionDoc = inFrozenLogFlow
     ? (logCtx.prescriptionDoc ?? null)
-    : (wodZiData?.movement_prescriptions ?? null)
+    : (editLogId && editWodZiData ? (editWodZiData?.movement_prescriptions ?? null) : (wodZiData?.movement_prescriptions ?? null))
 
   // P9.5.8 / P9.5.8.1 - the variant levels the coach ACTUALLY programmed for the
   // metcon shown on the Home card (canonical keys, data-driven - see
@@ -12093,7 +12154,7 @@ function App() {
                           // freeze that workout's identity for the session.
                           if (!homeDisplayIsCurrent) return
                           setLogCtx(captureLogCtx())
-                          setLogTargetSectionId(section.id); setEditLogId(null)
+                          setLogTargetSectionId(section.id); setEditLogId(null); setEditWodZiData(null)
                           setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null)
                           setLogWodStep('score'); setPrevScreen('home'); setScreen('logWOD')
                         }} t={t} />
@@ -12306,7 +12367,7 @@ function App() {
                     const variantReadyToLog = variantaAleasa !== null && homeVariantSelectable(VARIANTE_CONFIG[variantaAleasa]?.nivel)
                     const canLog = variantReadyToLog && homeDisplayIsCurrent
                     return (
-                  <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={!canLog}
+                  <button onClick={() => { if (!homeDisplayIsCurrent) return; setLogCtx(captureLogCtx()); setEditLogId(null); setEditWodZiData(null); setLogWodStep('compose'); setPrevScreen('home'); setScreen('logWOD') }} disabled={!canLog}
                     style={{ width: '100%', padding: '12px', background: canLog ? '#ABE73C' : '#ccc', color: canLog ? '#0E0E0E' : '#888', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: canLog ? 'pointer' : 'not-allowed', marginTop: '8px' }}>
                     {variantReadyToLog ? t.homeLogWithLevel(VARIANTE_CONFIG[variantaAleasa].nivel) : t.homeChooseVariantFirst}
                   </button>
@@ -12526,7 +12587,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E', marginBottom: '16px' }}>Log</h1>
           <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: '12px', padding: '3px', marginBottom: '20px' }}>
-            <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setLogWodStep('compose'); setPrevScreen('log'); setScreen('logWOD') }}
+            <div onClick={() => { setVariantaAleasa(null); setEditLogId(null); setEditWodZiData(null); setLogWodStep('compose'); setPrevScreen('log'); setScreen('logWOD') }}
               style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', fontSize: '13px', fontWeight: '400', background: 'transparent', color: '#888', cursor: 'pointer', transition: 'all 0.15s' }}>
               {t.logNewEntry}
             </div>
@@ -12721,6 +12782,13 @@ function App() {
                 // Not-RX badge stays consistent. V1 has no structured re-edit UI
                 // on the edit-existing path, so it is read-through only.
                 setPerformedCommitted(log.performed_prescription || null); setPerformedDraft(null); setLogWodEditMode(false)
+                // SINGLE-SCORER JOURNAL EDIT HISTORICAL CONTEXT FIX - resolve
+                // the structured-editing context from THIS log's own joined
+                // WOD (log.wods, extended by fetchWodLogs to carry
+                // movement_prescriptions), never from whatever date Home
+                // last had loaded. UI editing context only - the historical
+                // TRUTH read above (performed_prescription) is untouched.
+                setEditWodZiData(log.wods || null)
                 setPrevScreen('log')
                 setScreen('logWOD')
               }}
@@ -12761,7 +12829,7 @@ function App() {
         <div style={{ padding: '20px', paddingBottom: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <button onClick={() => {
-              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
+              if (editLogId) { setEditLogId(null); setEditLogNotesPrefix(''); setEditLogHeader(''); setEditLogFormatId(null); setEditLogFormatConfig(null); setEditLogMiscari([]); setEditWodZiData(null); setWodResult(''); setWodRoundsCompleted(''); setWodPartialReps([]); setWodAdditionalReps(''); setWodTime(''); setWodSets({}); setWodChainedStages([]); setWodCompleted(false); setWodNote(''); setWodWeightLogged(''); setWodScorerValues({}); setWodScorerStep(0); setEditComposerComponents(null); setEditLogPrescribedWeight(''); setScreen(prevScreen || 'home') }
               // Layer 2a - la fel ca editLogId mai sus: formatul e deja fixat
               // de sectiune, nu exista pas "compose" de revenit la el - back
               // navigheaza direct in afara ecranului.
