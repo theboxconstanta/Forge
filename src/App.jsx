@@ -87,6 +87,7 @@ import {
   resolveNumericInput, composeStructuredWorkoutDisplay,
   buildPerformedPrescriptionDraft, validatePerformedPrescription, performedMatchesProgrammed,
   performedIsModified, applyPerformedSubstitution, setPerformedMetricValue, switchPerformedQuantityMetric, PERFORMED_EDITABLE_METRICS,
+  pruneUntouchedBlankLoad,
   composePerformedResultLines, snapshotDisplayLines,
   performedCompositionGroups, performedEntriesForSource, performedStationInstances, resolveEffectivePartialMovements,
   addPerformedMovement, deletePerformedMovement, markSourceNotPerformed, restoreSourcePerformed,
@@ -1035,9 +1036,18 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
   // (structured Intervals - the round-by-round logger is authoritative there).
   // A text reps scheme (e.g. "21-15-9") stays read-only context.
   const repsIsEditable = !!repsEditable && !!inst.reps && repsSpec?.mode !== 'text' && !inst.notPerformed
+  // ATHLETE-SELECTED MOVEMENT LOAD - capability-driven (id-first, same
+  // resolution PERFORMED METRIC SWITCHING below already relies on), computed
+  // early so it can ALSO decide whether to offer a blank "Load" field for a
+  // movement whose programmed prescription never carried one at all (coach
+  // left it athlete-selected). This is the ONLY metric offered blank -
+  // distance/calories are unaffected, unchanged from before.
+  const quantityCap = resolveInstanceCapability(movementIndex, inst)
+  const loadCapableNoProgrammedLoad = !inst.notPerformed && !inst.load && quantityCap.allowed.includes('load')
   const presentMetrics = [
     ...(repsIsEditable ? ['reps'] : []),
     ...PERFORMED_EDITABLE_METRICS.filter(k => inst[k]),
+    ...(loadCapableNoProgrammedLoad ? ['load'] : []),
   ]
   // PERFORMED METRIC SWITCHING - capability-driven (never movement-name-driven):
   // a two-way selector appears ONLY when THIS instance's own catalog
@@ -1050,7 +1060,6 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
   // load+distance carries (their own future decision) still get no selector,
   // byte-identical to before. Active state comes from the INSTANCE itself
   // (the athlete's current truth), never the catalog default.
-  const quantityCap = resolveInstanceCapability(movementIndex, inst)
   const QUANTITY_SWITCH_PAIRS = [['calories', 'distance'], ['reps', 'distance']]
   const quantitySwitchPair = QUANTITY_SWITCH_PAIRS.find(pair => pair.every(m => quantityCap.allowed.includes(m))) || null
   const quantitySwitchEligible = !!quantitySwitchPair
@@ -1103,7 +1112,14 @@ function PerformedEditRow({ inst, gender, movementIndex, onChange, onDelete, del
       {presentMetrics.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '10px' }}>
           {presentMetrics.map((metric) => {
-            const { value, unit } = performedResolvedValue(inst[metric], gender)
+            const resolved = performedResolvedValue(inst[metric], gender)
+            const value = resolved.value
+            // ATHLETE-SELECTED MOVEMENT LOAD - a synthetic blank load field
+            // (inst.load absent) has no unit yet; default it the same way a
+            // freshly-seeded programmed/performed load spec always does
+            // (initializePerformedMetrics), purely for display/commit - never
+            // persisted until the athlete actually types a value.
+            const unit = resolved.unit || (metric === 'load' ? 'kg' : null)
             return (
               <label key={metric} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2, letterSpacing: '0.05em', color: '#9A9A9A', textTransform: 'uppercase' }}>
@@ -2384,7 +2400,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
         // (resultCompositionModified): a materially modified result (weight below
         // the SELECTED variant's standard, movement change, or performed overlay)
         // lands in Mixed Categories; a merely incomplete/capped one does NOT.
-        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription, { result: log.result, formatId: prov.formatId, formatConfig: prov.formatConfig })
+        const isMixed = isMixedCategory(log.weight_logged, prescribedWeight, miscariAfisate, prescribedMovements, log.performed_prescription, { result: log.result, formatId: prov.formatId, formatConfig: prov.formatConfig, prescriptionSnapshot: log.prescription_snapshot })
         if (isMixed) mixedLogs.push(logCuDetalii)
         else rxLogs.push(logCuDetalii)
       })
@@ -10377,10 +10393,18 @@ function App() {
     // dropped rather than written. Never touches prescription_snapshot (that
     // stays PROGRAMMED provenance) or the wods / Engine V2 rows.
     let performedToSave = null
-    if (variantaAleasa !== null && snapshotVariantKey && performedCommitted
-        && performedIsModified(performedCommitted, frozenDocForSnapshot, snapshotVariantKey, memberGenderKey)
-        && validatePerformedPrescription(performedCommitted).valid) {
-      performedToSave = performedCommitted
+    // ATHLETE-SELECTED MOVEMENT LOAD - prune a genuinely-untouched blank
+    // "Load" field (opened, never filled) back to absent BEFORE the
+    // modification check, so opening-but-not-using the optional field never
+    // by itself triggers persistence (§4). A load the athlete actually typed
+    // a number into is never touched by this.
+    const performedCommittedPruned = (variantaAleasa !== null && snapshotVariantKey && performedCommitted)
+      ? pruneUntouchedBlankLoad(performedCommitted, frozenDocForSnapshot, snapshotVariantKey)
+      : performedCommitted
+    if (variantaAleasa !== null && snapshotVariantKey && performedCommittedPruned
+        && performedIsModified(performedCommittedPruned, frozenDocForSnapshot, snapshotVariantKey, memberGenderKey)
+        && validatePerformedPrescription(performedCommittedPruned).valid) {
+      performedToSave = performedCommittedPruned
     }
 
     // INC-09 hardening - a re-log of this workout by this member must sort
@@ -10513,7 +10537,12 @@ function App() {
           // change, or a material performed_prescription overlay). Completion /
           // "did not finish" NEVER sets this. Same canonical rule as the
           // leaderboard bucket and the Jurnal badge.
-          resultModified: resultCompositionModified({ ...logFields, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements, activeLogFormatId, activeLogFormatConfig),
+          // ATHLETE-SELECTED MOVEMENT LOAD - resultCompositionModified now
+          // also consults prescription_snapshot (to tell a genuine load
+          // mismatch apart from a blank-programmed-load fill); this synthetic
+          // pre-insert object must carry it too, the same doc that is about
+          // to be persisted on this row.
+          resultModified: resultCompositionModified({ ...logFields, prescription_snapshot: prescriptionSnapshot, performed_prescription: performedToSave }, prescribedWeight, miscariFinale, prescribedMovements, activeLogFormatId, activeLogFormatConfig),
           // PHOTO RESULT / SHARE CARD Phase 2 - 'pending' the instant a photo
           // was picked (the upload/attach itself only starts further below,
           // AFTER this popup is already showing - owner §7 race handling);

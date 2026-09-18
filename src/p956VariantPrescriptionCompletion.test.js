@@ -193,7 +193,12 @@ describe('P9.5.6 — wiring: ONE rule for badge + bucket, no completion signal, 
     const fn = body.slice(0, body.indexOf('\n}') + 2)
     expect(fn).toMatch(/greutateEsteSubStandard/)
     expect(fn).toMatch(/movementsChanged/)
-    expect(fn).toMatch(/performed_prescription != null/)
+    // ATHLETE-SELECTED MOVEMENT LOAD - the old blunt `performed_prescription
+    // != null` term is now the narrower performedPrescriptionSubstantiveModification
+    // (a blank-programmed-load field the athlete merely filled in no longer
+    // demotes on its own; every other performed_prescription difference is
+    // unchanged, still composition-only, still no completion signal below).
+    expect(fn).toMatch(/performedPrescriptionSubstantiveModification\(log\)/)
     expect(fn).toMatch(/sequentialProgressionDeparted/) // INC-12 4th term
     // still no completion axis: elapsed time, capped/DNF, or rounds-completed
     expect(fn).not.toMatch(/time_result|completion_state|effectiveScoreMode|neterminat|rounds/)
@@ -203,7 +208,7 @@ describe('P9.5.6 — wiring: ONE rule for badge + bucket, no completion signal, 
     // leading args (the shared bucket/badge signal) are unchanged.
     expect(app).toMatch(/const resultModifiedLog = log\._supportsRx\s*\n\s*\? resultCompositionModified\(log, log\._prescribedWeight, log\._loggedMovements, log\._prescribedMovements[,)]/) // leaderboard
     expect(app).toMatch(/const resultModifiedLog = resultCompositionModified\(w, prescribedWeightLog, miscariAfisate, prescribedMovementsLog[,)]/) // Jurnal
-    expect(app).toMatch(/resultModified: resultCompositionModified\(\{ \.\.\.logFields, performed_prescription: performedToSave \}/) // share
+    expect(app).toMatch(/resultModified: resultCompositionModified\(\{ \.\.\.logFields, prescription_snapshot: prescriptionSnapshot, performed_prescription: performedToSave \}/) // share
   })
   it('the badge label is variant-aware (RX -> "Not RX\'d", else -> "Modified"), data-driven', () => {
     expect(app).toMatch(/const isRxVariant = String\(variant \?\? 'rx'\)\.toLowerCase\(\)\.replace\(\/\[_\\s-\]\/g, ''\) === 'rx'/)

@@ -20,7 +20,7 @@
 import { convertWeight, secToTime } from './utils'
 import { resolveAthleteGenderKey } from './rxEngine'
 import { classifyRxStatus } from './rxEngine'
-import { resolveMovementCapability } from './prescriptionContract'
+import { resolveMovementCapability, performedCompositionGroups } from './prescriptionContract'
 
 // Scheme de reps clasice (ladder-uri consacrate), oferite ca quick-select in
 // FormatConfigEditor peste campul de text liber - nu limiteaza ce se poate
@@ -891,11 +891,17 @@ function greutateEsteSubStandard(weightLogged, prescribedWeight) {
 //      (greutateEsteSubStandard - Faza 3, `entered >= standard` rule).
 //   2. the logged movement list differs from the SELECTED variant's prescribed one
 //      (movementsChanged - substituted / added / removed / rewritten).
-//   3. a non-null performed_prescription (P9.5.2). saveWodLog only ever writes it
-//      when the athlete's performed overlay MATERIALLY differs from the SELECTED
-//      variant - a per-movement load / distance / calorie change, or a canonical
-//      movement substitution. `!= null` is a composition modification by
-//      construction.
+//   3. a non-null performed_prescription (P9.5.2) that is SUBSTANTIVELY modified
+//      (performedPrescriptionSubstantiveModification) - a per-movement load /
+//      distance / calorie change, or a canonical movement substitution.
+//      ATHLETE-SELECTED MOVEMENT LOAD - `!= null` alone is no longer sufficient:
+//      a movement whose PROGRAMMED load was left blank (coach opted the
+//      athlete into selecting their own) may carry a non-null overlay purely
+//      because the athlete recorded the load they actually used - that alone
+//      must NOT demote Rx -> Mixed (product rule). Every OTHER difference
+//      (a load that WAS prescribed and was logged differently, distance/
+//      calories/reps mismatch, substitution, composition change,
+//      not-performed) is still a composition modification, unchanged.
 //
 // It DELIBERATELY does NOT look at completion_state / time_result / rounds
 // completed / partial reps / score magnitude. "Did not finish", "capped",
@@ -914,8 +920,65 @@ function greutateEsteSubStandard(weightLogged, prescribedWeight) {
 export function resultCompositionModified(log, prescribedWeight, loggedMovements, prescribedMovements, formatId = null, formatConfig = null) {
   return greutateEsteSubStandard(log?.weight_logged, prescribedWeight)
     || movementsChanged(loggedMovements, prescribedMovements)
-    || (log?.performed_prescription != null)
+    || performedPrescriptionSubstantiveModification(log)
     || (formatId != null && isSequentialFormat(formatId, formatConfig) && sequentialProgressionDeparted(log?.result))
+}
+
+// ATHLETE-SELECTED MOVEMENT LOAD - a narrower replacement for the old blunt
+// `performed_prescription != null` term above. Reads ONLY the log's own
+// FROZEN prescription_snapshot (the resolved, per-movement PROGRAMMED
+// prescription at log time) + performed_prescription (never live `wods`) -
+// same historical-truth discipline as every other P10 read here.
+//
+// Whitelist design, deliberately conservative: ANY shape this function does
+// not positively recognize as "a blank-programmed-load field the athlete
+// merely filled in" falls through to `true` (modified) - IDENTICAL to the
+// prior blunt rule for every case that existed before this ticket (v1 docs,
+// missing snapshot, composition/substitution/not-performed changes, reps/
+// distance/calories differences, and a load mismatch against a load the
+// coach DID prescribe). Only the one new, explicitly-required exception is
+// carved out: a movement whose snapshot load has no value is never allowed
+// to demote on load grounds, no matter what the athlete logged.
+export function performedPrescriptionSubstantiveModification(log) {
+  const performed = log?.performed_prescription
+  if (performed == null) return false
+  const snapMovements = Array.isArray(log?.prescription_snapshot?.movements) ? log.prescription_snapshot.movements : null
+  if (!snapMovements) return true // no frozen snapshot to reason against - keep prior strict behavior
+  if (performed.version !== 2 || !Array.isArray(performed.movements)) return true // legacy v1 shape - unchanged, strict
+  const snapById = new Map(snapMovements.map((m) => [m.instanceId, m]))
+  const groups = performedCompositionGroups(performed)
+  if (groups.length !== snapMovements.length) return true // composition changed (added/removed movement)
+  for (const g of groups) {
+    if (g.notPerformed) return true
+    if (g.entries.length !== 1) return true // this source now expands to >1 performed movement
+    const snap = snapById.get(g.sourceInstanceId)
+    if (!snap) return true
+    const e = g.entries[0]
+    if ((e.canonicalMovementId ?? null) !== (snap.canonicalMovementId ?? null)) return true // substitution
+    if (specDiffers(e.reps, snap.reps)) return true
+    if (specDiffers(e.distance, snap.distance)) return true
+    if (specDiffers(e.calories, snap.calories)) return true
+    const snapLoadValue = snap.load?.value ?? null
+    if (snapLoadValue == null) continue // programmed load was blank - the athlete's own value never demotes
+    const perfLoadValue = e.load?.value ?? null
+    const perfLoadUnit = e.load?.unit || 'kg'
+    const snapLoadUnit = snap.load?.unit || 'kg'
+    if (perfLoadValue !== snapLoadValue || perfLoadUnit !== snapLoadUnit) return true
+  }
+  return false
+}
+
+// Compare ONE metric between a raw performed spec (`{mode, value|text, unit?}`)
+// and its frozen prescription_snapshot counterpart (`{value|text, unit?}`) by
+// resolved value only - both shapes reduce to the same primitive. `null`/
+// absent on both sides is equal (never a difference).
+function specDiffers(perfSpec, snapSpec) {
+  const perfVal = perfSpec == null ? null : ('text' in perfSpec ? (perfSpec.text ?? '') : (perfSpec.value ?? null))
+  const snapVal = snapSpec == null ? null : ('text' in snapSpec ? (snapSpec.text ?? '') : (snapSpec.value ?? null))
+  if (perfVal !== snapVal) return true
+  const perfUnit = perfSpec?.unit ?? null
+  const snapUnit = snapSpec?.unit ?? null
+  return !!(perfUnit && snapUnit && perfUnit !== snapUnit)
 }
 
 // INC-12 - SEQUENTIAL PROGRESSION COMPOSITION. For a workout whose frozen
@@ -983,9 +1046,14 @@ export function movementsChanged(loggedMovements, prescribedMovements) {
 // INC-12 - the optional 6th arg carries the FROZEN result string + frozen format
 // so the sequential-progression term can evaluate; omitted by pre-INC-12 callers
 // (term simply never fires - no behaviour change for non-sequential results).
+// ATHLETE-SELECTED MOVEMENT LOAD - opts.prescriptionSnapshot (the log's own
+// frozen prescription_snapshot) is likewise optional; omitted callers keep the
+// prior strict "any performed_prescription = modified" behavior exactly
+// (performedPrescriptionSubstantiveModification's own conservative fallback),
+// so no existing caller changes behavior without being updated to pass it.
 export function isMixedCategory(weightLogged, prescribedWeight, loggedMovements, prescribedMovements, performedPrescription = null, opts = {}) {
   return resultCompositionModified(
-    { weight_logged: weightLogged, performed_prescription: performedPrescription, result: opts.result ?? null },
+    { weight_logged: weightLogged, performed_prescription: performedPrescription, prescription_snapshot: opts.prescriptionSnapshot ?? null, result: opts.result ?? null },
     prescribedWeight, loggedMovements, prescribedMovements, opts.formatId ?? null, opts.formatConfig ?? null,
   )
 }

@@ -1201,6 +1201,46 @@ export function setPerformedMetricValue(instance, metric, value, unit) {
   return { ...instance, [metric]: nextSpec }
 }
 
+function programmedLoadHasValue(mv) {
+  const l = mv?.load
+  if (!l) return false
+  if (l.mode === 'universal') return l.value != null
+  return l.male != null || l.female != null
+}
+
+/** ATHLETE-SELECTED MOVEMENT LOAD (§ blank programmed load) — an athlete who
+ * opens the optional "Load" field on a movement whose PROGRAMMED prescription
+ * never carried one, then leaves it blank (never types a value, or types then
+ * clears it), must not have that blank touch persisted or counted as a
+ * modification (§4: "missing performed load must remain genuinely absent").
+ * Strips a `load` key back OUT of a v2 performed entry whenever its resolved
+ * value is null (universal, uncommitted) AND the corresponding PROGRAMMED
+ * source movement never had a load value either — restoring the exact
+ * "never touched" shape addPerformedMovement / buildPerformedPrescriptionDraft
+ * would have produced. A load the athlete actually typed a number into
+ * (value !== null) is NEVER touched here, regardless of programmed state —
+ * only the genuinely-blank echo is pruned. distance/calories/reps are
+ * untouched (out of this rule's scope). Pure — returns a new doc, or the
+ * SAME doc reference when nothing needed pruning (v1 docs / null pass
+ * through unchanged). */
+export function pruneUntouchedBlankLoad(performedDoc, programmedDoc, variantKey) {
+  if (performedDoc?.version !== 2 || !Array.isArray(performedDoc.movements)) return performedDoc
+  const prog = programmedDoc?.variants?.[variantKey]?.movements
+  const progById = new Map((Array.isArray(prog) ? prog : []).map((mv) => [mv.instanceId, mv]))
+  let changed = false
+  const movements = performedDoc.movements.map((mv) => {
+    if (!mv || mv.notPerformed === true || !mv.load) return mv
+    if (mv.load.mode !== 'universal' || mv.load.value != null) return mv
+    const src = progById.get(mv.sourceInstanceId ?? mv.instanceId)
+    if (programmedLoadHasValue(src)) return mv
+    changed = true
+    const next = { ...mv }
+    delete next.load
+    return next
+  })
+  return changed ? { ...performedDoc, movements } : performedDoc
+}
+
 // PERFORMED METRIC SWITCHING (2026-09-04) - a movement whose catalog capability
 // allows BOTH distance and calories (Row, Air Bike, Bike Erg, Ski Erg, ... - 8
 // catalog rows, capability-derived, never a name allowlist) can be logged
