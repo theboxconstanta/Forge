@@ -44,7 +44,8 @@ function formatComponentScoreText(entry, weightUnit) {
 
 function RankedRow({ rank, name, scoreText, borderColor, logId, social }) {
   return (
-    <div style={{ background: '#fff', borderRadius: '10px', borderLeft: `3px solid ${borderColor}`, marginBottom: '6px', padding: '10px 12px' }}>
+    <div id={logId ? `leaderboard-card-${logId}` : undefined}
+      style={{ background: '#fff', borderRadius: '10px', borderLeft: `3px solid ${borderColor}`, marginBottom: '6px', padding: '10px 12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{ width: '24px', fontSize: '13px', fontWeight: '700', color: medalColor(rank), textAlign: 'center', flexShrink: 0 }}>{rank}</div>
         <div style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#0E0E0E' }}>{name}</div>
@@ -52,7 +53,10 @@ function RankedRow({ rank, name, scoreText, borderColor, logId, social }) {
       </div>
       {/* MULTI-PART / LIFECYCLE (owner decision §5) - Overall/Part A/Part B
           all key on the SAME wod_logs.id, so the same interaction set shows
-          identically across every tab, not a separate one per tab. */}
+          identically across every tab, not a separate one per tab. LEADERBOARD
+          ACTIVITY V1 - deep-link works the same way here as the legacy card
+          (id + autoOpen), so a comment notification navigates correctly even
+          when the target log is Composer multi-part. */}
       {logId && social && (
         <LeaderboardSocialSummary
           logId={logId}
@@ -62,6 +66,7 @@ function RankedRow({ rank, name, scoreText, borderColor, logId, social }) {
           onReactionTap={(emoji) => social.onToggleReaction(logId, emoji)}
           onCommentCountChange={(delta) => social.onCommentCountChange(logId, delta)}
           user={social.user} gymId={social.gymId} isCoachOrAdmin={social.isCoachOrAdmin} showToast={social.showToast} t={social.t}
+          autoOpen={social.focusTarget?.kind === 'comment' && social.focusTarget?.logId === logId}
         />
       )}
     </div>
@@ -104,12 +109,12 @@ function TierHeader({ nivel, count }) {
 export default function ComposerPartLeaderboard({
   scorers, nivele, logsUnicePerMembru, t,
   reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange,
-  user, gymId, isCoachOrAdmin, showToast,
+  user, gymId, isCoachOrAdmin, showToast, focusTarget,
 }) {
   const [tab, setTab] = useState('overall')
   const tabs = [{ id: 'overall', label: t?.clasamentOverallLabel || 'OVERALL' }, ...(scorers || []).map((s, i) => ({ id: s.id, label: partTabLabel(s, i) }))]
   const activeScorer = tab === 'overall' ? null : (scorers || []).find(s => s.id === tab)
-  const social = onToggleReaction ? { reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange, user, gymId, isCoachOrAdmin, showToast, t } : null
+  const social = onToggleReaction ? { reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange, user, gymId, isCoachOrAdmin, showToast, t, focusTarget } : null
 
   const tierBlocks = (nivele || []).map(nivel => {
     const tierLogs = (logsUnicePerMembru || []).filter(l => l.variant_level === nivel.id)

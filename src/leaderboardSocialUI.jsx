@@ -16,41 +16,18 @@
 // single wod_log_id. Counts/mine render straight from props already in
 // hand (fetchClasament's batched fetch) — no query for the inline bar.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { resolveMemberIdentity } from './utils'
 import { AvatarCircle } from './components'
 import {
   LEADERBOARD_REACTION_EMOJI, validateCommentText, relativeTimeLabel,
   commentIsEdited, commentControlsFor,
 } from './leaderboardSocial'
-
-function nameOf(identity, t) {
-  return identity?.full_name || identity?.email?.split('@')[0] || t?.clasamentAnonymous || 'Anonymous'
-}
-
-async function resolveIdentities(ids) {
-  const uniqueIds = [...new Set(ids)]
-  if (uniqueIds.length === 0) return {}
-  const [{ data: profiles }, { data: members }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', uniqueIds),
-    supabase.from('members').select('id, full_name, email, avatar_url').in('id', uniqueIds),
-  ])
-  const profById = {}
-  ;(profiles || []).forEach(p => { profById[p.id] = p })
-  const memById = {}
-  ;(members || []).forEach(m => { memById[m.id] = m })
-  const map = {}
-  uniqueIds.forEach(id => {
-    if (!profById[id] && !memById[id]) return
-    map[id] = { id, ...resolveMemberIdentity(memById[id], profById[id]) }
-  })
-  return map
-}
+import { nameOf, resolveIdentities } from './leaderboardMemberIdentity'
 
 export default function LeaderboardSocialSummary({
   logId, summary, reactorRows, commentCount, onReactionTap, onCommentCountChange,
-  user, gymId, isCoachOrAdmin, showToast, t,
+  user, gymId, isCoachOrAdmin, showToast, t, autoOpen,
 }) {
   const [open, setOpen] = useState(false)
   const [panelLoaded, setPanelLoaded] = useState(false)
@@ -77,6 +54,23 @@ export default function LeaderboardSocialSummary({
     setComments(commentRows || [])
     setPanelLoaded(true)
   }
+
+  // LEADERBOARD ACTIVITY V1 - deep-link from a comment notification (owner
+  // Navigation spec point 5). One-shot: fires only on the false->true
+  // transition, never re-fires just because the parent later clears its
+  // own focus-target state (autoOpen reverting to false does nothing
+  // here, by design - the panel stays open, this only ever opens it).
+  useEffect(() => {
+    if (autoOpen && !open) {
+      // Deliberate: reacting to an external trigger prop (the parent's
+      // deep-link target), not mirroring/synchronizing local state that
+      // could instead be derived during render - there is no render-time
+      // substitute for "the panel should now be open" here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOpen(true)
+      loadPanel()
+    }
+  }, [autoOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePanel = async (e) => {
     e.stopPropagation()

@@ -743,6 +743,16 @@ export const TRANSLATIONS = {
     clasamentCommentEditError: '❌ Eroare la editare!',
     clasamentCommentDeleteError: '❌ Eroare la ștergere!',
 
+    // Leaderboard Activity V1 (notificări sociale personale)
+    clasamentActivityTitle: 'ACTIVITATE',
+    clasamentActivityEmpty: 'Nicio activitate încă',
+    clasamentActivityMarkAllRead: 'Marchează tot ca citit',
+    clasamentActivityLoadError: '❌ Eroare la încărcare!',
+    clasamentActivityMarkReadError: '❌ Eroare!',
+    clasamentActivityReactionMessage: (name, emoji) => `${name} a reacționat ${emoji} la rezultatul tău.`,
+    clasamentActivityCommentMessage: (name) => `${name} a comentat la rezultatul tău.`,
+    clasamentActivityNavigateError: '❌ Rezultatul nu mai este disponibil.',
+
     // Feed
     feedTitle: 'Feed',
     feedJustNow: 'acum',
@@ -1992,6 +2002,16 @@ export const TRANSLATIONS = {
     clasamentCommentPostError: '❌ Error posting comment!',
     clasamentCommentEditError: '❌ Error editing comment!',
     clasamentCommentDeleteError: '❌ Error deleting comment!',
+
+    // Leaderboard Activity V1 (personal social notifications)
+    clasamentActivityTitle: 'ACTIVITY',
+    clasamentActivityEmpty: 'No activity yet',
+    clasamentActivityMarkAllRead: 'Mark all as read',
+    clasamentActivityLoadError: '❌ Error loading!',
+    clasamentActivityMarkReadError: '❌ Error!',
+    clasamentActivityReactionMessage: (name, emoji) => `${name} reacted ${emoji} to your result.`,
+    clasamentActivityCommentMessage: (name) => `${name} commented on your result.`,
+    clasamentActivityNavigateError: '❌ That result is no longer available.',
 
     // Feed
     feedTitle: 'Feed',

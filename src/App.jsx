@@ -40,6 +40,8 @@ import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, 
 import { filterValidRecentPrEvents, sortRecentPrEvents, newPrEventsForSource } from './recentPrEvents'
 import { reduceReactionRows, reduceCommentCounts, resolveReactionToggle, applyOptimisticReaction } from './leaderboardSocial'
 import LeaderboardSocialSummary from './leaderboardSocialUI'
+import { formatBadgeCount, resolveLeaderboardDateForLog } from './leaderboardActivity'
+import LeaderboardActivityPanel from './leaderboardActivityUI'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -716,7 +718,7 @@ const NAV_TABS = [
   { id: 'feed', labelKey: 'navFeed', icon: MessageCircle },
 ]
 
-function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
+function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, leaderboardUnread, t }) {
   // 2026-07-02, noaptea: renuntat definitiv la position:fixed pt NavBar, dupa o
   // seara intreaga de incercari esuate de a masura corect inaltimea ecranului
   // in standalone iOS (vezi [[project-navbar-safe-area]] pt istoricul complet).
@@ -761,7 +763,12 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
       <div className="flex items-center justify-around" style={{ paddingTop: '10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }}>
         {tabs.map(({ id, labelKey, icon: Icon }) => {
           const isActive = screen === id
-          const badge = id === 'feed' && feedUnread > 0 ? feedUnread : null
+          // LEADERBOARD ACTIVITY V1 - same badge rendering as Feed's,
+          // reused verbatim, just a tighter cap (formatBadgeCount: "9+"
+          // vs Feed's "99+") per the owner-specified "1 2 3 9+" format.
+          const badgeLabel = id === 'feed'
+            ? (feedUnread > 0 ? (feedUnread > 99 ? '99+' : String(feedUnread)) : null)
+            : id === 'clasament' ? formatBadgeCount(leaderboardUnread) : null
           return (
             <button
               key={id}
@@ -778,9 +785,9 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, t }) {
               <span className="text-[11px]" style={{ color: isActive ? COLORS.text.primary : '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap' }}>
                 {t[labelKey]}
               </span>
-              {badge != null && (
+              {badgeLabel != null && (
                 <span className="absolute -top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#E8192C] px-1 text-[11px] font-semibold text-white">
-                  {badge > 99 ? '99+' : badge}
+                  {badgeLabel}
                 </span>
               )}
             </button>
@@ -2312,12 +2319,34 @@ async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, 
   return monotonicLoggedAt({ base, siblingLoggedAts: data.map((r) => r.logged_at) })
 }
 
-export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, movementIndex, t, lang, user, isAdmin, isCoach, gymId, showToast, reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange }) {
+export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, movementIndex, t, lang, user, isAdmin, isCoach, gymId, showToast, reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange, leaderboardUnreadCount, onLeaderboardUnreadCountChange, onNavigateToLeaderboardResult, focusTarget, onFocusConsumed }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
   // read-only (fara editare/stergere, e logul altcuiva).
   const [expandedLogId, setExpandedLogId] = useState(null)
+  // LEADERBOARD ACTIVITY V1 - deep-link consumption. `focusTarget` arrives
+  // from a tapped notification (App.jsx's navigateToLeaderboardResult),
+  // already on the correct `selectedDate`/`logs` for it. Once the
+  // matching card exists in the DOM (found by a stable id every card root
+  // carries - both the legacy weightGroups card below and
+  // ComposerPartLeaderboard's RankedRow), scroll it into view and briefly
+  // highlight it, then consume (clear) the target so it never re-triggers
+  // on a later unrelated refresh/refetch. Auto-opening the comment panel
+  // itself (comment notifications only, owner Navigation spec point 5) is
+  // handled by LeaderboardSocialSummary's own `autoOpen` prop below, not
+  // here - reactions need no panel (already inline-visible).
+  useEffect(() => {
+    if (!focusTarget) return
+    const el = document.getElementById('leaderboard-card-' + focusTarget.logId)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.style.transition = 'background-color 0.6s'
+    el.style.backgroundColor = '#F7F5FC'
+    const fade = setTimeout(() => { el.style.backgroundColor = '' }, 2200)
+    onFocusConsumed?.()
+    return () => clearTimeout(fade)
+  }, [focusTarget, logs]) // eslint-disable-line react-hooks/exhaustive-deps
   const today = new Date(); const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
   const isToday = selectedDate === todayStr
   const goDay = (delta) => {
@@ -2562,6 +2591,20 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
         ))}
       </div>
 
+      {/* LEADERBOARD ACTIVITY V1 - compact ACTIVITY entry point (owner
+          decision §4: no separate full-screen system, no bell - lives
+          inside the existing Leaderboard screen). Only mounted when the
+          caller (App.jsx) actually wired notifications through - the
+          Clasament component itself stays usable without them (tests,
+          any future embedding). */}
+      {onNavigateToLeaderboardResult && (
+        <LeaderboardActivityPanel
+          unreadCount={leaderboardUnreadCount}
+          onUnreadCountChange={onLeaderboardUnreadCountChange}
+          user={user} showToast={showToast} onNavigateToLog={onNavigateToLeaderboardResult} t={t}
+        />
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#aaa', fontSize: '13px', lineHeight: 1.35 }}>{t.clasamentLoading}</div>
       ) : totalLogs === 0 && !(aggregateLeaderboard && aggregateLeaderboard.entries.length > 0) ? (
@@ -2586,7 +2629,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                 <ComposerPartLeaderboard scorers={renderGroup.composerScorers} nivele={NIVELE} logsUnicePerMembru={renderGroup.composerLogsForPart} t={t}
                   reactionsByLog={reactionsByLog} reactorRowsByLog={reactorRowsByLog} commentCountByLog={commentCountByLog}
                   onToggleReaction={onToggleReaction} onCommentCountChange={onCommentCountChange}
-                  user={user} gymId={gymId} isCoachOrAdmin={isAdmin || isCoach} showToast={showToast} />
+                  user={user} gymId={gymId} isCoachOrAdmin={isAdmin || isCoach} showToast={showToast} focusTarget={focusTarget} />
               ) : renderGroup.blocks.map(({ nivel, weightGroups }) => {
             const sectionLogs = weightGroups.flatMap(g => g.logs)
             const isForTime = sectionLogs.some(l => l.time_result) &&
@@ -2746,7 +2789,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                       const areRezultatFinal = rezultatBucati.length > 0
                       const areDetaliiFinal = areDetalii || areRezultatFinal || showSetsScoreAtEnd
                       return (
-                        <div key={cardKey} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
+                        <div key={cardKey} id={`leaderboard-card-${log.id}`} onClick={() => setExpandedLogId(isExpanded ? null : cardKey)}
                           style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: i === 0 ? '0 2px 10px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `4px solid ${borderColor}`, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px' }}>
@@ -2780,6 +2823,7 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                               onReactionTap={(emoji) => onToggleReaction(log.id, emoji)}
                               onCommentCountChange={(delta) => onCommentCountChange(log.id, delta)}
                               user={user} gymId={gymId} isCoachOrAdmin={isAdmin || isCoach} showToast={showToast} t={t}
+                              autoOpen={focusTarget?.kind === 'comment' && focusTarget?.logId === log.id}
                             />
                           )}
                           {isExpanded && (
@@ -8185,6 +8229,16 @@ function App() {
   const [clasamentReactionsByLog, setClasamentReactionsByLog] = useState({})
   const [clasamentReactorRowsByLog, setClasamentReactorRowsByLog] = useState({})
   const [clasamentCommentCountByLog, setClasamentCommentCountByLog] = useState({})
+  // LEADERBOARD ACTIVITY V1 - personal social notifications (reactions/
+  // comments on MY OWN results). New Results Indicator explicitly
+  // DEFERRED to V2 (owner decision) - this is notifications-only.
+  // `leaderboardUnreadCount` drives the NavBar badge (same rendering as
+  // feedUnread, smaller cap - formatBadgeCount). `clasamentFocusTarget`
+  // is the deep-link target set by tapping a notification - consumed
+  // (cleared) by Clasament once the matching card has been scrolled to/
+  // highlighted, so it never re-triggers on a later unrelated refresh.
+  const [leaderboardUnreadCount, setLeaderboardUnreadCount] = useState(0)
+  const [clasamentFocusTarget, setClasamentFocusTarget] = useState(null)
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [jurnalDate, setJurnalDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   // Citite de handlerele realtime (efect cu deps [user], deci create o
@@ -8833,6 +8887,23 @@ function App() {
       clearInterval(bookingsPoll)
     }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // LEADERBOARD ACTIVITY V1 - unread personal-notification count, polled
+  // like feedUnread above (narrowest reliable refresh per owner decision -
+  // no Realtime subscription for this). One indexed count query, active
+  // regardless of current screen so the NavBar badge stays live app-wide.
+  useEffect(() => {
+    if (!user) return
+    const recalcLeaderboardUnread = async () => {
+      const { count, error } = await supabase.from('leaderboard_notifications')
+        .select('id', { count: 'exact', head: true }).eq('recipient_id', user.id).is('read_at', null)
+      if (error) { console.error('[LeaderboardActivity] unread count query error:', error); return }
+      setLeaderboardUnreadCount(count || 0)
+    }
+    recalcLeaderboardUnread()
+    const poll = setInterval(recalcLeaderboardUnread, 15000)
+    return () => clearInterval(poll)
+  }, [user])
 
   // Forge Platform Architecture Decision (M13.X): a member being removed
   // from the gym (profiles.gym_id -> null) can never reach the `profiles`
@@ -9866,6 +9937,23 @@ function App() {
       setClasamentReactionsByLog(prev => ({ ...prev, [logId]: current }))
       fetchClasament(clasamentDate)
     }
+  }
+
+  // LEADERBOARD ACTIVITY V1 - deep-link navigation (owner Navigation spec).
+  // Resolves the notification's stable wod_logs.id to its historical
+  // Leaderboard date (mirroring fetchClasament's own wod_id/logged_at
+  // fallback), then opens Leaderboard on that date with a focus target
+  // Clasament consumes to scroll/highlight the exact card (and, for a
+  // comment notification only, auto-open its comment panel). If the
+  // target result no longer exists, fails gracefully - no navigation, no
+  // guessing an unrelated result, just a toast.
+  const navigateToLeaderboardResult = async (wodLogId, kind) => {
+    const date = await resolveLeaderboardDateForLog(supabase, wodLogId)
+    if (!date) { showToast(t.clasamentActivityNavigateError); return }
+    setClasamentDate(date)
+    setClasamentFocusTarget({ logId: wodLogId, kind })
+    setScreen('clasament')
+    fetchClasament(date)
   }
 
   const fetchWodZi = async (data_param) => {
@@ -14245,7 +14333,7 @@ function App() {
       })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} showToast={showToast} reactionsByLog={clasamentReactionsByLog} reactorRowsByLog={clasamentReactorRowsByLog} commentCountByLog={clasamentCommentCountByLog} onToggleReaction={toggleClasamentReaction} onCommentCountChange={(logId, delta) => setClasamentCommentCountByLog(prev => ({ ...prev, [logId]: Math.max(0, (prev[logId] || 0) + delta) }))} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} showToast={showToast} reactionsByLog={clasamentReactionsByLog} reactorRowsByLog={clasamentReactorRowsByLog} commentCountByLog={clasamentCommentCountByLog} onToggleReaction={toggleClasamentReaction} onCommentCountChange={(logId, delta) => setClasamentCommentCountByLog(prev => ({ ...prev, [logId]: Math.max(0, (prev[logId] || 0) + delta) }))} leaderboardUnreadCount={leaderboardUnreadCount} onLeaderboardUnreadCountChange={setLeaderboardUnreadCount} onNavigateToLeaderboardResult={navigateToLeaderboardResult} focusTarget={clasamentFocusTarget} onFocusConsumed={() => setClasamentFocusTarget(null)} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
@@ -14570,7 +14658,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={guardedSetScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} t={t} />
+      <NavBar screen={screen} setScreen={guardedSetScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} leaderboardUnread={leaderboardUnreadCount} t={t} />
     </div>
   )
 }
