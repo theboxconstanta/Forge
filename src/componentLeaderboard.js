@@ -203,15 +203,15 @@ export function computeOverallPlacements(scorers, logsByMember) {
       participantInputs[id] = r && r.rank != null ? { rank: r.rank, classifiedTier: log?.variant_level ?? null } : undefined
     })
     const result = deriveWorkoutAggregate(aggregateDefinition, participantInputs)
-    return { memberId, profile: profile ?? log?.profile ?? null, result }
+    return { memberId, profile: profile ?? log?.profile ?? null, logId: log?.id ?? null, result }
   })
 
   const available = results.filter(r => r.result.status === 'available')
     .sort((a, b) => a.result.value - b.result.value)
   const ranked = assignCompetitionRanks(available, (a, b) => a.result.value === b.result.value)
-    .map(r => ({ memberId: r.memberId, profile: r.profile, points: r.result.value, rank: r.rank }))
+    .map(r => ({ memberId: r.memberId, profile: r.profile, logId: r.logId, points: r.result.value, rank: r.rank }))
   const incomplete = results.filter(r => r.result.status !== 'available')
-    .map(r => ({ memberId: r.memberId, profile: r.profile }))
+    .map(r => ({ memberId: r.memberId, profile: r.profile, logId: r.logId }))
 
   return { ranked, incomplete }
 }

@@ -19,6 +19,7 @@ import { useState } from 'react'
 import { COLORS } from './theme'
 import { LevelDot } from './components'
 import { rankComponentAcrossLogs, computeOverallPlacements, partTabLabel } from './componentLeaderboard'
+import LeaderboardSocialSummary from './leaderboardSocialUI'
 
 function nameOf(profile, t) {
   return profile?.full_name || profile?.email?.split('@')[0] || t?.clasamentAnonymous || 'Anonymous'
@@ -41,12 +42,28 @@ function formatComponentScoreText(entry, weightUnit) {
   return '—'
 }
 
-function RankedRow({ rank, name, scoreText, borderColor }) {
+function RankedRow({ rank, name, scoreText, borderColor, logId, social }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fff', borderRadius: '10px', borderLeft: `3px solid ${borderColor}`, marginBottom: '6px' }}>
-      <div style={{ width: '24px', fontSize: '13px', fontWeight: '700', color: medalColor(rank), textAlign: 'center', flexShrink: 0 }}>{rank}</div>
-      <div style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#0E0E0E' }}>{name}</div>
-      <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{scoreText}</div>
+    <div style={{ background: '#fff', borderRadius: '10px', borderLeft: `3px solid ${borderColor}`, marginBottom: '6px', padding: '10px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '24px', fontSize: '13px', fontWeight: '700', color: medalColor(rank), textAlign: 'center', flexShrink: 0 }}>{rank}</div>
+        <div style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#0E0E0E' }}>{name}</div>
+        <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{scoreText}</div>
+      </div>
+      {/* MULTI-PART / LIFECYCLE (owner decision §5) - Overall/Part A/Part B
+          all key on the SAME wod_logs.id, so the same interaction set shows
+          identically across every tab, not a separate one per tab. */}
+      {logId && social && (
+        <LeaderboardSocialSummary
+          logId={logId}
+          summary={social.reactionsByLog?.[logId]}
+          reactorRows={social.reactorRowsByLog?.[logId]}
+          commentCount={social.commentCountByLog?.[logId] || 0}
+          onReactionTap={(emoji) => social.onToggleReaction(logId, emoji)}
+          onCommentCountChange={(delta) => social.onCommentCountChange(logId, delta)}
+          user={social.user} gymId={social.gymId} isCoachOrAdmin={social.isCoachOrAdmin} showToast={social.showToast} t={social.t}
+        />
+      )}
     </div>
   )
 }
@@ -84,10 +101,15 @@ function TierHeader({ nivel, count }) {
  * here - Composer multi-part scoring stays whole-log-variant-scoped only
  * (ticket §13 - "no per-scorer prescription schema"), a deliberate,
  * disclosed simplification versus the legacy single-score Mixed bucket. */
-export default function ComposerPartLeaderboard({ scorers, nivele, logsUnicePerMembru, t }) {
+export default function ComposerPartLeaderboard({
+  scorers, nivele, logsUnicePerMembru, t,
+  reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange,
+  user, gymId, isCoachOrAdmin, showToast,
+}) {
   const [tab, setTab] = useState('overall')
   const tabs = [{ id: 'overall', label: t?.clasamentOverallLabel || 'OVERALL' }, ...(scorers || []).map((s, i) => ({ id: s.id, label: partTabLabel(s, i) }))]
   const activeScorer = tab === 'overall' ? null : (scorers || []).find(s => s.id === tab)
+  const social = onToggleReaction ? { reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange, user, gymId, isCoachOrAdmin, showToast, t } : null
 
   const tierBlocks = (nivele || []).map(nivel => {
     const tierLogs = (logsUnicePerMembru || []).filter(l => l.variant_level === nivel.id)
@@ -102,7 +124,8 @@ export default function ComposerPartLeaderboard({ scorers, nivele, logsUnicePerM
           <TierHeader nivel={nivel} count={ranked.length + incomplete.length} t={t} />
           {ranked.map(r => (
             <RankedRow key={r.memberId} rank={r.rank} name={nameOf(r.profile, t)}
-              scoreText={t?.clasamentPointsLabel ? t.clasamentPointsLabel(r.points) : `${r.points} pts`} borderColor={nivel.culoare} />
+              scoreText={t?.clasamentPointsLabel ? t.clasamentPointsLabel(r.points) : `${r.points} pts`} borderColor={nivel.culoare}
+              logId={r.logId} social={social} />
           ))}
           {incomplete.map(r => <IncompleteRow key={r.memberId} name={nameOf(r.profile, t)} t={t} />)}
         </div>
@@ -117,7 +140,8 @@ export default function ComposerPartLeaderboard({ scorers, nivele, logsUnicePerM
         <TierHeader nivel={nivel} count={ranked.length} t={t} />
         {ranked.filter(r => r.rank != null).map(r => (
           <RankedRow key={r.memberId} rank={r.rank} name={nameOf(r.profile, t)}
-            scoreText={formatComponentScoreText(r.entry, r.profile?.weight_unit)} borderColor={nivel.culoare} />
+            scoreText={formatComponentScoreText(r.entry, r.profile?.weight_unit)} borderColor={nivel.culoare}
+            logId={r.log?.id} social={social} />
         ))}
         {ranked.filter(r => r.rank == null).map(r => <IncompleteRow key={r.memberId} name={nameOf(r.profile, t)} t={t} />)}
       </div>

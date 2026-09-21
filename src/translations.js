@@ -729,6 +729,21 @@ export const TRANSLATIONS = {
     clasamentIncompleteLabel: 'Incomplet',
     clasamentPointsLabel: (n) => `${n} pct`,
 
+    // Leaderboard Social Interactions V1 (reactii + comentarii pe rezultat)
+    clasamentReactLabel: 'Reacționează',
+    clasamentCommentsCountLabel: (n) => `${n} comentari${n === 1 ? 'u' : 'i'}`,
+    clasamentCommentPlaceholder: 'Scrie un comentariu...',
+    clasamentCommentSend: 'Trimite',
+    clasamentCommentEditedLabel: 'editat',
+    clasamentCommentEditButton: 'Editează',
+    clasamentCommentDeleteButton: 'Șterge',
+    clasamentCommentDeleteConfirm: 'Confirmă ștergerea?',
+    clasamentCommentSaveButton: 'Salvează',
+    clasamentCommentCancelButton: 'Anulează',
+    clasamentCommentPostError: '❌ Eroare la comentariu!',
+    clasamentCommentEditError: '❌ Eroare la editare!',
+    clasamentCommentDeleteError: '❌ Eroare la ștergere!',
+
     // Feed
     feedTitle: 'Feed',
     feedJustNow: 'acum',
@@ -1964,6 +1979,21 @@ export const TRANSLATIONS = {
     clasamentOverallLabel: 'OVERALL',
     clasamentIncompleteLabel: 'Incomplete',
     clasamentPointsLabel: (n) => `${n} pts`,
+
+    // Leaderboard Social Interactions V1 (reactions + comments on a result)
+    clasamentReactLabel: 'React',
+    clasamentCommentsCountLabel: (n) => `${n} comment${n === 1 ? '' : 's'}`,
+    clasamentCommentPlaceholder: 'Write a comment...',
+    clasamentCommentSend: 'Send',
+    clasamentCommentEditedLabel: 'edited',
+    clasamentCommentEditButton: 'Edit',
+    clasamentCommentDeleteButton: 'Delete',
+    clasamentCommentDeleteConfirm: 'Confirm delete?',
+    clasamentCommentSaveButton: 'Save',
+    clasamentCommentCancelButton: 'Cancel',
+    clasamentCommentPostError: '❌ Error posting comment!',
+    clasamentCommentEditError: '❌ Error editing comment!',
+    clasamentCommentDeleteError: '❌ Error deleting comment!',
 
     // Feed
     feedTitle: 'Feed',

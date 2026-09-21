@@ -38,6 +38,8 @@ import { resolveBenchmarkNames, getBenchmarksByIds } from './benchmarkResolution
 import { groupLogsByBenchmark, deriveBenchmarkSummary, buildBenchmarkListEntries, benchmarkScoreDisplay, buildCurrentBenchmarkBests, buildRecentBenchmarkProgress } from './benchmarkHistory'
 import { buildMovementListEntries, groupMovementEntries, deriveMovementHistory, movementEntryDisplay, comparisonModeLabel, deriveCurrentMovementBests, normalizeKey as normalizeMovementKey, movementHistoryIdentity, movementGroupDisplayName } from './movementHistory'
 import { filterValidRecentPrEvents, sortRecentPrEvents, newPrEventsForSource } from './recentPrEvents'
+import { reduceReactionRows, reduceCommentCounts, resolveReactionToggle, applyOptimisticReaction } from './leaderboardSocial'
+import LeaderboardSocialSummary from './leaderboardSocialUI'
 import { findExistingWodOnDate, shouldEnterNewWodSession } from './wodDateFirst'
 import { resolveAthleteGenderKey, resolveSectionStandardKg, classifyRxStatus, resolveMovementDisplayText, cleanMovementDisplayText } from './rxEngine'
 import { fetchProgressionForMember, formatProgressionNote } from './performanceProgression'
@@ -2310,7 +2312,7 @@ async function resolveMonotonicLoggedAt(supabase, { memberId, wodId, sectionId, 
   return monotonicLoggedAt({ base, siblingLoggedAts: data.map((r) => r.logged_at) })
 }
 
-export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, movementIndex, t, lang }) {
+export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiData, onRefresh, selectedDate, onDateChange, movementIndex, t, lang, user, isAdmin, isCoach, gymId, showToast, reactionsByLog, reactorRowsByLog, commentCountByLog, onToggleReaction, onCommentCountChange }) {
   const [genderTab, setGenderTab] = useState('toti')
   // Card-ul de participant se extinde la click, aratand exact ce a logat
   // (miscari/rezultat/seturi/nota) - acelasi format ca in Jurnal, dar
@@ -2581,7 +2583,10 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                 <div style={{ fontSize: '12px', lineHeight: 1.35, color: '#bbb', marginBottom: '16px' }}>{t.clasamentSectionEmptyLabel}</div>
               )}
               {renderGroup.composerScorers ? (
-                <ComposerPartLeaderboard scorers={renderGroup.composerScorers} nivele={NIVELE} logsUnicePerMembru={renderGroup.composerLogsForPart} t={t} />
+                <ComposerPartLeaderboard scorers={renderGroup.composerScorers} nivele={NIVELE} logsUnicePerMembru={renderGroup.composerLogsForPart} t={t}
+                  reactionsByLog={reactionsByLog} reactorRowsByLog={reactorRowsByLog} commentCountByLog={commentCountByLog}
+                  onToggleReaction={onToggleReaction} onCommentCountChange={onCommentCountChange}
+                  user={user} gymId={gymId} isCoachOrAdmin={isAdmin || isCoach} showToast={showToast} />
               ) : renderGroup.blocks.map(({ nivel, weightGroups }) => {
             const sectionLogs = weightGroups.flatMap(g => g.logs)
             const isForTime = sectionLogs.some(l => l.time_result) &&
@@ -2766,6 +2771,17 @@ export function Clasament({ logs, sections, aggregateDefinition, loading, wodZiD
                             </div>
                             <span style={{ fontSize: '13px', color: '#ccc', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
                           </div>
+                          {log._source === 'wod_logs' && (
+                            <LeaderboardSocialSummary
+                              logId={log.id}
+                              summary={reactionsByLog?.[log.id]}
+                              reactorRows={reactorRowsByLog?.[log.id]}
+                              commentCount={commentCountByLog?.[log.id] || 0}
+                              onReactionTap={(emoji) => onToggleReaction(log.id, emoji)}
+                              onCommentCountChange={(delta) => onCommentCountChange(log.id, delta)}
+                              user={user} gymId={gymId} isCoachOrAdmin={isAdmin || isCoach} showToast={showToast} t={t}
+                            />
+                          )}
                           {isExpanded && (
                             <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f0f0f0' }}>
                               {log.variant_level && (
@@ -8158,6 +8174,17 @@ function App() {
   const [clasamentAggregateDefinition, setClasamentAggregateDefinition] = useState(null)
   const [clasamentLoading, setClasamentLoading] = useState(false)
   const [clasamentWodData, setClasamentWodData] = useState(null)
+  // LEADERBOARD SOCIAL INTERACTIONS V1 - reactionsByLog:
+  // { [wod_log_id]: {counts:{emoji:n}, mine:emoji|null} }, reactorRowsByLog:
+  // { [wod_log_id]: [{member_id, emoji}] } (already in hand from the same
+  // batched fetch - no extra query to know WHO reacted, only to resolve
+  // their display identity, done lazily on panel open), commentCountByLog:
+  // { [wod_log_id]: n } (count-only; bodies load lazily per-log on panel
+  // open). Attaches ONLY to wod_logs.id - skill_logs cards render no
+  // affordance (docs/architecture/LEADERBOARD_SOCIAL_INTERACTIONS_V1_20260921.md).
+  const [clasamentReactionsByLog, setClasamentReactionsByLog] = useState({})
+  const [clasamentReactorRowsByLog, setClasamentReactorRowsByLog] = useState({})
+  const [clasamentCommentCountByLog, setClasamentCommentCountByLog] = useState({})
   const [clasamentDate, setClasamentDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   const [jurnalDate, setJurnalDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
   // Citite de handlerele realtime (efect cu deps [user], deci create o
@@ -9782,7 +9809,63 @@ function App() {
     } else {
       setClasamentLogs([])
     }
+    // LEADERBOARD SOCIAL INTERACTIONS V1 - exactly two additional batched
+    // queries, scoped to wod_logs ids only (skill_logs excluded, §1/§18 of
+    // the architecture doc), constant regardless of row count, never N+1.
+    const wodLogIds = (wodLogsData || []).map(l => l.id)
+    if (wodLogIds.length > 0) {
+      const [{ data: reactionRows }, { data: commentRows }] = await Promise.all([
+        supabase.from('wod_log_reactions').select('wod_log_id, emoji, member_id').in('wod_log_id', wodLogIds),
+        supabase.from('wod_log_comments').select('wod_log_id').in('wod_log_id', wodLogIds),
+      ])
+      setClasamentReactionsByLog(reduceReactionRows(reactionRows, user?.id))
+      const reactorMap = {}
+      ;(reactionRows || []).forEach(r => {
+        if (!reactorMap[r.wod_log_id]) reactorMap[r.wod_log_id] = []
+        reactorMap[r.wod_log_id].push({ member_id: r.member_id, emoji: r.emoji })
+      })
+      setClasamentReactorRowsByLog(reactorMap)
+      setClasamentCommentCountByLog(reduceCommentCounts(commentRows))
+    } else {
+      setClasamentReactionsByLog({})
+      setClasamentReactorRowsByLog({})
+      setClasamentCommentCountByLog({})
+    }
     setClasamentLoading(false)
+  }
+
+  // LEADERBOARD SOCIAL INTERACTIONS V1 - one active reaction per member per
+  // result (owner decision §4). Mirrors Feed's own toggleReactie exactly:
+  // optimistic update first, explicit rollback on error, no realtime
+  // subscription (owner decision §4/§19 - "React on failure", not "React on
+  // every remote tap"; see architecture doc §16/forensic for why).
+  const toggleClasamentReaction = async (logId, emoji) => {
+    const current = clasamentReactionsByLog[logId] || { counts: {}, mine: null }
+    const resolution = resolveReactionToggle(current.mine, emoji)
+    if (resolution.action === 'noop') return
+    const optimistic = applyOptimisticReaction(current, user.id, resolution)
+    setClasamentReactionsByLog(prev => ({ ...prev, [logId]: optimistic }))
+    setClasamentReactorRowsByLog(prev => {
+      const rows = (prev[logId] || []).filter(r => r.member_id !== user.id)
+      if (resolution.action !== 'remove') rows.push({ member_id: user.id, emoji: resolution.emoji })
+      return { ...prev, [logId]: rows }
+    })
+    const { error } = resolution.action === 'remove'
+      ? await supabase.from('wod_log_reactions').delete().eq('wod_log_id', logId).eq('member_id', user.id)
+      : await supabase.from('wod_log_reactions').upsert(
+          { wod_log_id: logId, member_id: user.id, gym_id: userProfile.gym_id, emoji: resolution.emoji },
+          { onConflict: 'wod_log_id,member_id' },
+        )
+    if (error) {
+      // esec (retea, dublu-tap etc) - fara realtime care sa corecteze automat,
+      // revenim la starea confirmata printr-un refetch complet (acelasi motiv
+      // ca toggleReactie, dar aici reactorRowsByLog trebuie corectat si el,
+      // nu doar counts/mine - un refetch e mai simplu si mai sigur decat doua
+      // rollback-uri manuale sincronizate).
+      console.error('toggleClasamentReaction error:', error)
+      setClasamentReactionsByLog(prev => ({ ...prev, [logId]: current }))
+      fetchClasament(clasamentDate)
+    }
   }
 
   const fetchWodZi = async (data_param) => {
@@ -14162,7 +14245,7 @@ function App() {
       })()}
 
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
-      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} />}
+      {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} showToast={showToast} reactionsByLog={clasamentReactionsByLog} reactorRowsByLog={clasamentReactorRowsByLog} commentCountByLog={clasamentCommentCountByLog} onToggleReaction={toggleClasamentReaction} onCommentCountChange={(logId, delta) => setClasamentCommentCountByLog(prev => ({ ...prev, [logId]: Math.max(0, (prev[logId] || 0) + delta) }))} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
