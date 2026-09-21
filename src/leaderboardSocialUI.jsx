@@ -101,6 +101,23 @@ export default function LeaderboardSocialSummary({
       .single()
     setPosting(false)
     if (error) { showToast?.(t?.clasamentCommentPostError || '❌ Error'); console.error(error); return }
+    // COMMENT AUTHOR IDENTITY BUG FIX - `identities` is populated once, in
+    // loadPanel(), from the comment/reactor rows that existed AT THAT
+    // MOMENT. A comment posted locally afterwards (most commonly the
+    // poster's own, when they're the first interaction on this result) has
+    // a member_id `identities` never saw, so nameOf() fell through to
+    // "Anonymous"/generic initials even though ownership (member_id ===
+    // user.id) was already correct - that's why Edit/Delete still showed.
+    // Feed doesn't hit this because it has no optimistic append at all; it
+    // relies on its Realtime subscription to fully refetch (and re-resolve
+    // every author's identity from scratch) on every insert. This
+    // component deliberately has no Realtime (owner decision, V1 scope),
+    // so it merges the poster's own identity in directly via the SAME
+    // canonical resolveMemberIdentity path (resolveIdentities, above).
+    if (!identities[user.id]) {
+      const mine = await resolveIdentities([user.id])
+      setIdentities(prev => ({ ...prev, ...mine }))
+    }
     setComments(prev => [...prev, data])
     setCommentDraft('')
     onCommentCountChange?.(1)
