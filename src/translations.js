@@ -730,7 +730,6 @@ export const TRANSLATIONS = {
     clasamentPointsLabel: (n) => `${n} pct`,
 
     // Leaderboard Social Interactions V1 (reactii + comentarii pe rezultat)
-    clasamentReactLabel: 'Reacționează',
     clasamentCommentsCountLabel: (n) => `${n} comentari${n === 1 ? 'u' : 'i'}`,
     clasamentCommentPlaceholder: 'Scrie un comentariu...',
     clasamentCommentSend: 'Trimite',
@@ -1981,7 +1980,6 @@ export const TRANSLATIONS = {
     clasamentPointsLabel: (n) => `${n} pts`,
 
     // Leaderboard Social Interactions V1 (reactions + comments on a result)
-    clasamentReactLabel: 'React',
     clasamentCommentsCountLabel: (n) => `${n} comment${n === 1 ? '' : 's'}`,
     clasamentCommentPlaceholder: 'Write a comment...',
     clasamentCommentSend: 'Send',

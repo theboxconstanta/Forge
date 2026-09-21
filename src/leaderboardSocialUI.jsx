@@ -8,10 +8,13 @@
 // calls stopPropagation() — the leaderboard card's own root has an onClick
 // that expands/collapses it, and a reaction tap must never trigger that.
 //
-// Compact summary (counts + comment count) is always rendered from props
-// already in hand (fetchClasament's batched fetch) — no query. The full
-// panel (reactor names/avatars, comment list, composer) loads lazily, only
-// when opened, one query each, scoped to this single wod_log_id.
+// REACTION BAR UX FIX: all five reactions render inline, always visible
+// (card collapsed or expanded, no separate accordion gate) - tapping one
+// resolves immediately via the same V1 add/swap/remove logic. Only the
+// "who reacted" list + comment thread stay behind the on-demand panel
+// (comment affordance), loaded lazily, one query each, scoped to this
+// single wod_log_id. Counts/mine render straight from props already in
+// hand (fetchClasament's batched fetch) — no query for the inline bar.
 
 import { useState } from 'react'
 import { supabase } from './supabase'
@@ -128,35 +131,27 @@ export default function LeaderboardSocialSummary({
 
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-      <div onClick={togglePanel} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-        {LEADERBOARD_REACTION_EMOJI.filter(e => counts[e] > 0).map(e => (
-          <span key={e} onClick={(ev) => tapEmoji(ev, e)}
-            style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 7px', borderRadius: '12px', background: mine === e ? '#EFEAF9' : '#f5f5f5', border: mine === e ? '1px solid #5B4B8A' : '1px solid transparent' }}>
-            {e} {counts[e]}
-          </span>
+      {/* REACTION BAR UX FIX - all five reactions inline, always visible
+          (collapsed or expanded card), no accordion gate. Tapping an emoji
+          resolves immediately via the existing V1 add/swap/remove logic
+          (onReactionTap - untouched). Comment count + "who reacted"/comment
+          panel stay on-demand, opened via the comment affordance only. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+        {LEADERBOARD_REACTION_EMOJI.map(e => (
+          <button key={e} onClick={(ev) => tapEmoji(ev, e)}
+            style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: counts[e] > 0 ? '3px' : '0', padding: '4px 8px', borderRadius: '14px', lineHeight: 1, cursor: 'pointer', background: mine === e ? '#EFEAF9' : '#f5f5f5', border: mine === e ? '1px solid #5B4B8A' : '1px solid transparent' }}>
+            {e}{counts[e] > 0 && <span style={{ fontSize: '11px', fontWeight: '600', color: mine === e ? '#5B4B8A' : '#888' }}>{counts[e]}</span>}
+          </button>
         ))}
-        {totalReactions === 0 && (
-          <span style={{ fontSize: '11px', color: '#bbb' }}>{t?.clasamentReactLabel || 'React'}</span>
-        )}
-        {commentCount > 0 && (
-          <span style={{ fontSize: '11px', color: '#888', marginLeft: 'auto' }}>
-            {t?.clasamentCommentsCountLabel ? t.clasamentCommentsCountLabel(commentCount) : `${commentCount} comments`}
-          </span>
-        )}
-        <span style={{ fontSize: '11px', color: '#ccc', marginLeft: commentCount > 0 ? '0' : 'auto' }}>{open ? '▲' : '▼'}</span>
+        <button onClick={togglePanel}
+          style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '4px 8px', borderRadius: '14px', border: 'none', background: 'none', color: '#888', cursor: 'pointer', marginLeft: 'auto' }}>
+          💬{commentCount > 0 && <span>{commentCount}</span>}
+          <span style={{ fontSize: '10px', color: '#ccc' }}>{open ? '▲' : '▼'}</span>
+        </button>
       </div>
 
       {open && (
         <div style={{ marginTop: '10px' }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            {LEADERBOARD_REACTION_EMOJI.map(e => (
-              <button key={e} onClick={(ev) => tapEmoji(ev, e)}
-                style={{ fontSize: '16px', width: '32px', height: '32px', borderRadius: '50%', border: mine === e ? '2px solid #5B4B8A' : '1px solid #e5e5e5', background: mine === e ? '#EFEAF9' : '#fff', cursor: 'pointer' }}>
-                {e}
-              </button>
-            ))}
-          </div>
-
           {totalReactions > 0 && (
             <div style={{ marginBottom: '12px' }}>
               {(reactorRows || []).map((r, i) => (
