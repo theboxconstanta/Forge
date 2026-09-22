@@ -3422,6 +3422,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [_loadingClase, setLoadingClase] = useState(true)
   const [_loadingClaseTrecute, setLoadingClaseTrecute] = useState(false)
   const [searchClienti, setSearchClienti] = useState('')
+  const [searchAbonamente, setSearchAbonamente] = useState('')
   const [rapoarteData, setRapoarteData] = useState(null)
 
   const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
@@ -5553,18 +5554,38 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               {savingAbonament ? t.adminSubsSaving : t.adminSubsAddButton}
             </button>
           </div>
+          {/* ADMIN SUBSCRIPTIONS SEARCH - minimal UI change - read-only, client-side
+              filter over the already-loaded `abonamente`/`clienti` state, name-or-email,
+              partial/case/diacritic-insensitive. Deliberately its own input+state
+              (searchAbonamente), not reusing searchClienti - independent of the New
+              subscription form above (no autocomplete change) and of the Clients tab. */}
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>🔍</span>
+            <input value={searchAbonamente} onChange={e => setSearchAbonamente(e.target.value)} placeholder={t.adminSubsSearchPlaceholder}
+              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
+          </div>
           {(() => {
             const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })
+            const foldDiacritics = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
             const grouped = {}
             abonamente.forEach(a => {
               const key = a.member_email?.toLowerCase()
               if (!grouped[key]) grouped[key] = []
               grouped[key].push(a)
             })
-            const emails = Object.keys(grouped)
+            const allEmails = Object.keys(grouped)
+            const searchQ = foldDiacritics(searchAbonamente.trim())
+            const emails = !searchQ ? allEmails : allEmails.filter(email => {
+              const membruNume = clienti.find(c => c.email?.toLowerCase() === email)?.full_name
+              return foldDiacritics(membruNume).includes(searchQ) || foldDiacritics(email).includes(searchQ)
+            })
+            const abonamenteVizibile = emails.reduce((sum, email) => sum + grouped[email].length, 0)
             return (
               <>
-                <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminSubsListHeader(emails.length, abonamente.length)}</div>
+                <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminSubsListHeader(emails.length, abonamenteVizibile)}</div>
+                {searchQ && emails.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#888', fontSize: '13px' }}>{t.adminSubsSearchEmpty}</div>
+                )}
                 {emails.map(email => {
                   const list = grouped[email]
                   const activ = list.find(a => a.is_active && !a.queued)
