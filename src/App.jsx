@@ -3692,7 +3692,6 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   // already holds ~40 useState pairs) doesn't need a Provider indirection
   // for a single call site (PrimarySectionBody's MiscareQuickAdd).
   const movementCatalog = useMemo(() => {
-    const names = Array.from(new Set([...MISCARI, ...gymMovements.map(m => m.name)]))
     // Per-Movement Prescription Engine (P9.3) - deterministic canonical identity:
     // an alias-aware normalized index over the catalog rows (hyphen / "&" /
     // whitespace / plural tolerant), byte-for-byte with forge-admin-web's
@@ -3704,11 +3703,35 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       return hit && !hit.ambiguous ? hit : null
     }
     return {
+      // MOVEMENT SEARCH / AUTOCOMPLETE FIX - was `[...MISCARI, ...gymMovements]`
+      // filtered by the LAST WORD only, sliced to 5: the static list always
+      // sorted first in that concatenation, so any search term already
+      // saturated within MISCARI (very common - "jerk", "clean", "press"...)
+      // silently crowded out every DB-only movement before the cap was ever
+      // reached, even though gymMovements (fetchMovementsForGym's own
+      // gym_id.eq/gym_id.is.null union) already contains the full live
+      // catalog. Now reuses searchPerformedMovements (prescriptionContract.js)
+      // - the SAME ranked, alias-aware, normalized (db/dumbbell, kb/kettlebell,
+      // &/and, depluralization) search PerformedMovementSearch's Change
+      // Movement / + Add movement picker already proves in production -
+      // searched against the COMPLETE typed text, not just its last word
+      // (this field is a standalone movement name, unlike MiscareQuickAdd's
+      // composite "reps + movement" free text, which keeps its own
+      // last-word convention, untouched, per ticket scope).
+      // Output contract deliberately unchanged (array of name strings, same
+      // 5-result cap) - MovementSuggestions/MovementRowPWA's onSelect both
+      // expect a plain string, so the string vs {id,name,...} shape mismatch
+      // is resolved right here (.map(r => r.name)), not in either consumer.
+      // Falls back to the ORIGINAL static-list algorithm only when
+      // gymMovements is genuinely empty (fetch still pending or failed) -
+      // preserves fetchMovements' own documented "degrades silently to the
+      // static MISCARI list, never blocks the WOD editor" resilience exactly.
       suggestions: (text) => {
+        if (!text || text.trim().length < 2) return []
+        if (gymMovements.length > 0) return searchPerformedMovements(gymMovements, text, 5).map(r => r.name)
         const word = text.trim().split(/\s+/).pop()
-        if (!word || word.length < 2) return []
         const lower = word.toLowerCase()
-        return names.filter(m => m.toLowerCase().includes(lower)).slice(0, 5)
+        return MISCARI.filter(m => m.toLowerCase().includes(lower)).slice(0, 5)
       },
       capabilityFor: (name) => resolveMovementCapability(matchRow(name)),
       // P9.3 - id-first: a movement confirmed once keeps its capability through
