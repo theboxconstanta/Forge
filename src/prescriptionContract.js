@@ -214,18 +214,41 @@ export function resolveCatalogMovementByName(index, name) {
 // Reuses normalizeMovementName (case-insensitive, whitespace/punctuation-
 // safe, deterministic) for both the query and every candidate string - no
 // new normalization, no fuzzy edit-distance, no dependency.
+// db/dumbbell + kb/kettlebell substitution, same rule movementNameKeys()
+// uses for exact-key resolution - applied here too so ranked suggestions
+// cross-match "DB Snatch" <-> "Dumbbell Snatch" the same way resolution does.
+function equivalentNameForms(normalized) {
+  return new Set([
+    normalized,
+    normalized.replace(/\bdb\b/g, 'dumbbell'),
+    normalized.replace(/\bdumbbell\b/g, 'db'),
+    normalized.replace(/\bkb\b/g, 'kettlebell'),
+    normalized.replace(/\bkettlebell\b/g, 'kb'),
+  ])
+}
+
+function bestTier(candidateVariants, queryVariants, tiers) {
+  let best = null
+  for (const c of candidateVariants) for (const q of queryVariants) {
+    const t = c === q ? tiers[0] : c.startsWith(q) ? tiers[1] : c.includes(q) ? tiers[2] : null
+    if (t !== null && (best === null || t < best)) best = t
+  }
+  return best
+}
+
 export function searchPerformedMovements(rows, query, limit = 6) {
   const q = normalizeMovementName(query)
   if (!q) return []
+  const qVariants = equivalentNameForms(q)
   const scored = []
   for (const row of rows || []) {
     if (!row || !row.name) continue
     const name = normalizeMovementName(row.name)
-    let tier = name === q ? 0 : name.startsWith(q) ? 1 : name.includes(q) ? 2 : null
+    let tier = bestTier(equivalentNameForms(name), qVariants, [0, 1, 2])
     for (const alias of row.aliases || []) {
       const a = normalizeMovementName(alias)
       if (!a) continue
-      const aTier = a === q ? 3 : a.startsWith(q) ? 4 : a.includes(q) ? 5 : null
+      const aTier = bestTier(equivalentNameForms(a), qVariants, [3, 4, 5])
       if (aTier !== null && (tier === null || aTier < tier)) tier = aTier
     }
     if (tier !== null) scored.push({ row, tier })

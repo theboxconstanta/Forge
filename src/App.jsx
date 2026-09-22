@@ -854,7 +854,18 @@ function CreateMiscareRow({ candidate, catalog, t }) {
   const [created, setCreated] = useState(null)
 
   const trimmed = candidate.trim().split(/\s+/).pop() || ''
-  if (!catalog || trimmed.length < 2) return null
+  // MOVEMENT SEARCH - REMAINING SURFACES FIX - owner decision: regular
+  // members must never be able to create catalog movements. Gating on
+  // `catalog?.createMovement` (a callable function), not merely on
+  // `catalog` being truthy, means this row renders nothing at all for the
+  // member-safe, read-only `memberMovementCatalog` (App.jsx) passed to
+  // MiscareQuickAdd's member-facing call sites - no crash (the button's
+  // own onClick, which calls `catalog.createMovement(...)`, is simply
+  // never reachable), and no movement-creation action ever exposed to a
+  // member. Admin's own `movementCatalog` still carries `createMovement`
+  // and is unaffected - this component's authorized behavior there is
+  // unchanged.
+  if (typeof catalog?.createMovement !== 'function' || trimmed.length < 2) return null
   if (created && created.toLowerCase() === trimmed.toLowerCase()) {
     return <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{t.adminWodCreateMovementSuccess(trimmed)}</div>
   }
@@ -1889,7 +1900,7 @@ export function SectionCard({ section, index, total, sectionTypes, onChange, onT
           ) : (
             <>
               <FormatConfigEditor formatId={section.format} onFormatChange={f => onChange({ format: f })}
-                config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })} t={t} />
+                config={section.formatConfig} onConfigChange={c => onChange({ formatConfig: c })} t={t} catalog={movementCatalog} />
               {section.format === 'Weightlifting' ? (
                 <CautareMiscare key={section.id} preFill={section.movementName} onAleage={m => onChange({ movementName: m })} t={t} label={t.adminWodSkillMovementLabel} />
               ) : (
@@ -8083,6 +8094,22 @@ function App() {
   // temporal dead zone - and threw during render on every route).
   const [memberGymMovements, setMemberGymMovements] = useState([])
   const memberMovementIndex = useMemo(() => buildMovementIndex(memberGymMovements), [memberGymMovements])
+  // MOVEMENT SEARCH - REMAINING SURFACES FIX - member-safe, READ-ONLY
+  // catalog wrapper for the free-text/Hero-WOD/Log-a-WOD movement-entry
+  // surfaces (MiscareQuickAdd, FormatConfigEditor's fields). Reuses
+  // memberGymMovements - already fetched above for capability purposes, no
+  // new network call - and the SAME searchPerformedMovements engine the
+  // Composer's own fix (fa68f4c) already ships: alias-aware, db/dumbbell +
+  // kb/kettlebell + &/and normalized, ranked, 5-result cap. Deliberately
+  // has NO `createMovement` - owner decision: regular members must not be
+  // able to create catalog movements from these surfaces (only Admin's own
+  // `movementCatalog`, further below in Admin(), carries that capability).
+  const memberMovementCatalog = useMemo(() => ({
+    suggestions: (text) => {
+      if (!text || text.trim().length < 2) return []
+      return searchPerformedMovements(memberGymMovements, text, 5).map(r => r.name)
+    },
+  }), [memberGymMovements])
   // Greutatea efectiv folosita de membru (text liber, ex. "40kg") - comparata
   // cu greutatea prescrisa a VARIANTEI ALESE pentru a detecta o modificare de
   // prescriptie (vezi resultCompositionModified in workoutFormats.js). Semanata
@@ -13164,7 +13191,7 @@ function App() {
               <MiscareQuickAdd value={editLogMiscareCurenta} onChange={setEditLogMiscareCurenta}
                 onAdd={(v) => { setEditLogMiscari(prev => [...prev, v]); setEditLogMiscareCurenta('') }}
                 placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
-                weightUnit={userProfile?.weight_unit} t={t} />
+                weightUnit={userProfile?.weight_unit} t={t} catalog={memberMovementCatalog} />
             </div>
             )
           ) : logWodPrimaryPath ? (() => {
@@ -13414,7 +13441,7 @@ function App() {
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                   <FormatConfigEditor formatId={wodTip} onFormatChange={setWodTip}
                     config={wodFormatConfig} onConfigChange={setWodFormatConfig}
-                    excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} />
+                    excludeConfigKeys={['durationSec', 'timeCapSec']} t={t} catalog={memberMovementCatalog} />
                   {AUTO_DURATION_FORMAT_IDS.includes(wodTip) ? (
                     <div>
                       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px', fontWeight: '600', lineHeight: 1.2 }}>{t.logWodDurationLabel}</div>
@@ -13481,7 +13508,7 @@ function App() {
                   <MiscareQuickAdd value={wodMiscareCurenta} onChange={setWodMiscareCurenta}
                     onAdd={(v) => { setWodMiscari(prev => [...prev, v]); setWodMiscareCurenta('') }}
                     placeholder={t.logWodMovementPlaceholder(userProfile?.weight_unit)}
-                    weightUnit={userProfile?.weight_unit} t={t} />
+                    weightUnit={userProfile?.weight_unit} t={t} catalog={memberMovementCatalog} />
                 </div>
               )}
               <button onClick={() => setLogWodStep('score')}
@@ -13706,7 +13733,7 @@ function App() {
             <input value={newHeroWodName} onChange={e => setNewHeroWodName(e.target.value)} placeholder={t.heroWodNamePlaceholder}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
             <FormatConfigEditor formatId={newHeroWodTip} onFormatChange={setNewHeroWodTip}
-              config={newHeroWodFormatConfig} onConfigChange={setNewHeroWodFormatConfig} t={t} />
+              config={newHeroWodFormatConfig} onConfigChange={setNewHeroWodFormatConfig} t={t} catalog={memberMovementCatalog} />
           </div>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '10px', fontWeight: '600', lineHeight: 1.2 }}>{t.heroWodMovementsLabel} <span style={{ fontWeight: '400', fontSize: '11px' }}>{t.heroWodReorderHint}</span></div>
@@ -13718,7 +13745,7 @@ function App() {
             <MiscareQuickAdd value={newHeroWodMiscareCurenta} onChange={setNewHeroWodMiscareCurenta}
               onAdd={(v) => { setNewHeroWodMiscari(prev => [...prev, v]); setNewHeroWodMiscareCurenta('') }}
               placeholder={t.heroWodMovementPlaceholder(userProfile?.weight_unit)}
-              weightUnit={userProfile?.weight_unit} t={t} />
+              weightUnit={userProfile?.weight_unit} t={t} catalog={memberMovementCatalog} />
           </div>
           <button onClick={saveNewHeroWod} disabled={newHeroWodSaving}
             style={{ width: '100%', padding: '14px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '600', lineHeight: 1, cursor: newHeroWodSaving ? 'not-allowed' : 'pointer', opacity: newHeroWodSaving ? 0.7 : 1 }}>

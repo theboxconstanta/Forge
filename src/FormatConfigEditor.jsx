@@ -84,13 +84,20 @@ function TextField({ label, value, onChange, placeholder, quickOptions }) {
   )
 }
 
-// Un singur nume de miscare (ex. "Back Squat" la Max Effort) - text liber cu
-// sugestii din MISCARI, spre deosebire de TextField (folosit si pentru
-// campuri care NU sunt nume de miscari - repsScheme, targetLabel).
-function MovementTextField({ label, value, onChange, placeholder }) {
+// Un singur nume de miscare (ex. "Back Squat" la Max Effort) - text liber,
+// spre deosebire de TextField (folosit si pentru campuri care NU sunt nume
+// de miscari - repsScheme, targetLabel). MOVEMENT SEARCH REMAINING SURFACES
+// FIX - `value` e deja doar numele miscarii (niciodata text compus cu reps),
+// deci cand un `catalog` real e disponibil (Admin WOD authoring / member Log
+// a WOD / Hero WOD creation - toate trei deja au catalogul complet fetch-uit,
+// vezi App.jsx) cauta pe TOT textul tastat prin searchPerformedMovements
+// (alias-aware, normalizat db/dumbbell+kb/kettlebell+&/and) - acelasi motor
+// deja dovedit de fix-ul Composer-ului (fa68f4c). Fara catalog, cade pe
+// miscareSugestii (lista statica), neschimbat.
+function MovementTextField({ label, value, onChange, placeholder, catalog }) {
   const [justSelected, setJustSelected] = useState(false)
   const val = value || ''
-  const sugestii = justSelected ? [] : miscareSugestii(val)
+  const sugestii = justSelected ? [] : (catalog ? catalog.suggestions(val) : miscareSugestii(val))
   return (
     <div style={{ ...fieldWrapStyle, position: 'relative' }}>
       <div style={labelStyle}>{label}</div>
@@ -159,7 +166,7 @@ function RepsSchemeListField({ label, value, onChange, quickOptions }) {
 // loc sa reinventeze input-uri de durata/miscari - vezi workoutFormats.js
 // pentru forma exacta a unei etape ({kind, durationSec, movements,
 // intervalSec?}).
-function StageListField({ label, value, onChange, t }) {
+function StageListField({ label, value, onChange, t, catalog }) {
   const stages = value || []
   const setStage = (i, patch) => onChange(stages.map((s, idx) => idx === i ? { ...s, ...patch } : s))
   const addStage = () => onChange([...stages, { kind: 'amrap', durationSec: null, movements: [] }])
@@ -185,7 +192,7 @@ function StageListField({ label, value, onChange, t }) {
           {stage.kind === 'interval' && (
             <DurationField label={t?.fmtIntervalDuration || 'Durată interval'} seconds={stage.intervalSec ?? null} onChange={v => setStage(i, { intervalSec: v })} />
           )}
-          <MovementListField label={t?.fmtStageMovements || 'Mișcări'} value={stage.movements} onChange={v => setStage(i, { movements: v })} placeholder={t?.fmtMovementListPlaceholder} />
+          <MovementListField label={t?.fmtStageMovements || 'Mișcări'} value={stage.movements} onChange={v => setStage(i, { movements: v })} placeholder={t?.fmtMovementListPlaceholder} catalog={catalog} />
         </div>
       ))}
       <button type="button" onClick={addStage}
@@ -216,8 +223,16 @@ function SelectField({ label, value, options, onChange }) {
 
 // Listă simplă, ordonată, de nume de mișcări (Buy-In, Cash-Out, lanțul unui
 // Complex, mișcare pe interval la EMOM) - cu sugestii din MISCARI, la fel ca
-// MiscareQuickAdd din App.jsx.
-function MovementListField({ label, value, onChange, placeholder }) {
+// MiscareQuickAdd din App.jsx. MOVEMENT SEARCH REMAINING SURFACES FIX -
+// spre deosebire de MovementTextField, `draft` aici poate fi text COMPUS
+// ("12 Dumbbell Snatch") - un item din Buy-In/Cash-Out/Complex/EMOM-interval
+// e adesea scris cu un numar de reps in fata. Cautarea ramane pe ULTIMUL
+// CUVANT (exact ca miscareSugestii, neschimbat ca semantica), doar sursa
+// numelor se schimba: cand exista un `catalog` real, ultimul cuvant e trimis
+// prin searchPerformedMovements (acelasi motor alias-aware/normalizat ca
+// fix-ul Composer-ului, fa68f4c) - NICIODATA tot `draft`-ul, ca sa nu caute
+// un rand din catalog literalmente numit "12 Dumbbell Snatch".
+function MovementListField({ label, value, onChange, placeholder, catalog }) {
   const [draft, setDraft] = useState('')
   const [justSelected, setJustSelected] = useState(false)
   const items = value || []
@@ -232,7 +247,7 @@ function MovementListField({ label, value, onChange, placeholder }) {
   }
   // La fel ca la MiscareQuickAdd - dupa ce alegi o sugestie, n-o mai arata
   // din nou pana nu mai scrii ceva (altfel ramane vizibila peste lista).
-  const sugestii = justSelected ? [] : miscareSugestii(draft)
+  const sugestii = justSelected ? [] : (catalog ? catalog.suggestions(draft.trim().split(/\s+/).pop() || '') : miscareSugestii(draft))
   return (
     <div style={fieldWrapStyle}>
       <div style={labelStyle}>{label}</div>
@@ -259,8 +274,8 @@ function MovementListField({ label, value, onChange, placeholder }) {
 // Un exercițiu per interval (ex. EMOM alternat: min 1 = Row, min 2 = Wall
 // Ball...) - lista se reia ciclic peste numărul total de intervale definit
 // separat (vezi defaultRowsForFormat în workoutFormats.js).
-function IntervalListField({ label, value, onChange, placeholder }) {
-  return <MovementListField label={label} value={value} onChange={onChange} placeholder={placeholder} />
+function IntervalListField({ label, value, onChange, placeholder, catalog }) {
+  return <MovementListField label={label} value={value} onChange={onChange} placeholder={placeholder} catalog={catalog} />
 }
 
 // EMOM AUTHORING + CANONICAL SCORING INTEGRITY - EMOM's own "Scoring"
@@ -314,7 +329,7 @@ function EmomScoringField({ label, value, onChange, movementInstances, t }) {
   )
 }
 
-export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, movementInstances, hideFormatSelector, t }) {
+export default function FormatConfigEditor({ formatId, onFormatChange, config, onConfigChange, formatOptions, excludeConfigKeys, movementInstances, hideFormatSelector, t, catalog }) {
   const options = formatOptions || FORMAT_IDS
   const format = getFormat(formatId)
   const cfg = config || {}
@@ -371,19 +386,19 @@ export default function FormatConfigEditor({ formatId, onFormatChange, config, o
           <RepMaxStepperField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
         )
         if (field.type === 'movementText') return (
-          <MovementTextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} />
+          <MovementTextField key={key} label={label} value={cfg[key] ?? field.default} onChange={v => setField(key, v)} catalog={catalog} />
         )
         if (field.type === 'movementList') return (
-          <MovementListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
+          <MovementListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} catalog={catalog} />
         )
         if (field.type === 'intervalList') return (
-          <IntervalListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} />
+          <IntervalListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} placeholder={t?.fmtMovementListPlaceholder} catalog={catalog} />
         )
         if (field.type === 'repsSchemeList') return (
           <RepsSchemeListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} quickOptions={field.quickOptions} />
         )
         if (field.type === 'stageList') return (
-          <StageListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} t={t} />
+          <StageListField key={key} label={label} value={cfg[key]} onChange={v => setField(key, v)} t={t} catalog={catalog} />
         )
         return null
       })}
