@@ -3423,6 +3423,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [_loadingClaseTrecute, setLoadingClaseTrecute] = useState(false)
   const [searchClienti, setSearchClienti] = useState('')
   const [searchAbonamente, setSearchAbonamente] = useState('')
+  const [abonamentDropdownOpen, setAbonamentDropdownOpen] = useState(false)
   const [rapoarteData, setRapoarteData] = useState(null)
 
   const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
@@ -4945,7 +4946,15 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   }
 
   const saveAbonament = async () => {
-    if (!emailAbonament || !planSelectat) { showToast(t.toastFillEmailAndPlan); return }
+    // ADMIN SUBSCRIPTIONS - SEARCH BY NAME OR EMAIL - the "Athlete email" field
+    // now also accepts a typed name, resolved to an exact email only via an
+    // explicit dropdown selection (which overwrites emailAbonament with that
+    // member's real email - see the field's render below). This guard is the
+    // actual enforcement point: an unresolved name never looks like an email,
+    // so it can never reach create_subscription as p_member_email.
+    const emailTrimmed = emailAbonament.trim()
+    const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)
+    if (!emailFormatValid || !planSelectat) { showToast(!emailTrimmed || !planSelectat ? t.toastFillEmailAndPlan : t.toastSelectMemberOrValidEmail); return }
     setSavingAbonament(true)
     const emailNorm = emailAbonament.toLowerCase().trim()
     const plan = planuri.find(p => p.id === planSelectat)
@@ -5478,24 +5487,53 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminSubsNewTitle}</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminSubsEmailLabel}</div>
+            {/* ADMIN SUBSCRIPTIONS - EXISTING MEMBER FIELD: SEARCH BY NAME OR EMAIL -
+                the SAME field, upgraded from a native <datalist> (which can only
+                prefix-match the raw email value - it cannot search by name, and
+                has no diacritic folding) to a custom dropdown searching clienti by
+                full_name OR email, diacritic/case-insensitive, partial match.
+                Selecting a suggestion OVERWRITES emailAbonament with that member's
+                EXACT existing email - the single source of truth this field has
+                always held and the only thing saveAbonament ever reads - so a typed
+                name can never reach create_subscription: saveAbonament's own guard
+                (below) blocks submission whenever the field isn't a well-formed
+                email, resolved or manually typed. Manual email entry (including an
+                email not in the roster) still works exactly as before - it just
+                never triggers the dropdown, since foldD(email) rarely matches a
+                clienti name/email substring unless it's a real, resolvable one. */}
             {(() => {
               const emailVal = emailAbonament.trim()
               const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)
-              const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#0E0E0E' : '#E24B4A'
+              const foldD = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+              const q = foldD(emailVal)
+              const matches = (!q || emailValid) ? [] : clienti.filter(c => foldD(c.full_name).includes(q) || foldD(c.email).includes(q)).slice(0, 8)
+              const borderColor = emailVal.length === 0 ? '#e0e0e0' : emailValid ? '#0E0E0E' : matches.length > 0 ? '#e0e0e0' : '#E24B4A'
+              const selectMember = (c) => { setEmailAbonament(c.email); setAbonamentDropdownOpen(false) }
               return (
-                <>
-                  <input value={emailAbonament} onChange={e => setEmailAbonament(e.target.value)} placeholder={t.adminSubsEmailPlaceholder} type="email"
-                    list="clienti-emails-list"
+                <div style={{ position: 'relative' }}>
+                  <input value={emailAbonament}
+                    onChange={e => { setEmailAbonament(e.target.value); setAbonamentDropdownOpen(true) }}
+                    onFocus={() => setAbonamentDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setAbonamentDropdownOpen(false), 150)}
+                    placeholder={t.adminSubsEmailPlaceholder} type="text" autoComplete="off"
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1.5px solid ${borderColor}`, fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '4px' }} />
-                  {emailVal.length > 0 && !emailValid && (
+                  {emailVal.length > 0 && !emailValid && matches.length === 0 && (
                     <div style={{ fontSize: '11px', color: '#E24B4A', marginBottom: '4px' }}>{t.adminSubsEmailInvalid}</div>
                   )}
-                </>
+                  {abonamentDropdownOpen && matches.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '2px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0', maxHeight: '220px', overflowY: 'auto' }}>
+                      {matches.map((c, i) => (
+                        <div key={c.id} onMouseDown={e => e.preventDefault()} onClick={() => selectMember(c)}
+                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: i < matches.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{c.full_name || c.email}</div>
+                          <div style={{ fontSize: '11px', color: '#888', marginTop: '1px' }}>{c.email}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )
             })()}
-            <datalist id="clienti-emails-list">
-              {clienti.map(c => <option key={c.id} value={c.email}>{c.full_name}</option>)}
-            </datalist>
             {(() => {
               const emailTastat = emailAbonament.toLowerCase().trim()
               if (emailTastat.length < 4) return null

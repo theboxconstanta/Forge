@@ -913,6 +913,7 @@ export const TRANSLATIONS = {
     toastSectionSaved: (sectiune) => `✓ ${sectiune} salvat!`,
     toastWodDeletedAdmin: '✓ WOD șters!',
     toastFillEmailAndPlan: '❌ Completează emailul și planul!',
+    toastSelectMemberOrValidEmail: '❌ Alege un membru din listă sau introdu un email valid!',
     unknownErrorFallback: 'Eroare necunoscută',
     toastSubscriptionQueued: '✓ Abonament programat! Va activa automat când cel curent se epuizează.',
     toastSubscriptionAdded: '✓ Abonament adăugat!',
@@ -1002,8 +1003,8 @@ export const TRANSLATIONS = {
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ Abonament nou',
-    adminSubsEmailLabel: 'Email atlet',
-    adminSubsEmailPlaceholder: 'email@exemplu.com',
+    adminSubsEmailLabel: 'Caută după nume sau email',
+    adminSubsEmailPlaceholder: 'Caută după nume sau email',
     adminSubsEmailInvalid: 'Email invalid',
     adminSubsSimilarEmailPrefix: 'Email similar cu',
     adminSubsSimilarEmailSuffix: (name) => ` (${name}). Verifică dacă e corect.`,
@@ -2175,6 +2176,7 @@ export const TRANSLATIONS = {
     toastSectionSaved: (section) => `✓ ${section} saved!`,
     toastWodDeletedAdmin: '✓ WOD deleted!',
     toastFillEmailAndPlan: '❌ Fill in the email and plan!',
+    toastSelectMemberOrValidEmail: '❌ Select a member from the list or enter a valid email!',
     unknownErrorFallback: 'Unknown error',
     toastSubscriptionQueued: '✓ Subscription scheduled! It will activate automatically when the current one runs out.',
     toastSubscriptionAdded: '✓ Subscription added!',
@@ -2264,8 +2266,8 @@ export const TRANSLATIONS = {
 
     // Admin - tab Abonamente
     adminSubsNewTitle: '+ New subscription',
-    adminSubsEmailLabel: 'Athlete email',
-    adminSubsEmailPlaceholder: 'email@example.com',
+    adminSubsEmailLabel: 'Search by name or email',
+    adminSubsEmailPlaceholder: 'Search by name or email',
     adminSubsEmailInvalid: 'Invalid email',
     adminSubsSimilarEmailPrefix: 'Similar email to',
     adminSubsSimilarEmailSuffix: (name) => ` (${name}). Check if it's correct.`,
