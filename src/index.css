@@ -29,6 +29,27 @@
   -webkit-touch-callout: none;
 }
 
+/* Design System V1.0 - accessible keyboard focus (theme.js interaction.focus,
+   #0E0E0E). :focus-visible only - never shows on a mouse/touch click, so this
+   is purely additive for keyboard users and changes nothing about existing
+   click/tap behavior on any control. */
+:focus-visible {
+  outline: 2px solid #0E0E0E;
+  outline-offset: 2px;
+}
+
+/* prefers-reduced-motion - Design System V1.0 accessibility requirement.
+   Global opt-out; any transition/animation this design system introduces
+   inherits this without needing its own media query. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* scrollbarWidth:'none' (inline, in JSX) ascunde scrollbar-ul doar in Firefox -
    pe iOS/Safari (WebKit) tot apare bara nativa de scroll, vizibila mai ales
    pe fundaluri inchise (ex: chip-ul de zi selectat, negru) ca o linie alba/gri

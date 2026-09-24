@@ -132,7 +132,10 @@ describe('SERIES FIREWALL - stergeSeria/stergeClasa/stergeClaseleTrecute logic u
   })
 
   it('the Delete Past button is no longer gated on a clase.some(...) heuristic that would misfire once clase excludes older weeks - always rendered, still no-ops gracefully with a toast when nothing is eligible', () => {
-    expect(appSource).toMatch(/<button onClick=\{stergeClaseleTrecute\} style=\{\{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' \}\}>\{t\.adminClassDeletePast\}<\/button>/)
+    // Design System V1.0 Phase 3A migrated this button's markup onto the
+    // shared destructive Button component (same onClick, same handler,
+    // visual-only change) - assert the new markup, not the pre-migration one.
+    expect(appSource).toMatch(/<Button variant="destructive" fullWidth=\{false\} onClick=\{stergeClaseleTrecute\}>\{t\.adminClassDeletePast\}<\/Button>/)
     // The old gate is gone from the render block immediately preceding it.
     const idx = appSource.indexOf("t.adminClassListHeader(clase.length)")
     const nearby = appSource.slice(idx, idx + 400)

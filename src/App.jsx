@@ -23,7 +23,7 @@ import {
   resolveClassColor, getReadableTextColor,
   classifyQueuedSubscription, isScheduledRenewal,
 } from './utils'
-import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet } from './components'
+import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet, Button, Select, Input, StatusBadge, EmptyState, Card } from './components'
 import { getT } from './translations'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
@@ -100,6 +100,8 @@ import { resolveResultProvenance } from './resultProvenance'
 import { resolveResultMovementLines } from './resultWorkoutLines'
 import { dedupLatestPerMember, monotonicLoggedAt } from './leaderboardSelection'
 import { COLORS } from './theme'
+import { RADIUS } from './spacing'
+import { ICON_SIZE, ICON_STROKE } from './iconSystem'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { currentWeekStartStr, fetchAllClasses, groupClassesByDay, groupPastClassesByWeek } from './classesPaging'
@@ -780,8 +782,12 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, leaderboardUn
                   replacing the slightly different #afe607 that was only
                   ever used here); inactive tabs are gray instead of
                   black, per the mission's explicit "keep the bar visually
-                  light" instruction. Same isActive/onClick mechanism. */}
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#B7E63A' : '#9CA3AF'} />
+                  light" instruction. Same isActive/onClick mechanism.
+                  Design System V1.0 Phase 2 - stroke width is now uniform
+                  (ICON_STROKE) instead of 2.5/2 - active state is signaled
+                  by color alone, per the approved icon spec ("do not rely
+                  on a heavier stroke as the primary active-state signal"). */}
+              <Icon size={ICON_SIZE.primaryNav} strokeWidth={ICON_STROKE} color={isActive ? '#B7E63A' : '#9CA3AF'} />
               <span className="text-[11px]" style={{ color: isActive ? COLORS.text.primary : '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap' }}>
                 {t[labelKey]}
               </span>
@@ -817,7 +823,7 @@ function CautareMiscare({ onAleage, preFill, t, label }) {
     <div style={{ position: 'relative', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{label || t.cautareMiscareLabel}</div>
       <input value={query} onChange={e => cauta(e.target.value)} placeholder={t.cautareMiscarePlaceholder}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #0E0E0E' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', outline: 'none' }} />
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: aleasa ? '2px solid #0E0E0E' : '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box' }} />
       {sugestii.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '4px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
           {sugestii.map((s, i) => (
@@ -1894,7 +1900,7 @@ export function SectionCard({ section, index, total, sectionTypes, onChange, onT
           {isPlainText ? (
             <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
               placeholder={t.adminWodWarmupPlaceholder} rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
           ) : section.isPrimary ? (
             <PrimarySectionBody section={section} onChange={onChange} updateVariant={updateVariant} movementCatalog={movementCatalog} t={t} />
           ) : (
@@ -1909,7 +1915,7 @@ export function SectionCard({ section, index, total, sectionTypes, onChange, onT
               )}
               <textarea value={section.text} onChange={e => onChange({ text: e.target.value })}
                 placeholder={t.adminWodSkillPlaceholder} rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fff', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
             </>
           )}
 
@@ -3189,7 +3195,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <AvatarCircle name={myName} avatarUrl={myAvatar} size={36} />
           <textarea value={postText} onChange={e => setPostText(e.target.value)} placeholder={t.feedComposePlaceholder}
-            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#0E0E0E', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'inherit' }} />
+            style={{ flex: 1, border: 'none', fontSize: '13px', color: '#0E0E0E', background: 'transparent', resize: 'none', minHeight: '60px', fontFamily: 'inherit' }} />
         </div>
         {postText.trim() && (
           <button onClick={posteaza} disabled={posting}
@@ -3290,7 +3296,7 @@ function Feed({ showToast, user, userProfile, isAdmin, t, lang }) {
                 <input value={comentariuText} onChange={e => setComentariuText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && adaugaComentariu(post.id)}
                   placeholder={t.feedCommentPlaceholder}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa' }} />
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa' }} />
                 <button onClick={() => adaugaComentariu(post.id)}
                   style={{ padding: '8px 14px', borderRadius: '20px', background: '#ABE73C', color: '#0E0E0E', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: '600', lineHeight: 1 }}>{t.feedCommentSend}</button>
               </div>
@@ -3364,7 +3370,7 @@ export function BuilderEntryActions({ aiParseText, onAiParseTextChange, aiAnalyz
       </button>
       <textarea value={aiParseText} onChange={e => onAiParseTextChange(e.target.value)}
         placeholder={t.adminWodQuickCreatePlaceholder} rows={8}
-        style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', outline: 'none', lineHeight: '1.5', marginTop: '14px' }} />
+        style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', marginTop: '14px' }} />
       {/* Secondary accelerators - equal visual weight, quieter than Start
           Empty above (unchanged treatment from the pre-existing
           Template/Empty row this replaces). */}
@@ -3425,6 +3431,13 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [searchAbonamente, setSearchAbonamente] = useState('')
   const [abonamentDropdownOpen, setAbonamentDropdownOpen] = useState(false)
   const [rapoarteData, setRapoarteData] = useState(null)
+  // Design System V1.0 Phase 2 - Admin nav horizontal-scroll tracking (owner
+  // decision A: one row, no wrapping). Tracks whether there's more content
+  // to scroll to on each side, for the "subtle visual indication when more
+  // tabs are available" edge fades - not a fixed decoration, since a fade on
+  // a side with nothing left to scroll to would be misleading.
+  const adminTabsScrollRef = useRef(null)
+  const [adminTabsOverflow, setAdminTabsOverflow] = useState({ left: false, right: false })
 
   const [numeClasa, setNumeClasa] = useState('CrossFit WOD')
   const [dataClasa, setDataClasa] = useState('')
@@ -5161,7 +5174,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   <div style={{ fontSize: '10px', fontWeight: '600', color: '#aaa', letterSpacing: '0.06em', marginBottom: '6px' }}>{t.adminClassAddManualLabel}</div>
                   <input value={adaugaMembruSearch[c.id] || ''} onChange={e => setAdaugaMembruSearch(prev => ({ ...prev, [c.id]: e.target.value }))}
                     placeholder={t.adminClassSearchMemberPlaceholder}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', outline: 'none', background: '#fafafa', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '12px', background: '#fafafa', boxSizing: 'border-box' }} />
                   {adaugaMembruSearch[c.id]?.trim() && (() => {
                     const q = adaugaMembruSearch[c.id].toLowerCase()
                     const rezultate = clienti.filter(cl =>
@@ -5192,30 +5205,70 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     )
   }
 
+  // Design System V1.0 Phase 2 - Admin nav horizontal scroll (owner decision
+  // A). Recomputes which edge fades should show, and keeps the active tab
+  // scrolled into view whenever it changes (e.g. after a click, or after a
+  // role change alters which tabs are in the row).
+  const updateAdminTabsOverflow = () => {
+    const el = adminTabsScrollRef.current
+    if (!el) return
+    setAdminTabsOverflow({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    })
+  }
+  useEffect(() => {
+    updateAdminTabsOverflow()
+    adminTabsScrollRef.current?.querySelector(`[data-admin-tab="${adminTab}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    window.addEventListener('resize', updateAdminTabsOverflow)
+    return () => window.removeEventListener('resize', updateAdminTabsOverflow)
+  }, [adminTab])
+
   return (
     <div style={{ padding: '20px', paddingBottom: '80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <h1 style={{ ...TYPO.pageTitle, color: '#0E0E0E' }}>{t.adminHeaderTitle}</h1>
-        <span style={{ background: '#FCEBEB', color: '#791F1F', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600' }}>{isAdmin ? t.adminBadgeAdmin : t.adminBadgeCoach}</span>
+        <StatusBadge tone="danger" label={isAdmin ? t.adminBadgeAdmin : t.adminBadgeCoach} />
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }, { id: 'billing', icon: CreditCard, lbl: t.billingTabLabel, ownerOnly: true }, { id: 'platforma', icon: Flag, lbl: t.platformAdminTab, adminOnly: true, platformOnly: true }].filter(tab => (!tab.adminOnly || isAdmin) && (!tab.platformOnly || isPlatformAdmin) && (!tab.ownerOnly || isOwner)).map(tab => (
-          <div key={tab.id} onClick={() => setAdminTab(tab.id)}
-            style={{ flex: adminTab === tab.id ? '1 1 auto' : '0 0 auto', padding: '7px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === tab.id ? '600' : '400', background: adminTab === tab.id ? '#0E0E0E' : '#fff', color: adminTab === tab.id ? '#fff' : '#888', border: '1px solid #e0e0e0', whiteSpace: 'nowrap', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-            <tab.icon size={13} color={adminTab === tab.id ? '#fff' : '#888'} />{adminTab === tab.id ? ` ${tab.lbl}` : ''}
-          </div>
-        ))}
+      {/* Design System V1.0 Phase 2 (owner decision A) - horizontal-scrolling,
+          single-row Admin nav. Was icon-only-except-selected (the owner's
+          original flagged concern) - every tab now always shows its Lucide
+          icon (ICON_SIZE.adminNav/ICON_STROKE) AND label, never wraps, and
+          the active tab auto-scrolls into view. Edge fades appear only when
+          there's actually more to scroll to on that side (adminTabsOverflow,
+          computed above) - a fixed decoration on a side with nothing left
+          would be misleading. Role-gated filter (adminOnly/platformOnly/
+          ownerOnly) is untouched - same predicate as before, only the
+          rendering changed. */}
+      <div style={{ position: 'relative', marginBottom: '16px' }}>
+        <div ref={adminTabsScrollRef} onScroll={updateAdminTabsOverflow} className="hide-scrollbar"
+          style={{ display: 'flex', gap: '6px', overflowX: 'auto', flexWrap: 'nowrap', scrollBehavior: 'smooth' }}>
+          {[{ id: 'clienti', icon: Users, lbl: t.adminTabClienti, adminOnly: true }, { id: 'abonamente', icon: Ticket, lbl: t.adminTabAbonamente, adminOnly: true }, { id: 'clase', icon: Calendar, lbl: t.adminTabClase }, { id: 'wod', icon: Dumbbell, lbl: t.adminTabWod }, { id: 'planuri', icon: ClipboardList, lbl: t.adminTabPlanuri, adminOnly: true }, { id: 'setari', icon: Settings, lbl: t.adminTabSetari, adminOnly: true }, { id: 'billing', icon: CreditCard, lbl: t.billingTabLabel, ownerOnly: true }, { id: 'platforma', icon: Flag, lbl: t.platformAdminTab, adminOnly: true, platformOnly: true }].filter(tab => (!tab.adminOnly || isAdmin) && (!tab.platformOnly || isPlatformAdmin) && (!tab.ownerOnly || isOwner)).map(tab => (
+            <div key={tab.id} data-admin-tab={tab.id} onClick={() => setAdminTab(tab.id)}
+              style={{ flexShrink: 0, minHeight: '44px', padding: '10px 14px', borderRadius: RADIUS.full, cursor: 'pointer', fontSize: '11px', fontWeight: adminTab === tab.id ? '600' : '400', background: adminTab === tab.id ? COLORS.interaction.actionSecondary : COLORS.surface.default, color: adminTab === tab.id ? COLORS.text.inverse : COLORS.text.secondary, border: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <tab.icon size={ICON_SIZE.adminNav} strokeWidth={ICON_STROKE} color={adminTab === tab.id ? COLORS.text.inverse : COLORS.text.secondary} />
+              {tab.lbl}
+            </div>
+          ))}
+        </div>
+        {adminTabsOverflow.left && (
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '28px', background: 'linear-gradient(to right, #FFFFFF, transparent)', pointerEvents: 'none' }} />
+        )}
+        {adminTabsOverflow.right && (
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '28px', background: 'linear-gradient(to left, #FFFFFF, transparent)', pointerEvents: 'none' }} />
+        )}
       </div>
 
       {/* CLIENTI */}
       {adminTab === 'clienti' && isAdmin && (
         <>
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Card bordered style={{ padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '16px' }}>🔍</span>
             <input value={searchClienti} onChange={e => setSearchClienti(e.target.value)} placeholder={t.adminClientsSearchPlaceholder}
-              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
-          </div>
+              style={{ flex: 1, border: 'none', fontSize: '13px', background: 'transparent' }} />
+          </Card>
 
           {/*
             M9 Increment 1 - Manual Member Enrollment (Product Specification Section 4.1)
@@ -5242,15 +5295,14 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             {addMemberFormOpen && (
               <div style={{ marginTop: '12px' }}>
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminAddMemberEmailLabel}</div>
-                <input value={emailMembruNou} onChange={e => setEmailMembruNou(e.target.value)} placeholder={t.adminAddMemberEmailPlaceholder} type="email"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+                <Input value={emailMembruNou} onChange={e => setEmailMembruNou(e.target.value)} placeholder={t.adminAddMemberEmailPlaceholder} type="email"
+                  style={{ marginBottom: '10px' }} />
                 <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminAddMemberNameLabel}</div>
-                <input value={numeMembruNou} onChange={e => setNumeMembruNou(e.target.value)} placeholder={t.adminAddMemberNamePlaceholder}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
-                <button onClick={adaugaMembruManual} disabled={savingMembruNou || !emailMembruNou.trim()}
-                  style={{ width: '100%', padding: '12px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: (savingMembruNou || !emailMembruNou.trim()) ? 'not-allowed' : 'pointer', opacity: (savingMembruNou || !emailMembruNou.trim()) ? 0.6 : 1 }}>
+                <Input value={numeMembruNou} onChange={e => setNumeMembruNou(e.target.value)} placeholder={t.adminAddMemberNamePlaceholder}
+                  style={{ marginBottom: '10px' }} />
+                <Button variant="secondary" onClick={adaugaMembruManual} disabled={savingMembruNou || !emailMembruNou.trim()}>
                   {savingMembruNou ? t.adminAddMemberSaving : t.adminAddMemberSubmitButton}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -5273,10 +5325,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             {sortClienti === 'toti' ? t.adminClientsSectionAll : sortClienti === 'activi' ? t.adminClientsSectionActive : t.adminClientsSectionInactive} ({clientiFiltrati.length})
           </div>
           {clientiFiltrati.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '13px' }}>
-              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Users size={32} color="#ccc" strokeWidth={1.5} /></div>
-              {clienti.length === 0 ? t.adminClientsEmptyRegistered : t.adminClientsEmptyFiltered}
-            </div>
+            <EmptyState icon={Users} message={clienti.length === 0 ? t.adminClientsEmptyRegistered : t.adminClientsEmptyFiltered} />
           ) : clientiFiltrati.map(c => {
             const abo = getAbonamentClient(c.email)
             const aboQueued = getQueuedAbonamentClient(c.email)
@@ -5588,20 +5637,20 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 </select>
               </>
             )}
-            <button onClick={saveAbonament} disabled={savingAbonament} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingAbonament ? 'not-allowed' : 'pointer', opacity: savingAbonament ? 0.7 : 1 }}>
+            <Button onClick={saveAbonament} disabled={savingAbonament}>
               {savingAbonament ? t.adminSubsSaving : t.adminSubsAddButton}
-            </button>
+            </Button>
           </div>
           {/* ADMIN SUBSCRIPTIONS SEARCH - minimal UI change - read-only, client-side
               filter over the already-loaded `abonamente`/`clienti` state, name-or-email,
               partial/case/diacritic-insensitive. Deliberately its own input+state
               (searchAbonamente), not reusing searchClienti - independent of the New
               subscription form above (no autocomplete change) and of the Clients tab. */}
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '10px 14px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Card bordered style={{ padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '16px' }}>🔍</span>
             <input value={searchAbonamente} onChange={e => setSearchAbonamente(e.target.value)} placeholder={t.adminSubsSearchPlaceholder}
-              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }} />
-          </div>
+              style={{ flex: 1, border: 'none', fontSize: '13px', background: 'transparent' }} />
+          </Card>
           {(() => {
             const fmtData = (d) => new Date(d + 'T00:00:00').toLocaleDateString(localeFor(lang), { day: '2-digit', month: '2-digit', year: 'numeric' })
             const foldDiacritics = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -5622,7 +5671,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               <>
                 <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminSubsListHeader(emails.length, abonamenteVizibile)}</div>
                 {searchQ && emails.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#888', fontSize: '13px' }}>{t.adminSubsSearchEmpty}</div>
+                  <EmptyState message={t.adminSubsSearchEmpty} />
                 )}
                 {emails.map(email => {
                   const list = grouped[email]
@@ -5833,7 +5882,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ fontSize: '12px', color: '#888' }}>{t.adminClassListHeader(clase.length)}</div>
-            <button onClick={stergeClaseleTrecute} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', cursor: 'pointer' }}>{t.adminClassDeletePast}</button>
+            <Button variant="destructive" fullWidth={false} onClick={stergeClaseleTrecute}>{t.adminClassDeletePast}</Button>
           </div>
 
           {/* SĂPTĂMÂNILE TRECUTE - same accordion visual/interaction pattern
@@ -5844,7 +5893,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               default; historical classes are fetched only on first open
               (toggleClaseTrecuteOpen), then cached in claseTrecute for the
               rest of the admin session. */}
-          <div style={{ background: '#fff', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '14px' }}>
+          <Card bordered style={{ overflow: 'hidden', marginBottom: '14px' }}>
             <button onClick={toggleClaseTrecuteOpen}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box' }}>
               <div style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0E0E0E' }}>{t.adminClassPastWeeksHeader}</div>
@@ -5871,7 +5920,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* CURRENT + FUTURE - unchanged flat day-by-day rendering, now
               starting at the current week's Monday instead of the earliest
@@ -6040,27 +6089,27 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {/* PLANURI */}
       {adminTab === 'planuri' && isAdmin && (
         <>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <Card bordered style={{ padding: '16px', marginBottom: '14px' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminPlansNewTitle}</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansNameLabel}</div>
-            <input value={numePlan} onChange={e => setNumePlan(e.target.value)} placeholder={t.adminPlansNamePlaceholder}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <Input value={numePlan} onChange={e => setNumePlan(e.target.value)} placeholder={t.adminPlansNamePlaceholder}
+              style={{ marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansSessionsLabel}</div>
-            <input type="number" value={sedintePlan} onChange={e => setSedintePlan(e.target.value)} placeholder={t.adminPlansSessionsPlaceholder}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <Input type="number" value={sedintePlan} onChange={e => setSedintePlan(e.target.value)} placeholder={t.adminPlansSessionsPlaceholder}
+              style={{ marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansPriceLabel}</div>
-            <input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder={t.adminPlansPricePlaceholder}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '10px' }} />
+            <Input type="number" value={pretPlan} onChange={e => setPretPlan(e.target.value)} placeholder={t.adminPlansPricePlaceholder}
+              style={{ marginBottom: '10px' }} />
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminPlansDurationLabel}</div>
-            <input type="number" min="1" value={durataPlan} onChange={e => setDurataPlan(Math.max(1, parseInt(e.target.value) || 1))} placeholder={t.adminPlansDurationPlaceholder}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
+            <Input type="number" min="1" value={durataPlan} onChange={e => setDurataPlan(Math.max(1, parseInt(e.target.value) || 1))} placeholder={t.adminPlansDurationPlaceholder}
+              style={{ marginBottom: '14px' }} />
             <button onClick={savePlan} disabled={savingPlan} style={{ width: '100%', padding: '12px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '500', cursor: savingPlan ? 'not-allowed' : 'pointer', opacity: savingPlan ? 0.7 : 1 }}>
               {savingPlan ? t.adminPlansSaving : t.adminPlansAddButton}
             </button>
-          </div>
+          </Card>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>{t.adminPlansListHeader(planuri.length)}</div>
           {planuri.map(p => (
-            <div key={p.id} style={{ background: '#fff', borderRadius: '14px', padding: '14px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <Card key={p.id} bordered style={{ padding: '14px', marginBottom: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E' }}>{p.name}</div>
@@ -6091,7 +6140,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
                   </div>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </>
       )}
@@ -6099,7 +6148,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {/* SETĂRI */}
       {adminTab === 'setari' && isAdmin && (
         <>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <Card bordered style={{ padding: '16px 20px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} /> {t.adminSettingsReportsTitle}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -6124,8 +6173,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           ) : (
             <div style={{ textAlign: 'center', color: '#aaa', fontSize: '13px', padding: '20px 0' }}>{t.adminSettingsLoading}</div>
           )}
-        </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        </Card>
+        <Card bordered style={{ padding: '20px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCancelWindowTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '20px' }}>{t.adminSettingsCancelWindowSubtitle}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -6141,12 +6190,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           {cancelWindowSetting === 0 && (
             <div style={{ fontSize: '11px', color: '#0E0E0E', background: '#f0f0f0', padding: '8px 12px', borderRadius: '8px', marginBottom: '16px' }}>{t.adminSettingsNoRestriction}</div>
           )}
-          <button onClick={saveSettings} disabled={savingSettings}
-            style={{ width: '100%', padding: '13px', background: savingSettings ? '#e0e0e0' : '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: savingSettings ? 'not-allowed' : 'pointer' }}>
+          <Button onClick={saveSettings} disabled={savingSettings}>
             {savingSettings ? t.adminSettingsSaving : t.adminSettingsSaveButton}
-          </button>
-        </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          </Button>
+        </Card>
+        <Card bordered style={{ padding: '20px', marginTop: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
             <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={16} /> {t.adminOnlinePaymentsTitle}</div>
             <button onClick={toggleOnlinePayments} disabled={savingOnlinePayments}
@@ -6158,39 +6206,36 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
           <div style={{ fontSize: '11px', color: '#0E0E0E', background: onlinePaymentsEnabled ? '#F0FBE3' : '#f0f0f0', padding: '8px 12px', borderRadius: '8px' }}>
             {onlinePaymentsEnabled ? t.adminOnlinePaymentsEnabled : t.adminOnlinePaymentsDisabled}
           </div>
-        </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+        </Card>
+        <Card bordered style={{ padding: '20px', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymNameLabel}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminGymNameHint}</div>
-          <input value={gymNameInput} onChange={e => setGymNameInput(e.target.value)}
-            style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px' }} />
-          <button onClick={saveGymName} disabled={savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent}
-            style={{ width: '100%', padding: '13px', background: (savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent) ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: (savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent) ? 'not-allowed' : 'pointer' }}>
+          <Input value={gymNameInput} onChange={e => setGymNameInput(e.target.value)}
+            style={{ padding: '12px', fontSize: '14px', marginBottom: '14px' }} />
+          <Button variant="secondary" onClick={saveGymName} disabled={savingGymName || !gymNameInput.trim() || gymNameInput.trim() === gymNameCurrent}>
             {t.adminGymNameSave}
-          </button>
-        </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          </Button>
+        </Card>
+        <Card bordered style={{ padding: '20px', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminGymCodeLabel}</div>
           <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#888', marginBottom: '16px' }}>{t.adminGymCodeHint}</div>
           <div style={{ fontSize: '28px', fontWeight: '600', color: '#0E0E0E', letterSpacing: '3px', textAlign: 'center', background: '#f9f9f9', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
             {gymJoinCode || '······'}
           </div>
-          <button onClick={regenerateGymJoinCode} disabled={regeneratingCode}
-            style={{ width: '100%', padding: '13px', background: regeneratingCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: regeneratingCode ? 'not-allowed' : 'pointer' }}>
+          <Button variant="secondary" onClick={regenerateGymJoinCode} disabled={regeneratingCode}>
             {t.adminGymCodeRegenerate}
-          </button>
-        </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+          </Button>
+        </Card>
+        <Card bordered style={{ padding: '20px', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminRedeemTransferCodeTitle}</div>
           <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#888', marginBottom: '16px' }}>{t.adminRedeemTransferCodeHint}</div>
           <input value={redeemCodeInput} onChange={e => setRedeemCodeInput(e.target.value)}
             placeholder={t.adminRedeemTransferCodePlaceholder}
             style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '14px', textTransform: 'uppercase' }} />
-          <button onClick={redeemTransferCode} disabled={redeemingCode || !redeemCodeInput.trim()}
-            style={{ width: '100%', padding: '13px', background: (redeemingCode || !redeemCodeInput.trim()) ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: (redeemingCode || !redeemCodeInput.trim()) ? 'not-allowed' : 'pointer' }}>
+          <Button variant="secondary" onClick={redeemTransferCode} disabled={redeemingCode || !redeemCodeInput.trim()}>
             {redeemingCode ? t.adminRedeemTransferCodeSubmitting : t.adminRedeemTransferCodeButton}
-          </button>
-        </div>
+          </Button>
+        </Card>
         <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '4px' }}>{t.adminSettingsCoachTitle}</div>
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '14px' }}>{t.adminSettingsCoachSubtitle}</div>
@@ -6275,12 +6320,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             </div>
           )})}
         </div>
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: '14px' }}>
+        <Card bordered style={{ padding: '20px', marginTop: '14px' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#0E0E0E', marginBottom: '14px' }}>{t.platformAdminCodesTitle}</div>
-          <button onClick={generateSignupCode} disabled={generatingSignupCode}
-            style={{ width: '100%', padding: '13px', background: generatingSignupCode ? '#e0e0e0' : '#0E0E0E', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: generatingSignupCode ? 'not-allowed' : 'pointer', marginBottom: '14px' }}>
+          <Button variant="secondary" onClick={generateSignupCode} disabled={generatingSignupCode} style={{ marginBottom: '14px' }}>
             {t.platformAdminGenerateCode}
-          </button>
+          </Button>
           {signupCodes.length === 0 ? (
             <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center', padding: '10px 0' }}>{t.platformAdminNoCodes}</div>
           ) : signupCodes.map(c => (
@@ -6291,7 +6335,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               </span>
             </div>
           ))}
-        </div>
+        </Card>
         </>
       )}
 
@@ -6467,7 +6511,7 @@ function SortableList({ items, onReorder, onRemove }) {
                 onChange={e => setEditVal(e.target.value)}
                 onBlur={() => commitEdit(i)}
                 onKeyDown={e => { if (e.key === 'Enter') commitEdit(i) }}
-                style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '13px', color: '#0E0E0E', outline: 'none', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
+                style={{ width: '100%', border: 'none', background: 'transparent', fontSize: '13px', color: '#0E0E0E', padding: '0', touchAction: 'auto', boxSizing: 'border-box' }}
               />
               {miscareSugestii(editVal).length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', borderRadius: '10px', marginTop: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
@@ -11710,12 +11754,12 @@ function App() {
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetNewPasswordLabel}</div>
               <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder={t.resetNewPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
             </div>
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.resetConfirmPasswordLabel}</div>
               <input value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)} type="password" placeholder={t.resetConfirmPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
             </div>
             {authError && (
               <div style={{ padding: '10px 14px', borderRadius: '10px', marginBottom: '14px', background: authError.startsWith('✓') ? '#1a2e0f' : '#2e0f0f', color: authError.startsWith('✓') ? '#7dce4e' : '#ff7070', fontSize: '12px' }}>
@@ -11839,13 +11883,13 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authFindGymLabel}</div>
                 <input value={gymQuery} onChange={e => searchGyms(e.target.value)} placeholder={t.authFindGymPlaceholder}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
                 {selectedGym && (
                   <div>
                     <div style={{ marginTop: '8px', marginBottom: '8px', fontSize: '12px', color: '#ABE73C', fontWeight: '600' }}>✓ {selectedGym.name}</div>
                     <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authGymCodeLabel}</div>
                     <input value={joinCodeInput} onChange={e => setJoinCodeInput(e.target.value.toUpperCase())} placeholder={t.authGymCodePlaceholder}
-                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff', letterSpacing: '1px' }} />
+                      style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff', letterSpacing: '1px' }} />
                   </div>
                 )}
                 {!selectedGym && gymResults.length > 0 && (
@@ -11864,11 +11908,11 @@ function App() {
         )}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authEmailLabel}</div>
-          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.authEmailPlaceholder} type="email" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
         </div>
         <div style={{ marginBottom: authScreen === 'login' ? '12px' : '20px' }}>
           <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '4px' }}>{t.authPasswordLabel}</div>
-          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={t.authPasswordPlaceholder} type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={t.authPasswordPlaceholder} type="password" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #333', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#222', color: '#fff' }} />
         </div>
         {authScreen === 'login' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -11943,7 +11987,7 @@ function App() {
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.noGymMembershipText}</div>
             <input value={noGymJoinCode} onChange={e => { setNoGymJoinCode(e.target.value.toUpperCase()); setNoGymJoinError('') }}
               placeholder={t.authGymCodePlaceholder}
-              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fafafa', letterSpacing: '1px', textAlign: 'center', marginBottom: '10px' }} />
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fafafa', letterSpacing: '1px', textAlign: 'center', marginBottom: '10px' }} />
             {noGymJoinError && (
               <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{noGymJoinError}</div>
             )}
@@ -11964,7 +12008,7 @@ function App() {
             <div style={{ fontSize: '18px', fontWeight: '600', color: '#0E0E0E', marginBottom: '8px' }}>{t.ownerBootstrapTitle}</div>
             <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', marginBottom: '20px' }}>{t.ownerBootstrapText}</div>
             <input value={newGymName} onChange={e => setNewGymName(e.target.value)} placeholder={t.authGymNamePlaceholder}
-              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', background: '#fafafa', marginBottom: '10px' }} />
+              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', background: '#fafafa', marginBottom: '10px' }} />
             {authError && (
               <div style={{ fontSize: '12px', color: '#E24B4A', marginBottom: '10px' }}>{authError}</div>
             )}
@@ -13866,9 +13910,9 @@ function App() {
                       </>
                     )}
                     <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prVariantLabel}</div>
-                    <select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }}>
+                    <Select value={prVarianta} onChange={e => setPrVarianta(e.target.value)} style={{ marginBottom: '12px' }}>
                       <option>RX</option><option>Intermediate</option><option>Beginner</option><option>OnRamp</option>
-                    </select>
+                    </Select>
                   </>
                 ) : CARDIO_MISCARI.includes(miscarePR) ? (
                   <>
@@ -14200,7 +14244,7 @@ function App() {
                           value={catSearch[cat] || ''}
                           onChange={e => setCatSearch(prev => ({ ...prev, [cat]: e.target.value }))}
                           placeholder={t.prSearchPlaceholder(cfg.label)}
-                          style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box', outline: 'none' }}
+                          style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box' }}
                         />
                       </div>
                       {miscariAfisate.length === 0
@@ -14243,7 +14287,7 @@ function App() {
                           value={catSearch['HERO_WODS'] || ''}
                           onChange={e => setCatSearch(prev => ({ ...prev, HERO_WODS: e.target.value }))}
                           placeholder={t.prSearchPlaceholder(cfg.label)}
-                          style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box', outline: 'none' }}
+                          style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '13px', background: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 10px center #fafafa`, boxSizing: 'border-box' }}
                         />
                       </div>
                       {heroAfisate.length === 0
@@ -14481,13 +14525,13 @@ function App() {
                 <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileFirstNameLabel}</div>
                 <input value={profileFirstName} onChange={e => setProfileFirstName(e.target.value)}
                   placeholder={t.profileFirstNamePlaceholder}
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileLastNameLabel}</div>
                 <input value={profileLastName} onChange={e => setProfileLastName(e.target.value)}
                   placeholder={t.profileLastNamePlaceholder}
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
               </div>
             </div>
 
@@ -14495,7 +14539,7 @@ function App() {
               <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileBirthDateLabel}</div>
               <input type="date" value={profileBirthDate} onChange={e => setProfileBirthDate(e.target.value)}
                 max={todayLocalStr()}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
             </div>
 
             <div style={{ marginBottom: '24px' }}>
@@ -14576,12 +14620,12 @@ function App() {
             <div style={{ marginBottom: '14px' }}>
               <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileNewPasswordLabel}</div>
               <input value={profileNewPassword} onChange={e => setProfileNewPassword(e.target.value)} type="password" placeholder={t.profileNewPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.profileConfirmPasswordLabel}</div>
               <input value={profileNewPasswordConfirm} onChange={e => setProfileNewPasswordConfirm(e.target.value)} type="password" placeholder={t.profileConfirmPasswordPlaceholder}
-                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
             </div>
             <button onClick={changeMyPassword} disabled={passwordSaving}
               style={{ width: '100%', padding: '16px', background: '#0E0E0E', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.6 : 1 }}>
@@ -14680,20 +14724,20 @@ function App() {
                     <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingFirstNameLabel}</div>
                     <input value={onboardingFirstName} onChange={e => setOnboardingFirstName(e.target.value)}
                       placeholder={t.onboardingFirstNamePlaceholder}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingLastNameLabel}</div>
                     <input value={onboardingLastName} onChange={e => setOnboardingLastName(e.target.value)}
                       placeholder={t.onboardingLastNamePlaceholder}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box' }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: '24px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '600', lineHeight: 1.2, color: '#888', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>{t.onboardingBirthDateLabel}</div>
                   <input type="date" value={onboardingBirthDate} onChange={e => setOnboardingBirthDate(e.target.value)}
                     max={todayLocalStr()}
-                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', outline: 'none', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1.5px solid #e0e0e0', fontSize: '15px', color: '#0E0E0E', boxSizing: 'border-box', background: '#fff' }} />
                 </div>
                 <button onClick={() => { if (!onboardingFirstName.trim() || !onboardingLastName.trim() || !onboardingBirthDate) { showToast(t.onboardingFillRequired); return }; setOnboardingStep(2) }}
                   style={{ width: '100%', padding: '16px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>

@@ -1,7 +1,154 @@
 // Componente prezentaționale mici, fără dependințe de Supabase - testabile izolat.
 import { useEffect, useRef } from 'react'
 import { getInitiale, NIVEL_DOT_COLORS } from './utils'
-import { TYPO } from './typography'
+import { TYPO, TYPE } from './typography'
+import { COLORS } from './theme'
+import { RADIUS } from './spacing'
+
+// Design System V1.0 - shared Button foundation. Demonstrated shared use
+// case: "+ Add subscription" and "+ Add member" (App.jsx) were two
+// independent inline <button style={{}}> blocks with the same primary-CTA
+// pattern (lime fill, dark text, full-width, 12px radius) - this is the
+// extraction point, migrated incrementally (these two call sites first),
+// not a sweeping replace of every button in the app.
+const BUTTON_VARIANTS = {
+  primary: { background: COLORS.brand.default, color: COLORS.brand.contrast },
+  secondary: { background: COLORS.interaction.actionSecondary, color: COLORS.text.inverse },
+  destructive: { background: COLORS.feedback.dangerSoft, color: COLORS.feedback.danger },
+}
+
+export function Button({ variant = 'primary', disabled = false, fullWidth = true, type = 'button', children, style, ...rest }) {
+  const v = BUTTON_VARIANTS[variant] || BUTTON_VARIANTS.primary
+  return (
+    <button type={type} disabled={disabled}
+      style={{
+        width: fullWidth ? '100%' : undefined,
+        padding: '13px 16px',
+        borderRadius: RADIUS.button,
+        border: 'none',
+        background: disabled ? COLORS.interaction.disabled : v.background,
+        color: disabled ? COLORS.text.disabled : v.color,
+        ...TYPE.button,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        ...style,
+      }}
+      {...rest}>
+      {children}
+    </button>
+  )
+}
+
+// Design System V1.0 - shared workout-level badge. Owner's final WorkoutCard
+// override: no colored vertical accent - level is communicated ONLY through
+// this badge (color + text label together, never color alone). `level` picks
+// the token pair from theme.js COLORS.category; `label` is caller-supplied
+// (already-translated) text, kept out of this presentational component the
+// same way AvatarCircle/LevelDot above take no embedded copy of their own.
+const LEVEL_BADGE_COLORS = {
+  rx: { bg: COLORS.category.rx, text: COLORS.category.rxContrast },
+  intermediate: { bg: COLORS.category.intermediate, text: COLORS.category.intermediateContrast },
+  beginner: { bg: COLORS.category.beginner, text: COLORS.category.beginnerContrast },
+  onramp: { bg: COLORS.category.onramp, text: COLORS.category.onrampContrast },
+}
+
+export function WorkoutLevelBadge({ level, label }) {
+  const c = LEVEL_BADGE_COLORS[level]
+  if (!c || !label) return null
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: RADIUS.full, background: c.bg, color: c.text, ...TYPE.label }}>
+      {label}
+    </span>
+  )
+}
+
+// Design System V1.0 Phase 3A - shared Select foundation. Demonstrated shared
+// use case: 8 native <select style={{}}> blocks across App.jsx share this
+// exact convention (10px/12px padding, border, #fafafa fill) with no shared
+// wrapper. `children` (not an options prop) so a call site migrates by
+// swapping the tag and moving its existing <option> children in unchanged -
+// no risk of altering which options exist or their order.
+export function Select({ value, onChange, children, disabled, style, ...rest }) {
+  return (
+    <select value={value} onChange={onChange} disabled={disabled}
+      style={{ width: '100%', padding: '10px 12px', borderRadius: RADIUS.input, border: `1px solid ${COLORS.border}`, fontSize: '13px', background: COLORS.surface.subtle, boxSizing: 'border-box', color: disabled ? COLORS.text.disabled : COLORS.text.primary, ...style }}
+      {...rest}>
+      {children}
+    </select>
+  )
+}
+
+// Design System V1.0 Phase 3A - shared Input foundation. Demonstrated shared
+// use case: 46 inputs across App.jsx match this exact convention. Deliberately
+// thin (no built-in label/error - callers keep their own label div above it,
+// same as every existing call site) so migrating a call site changes nothing
+// about its surrounding structure, only the input element itself.
+export function Input({ style, ...rest }) {
+  return (
+    <input
+      style={{ width: '100%', padding: '10px 12px', borderRadius: RADIUS.input, border: `1px solid ${COLORS.border}`, fontSize: '13px', background: COLORS.surface.subtle, boxSizing: 'border-box', ...style }}
+      {...rest} />
+  )
+}
+
+// Design System V1.0 Phase 3A - shared StatusBadge foundation. Demonstrated
+// shared use case: small colored status/role pills (Admin/Coach role badge
+// today; subscription-status badges are a separate, regression-risk-adjacent
+// call site deliberately NOT migrated in this phase). Per the approved
+// accessibility rule, color is never the only signal - `label` is required,
+// never optional, same guarantee WorkoutLevelBadge already makes.
+const STATUS_BADGE_COLORS = {
+  danger: { bg: COLORS.feedback.dangerSoft, text: COLORS.feedback.danger },
+  success: { bg: COLORS.feedback.successSoft, text: COLORS.feedback.success },
+  warning: { bg: COLORS.feedback.warningSoft, text: COLORS.feedback.warning },
+  info: { bg: COLORS.feedback.infoSoft, text: COLORS.feedback.info },
+  neutral: { bg: COLORS.surface.subtle, text: COLORS.text.secondary },
+}
+
+export function StatusBadge({ tone = 'neutral', label }) {
+  if (!label) return null
+  const c = STATUS_BADGE_COLORS[tone] || STATUS_BADGE_COLORS.neutral
+  return (
+    <span style={{ background: c.bg, color: c.text, fontSize: '10px', padding: '2px 8px', borderRadius: RADIUS.full, fontWeight: '600' }}>
+      {label}
+    </span>
+  )
+}
+
+// Design System V1.0 Phase 3A - shared EmptyState foundation. Demonstrated
+// shared use case: the Clients tab and Subscriptions-list search (both built
+// earlier this session) independently reached for the same "no results"
+// shape with minor drift (padding/color). Formalized here on the approved
+// text.tertiary token rather than either call site's original ad hoc gray.
+// `icon` is optional - the Clients tab's empty state has one, the
+// Subscriptions search's doesn't; both are real, current usages.
+export function EmptyState({ icon: Icon, message }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '24px 0', color: COLORS.text.tertiary, fontSize: '13px' }}>
+      {Icon && <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Icon size={32} color={COLORS.text.muted} strokeWidth={1.5} /></div>}
+      {message}
+    </div>
+  )
+}
+
+// Design System V1.0 Phase 3A - Card, PREPARED ONLY, not yet wired into any
+// live call site (per owner instruction: Phase 3B, separate approval). Radius
+// 16px / no default shadow are the two concrete, visible corrections the
+// approved spec makes to the ~59 existing ad hoc "white card" instances - this
+// definition exists so Phase 3B can migrate against a tested target rather
+// than improvising one later. `bordered` (a subtle 1px border, the approved
+// spec's "subtle border where necessary" for a workout-card-like surface) and
+// `elevated` (theme.js shadow.sm, for the rare case something functionally
+// needs to lift off the page) are both opt-in - the default is neither, per
+// "no default decorative shadow on every card."
+export function Card({ bordered = false, elevated = false, children, style, ...rest }) {
+  return (
+    <div
+      style={{ background: COLORS.surface.default, borderRadius: RADIUS.card, border: bordered ? `1px solid ${COLORS.border}` : 'none', boxShadow: elevated ? COLORS.shadow.sm : 'none', ...style }}
+      {...rest}>
+      {children}
+    </div>
+  )
+}
 
 export function AvatarCircle({ name, avatarUrl, size = 38 }) {
   const culori = ['#f0f0f0', '#f0f0f0', '#FAEEDA', '#E6F1FB', '#FCE8E8']

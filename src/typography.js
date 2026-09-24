@@ -107,4 +107,19 @@ export const TYPE = {
 
   // finest print — "for time" / "AMRAP" tag, prescribed-weight suffix, disclaimers
   caption: { fontSize: '11px', fontWeight: '400', lineHeight: 1.35 },
+
+  // Design System V1.0 — completes the scale (Final Specification, Typography
+  // Option A). Ported from TYPO.navBottom/navTop rather than re-derived, so
+  // migrating a nav call site from TYPO to TYPE changes nothing visually.
+  navBottom: { fontSize: '11px', fontWeight: '500', lineHeight: 1.2 },
+  navTop: { fontSize: '13px', fontWeight: '500', lineHeight: 1.2 },
+
+  // Countdown/stopwatch display (the fullscreen timer). The 80px size stays
+  // a documented one-off outside this scale's normal steps — this role exists
+  // so that one-off has a named home instead of an inline literal.
+  timer: { fontSize: '80px', fontWeight: '600', lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' },
+
+  // PR/leaderboard/stat-tile numbers — one step down from `score`, for
+  // secondary or listed statistics rather than the single anchor number.
+  statistics: { fontSize: '15px', fontWeight: '600', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' },
 }
