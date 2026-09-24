@@ -14,7 +14,7 @@ export const MISCARI = [
   'Thruster', 'Farmers Carry', 'Turkish Get Up', 'Good Morning', 'Hip Thrust',
   'Pull-up', 'Chest to Bar Pull-up', 'Muscle-up', 'Ring Muscle-up', 'Bar Muscle-up',
   'Toes to Bar', 'Knees to Elbow', 'Ring Row', 'Push-up', 'Handstand Push-up',
-  'Ring Dip', 'Bar Dip', 'Handstand Hold', 'Handstand Walk', 'L-sit Hold',
+  'Ring Dip', 'Bar Dip', 'Handstand Hold', 'Handstand Walk', 'L-sit Hold', 'Bar Hang', 'Static Bar Hang',
   'Box Jump', 'Broad Jump', 'Burpee', 'Double Under', 'Single Under',
   'Pistol Squat', 'Rope Climb', 'GHD Sit-up', 'GHD Back Extension',
   'Walking Lunge', 'Overhead Lunge', 'Front Rack Lunge',

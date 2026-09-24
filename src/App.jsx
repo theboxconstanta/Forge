@@ -11095,7 +11095,7 @@ function App() {
     const isBenchmark = miscarePR in heroWodsInfoAll
     const isCardio = CARDIO_MISCARI.includes(miscarePR)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(miscarePR)
-    const isHold = ['Handstand Hold','L-sit Hold'].includes(miscarePR)
+    const isHold = ['Handstand Hold','L-sit Hold','Bar Hang','Static Bar Hang'].includes(miscarePR)
     let insertData = { movement: miscarePR, notes: prNote || null }
     if (!editPrId) { insertData.member_id = user.id; insertData.gym_id = userProfile.gym_id }
     if (isBenchmark && isAmrapHeroPr) {
@@ -11126,7 +11126,7 @@ function App() {
     const isBenchmark = movement in heroWodsInfoAll
     const isCardio = CARDIO_MISCARI.includes(movement)
     const isGym = ['Pull-up','Chest to Bar Pull-up','Muscle-up','Toes to Bar','Push-up','Handstand Push-up','Double Under','Box Jump','Pistol Squat','Rope Climb','GHD Sit-up','GHD Back Extension'].includes(movement)
-    const isHold = ['Handstand Hold','L-sit Hold'].includes(movement)
+    const isHold = ['Handstand Hold','L-sit Hold','Bar Hang','Static Bar Hang'].includes(movement)
     setMiscarePR(movement)
     setPrValoare(''); setPrReps(''); setPrTimp(''); setPrRoundsCompleted(''); setPrPartialReps([]); setPrDistanta(''); setPrCardioUnit('m'); setPrVarianta('RX')
     if (isBenchmark) {
@@ -13939,7 +13939,7 @@ function App() {
                     <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prMaxRepsLabel}</div>
                     <input type="number" value={prReps} onChange={e => setPrReps(e.target.value)} placeholder={t.prRepsPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />
                   </>
-                ) : ['Handstand Hold','L-sit Hold'].includes(miscarePR) ? (
+                ) : ['Handstand Hold','L-sit Hold','Bar Hang','Static Bar Hang'].includes(miscarePR) ? (
                   <>
                     <div style={{ fontSize: '11px', lineHeight: 1.35, color: '#888', marginBottom: '4px' }}>{t.prHoldTimeLabel}</div>
                     <input type="number" value={prValoare} onChange={e => setPrValoare(e.target.value)} placeholder={t.prHoldPlaceholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e0e0e0', fontSize: '13px', background: '#fafafa', boxSizing: 'border-box', marginBottom: '12px' }} />

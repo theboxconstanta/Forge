@@ -99,7 +99,7 @@ describe('P9.3 — representative capability expectations (deterministic movemen
     // erg / cardio
     Row: 'calories+distance/calories', 'Ski Erg': 'calories+distance/calories', 'Bike Erg': 'calories+distance/calories',
     'Assault Bike': 'calories+distance/calories', 'Echo Bike': 'calories+distance/calories', 'Air Bike': 'calories+distance/calories',
-    Run: 'distance/distance', 'Shuttle Run': 'distance/distance', Swim: 'distance/distance',
+    Run: 'distance/distance', 'Shuttle Run': 'distance+reps/distance', Swim: 'distance/distance',
     // carries — load + distance
     'Farmers Carry': 'distance+load/load', 'Sandbag Carry': 'distance+load/load', 'Suitcase Carry': 'distance+load/load',
     'Overhead Walk': 'distance+load/load',
