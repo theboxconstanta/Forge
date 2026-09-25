@@ -1434,9 +1434,11 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
           // scheme) with nothing left blank/incomplete. Only a movement whose
           // capability is load-ONLY (no reps at all) keeps the original guard,
           // since removing its one and only metric would leave zero
-          // prescription content.
+          // prescription content. Any quantity metric counts as that structure
+          // (e.g. "100 m Dumbbell Walking Lunge" - distance, no reps), so
+          // load stays optional in both Reps and Meters mode.
           <PmpeMetricEditor label="Load" metric="load" spec={instance.load} defaultMode="sex_specific" onChange={s => patch({ load: s })}
-            onRemove={(cap.default !== 'load' || !!instance.reps) ? () => { const n = { ...instance }; delete n.load; onChange(n) } : undefined} />
+            onRemove={(cap.default !== 'load' || PMPE_QTY.some(k => instance[k])) ? () => { const n = { ...instance }; delete n.load; onChange(n) } : undefined} />
         ) : cap.allowed.includes('load') ? (
           <button style={pmpeLink} onClick={() => patch({ load: { mode: 'sex_specific', male: null, female: null, unit: 'kg' } })}>+ Load</button>
         ) : null}
