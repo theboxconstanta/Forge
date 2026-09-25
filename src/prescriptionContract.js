@@ -19,7 +19,7 @@
 
 export const PRESCRIPTION_CONTRACT_VERSION = 1
 export const VARIANT_KEYS = ['rx', 'intermediate', 'beginner', 'onramp']
-export const METRIC_KEYS = ['reps', 'load', 'distance', 'calories']
+export const METRIC_KEYS = ['reps', 'load', 'distance', 'calories', 'seconds']
 export const LOAD_UNITS = ['kg', 'lb']
 export const DISTANCE_UNITS = ['m', 'km', 'ft', 'mi']
 
@@ -68,6 +68,7 @@ export function newMovementInstance({ name = '', canonicalMovementId = null, cap
   else if (def === 'load') inst.load = { mode: 'sex_specific', male: null, female: null, unit: 'kg' }
   else if (def === 'distance') inst.distance = { mode: 'universal', value: null, unit: 'm' }
   else if (def === 'calories') inst.calories = { mode: 'sex_specific', male: null, female: null }
+  else if (def === 'seconds') inst.seconds = { mode: 'universal', value: null }
   return inst
 }
 
@@ -385,7 +386,7 @@ export function validatePrescriptionsForPublish(doc, variantsToCheck = null) {
   const struct = validateMovementPrescriptions(doc)
   if (!struct.valid) return struct
   const variants = variantsToCheck || Object.keys(doc.variants)
-  const label = { reps: 'reps', load: 'load', distance: 'distance', calories: 'calories' }
+  const label = { reps: 'reps', load: 'load', distance: 'distance', calories: 'calories', seconds: 'seconds' }
   for (const vk of variants) {
     const vObj = doc.variants[vk]
     if (!vObj) continue
@@ -469,18 +470,19 @@ export function resolveMovementInstance(instance, gender) {
   const load = resolveSpec(instance.load, gender)
   const distance = resolveSpec(instance.distance, gender)
   const calories = resolveSpec(instance.calories, gender)
+  const seconds = resolveSpec(instance.seconds, gender)
   return {
     instanceId: instance.instanceId,
     name: instance.name,
     canonicalMovementId: instance.canonicalMovementId ?? null,
-    reps, load, distance, calories,
-    line: renderInstanceLine({ name: instance.name, reps, load, distance, calories }),
+    reps, load, distance, calories, seconds,
+    line: renderInstanceLine({ name: instance.name, reps, load, distance, calories, seconds }),
   }
 }
 
 /** Build the human line from ALREADY-RESOLVED specs (so it is identical whether
  * resolved to a member or to the gender-neutral "both" form). */
-export function renderInstanceLine({ name, reps, load, distance, calories }) {
+export function renderInstanceLine({ name, reps, load, distance, calories, seconds }) {
   let lead = ''
   if (reps) lead = measureToken(reps)
   else if (distance) {
@@ -489,6 +491,9 @@ export function renderInstanceLine({ name, reps, load, distance, calories }) {
   } else if (calories) {
     const t = measureToken(calories)
     lead = t ? `${t} Cal` : ''
+  } else if (seconds) {
+    const t = measureToken(seconds)
+    lead = t ? `${t} sec` : ''
   }
   let line = lead ? `${lead} ${name}` : name
   if (load) {
@@ -1376,6 +1381,7 @@ export function buildLegacyArtifactsForVariant(movements, opts = {}) {
       load: inlineLoad ? resolveSpec(mv.load, null) : null,
       distance: resolveSpec(mv.distance, null),
       calories: resolveSpec(mv.calories, null),
+      seconds: resolveSpec(mv.seconds, null),
     }
     return renderInstanceLine(resolved)
   })
@@ -1411,6 +1417,7 @@ export function buildPrescriptionSnapshot({ doc, variantKey, gender, resolvedAt,
     if (r.load) out.load = { value: r.load.value ?? null, unit: r.load.unit || 'kg', mode: r.load.mode, bothValues: r.load.bothValues }
     if (r.distance) out.distance = { value: r.distance.value ?? null, unit: r.distance.unit || 'm', mode: r.distance.mode, bothValues: r.distance.bothValues }
     if (r.calories) out.calories = { value: r.calories.value ?? null, mode: r.calories.mode, bothValues: r.calories.bothValues }
+    if (r.seconds) out.seconds = { value: r.seconds.value ?? null, mode: r.seconds.mode, bothValues: r.seconds.bothValues }
     return out
   })
   return {
@@ -1443,6 +1450,7 @@ export function movementObjectsForV2(instances) {
     const load = resolveSpec(mv.load, null)
     const distance = resolveSpec(mv.distance, null)
     const calories = resolveSpec(mv.calories, null)
+    const seconds = resolveSpec(mv.seconds, null)
     return {
       name: mv.name,
       instanceId: mv.instanceId ?? null,
@@ -1451,12 +1459,14 @@ export function movementObjectsForV2(instances) {
       weight: load ? `${measureToken(load)}${load.unit || 'kg'}` : null,
       distance: distance ? `${measureToken(distance)}${distance.unit || 'm'}` : null,
       calories: calories ? measureToken(calories) : null,
+      seconds: seconds ? measureToken(seconds) : null,
       equipment: [],
       prescription: {
         reps: mv.reps ?? null,
         load: mv.load ?? null,
         distance: mv.distance ?? null,
         calories: mv.calories ?? null,
+        seconds: mv.seconds ?? null,
       },
     }
   })

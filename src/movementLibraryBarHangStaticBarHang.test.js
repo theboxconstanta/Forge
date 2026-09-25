@@ -5,7 +5,8 @@
 // unchanged, the new DB migration is additive/idempotent and does NOT
 // touch the prescription-metric CHECK constraint domain, and neither
 // movement was fabricated into the checked-in capability snapshot (which
-// can only be regenerated after the migration is actually applied).
+// is regenerated from the live catalog only after a migration is applied -
+// it now reflects the follow-up seconds-prescription migration too).
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
@@ -96,10 +97,12 @@ describe('Catalog integrity snapshot — regenerated from the live catalog after
     const staticBarHang = hits.find((m) => m.name === 'Static Bar Hang')
     expect(barHang.id).toBe('6b132f3a-9287-49f8-ab73-51008caca92d')
     expect(staticBarHang.id).toBe('36b8fb73-21cd-4ce8-80fb-1aefc418b4fb')
-    expect(barHang.allowed).toEqual([])
-    expect(barHang.default).toBeNull()
-    expect(staticBarHang.allowed).toEqual([])
-    expect(staticBarHang.default).toBeNull()
+    // Post seconds-prescription migration 20260924100000 (applied 2026-09-25):
+    // the insert above left them opted out, the follow-up enabled seconds.
+    expect(barHang.allowed).toEqual(['seconds'])
+    expect(barHang.default).toBe('seconds')
+    expect(staticBarHang.allowed).toEqual(['seconds'])
+    expect(staticBarHang.default).toBe('seconds')
   })
 
   it('the snapshot invariant still holds (>= 460 rows) and existing hold movements are byte-identical', () => {

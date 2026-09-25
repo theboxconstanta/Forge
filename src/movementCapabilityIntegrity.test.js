@@ -50,8 +50,8 @@ describe('P9.3 — catalog snapshot invariants', () => {
     expect(bad.map((r) => r.name)).toEqual([])
   })
 
-  it('every allowed metric is one of reps|load|distance|calories', () => {
-    const ok = new Set(['reps', 'load', 'distance', 'calories'])
+  it('every allowed metric is one of reps|load|distance|calories|seconds', () => {
+    const ok = new Set(['reps', 'load', 'distance', 'calories', 'seconds'])
     const bad = rows.filter((r) => (r.allowed_prescription_metrics || []).some((m) => !ok.has(m)))
     expect(bad.map((r) => r.name)).toEqual([])
   })
@@ -103,7 +103,8 @@ describe('P9.3 — representative capability expectations (deterministic movemen
     // carries — load + distance
     'Farmers Carry': 'distance+load/load', 'Sandbag Carry': 'distance+load/load', 'Suitcase Carry': 'distance+load/load',
     'Overhead Walk': 'distance+load/load',
-    // static holds — no prescription metric (time lives in the section/format)
+    // static holds — no prescription metric (time lives in the section/format),
+    // except the seconds-prescription pilot (see below).
     Plank: 'none/null', 'Wall Sit': 'none/null', 'Handstand Hold': 'none/null', 'Hollow Hold': 'none/null', 'L Sit': 'none/null',
     // the one capability-disagreeing duplicate pair, now aligned
     'Sledgehammer Strike': 'load+reps/load', 'Sledgehammer Strikes': 'load+reps/load',
@@ -115,6 +116,21 @@ describe('P9.3 — representative capability expectations (deterministic movemen
       expect(sig(row)).toBe(expected)
     })
   }
+
+  // SECONDS PRESCRIPTION (2026-09-24) - migration
+  // 20260924100000_movement_prescription_seconds_metric.sql (applied to
+  // production 2026-09-25, snapshot regenerated from the live catalog) enables
+  // allowed_prescription_metrics=['seconds'] for exactly Bar Hang and Static
+  // Bar Hang - a per-row pilot, so no other movement may carry seconds.
+  it('Bar Hang and Static Bar Hang → seconds/seconds, and they are the only seconds-capable movements', () => {
+    for (const name of ['Bar Hang', 'Static Bar Hang']) {
+      const row = rows.find((r) => r.name === name)
+      expect(row, `catalog row "${name}" missing`).toBeTruthy()
+      expect(sig(row)).toBe('seconds/seconds')
+    }
+    const withSeconds = rows.filter((r) => (r.allowed_prescription_metrics || []).includes('seconds')).map((r) => r.name).sort()
+    expect(withSeconds).toEqual(['Bar Hang', 'Static Bar Hang'])
+  })
 })
 
 describe('P9.3 — the Wall Ball acceptance-failure class is closed', () => {

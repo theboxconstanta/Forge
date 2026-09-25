@@ -92,6 +92,7 @@ function variantInstances(sec, key) {
     load: specTuple(inst?.load),
     distance: specTuple(inst?.distance),
     calories: specTuple(inst?.calories),
+    seconds: specTuple(inst?.seconds),
   }))
 }
 
@@ -130,10 +131,10 @@ function diffMovements(sectionIdx, variantKey, base, fin) {
     if (a.name !== b.name && normMovementName(a.name) === normMovementName(b.name)) {
       push('movement_renamed', 'cosmetic', { at: i, from: a.name, to: b.name })
     }
-    for (const metric of ['reps', 'load', 'distance', 'calories']) {
+    for (const metric of ['reps', 'load', 'distance', 'calories', 'seconds']) {
       if (!tupleEq(a[metric], b[metric])) {
         push(metric === 'reps' ? 'reps_changed' : metric === 'load' ? 'load_changed'
-          : metric === 'distance' ? 'distance_changed' : 'calories_changed',
+          : metric === 'distance' ? 'distance_changed' : metric === 'calories' ? 'calories_changed' : 'seconds_changed',
           'semantic', { at: i, name: a.name, from: a[metric], to: b[metric] })
       }
     }

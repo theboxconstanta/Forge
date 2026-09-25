@@ -108,6 +108,30 @@
       "instance": { "instanceId": "m", "name": "Deadlift", "reps": { "mode": "universal", "value": 5 }, "load": { "mode": "sex_specific", "male": 225, "female": 155, "unit": "lb" } },
       "gender": "female",
       "expected": "5 Deadlift @ 155 lb"
+    },
+    {
+      "name": "seconds universal - Bar Hang",
+      "instance": { "instanceId": "n", "name": "Bar Hang", "seconds": { "mode": "universal", "value": 30 } },
+      "gender": "male",
+      "expected": "30 sec Bar Hang"
+    },
+    {
+      "name": "seconds universal, unknown gender - Static Bar Hang",
+      "instance": { "instanceId": "o", "name": "Static Bar Hang", "seconds": { "mode": "universal", "value": 45 } },
+      "gender": null,
+      "expected": "45 sec Static Bar Hang"
+    },
+    {
+      "name": "seconds sex_specific, female - Bar Hang",
+      "instance": { "instanceId": "p", "name": "Bar Hang", "seconds": { "mode": "sex_specific", "male": 45, "female": 30 } },
+      "gender": "female",
+      "expected": "30 sec Bar Hang"
+    },
+    {
+      "name": "seconds sex_specific, unknown gender shows BOTH",
+      "instance": { "instanceId": "q", "name": "Bar Hang", "seconds": { "mode": "sex_specific", "male": 45, "female": 30 } },
+      "gender": null,
+      "expected": "45/30 sec Bar Hang"
     }
   ],
   "validateStructure": [

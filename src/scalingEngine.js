@@ -264,6 +264,7 @@ export function generateVariantInstancesFromRx(rxInstances, overrides, lookupCan
         load: resolveSpec(inst.load, null),
         distance: resolveSpec(inst.distance, null),
         calories: resolveSpec(inst.calories, null),
+        seconds: resolveSpec(inst.seconds, null),
       })
       const parsed = parsePastedMovementLine(scaleMovementLine(line, tier, overrides), { lookupCanonical })
       if (parsed) {

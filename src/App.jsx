@@ -1259,7 +1259,7 @@ function PerformedEditPanel({ draft, gender, movementIndex, programmedInstances,
 const pmpeNumInput = { width: '52px', padding: '6px 4px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', textAlign: 'center', background: '#fff', boxSizing: 'border-box' }
 const pmpeLink = { background: 'none', border: 'none', color: '#888', fontSize: '11px', textDecoration: 'underline dotted', cursor: 'pointer', padding: 0 }
 const pmpeIconBtn = { width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #e0e0e0', background: '#fff', fontSize: '11px', color: '#666', cursor: 'pointer', flexShrink: 0 }
-const PMPE_QTY = ['reps', 'distance', 'calories']
+const PMPE_QTY = ['reps', 'distance', 'calories', 'seconds']
 
 const pmpeNumStr = (v) => (v === null || v === undefined ? '' : String(v))
 const pmpeAsNum = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -1302,8 +1302,8 @@ function PmpeMetricEditor({ label, metric, spec, defaultMode, onChange, onRemove
   const showUnit = metric === 'load' || metric === 'distance'
   const isText = metric === 'reps' && mode === 'text'
   const carry = showUnit ? { unit } : {}
-  // reps and calories are whole counts - the field rejects a decimal for them.
-  const isInt = metric === 'reps' || metric === 'calories'
+  // reps, calories and seconds are whole counts - the field rejects a decimal for them.
+  const isInt = metric === 'reps' || metric === 'calories' || metric === 'seconds'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
       <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#999' }}>{label}</span>
@@ -1377,13 +1377,14 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
     }
     else if (metric === 'distance') next.distance = { mode: 'universal', value: null, unit: 'm' }
     else if (metric === 'calories') next.calories = { mode: 'sex_specific', male: null, female: null }
+    else if (metric === 'seconds') next.seconds = { mode: 'universal', value: null }
   }
   const changeName = (name) => {
     const nc = capabilityFor(name)
     const hit = catalogRowFor(name)
     const next = { ...instance, name, canonicalMovementId: hit?.id ?? null }
-    if (nc.allowed.length) for (const k of ['reps', 'load', 'distance', 'calories']) if (next[k] && !nc.allowed.includes(k)) delete next[k]
-    const bare = !['reps', 'load', 'distance', 'calories'].some(k => next[k])
+    if (nc.allowed.length) for (const k of ['reps', 'load', 'distance', 'calories', 'seconds']) if (next[k] && !nc.allowed.includes(k)) delete next[k]
+    const bare = !['reps', 'load', 'distance', 'calories', 'seconds'].some(k => next[k])
     if (bare && nc.default) seed(next, nc.default, nc)
     onChange(next)
   }
@@ -1413,12 +1414,12 @@ function MovementRowPWA({ instance, onChange, onRemove, onDuplicate, onMoveUp, o
           <span style={{ display: 'inline-flex', border: '1px solid #e0e0e0', borderRadius: '7px', overflow: 'hidden' }}>
             {quantityChoices.map(m => (
               <button key={m} onClick={() => setQuantity(m)} style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, border: 'none', cursor: 'pointer', background: quantityMetric === m ? '#ABE73C' : '#fff', color: quantityMetric === m ? '#0E0E0E' : '#666' }}>
-                {m === 'distance' ? 'Distance' : m === 'calories' ? 'Calories' : 'Reps'}
+                {m === 'distance' ? 'Distance' : m === 'calories' ? 'Calories' : m === 'seconds' ? 'Seconds' : 'Reps'}
               </button>
             ))}
           </span>
         )}
-        {quantityMetric && <PmpeMetricEditor label={quantityMetric === 'reps' ? 'Reps' : quantityMetric === 'distance' ? 'Distance' : 'Calories'} metric={quantityMetric} spec={instance[quantityMetric]} defaultMode={quantityMetric === 'calories' ? 'sex_specific' : 'universal'} onChange={s => patch({ [quantityMetric]: s })} />}
+        {quantityMetric && <PmpeMetricEditor label={quantityMetric === 'reps' ? 'Reps' : quantityMetric === 'distance' ? 'Distance' : quantityMetric === 'seconds' ? 'Seconds' : 'Calories'} metric={quantityMetric} spec={instance[quantityMetric]} defaultMode={quantityMetric === 'calories' ? 'sex_specific' : 'universal'} onChange={s => patch({ [quantityMetric]: s })} />}
         {active.has('load') ? (
           // STRENGTH SETS OPTIONAL PROGRAMMED LOAD - "remove" was previously
           // hidden whenever load was the movement's own catalog default (e.g.

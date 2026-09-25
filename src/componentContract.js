@@ -1258,6 +1258,7 @@ export function renderComponentMovementLines(instances, gender = null) {
     load: resolveSpec(i.load, gender),
     distance: resolveSpec(i.distance, gender),
     calories: resolveSpec(i.calories, gender),
+    seconds: resolveSpec(i.seconds, gender),
   }))
 }
 
