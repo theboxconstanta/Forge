@@ -38,6 +38,12 @@
   outline-offset: 2px;
 }
 
+/* Admin -> Classes "Edit class" pencil button - hover feedback on pointer
+   devices only (touch devices never get a sticky hover state). */
+@media (hover: hover) {
+  .class-edit-btn:hover { background: #F2F2F2 !important; border-color: #C8C8C8 !important; }
+}
+
 /* prefers-reduced-motion - Design System V1.0 accessibility requirement.
    Global opt-out; any transition/animation this design system introduces
    inherits this without needing its own media query. */

@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban, ChevronDown, ChevronRight, Camera,
+  Archive, Ban, ChevronDown, ChevronRight, Camera, Pencil,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -105,6 +105,9 @@ import { ICON_SIZE, ICON_STROKE } from './iconSystem'
 import { resolveStructuredIntervalResult } from './resultIntervalStructure'
 import { fetchMovementsForGym, createMovement as createMovementApi, DuplicateMovementError, getMovementsByIds } from './movementsApi'
 import { currentWeekStartStr, fetchAllClasses, groupClassesByDay, groupPastClassesByWeek } from './classesPaging'
+import { CLASS_COLOR_PALETTE, newSeriesId, scopeToOwnSeries } from './classEdit'
+import ClassEditSheet from './ClassEditSheet'
+import { coalescedRefresh } from './coalescedRefresh'
 import { scoreDefinitionFor } from './scoreDefinition'
 import { composeMixedLogFields } from './componentContract'
 import { logHasComponentResults } from './componentLeaderboard'
@@ -3454,6 +3457,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const [zileRepetare, setZileRepetare] = useState([])
   const [laInfinit, setLaInfinit] = useState(false)
   const [savingClasa, setSavingClasa] = useState(false)
+  // Editare clasă - rândul `classes` deschis în ClassEditSheet (null = închis).
+  const [clasaEditata, setClasaEditata] = useState(null)
 
   const [dataWod, setDataWod] = useState(() => todayLocalStr())
   // Text lipit in caseta "Paste your workout" (varf de pagina, editor WOD) -
@@ -4321,7 +4326,10 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     if (!dataClasa) { showToast(t.toastFillDate); return }
     if (repetitiva && zileRepetare.length === 0) { showToast(t.toastPickAtLeastOneDay); return }
     setSavingClasa(true)
-    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null, gym_id: gymId }
+    // series_id - identitatea stabilă a seriei (migrația 20261008090000):
+    // toate ocurențele create împreună o împart; o clasă unică rămâne NULL.
+    // Folosită de "Editează clasa" pentru "Aceasta și viitoarele"/"Întreaga serie".
+    const baza = { name: numeClasa, start_time: oraInceput, end_time: oraSfarsit, coach: coachClasa || 'Coach', max_spots: locuriClasa, color: culoarClasa || null, gym_id: gymId, series_id: repetitiva ? newSeriesId() : null }
     const records = repetitiva
       ? genereazaDateRepetare().map(date => ({ ...baza, date }))
       : [{ ...baza, date: dataClasa }]
@@ -4367,9 +4375,10 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
   const stergeSeria = async (c) => {
     const azi = new Date()
     const aziS = `${azi.getFullYear()}-${String(azi.getMonth()+1).padStart(2,'0')}-${String(azi.getDate()).padStart(2,'0')}`
-    const { data: claseSeriei } = await supabase.from('classes').select('id')
+    // Doar in seria proprie a clasei (series_id) - vezi scopeToOwnSeries.
+    const { data: claseSeriei } = await scopeToOwnSeries(supabase.from('classes').select('id')
       .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
-      .gte('date', aziS)
+      .gte('date', aziS), c)
     const serieIds = claseSeriei?.map(cl => cl.id) || []
     if (serieIds.length > 0) {
       const { data: bks } = await supabase.from('bookings').select('member_id').in('class_id', serieIds)
@@ -4398,9 +4407,9 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
         }
       }
     }
-    const { error } = await supabase.from('classes').delete()
+    const { error } = await scopeToOwnSeries(supabase.from('classes').delete()
       .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
-      .gte('date', aziS)
+      .gte('date', aziS), c)
     if (error) showToast(t.toastGenericErrorWithFallback(error.message))
     else showToast(t.toastSeriesDeleted)
     await refreshClase()
@@ -5132,6 +5141,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => { if (clasaDeschisa === c.id) setClasaDeschisa(null); else { setClasaDeschisa(c.id); fetchRezervariClasa(c.id) } }}
                   style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Users size={13} color="#0E0E0E" /></button>
+                <button type="button" className="class-edit-btn" aria-label={t.adminClassEditAria} title={t.adminClassEditAria} onClick={() => setClasaEditata(c)}
+                  style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', background: '#FFFFFF', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Pencil size={13} color="#0E0E0E" aria-hidden="true" /></button>
                 <button onClick={() => stergeClasa(c.id)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                 <button onClick={() => { if (window.confirm(t.adminClassDeleteSeriesConfirm(c.name, c.start_time?.slice(0,5)))) stergeSeria(c) }} style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #F7C1C1', background: '#FCEBEB', color: '#791F1F', fontSize: '10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.adminClassDeleteSeriesButton}</button>
               </div>
@@ -5789,6 +5800,22 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       {/* CLASE */}
       {adminTab === 'clase' && (
         <>
+          {clasaEditata && (
+            <ClassEditSheet
+              key={clasaEditata.id}
+              cls={clasaEditata}
+              t={t}
+              lang={lang}
+              supabase={supabase}
+              bookedCount={rezervariClasa[clasaEditata.id]?.length}
+              onClose={() => setClasaEditata(null)}
+              onSaved={async (result) => {
+                setClasaEditata(null)
+                showToast(t.toastClassEditSaved(result.affected))
+                await refreshClase()
+              }}
+            />
+          )}
           <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', marginBottom: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#0E0E0E', marginBottom: '12px' }}>{t.adminClassNewTitle}</div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{t.adminClassTypeLabel}</div>
@@ -5819,7 +5846,7 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
             </div>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{t.adminClassColorLabel}</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              {[null, '#0E0E0E', '#2E2E2E', '#5C6B1E', '#8C9B4A', '#ABE73C', '#afe607', '#C9D9A8', '#E8871E', '#F2C94C', '#E24B4A', '#3B82C4'].map(col => (
+              {CLASS_COLOR_PALETTE.map(col => (
                 <div key={col || 'none'} onClick={() => setCuloarClasa(culoarClasa === col ? null : col)}
                   style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
                     background: col || '#e0e0e0',
@@ -8951,12 +8978,16 @@ function App() {
       setRefreshZiTrigger(t => t + 1)
     }, 8000)
 
+    // Un eveniment realtime per rand: editarea/stergerea unei serii aduce
+    // zeci de evenimente odata - coalescedRefresh porneste fetch-ul imediat
+    // si mai face cel mult unul la final (vezi coalescedRefresh.js).
+    const refreshClaseDB = coalescedRefresh(() => fetchClaseDB())
     const channel = supabase.channel('realtime-app')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
-        fetchClaseDB()
+        refreshClaseDB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchRezervari(); fetchClaseDB(); fetchAbonamentMeu(); setRefreshZiTrigger(t => t + 1)
+        fetchRezervari(); refreshClaseDB(); fetchAbonamentMeu(); setRefreshZiTrigger(t => t + 1)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'class_waitlist' }, () => {
         fetchWaitlistMea(); fetchRezervari(); setRefreshZiTrigger(t => t + 1)

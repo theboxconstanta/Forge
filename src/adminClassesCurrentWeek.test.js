@@ -122,8 +122,11 @@ describe('BOOKING FIREWALL - subscription-cancellation future-booking cleanup un
 })
 
 describe('SERIES FIREWALL - stergeSeria/stergeClasa/stergeClaseleTrecute logic untouched (all query Supabase directly, never read from clase/claseTrecute state)', () => {
+  // Class Editing (2026-10-08): the same direct query, now additionally
+  // confined to the class's own series (scopeToOwnSeries - series_id, or
+  // series-less rows only). See classEditWiring.test.js.
   it('stergeSeria still queries Supabase directly by name/time/coach/date, not from client state', () => {
-    expect(appSource).toMatch(/const stergeSeria = async \(c\) => \{[\s\S]{0,300}?const \{ data: claseSeriei \} = await supabase\.from\('classes'\)\.select\('id'\)\s*\n\s*\.eq\('name', c\.name\)\.eq\('start_time', c\.start_time\)\.eq\('end_time', c\.end_time\)\.eq\('coach', c\.coach\)\s*\n\s*\.gte\('date', aziS\)/)
+    expect(appSource).toMatch(/const stergeSeria = async \(c\) => \{[\s\S]{0,400}?const \{ data: claseSeriei \} = await scopeToOwnSeries\(supabase\.from\('classes'\)\.select\('id'\)\s*\n\s*\.eq\('name', c\.name\)\.eq\('start_time', c\.start_time\)\.eq\('end_time', c\.end_time\)\.eq\('coach', c\.coach\)\s*\n\s*\.gte\('date', aziS\), c\)/)
   })
 
   it('stergeClaseleTrecute (Delete Past) semantics are byte-identical - still date < today, still preserves classes with bookings', () => {
