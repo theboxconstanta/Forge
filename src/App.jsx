@@ -6,7 +6,7 @@ import {
   Flame, Dumbbell, ClipboardList, Ticket, CreditCard, Timer as TimerIcon,
   Calendar, AlertTriangle, Lock, Zap, Info, Flag, Users, Coins, BarChart3,
   RotateCw, Clock, Mars, Venus, User, CheckCircle2, Share2, X,
-  Archive, Ban, ChevronDown, ChevronRight, Camera, Pencil,
+  Archive, Ban, ChevronDown, ChevronRight, Camera, Pencil, CalendarHeart,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -119,6 +119,15 @@ import { extractWodLogMedia, getWodLogPhotoSignedUrl, resolveJustAttachedPhotoUr
 import PhotoResultCard from './PhotoResultCard'
 import { buildShareFilename } from './photoResultCardExport.jsx'
 import { sharePhotoResultCardImage } from './photoResultCardShare'
+// FORGE EVENTS (Phase 3) - member Events: tab, screen, announcements, paywall exemption.
+import EventsScreen from './events/EventsScreen'
+import { EventAnnouncementModal } from './events/EventAnnouncementModal'
+import { useEventsFeature } from './events/useEventsFeature'
+import { useEventAnnouncements } from './events/useEventAnnouncements'
+import {
+  EVENTS_SCREEN, isEventsPaywallExempt, withEventsTab,
+  readEventsRoute, persistEventsRoute, clearEventsRoute, stripEventsParamsFromUrl,
+} from './events/eventsNavigation'
 
 // P9.5 - split a resolved prescription line ("12 Wall Ball @ 9 kg") into the
 // name part and the trailing "@ x" prescription part, for the right-aligned
@@ -723,7 +732,11 @@ const NAV_TABS = [
   { id: 'feed', labelKey: 'navFeed', icon: MessageCircle },
 ]
 
-function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, leaderboardUnread, t }) {
+// FORGE EVENTS - inserted right after Feed by withEventsTab, ONLY while the
+// gym's events_enabled flag is confirmed on (eventsNavigation.js).
+const EVENTS_NAV_TAB = { id: 'events', labelKey: 'navEvents', icon: CalendarHeart }
+
+function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, leaderboardUnread, eventsEnabled = false, t }) {
   // 2026-07-02, noaptea: renuntat definitiv la position:fixed pt NavBar, dupa o
   // seara intreaga de incercari esuate de a masura corect inaltimea ecranului
   // in standalone iOS (vezi [[project-navbar-safe-area]] pt istoricul complet).
@@ -757,7 +770,8 @@ function NavBar({ screen, setScreen, isAdmin, isCoach, feedUnread, leaderboardUn
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const tabs = (isAdmin || isCoach) ? [...NAV_TABS, { id: 'admin', labelKey: isAdmin ? 'navAdmin' : 'navCoach', icon: Settings }] : NAV_TABS
+  const memberTabs = withEventsTab(NAV_TABS, eventsEnabled, EVENTS_NAV_TAB)
+  const tabs = (isAdmin || isCoach) ? [...memberTabs, { id: 'admin', labelKey: isAdmin ? 'navAdmin' : 'navCoach', icon: Settings }] : memberTabs
   return (
     <>
     {showDebug && <NavBarDebug navRef={navRef} />}
@@ -11765,6 +11779,41 @@ function App() {
     return () => clearInterval(interval)
   }, [user, isAdmin, abonamentInitialized, abonamentActiv]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // FORGE EVENTS (Phase 3). Feature flag + live-change signal for the
+  // member's gym; anything but a CONFIRMED `true` keeps Events fully hidden
+  // (tab, screen, paywall entry point, announcements, requests).
+  const eventsFeature = useEventsFeature({ userId: user?.id, gymId: userProfile?.gym_id })
+  const eventsEnabled = eventsFeature.enabled === true
+  const [eventsEventId, setEventsEventId] = useState(null)
+  const eventsRouteConsumedRef = useRef(false)
+  const eventsAnnouncements = useEventAnnouncements({ enabled: eventsEnabled, userId: user?.id, version: eventsFeature.version })
+  const openEvents = (eventId = null) => { setEventsEventId(eventId); setScreen(EVENTS_SCREEN) }
+
+  // Direct navigation (?event=<id> / ?events) and refresh survival: once the
+  // flag is confirmed ON, reopen the remembered Events route exactly once.
+  useEffect(() => {
+    if (!user || !eventsEnabled || eventsRouteConsumedRef.current) return
+    eventsRouteConsumedRef.current = true
+    const route = readEventsRoute()
+    stripEventsParamsFromUrl()
+    if (route) openEvents(route.eventId)
+  }, [user, eventsEnabled])
+
+  // Remember the open Events route (sessionStorage) / forget it on leaving.
+  useEffect(() => {
+    if (screen === EVENTS_SCREEN) persistEventsRoute(eventsEventId)
+    else if (eventsRouteConsumedRef.current) clearEventsRoute()
+  }, [screen, eventsEventId])
+
+  // Flag turned OFF (or confirmed off) while on Events -> leave immediately.
+  useEffect(() => {
+    if (screen === EVENTS_SCREEN && eventsFeature.enabled === false) {
+      clearEventsRoute()
+      setEventsEventId(null)
+      setScreen('home')
+    }
+  }, [screen, eventsFeature.enabled])
+
   if (resetMode) return (
     <div style={{ position: 'fixed', inset: 0, background: '#0E0E0E', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', paddingLeft: '20px', paddingRight: '20px', boxSizing: 'border-box', boxShadow: '0 60px 0 0 #0E0E0E' }}>
       <img src="/forge.png" alt="Forge" style={{ width: '100px', height: '100px', borderRadius: '22px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
@@ -12064,7 +12113,11 @@ function App() {
         />
       )}
 
-      {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && screen !== 'catalog' && (
+      {/* FORGE EVENTS - the ONLY added exemption: the Events screen itself
+          while Events is enabled for the gym (isEventsPaywallExempt). Every
+          other screen (classes, bookings, logging, PRs, leaderboard,
+          payments) keeps this paywall exactly as before. */}
+      {!isAdmin && abonamentInitialized && claseDBLoaded && rezervariIncarcate && !abonamentActiv && !showOnboarding && screen !== 'abonament' && screen !== 'catalog' && !isEventsPaywallExempt(screen, eventsEnabled) && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxShadow: '0 60px 0 0 rgba(0,0,0,0.65)' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 24px', textAlign: 'center', maxWidth: '340px', width: '100%' }}>
             <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}><Lock size={48} color="#0E0E0E" strokeWidth={1.5} /></div>
@@ -12096,6 +12149,14 @@ function App() {
                 <CreditCard size={16} /> {t.chooseMembershipButton}
               </button>
             )}
+            {/* FORGE EVENTS - gym members keep Events access without a paid
+                subscription (owner rule); shown only while Events is enabled. */}
+            {eventsEnabled && (
+              <button onClick={() => openEvents(null)}
+                style={{ width: '100%', padding: '13px', background: '#ABE73C', color: '#0E0E0E', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <CalendarHeart size={16} /> {t.paywallViewEvents}
+              </button>
+            )}
             <button onClick={() => setScreen('abonament')} style={{ width: '100%', padding: '10px', background: 'transparent', color: '#555', border: '1px solid #e0e0e0', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '10px' }}>
               {t.paywallViewSubscription}
             </button>
@@ -12104,6 +12165,27 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* FORGE EVENTS - one pending announcement at a time, never on top of a
+          gym-level block, owner bootstrap, onboarding or a checkout screen. */}
+      {eventsEnabled && eventsAnnouncements.current && userProfile?.gym_id
+        && !gymBlocked && !trialExpired && !noGymMembership && !pendingOwnerBootstrap && !showOnboarding
+        && !checkoutStatus && !platformCheckoutStatus && (
+        <EventAnnouncementModal
+          key={`${eventsAnnouncements.current.id}:${eventsAnnouncements.current.announcement_revision}`}
+          announcement={eventsAnnouncements.current}
+          gymId={userProfile.gym_id}
+          total={eventsAnnouncements.total}
+          working={eventsAnnouncements.working}
+          error={eventsAnnouncements.error}
+          joinedAwaitingAck={eventsAnnouncements.joinedAwaitingAck}
+          onJoin={(division) => eventsAnnouncements.join(division)}
+          onLater={() => eventsAnnouncements.later()}
+          onView={() => eventsAnnouncements.view((id) => openEvents(id))}
+          t={t}
+          lang={lang}
+        />
       )}
 
       {/* Ecran de asteptare dupa revenirea de la Stripe Checkout - CITESTE
@@ -14522,6 +14604,19 @@ function App() {
       {screen === 'timer' && <Timer onBack={() => setScreen(prevScreen)} defaultFortime={wodZiData ? parseWodMinute(wodZiData.duration) : null} t={t} />}
       {screen === 'clasament' && <Clasament logs={clasamentLogs} sections={clasamentSections} aggregateDefinition={clasamentAggregateDefinition} loading={clasamentLoading} wodZiData={clasamentWodData} onRefresh={() => fetchClasament(clasamentDate)} selectedDate={clasamentDate} onDateChange={(d) => { setClasamentDate(d); fetchClasament(d) }} movementIndex={memberMovementIndex} t={t} lang={lang} user={user} isAdmin={isAdmin} isCoach={isCoach} gymId={userProfile?.gym_id} showToast={showToast} reactionsByLog={clasamentReactionsByLog} reactorRowsByLog={clasamentReactorRowsByLog} commentCountByLog={clasamentCommentCountByLog} onToggleReaction={toggleClasamentReaction} onCommentCountChange={(logId, delta) => setClasamentCommentCountByLog(prev => ({ ...prev, [logId]: Math.max(0, (prev[logId] || 0) + delta) }))} leaderboardUnreadCount={leaderboardUnreadCount} onLeaderboardUnreadCountChange={setLeaderboardUnreadCount} onNavigateToLeaderboardResult={navigateToLeaderboardResult} focusTarget={clasamentFocusTarget} onFocusConsumed={() => setClasamentFocusTarget(null)} />}
       {screen === 'feed' && <Feed showToast={showToast} user={user} userProfile={userProfile} isAdmin={isAdmin} t={t} lang={lang} />}
+      {screen === EVENTS_SCREEN && eventsEnabled && user && userProfile?.gym_id && (
+        <EventsScreen
+          gymId={userProfile.gym_id}
+          memberId={user.id}
+          version={eventsFeature.version}
+          eventId={eventsEventId}
+          onOpenEvent={(id) => { setEventsEventId(id); mainScrollRef.current?.scrollTo?.(0, 0) }}
+          showToast={showToast}
+          memberWeightUnit={userProfile?.weight_unit === 'lbs' ? 'lbs' : 'kg'}
+          lang={lang}
+          t={t}
+        />
+      )}
       {screen === 'admin' && (isAdmin || isCoach) && <Admin showToast={showToast} user={user} isAdmin={isAdmin} isCoach={isCoach} isOwner={isOwner} gymId={userProfile?.gym_id} isPlatformAdmin={isPlatformAdmin} onWodChanged={() => { fetchWodZi(dataAcasaRef.current); fetchWodZiWorkoutV2(dataAcasaRef.current) }} onWodDirtyChange={(d) => { wodDirtyRef.current = d }} mainScrollRef={mainScrollRef} t={t} lang={lang} clientsReloadToken={clientsReloadToken} adminSubsReloadToken={adminSubsReloadToken} />}
 
       {screen === 'profile' && (
@@ -14845,7 +14940,7 @@ function App() {
         </div>
       )}
 
-      <NavBar screen={screen} setScreen={guardedSetScreen} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} leaderboardUnread={leaderboardUnreadCount} t={t} />
+      <NavBar screen={screen} setScreen={(next) => { if (next === EVENTS_SCREEN) setEventsEventId(null); guardedSetScreen(next) }} isAdmin={isAdmin} isCoach={isCoach} feedUnread={feedUnread} leaderboardUnread={leaderboardUnreadCount} eventsEnabled={eventsEnabled} t={t} />
     </div>
   )
 }
