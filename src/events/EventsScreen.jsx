@@ -8,7 +8,7 @@ import { coalescedRefresh } from '../coalescedRefresh'
 import * as defaultApi from './eventsApi'
 import { eventsStrings } from './eventsStrings'
 import {
-  categorizeEvents, eventDisplayStatus, registrationState, eventDivisions, scoringState, eventErrorCode,
+  categorizeEvents, eventDisplayStatus, registrationState, divisionsShownToMembers, memberDivisionChoices, scoringState, eventErrorCode,
 } from './eventModel'
 import { formatEventWhen, formatDateTime, eventTimeCapText, maxEffortScoreTypeText } from './eventFormat'
 import { MyAttempts, EventLeaderboard } from './EventAttempts'
@@ -147,7 +147,7 @@ function EventsList({ data, status, onRetry, onOpen, api, lang, s }) {
 }
 
 function RegistrationCard({ event, reg, count, busy, error, onJoin, onLeave, lang, s }) {
-  const divisions = eventDivisions(event)
+  const divisions = memberDivisionChoices(event)
   const [division, setDivision] = useState(divisions[0] || null)
   const chosen = divisions.includes(division) ? division : divisions[0] || null
   return (
@@ -163,7 +163,7 @@ function RegistrationCard({ event, reg, count, busy, error, onJoin, onLeave, lan
       )}
       {reg.isRegistered && (
         <div role="status" style={{ ...TYPE.bodyStrong, color: COLORS.feedback.success, background: COLORS.feedback.successSoft, padding: '10px 12px', borderRadius: RADIUS.input, margin: '8px 0 12px' }}>
-          {s.youAreRegistered(s.divisionLabels[reg.division] || reg.division)}
+          {divisionsShownToMembers(event) ? s.youAreRegistered(s.divisionLabels[reg.division] || reg.division) : s.youAreRegisteredPlain}
         </div>
       )}
       {reg.canJoin && divisions.length > 1 && (
@@ -209,7 +209,7 @@ function ParticipantsCard({ event, participants, membersById, memberId, count, s
               <li key={p.member_id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <AvatarCircle name={name} avatarUrl={m?.avatar_url} size={30} />
                 <span style={{ ...TYPE.body, color: COLORS.text.primary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}{p.member_id === memberId ? ` · ${s.you}` : ''}</span>
-                <span style={{ ...TYPE.caption, color: COLORS.text.tertiary }}>{s.divisionLabels[p.division] || p.division}</span>
+                {divisionsShownToMembers(event) && <span style={{ ...TYPE.caption, color: COLORS.text.tertiary }}>{s.divisionLabels[p.division] || p.division}</span>}
               </li>
             )
           })}
