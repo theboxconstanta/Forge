@@ -18,6 +18,8 @@ export const TRANSLATIONS = {
     navPr: 'PR-uri',
     navLeaderboard: 'Leaderboard',
     navFeed: 'Feed',
+    navEvents: 'Evenimente',
+    paywallViewEvents: 'VEZI EVENIMENTELE',
     navAdmin: 'Admin',
     navCoach: 'Coach',
 
@@ -1342,6 +1344,8 @@ export const TRANSLATIONS = {
     navPr: 'PRs',
     navLeaderboard: 'Leaderboard',
     navFeed: 'Feed',
+    navEvents: 'Events',
+    paywallViewEvents: 'VIEW EVENTS',
     navAdmin: 'Admin',
     navCoach: 'Coach',
 
