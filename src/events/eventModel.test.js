@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   eventPhase, eventDisplayStatus, registrationState, eventDivisions, scoringState,
-  categorizeEvents, eventErrorCode, registrationClosesMs,
+  categorizeEvents, eventErrorCode, registrationClosesMs, divisionsShownToMembers, memberDivisionChoices,
 } from './eventModel'
 
 const NOW = Date.parse('2026-10-15T12:00:00Z')
@@ -56,6 +56,20 @@ describe('registrationState mirrors event_join / event_leave', () => {
 describe('eventDivisions keeps the canonical order', () => {
   it('rx, intermediate, beginner, onramp', () => {
     expect(eventDivisions({ divisions: ['onramp', 'rx', 'beginner'] })).toEqual(['rx', 'beginner', 'onramp'])
+  })
+})
+
+describe('"Show divisions to members" (member_division_choice)', () => {
+  it('shown unless explicitly false (rows without the column keep today\'s behaviour)', () => {
+    expect(divisionsShownToMembers({ divisions: ['rx'] })).toBe(true)
+    expect(divisionsShownToMembers({ member_division_choice: true })).toBe(true)
+    expect(divisionsShownToMembers({ member_division_choice: null })).toBe(true)
+    expect(divisionsShownToMembers({ member_division_choice: false })).toBe(false)
+  })
+  it('member choices: the event divisions when shown, none when hidden', () => {
+    const all = ['onramp', 'rx', 'beginner', 'intermediate']
+    expect(memberDivisionChoices({ divisions: all })).toEqual(['rx', 'intermediate', 'beginner', 'onramp'])
+    expect(memberDivisionChoices({ divisions: all, member_division_choice: false })).toEqual([])
   })
 })
 

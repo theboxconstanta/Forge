@@ -160,6 +160,32 @@ describe('Registration', () => {
     expect(screen.queryByRole('button', { name: 'Join event' })).not.toBeInTheDocument()
   })
 
+  it('divisions hidden by staff: no picker, Join sends no division, no division labels anywhere', async () => {
+    const api = makeApi()
+    api.state.events[0] = baseEvent({ divisions: ['rx', 'intermediate', 'beginner', 'onramp'], member_division_choice: false })
+    api.state.participants = [{ member_id: 'x', division: 'beginner', status: 'registered' }]
+    renderScreen(api, { eventId: 'e1' })
+    const join = await screen.findByRole('button', { name: 'Join event' })
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Choose your division')).not.toBeInTheDocument()
+    fireEvent.click(join)
+    await waitFor(() => expect(api.joinEvent).toHaveBeenCalledWith('e1', null))
+    expect(await screen.findByText("You're registered")).toBeInTheDocument()
+    expect(screen.queryByText(/You're registered ·/)).not.toBeInTheDocument()
+    expect(await screen.findByText('Member x')).toBeInTheDocument()
+    expect(screen.queryByText('Scaled')).not.toBeInTheDocument()
+    expect(screen.queryByText('RX')).not.toBeInTheDocument()
+  })
+
+  it('divisions explicitly shown: picker and labels exactly as before', async () => {
+    const api = makeApi()
+    api.state.events[0] = baseEvent({ divisions: ['rx', 'beginner'], member_division_choice: true })
+    api.state.participants = [{ member_id: 'x', division: 'beginner', status: 'registered' }]
+    renderScreen(api, { eventId: 'e1' })
+    expect(await screen.findByRole('combobox')).toBeInTheDocument()
+    expect(await screen.findByText('Scaled', { selector: 'span' })).toBeInTheDocument()
+  })
+
   it('private participant list shows only the count', async () => {
     const api = makeApi()
     api.state.events[0] = baseEvent({ participants_visible: false })

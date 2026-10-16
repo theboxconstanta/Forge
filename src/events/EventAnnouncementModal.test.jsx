@@ -7,8 +7,8 @@ const a = (p = {}) => ({
   cover_path: 'g/e1/c.jpg', location: 'Box C15', starts_at: '2026-11-07T08:00:00Z', ends_at: '2026-11-07T14:00:00Z',
   has_workout: true, workout_format: 'For Time', registration_enabled: true, is_registered: false, ...p,
 })
-const api = (divisions = ['rx']) => ({
-  fetchEvent: vi.fn(async () => ({ id: 'e1', divisions })),
+const api = (divisions = ['rx'], extra = {}) => ({
+  fetchEvent: vi.fn(async () => ({ id: 'e1', divisions, ...extra })),
   coverUrl: (p) => (p ? `https://cdn.test/${p}` : null),
 })
 const renderModal = (props = {}) => {
@@ -33,6 +33,16 @@ describe('EventAnnouncementModal', () => {
     fireEvent.change(select, { target: { value: 'beginner' } })
     fireEvent.click(screen.getByRole('button', { name: 'JOIN EVENT' }))
     expect(h.onJoin).toHaveBeenCalledWith('beginner')
+  })
+
+  it('divisions hidden by staff: no picker even with several divisions, JOIN sends no division', async () => {
+    const eventApi = api(['rx', 'intermediate', 'beginner', 'onramp'], { member_division_choice: false })
+    const h = renderModal({ api: eventApi })
+    await waitFor(() => expect(eventApi.fetchEvent).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument())
+    expect(screen.queryByText('Choose your division')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'JOIN EVENT' }))
+    expect(h.onJoin).toHaveBeenLastCalledWith(null)
   })
 
   it('single division: JOIN sends it, no picker', async () => {

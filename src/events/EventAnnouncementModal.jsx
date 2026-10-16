@@ -6,7 +6,7 @@ import { RADIUS } from '../spacing'
 import { Button } from '../components'
 import { eventsStrings } from './eventsStrings'
 import { formatEventWhen } from './eventFormat'
-import { eventDivisions } from './eventModel'
+import { memberDivisionChoices } from './eventModel'
 import * as defaultApi from './eventsApi'
 
 /**
@@ -30,7 +30,9 @@ export function EventAnnouncementModal({ announcement: a, gymId, total, working,
     return () => { cancelled = true }
   }, [api, gymId, a.id])
 
-  const divisions = details ? eventDivisions(details) : []
+  // Empty when the event hides divisions: no picker, Join sends no division
+  // and the server assigns it (same rule as the event screen).
+  const divisions = details ? memberDivisionChoices(details) : []
   const chosen = division && divisions.includes(division) ? division : divisions[0] || null
 
   const laterRef = useRef(onLater)

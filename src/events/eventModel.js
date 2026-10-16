@@ -73,6 +73,21 @@ export function eventDivisions(event) {
   return EVENT_DIVISIONS.filter((d) => set.has(d))
 }
 
+/**
+ * Staff setting "Show divisions to members" (events.member_division_choice).
+ * Anything but an explicit false keeps today's behaviour. When false (only
+ * possible on unscored events), members never see or pick a division - the
+ * server assigns it (event_join).
+ */
+export function divisionsShownToMembers(event) {
+  return event?.member_division_choice !== false
+}
+
+/** The divisions a member may pick from; empty when the event hides divisions. */
+export function memberDivisionChoices(event) {
+  return divisionsShownToMembers(event) ? eventDivisions(event) : []
+}
+
 /** Scoring window (event_submit_attempt / forge_events_own_open_attempt). */
 export function scoringState(event, now = Date.now()) {
   if (!event.has_workout || !event.scoring_enabled || !event.ends_at) return { enabled: false, open: false, phase: 'none' }
