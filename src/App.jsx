@@ -25,6 +25,7 @@ import {
 } from './utils'
 import { AvatarCircle, LevelDot, MovementSuggestions, MembershipCoverageDialog, BottomSheet, Button, Select, Input, StatusBadge, EmptyState, Card } from './components'
 import { getT } from './translations'
+import { isServerAccounting, bookingErrorToast, noteBookingError, MANUAL_ADJUST_REASON, cancelClassesForStaff } from './bookingAccounting'
 import { CARDIO_MISCARI, CARDIO_CU_CALORII, MISCARI, miscareSugestii, parseMiscareLinePasta, looksLikeMovementLine } from './movements'
 import FormatConfigEditor from './FormatConfigEditor'
 import FormatLogger, { PrCandidatesConfirm } from './FormatLogger'
@@ -232,6 +233,9 @@ async function sendNotification(type, memberEmail, planName, endDate) {
 }
 
 async function checkAndBookFromWaitlist(classId) {
+  // Server accounting: the database promotes the waitlist (charge, reminder, FIFO, capacity) inside the
+  // same transaction as the cancellation - a client promotion would race it.
+  if (await isServerAccounting(supabase)) return
   const { data: next } = await supabase
     .from('class_waitlist').select('member_id, member_email')
     .eq('class_id', classId).order('joined_at', { ascending: true }).limit(1).maybeSingle()
@@ -4068,8 +4072,11 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     // RPC restransa (nu update direct pe subscriptions) - permite si coach-ului sa
     // ajusteze doar sessions_used ca efect al adaugarii/scoaterii dintr-o clasa, fara
     // sa-i dea acces RLS larg la restul tabelului subscriptions (pret, plan, is_active).
-    const { error } = await supabase.rpc('adjust_session_count', { p_member_email: email, p_delta: delta })
-    if (error) { console.error('adjustMemberSessions:', error.message || error); return }
+    // Server accounting: the booking insert/delete itself charges/refunds (deadline rules apply).
+    if (!(await isServerAccounting(supabase))) {
+      const { error } = await supabase.rpc('adjust_session_count', { p_member_email: email, p_delta: delta })
+      if (error) { console.error('adjustMemberSessions:', error.message || error); return }
+    }
     const bc = supabase.channel('member-sessions-' + memberId)
     bc.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -4094,7 +4101,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const { error } = await supabase.from('bookings').delete().eq('class_id', classId).eq('member_id', memberId)
     if (error) {
       await adjustMemberSessions(memberId, +1)
-      showToast(t.toastGenericError); console.error(error); return
+      showToast(bookingErrorToast(t, error, t.toastGenericError)); console.error(error)
+      fetchRezervariClasa(classId); return
     }
     const memberEmail = clienti.find(c => c.id === memberId)?.email?.toLowerCase()
     if (memberEmail) supabase.from('class_reminders').delete().eq('class_id', classId).eq('member_email', memberEmail)
@@ -4116,7 +4124,8 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     const { error } = await supabase.from('bookings').insert({ class_id: classId, member_id: memberId, gym_id: gymId })
     if (error) {
       await adjustMemberSessions(memberId, -1)
-      showToast(t.toastGenericError); console.error(error); return
+      showToast(bookingErrorToast(t, error, t.toastGenericError)); console.error(error)
+      fetchRezervariClasa(classId); return
     }
     showToast(t.toastAddedToClass)
     const member = clienti.find(c => c.id === memberId)
@@ -4160,10 +4169,23 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
   }
 
-  const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta) => {
+  const adminAjusteazaSedinte = async (aboId, currentUsed, currentTotal, delta, retried = false) => {
+    if (await isServerAccounting(supabase)) {
+      // Server accounting: atomic, clamped, admin-only and ledgered; the server returns the real balance.
+      const { data: serverUsed, error } = await supabase.rpc('admin_adjust_sessions', { p_subscription_id: aboId, p_delta: delta, p_reason: MANUAL_ADJUST_REASON })
+      if (error || serverUsed == null) { showToast(bookingErrorToast(t, error, t.toastUpdateError)); await fetchAbonamente(); return }
+      setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: serverUsed } : a))
+      showToast(delta > 0 ? t.toastSessionAdded : t.toastSessionRemoved)
+      return
+    }
     const newUsed = Math.max(0, Math.min(currentTotal ?? 9999, (currentUsed || 0) + delta))
     const { error } = await supabase.from('subscriptions').update({ sessions_used: newUsed }).eq('id', aboId)
-    if (error) { showToast(t.toastUpdateError); return }
+    if (error) {
+      // FRG05: the database became server-managed while this screen was open - re-detect and retry once.
+      noteBookingError(error)
+      if (error.code === 'FRG05' && !retried) return adminAjusteazaSedinte(aboId, currentUsed, currentTotal, delta, true)
+      showToast(t.toastUpdateError); return
+    }
     setAbonamente(prev => prev.map(a => a.id === aboId ? { ...a, sessions_used: newUsed } : a))
     showToast(delta > 0 ? t.toastSessionAdded : t.toastSessionRemoved)
   }
@@ -4394,37 +4416,12 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
       .gte('date', aziS), c)
     const serieIds = claseSeriei?.map(cl => cl.id) || []
-    if (serieIds.length > 0) {
-      const { data: bks } = await supabase.from('bookings').select('member_id').in('class_id', serieIds)
-      if (bks?.length > 0) {
-        const memberIds = [...new Set(bks.map(b => b.member_id))]
-        const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
-        if (profs?.length > 0) {
-          for (const prof of profs) {
-            const email = prof.email?.toLowerCase()
-            if (!email) continue
-            const memberBookings = bks.filter(b => b.member_id === prof.id).length
-            const { data: abo } = await supabase.from('subscriptions')
-              .select('id, sessions_used')
-              .ilike('member_email', email)
-              .eq('is_active', true)
-              .not('sessions_total', 'is', null)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-            if (abo) {
-              await supabase.from('subscriptions')
-                .update({ sessions_used: Math.max(0, (abo.sessions_used || 0) - memberBookings) })
-                .eq('id', abo.id)
-            }
-          }
-        }
-      }
-    }
-    const { error } = await scopeToOwnSeries(supabase.from('classes').delete()
-      .eq('name', c.name).eq('start_time', c.start_time).eq('end_time', c.end_time).eq('coach', c.coach)
-      .gte('date', aziS), c)
-    if (error) showToast(t.toastGenericErrorWithFallback(error.message))
+    // Credits are refunded by the database (cancel_class/cancel_classes), never by this client: a
+    // client loop could refund and then fail the delete, or refund the wrong subscription.
+    const { cancelled, error } = await cancelClassesForStaff(supabase, serieIds)
+    if (error) showToast(cancelled > 0
+      ? t.toastSeriesPartiallyCancelled(cancelled, serieIds.length)
+      : bookingErrorToast(t, error, t.toastGenericErrorWithFallback(error.message)))
     else showToast(t.toastSeriesDeleted)
     await refreshClase()
   }
@@ -4456,32 +4453,10 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
       : t.adminClassDeleteConfirmNoBookings(cls.name, cls.start_time?.slice(0, 5))
     if (!window.confirm(confirmMsg)) return
 
-    // returnăm ședințele doar pentru clase viitoare (nu pentru cele din trecut, deja consumate)
-    if (nRezervari > 0 && !esteTrecuta) {
-      const memberIds = bks.map(b => b.member_id)
-      const { data: profs } = await supabase.from('profiles').select('id, email').in('id', memberIds)
-      if (profs?.length > 0) {
-        for (const prof of profs) {
-          const email = prof.email?.toLowerCase()
-          if (!email) continue
-          const { data: abo } = await supabase.from('subscriptions')
-            .select('id, sessions_used')
-            .ilike('member_email', email)
-            .eq('is_active', true)
-            .not('sessions_total', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (abo) {
-            await supabase.from('subscriptions')
-              .update({ sessions_used: Math.max(0, (abo.sessions_used || 0) - 1) })
-              .eq('id', abo.id)
-          }
-        }
-      }
-    }
-    const { error } = await supabase.from('classes').delete().eq('id', id)
-    if (error) { showToast(t.toastGenericErrorWithFallback(error.message)); return }
+    // Cancellation + refunds happen in one database transaction (cancel_class): each proven charge is
+    // refunded once to the subscription it was taken from; nothing is refunded if the delete fails.
+    const { error } = await cancelClassesForStaff(supabase, [id])
+    if (error) { showToast(bookingErrorToast(t, error, t.toastGenericErrorWithFallback(error.message))); await refreshClase(); return }
     showToast(t.toastClassDeleted); await refreshClase()
   }
 
@@ -5076,19 +5051,28 @@ function Admin({ showToast, user, isAdmin, isCoach, isOwner, gymId, isPlatformAd
     }
     if (memberId) {
       const _d = new Date(); const aziStr = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`
-      const { data: memberBookings } = await supabase.from('bookings').select('id, class_id').eq('member_id', memberId)
+      const { data: memberBookings } = await supabase.from('bookings').select('id, class_id, checked_in').eq('member_id', memberId)
       if (memberBookings?.length > 0) {
-        const futureClassIds = new Set(clase.filter(c => c.date >= aziStr).map(c => c.id))
-        const futureBookingIds = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.id)
-        if (futureBookingIds.length > 0) {
-          const affectedClassIds = memberBookings.filter(b => futureClassIds.has(b.class_id)).map(b => b.class_id)
-          await supabase.from('bookings').delete().in('id', futureBookingIds)
-          affectedClassIds.forEach(cid => checkAndBookFromWaitlist(cid))
+        // Only bookings whose class has not ended and that carry no attendance (the database refuses the rest).
+        const futureClassIds = new Set(clase.filter(c => c.date >= aziStr && (!c.end_time || new Date(`${c.date}T${c.end_time}`) > new Date())).map(c => c.id))
+        const futureBookings = memberBookings.filter(b => futureClassIds.has(b.class_id) && !b.checked_in)
+        if (futureBookings.length > 0) {
+          const { error: bookingsError } = await supabase.from('bookings').delete().in('id', futureBookings.map(b => b.id))
+          if (bookingsError) {
+            showToast(bookingErrorToast(t, bookingsError, t.toastGenericErrorWithFallback(bookingsError.message)))
+            console.error('stergeAbonament (bookings):', bookingsError)
+            await fetchAbonamente(); return
+          }
+          futureBookings.forEach(b => checkAndBookFromWaitlist(b.class_id))
         }
       }
     }
     const { error: endError } = await supabase.rpc('end_subscription', { p_subscription_id: id })
-    if (endError) console.error('stergeAbonament (active):', endError)
+    if (endError) {
+      console.error('stergeAbonament (active):', endError)
+      showToast(t.toastGenericErrorWithFallback(endError.message || t.unknownErrorFallback))
+      await fetchAbonamente(); return
+    }
     showToast(t.toastSubscriptionCancelled)
     setRezervariClasa({})
     await fetchAbonamente(); fetchRapoarte()
@@ -11315,9 +11299,13 @@ function App() {
     }
     if (esteRezervat) {
       const { error: delErr } = await supabase.from('bookings').delete().eq('member_id', user.id).eq('class_id', clasaId)
-      if (delErr) { showToast(t.toastCancelBookingError); console.error(delErr); return }
+      if (delErr) {
+        showToast(bookingErrorToast(t, delErr, t.toastCancelBookingError)); console.error(delErr)
+        await fetchClaseDB(); await fetchAbonamentMeu(); return
+      }
       setRezervariMele(prev => prev.filter(id => id !== clasaId))
-      if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
+      const serverAccounting = await isServerAccounting(supabase)   // server refunds (deadline rules) itself
+      if (!serverAccounting && !isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, -1)
         if (newUsed != null) setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
@@ -11328,10 +11316,12 @@ function App() {
       const { error: insErr } = await supabase.from('bookings').insert({ member_id: user.id, class_id: clasaId, gym_id: userProfile.gym_id })
       if (insErr) {
         if (insErr.code === MEMBERSHIP_COVERAGE_ERROR_CODE) { setMembershipCoverageDialog(true); return }
-        showToast(t.toastBookingError); console.error(insErr); return
+        showToast(bookingErrorToast(t, insErr, t.toastBookingError)); console.error(insErr)
+        await fetchClaseDB(); await fetchAbonamentMeu(); return
       }
       setRezervariMele(prev => [...prev, clasaId])
-      if (!isAdmin && sedinteLimitate && abonamentReal?.id) {
+      const serverAccounting = await isServerAccounting(supabase)   // server charged inside the insert
+      if (!serverAccounting && !isAdmin && sedinteLimitate && abonamentReal?.id) {
         const newUsed = await adjustSessionsUsedAtomic(abonamentReal.id, +1, { max: abonamentReal.sessions_total })
         if (newUsed != null) setAbonamentReal(prev => prev ? { ...prev, sessions_used: newUsed } : prev)
       }
