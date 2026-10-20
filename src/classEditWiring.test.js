@@ -39,13 +39,24 @@ describe('Admin -> Classes card wiring', () => {
     expect(app).toMatch(/const stergeSeria = async \(c\) => \{/)
     expect(app).toMatch(/if \(window\.confirm\(t\.adminClassDeleteSeriesConfirm\(c\.name, c\.start_time\?\.slice\(0,5\)\)\)\) stergeSeria\(c\)/)
   })
-  it('Delete series: both the refund lookup and the delete are confined to the class own series', () => {
+  // Booking credit integrity (2026-10-17): the series is cancelled ONLY through cancel_class/cancel_classes
+  // over the ids of the class's own series - refunds happen in the database, never in this client.
+  it('Delete series: confined to the class own series, cancelled server-side, no direct delete/refund', () => {
     const start = app.indexOf('const stergeSeria = async (c) => {')
     const body = app.slice(start, app.indexOf('await refreshClase()', start))
     expect(body.split("scopeToOwnSeries(supabase.from('classes').select('id')").length - 1).toBe(1)
-    expect(body.split("scopeToOwnSeries(supabase.from('classes').delete()").length - 1).toBe(1)
-    expect(body.split(".gte('date', aziS), c)").length - 1).toBe(2)
+    expect(body.split(".gte('date', aziS), c)").length - 1).toBe(1)
     expect(body).not.toMatch(/\.gte\('date', aziS\)\s*\n/) // no unscoped query left
+    expect(body).toContain('cancelClassesForStaff(supabase, serieIds)')
+    expect(body).not.toContain(".delete()")
+    expect(body).not.toContain("from('subscriptions')")
+  })
+  it('Delete class: cancelled server-side only (cancel_class), no direct delete/refund', () => {
+    const start = app.indexOf('const stergeClasa = async (id) => {')
+    const body = app.slice(start, app.indexOf('showToast(t.toastClassDeleted)', start))
+    expect(body).toContain('cancelClassesForStaff(supabase, [id])')
+    expect(body).not.toContain(".delete()")
+    expect(body).not.toContain("from('subscriptions')")
   })
   it('member realtime: classes/bookings events refresh the class list through one coalesced trigger', () => {
     expect(app).toContain('const refreshClaseDB = coalescedRefresh(() => fetchClaseDB())')

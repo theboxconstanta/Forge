@@ -116,8 +116,18 @@ describe('22/23. Booking/member management resolves a class from EITHER dataset 
 })
 
 describe('BOOKING FIREWALL - subscription-cancellation future-booking cleanup untouched (already correct: clase is a strict subset of the old unbounded array at date >= today)', () => {
-  it('stergeAbonament still filters clase (now current+future) by date >= today for future-booking cleanup, unchanged', () => {
-    expect(appSource).toMatch(/const futureClassIds = new Set\(clase\.filter\(c => c\.date >= aziStr\)\.map\(c => c\.id\)\)/)
+  it('stergeAbonament still filters clase (now current+future) by date >= today for future-booking cleanup', () => {
+    expect(appSource).toMatch(/const futureClassIds = new Set\(clase\.filter\(c => c\.date >= aziStr && /)
+  })
+  // Booking credit integrity (2026-10-17): the cleanup additionally skips classes that already ended and
+  // bookings with recorded attendance (the database refuses those - FRG04), and a failed delete or
+  // end_subscription is reported instead of a false "cancelled" toast.
+  it('stergeAbonament never removes attended/ended bookings and never reports false success', () => {
+    const body = appSource.slice(appSource.indexOf("select('id, class_id, checked_in').eq('member_id', memberId)"), appSource.indexOf('showToast(t.toastSubscriptionCancelled)'))
+    expect(body).toMatch(/new Date\(`\$\{c\.date\}T\$\{c\.end_time\}`\) > new Date\(\)/)
+    expect(body).toContain('futureClassIds.has(b.class_id) && !b.checked_in')
+    expect(body).toMatch(/if \(bookingsError\) \{[\s\S]*?return/)
+    expect(body).toMatch(/if \(endError\) \{[\s\S]*?return/)
   })
 })
 
